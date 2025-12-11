@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# Check for runtime arguments
+if [[ "$1" == "--quicker" ]]; then
+	kernel_dir="src/kernel"
+	alr -C "${kernel_dir}" build && make -C "src" emu
+elif [[ "$1" == "--quick" ]]; then
+	kernel_dir="src/kernel"
+	alr -C "${kernel_dir}" clean; alr -C "${kernel_dir}" build && make -C "src" emu
+elif [[ "$1" == "--log" ]]; then
+	# Build and run with qemu logging to a file.
+	make -C "src" clean; make -C "src" && make -C "src" emu-log
+else
+	# Full build: clean and build.
+	make -C "src" clean; make -C "src" && make -C "src" emu
+fi

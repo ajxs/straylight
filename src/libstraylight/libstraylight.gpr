@@ -1,0 +1,53 @@
+with "config/libstraylight_config.gpr";
+project Libstraylight is
+
+   for Library_Name use "straylight";
+   for Library_Version use Project'Library_Name & ".so." & Libstraylight_Config.Crate_Version;
+
+   for Source_Dirs use ("src/", "config/");
+   for Object_Dir use "obj/" & Libstraylight_Config.Build_Profile;
+   for Create_Missing_Dirs use "True";
+   for Library_Dir use "lib";
+
+   for Languages use (
+     "Ada",
+     "Asm_Cpp"
+   );
+
+   type Library_Type_Type is ("relocatable", "static", "static-pic");
+   Library_Type : Library_Type_Type :=
+     external ("LIBSTRAYLIGHT_LIBRARY_TYPE", external ("LIBRARY_TYPE", "static"));
+   for Library_Kind use Library_Type;
+
+   package Compiler is
+      for Default_Switches ("Ada") use (
+        "-O2",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-fno-omit-frame-pointer",
+        "-fno-eliminate-unused-debug-symbols",
+        "-ggdb",
+        "-gnat2022",
+        "-gnatX0",
+        "-gnatwadehl",
+        "-gnaty3abcdefhiklmnoprstux",
+        "-mcmodel=medany"
+      );
+
+      for Default_Switches ("Asm_Cpp") use (
+        "-O2",
+        "-ggdb"
+      );
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback
+   end Binder;
+
+   package Install is
+      for Artifacts (".") use ("share");
+   end Install;
+
+   for Runtime ("Ada") use "light-rv64imafdc";
+   for Target use "riscv64-elf";
+end Libstraylight;

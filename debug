@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+# Launches GDB with a prescribed set of commands to load the OS debug symbols.
+
+# Export Alire's environment variables to get the prefix for the compiler.
+$(alr -C ./src/kernel printenv)
+
+# Remove quotes.
+compiler_prefix="${GNAT_RISCV64_ELF_ALIRE_PREFIX%\"}"
+compiler_prefix="${compiler_prefix#\"}"
+
+${compiler_prefix}/bin/riscv64-elf-gdb -command=./_dev/debugrc

@@ -1,0 +1,89 @@
+###############################################################################
+#  Copyright (c) 2025, Ajxs.
+#  SPDX-License-Identifier: GPL-3.0-or-later
+###############################################################################
+
+#include "riscv.h"
+
+.section .boot_text
+
+###############################################################################
+# Boot entry point.
+###############################################################################
+.global _start
+.type _start, @function
+_start:
+.option push
+.option norelax
+# Load the global pointer location defined in the linker script into gp.
+	lla  gp, __global_pointer$
+.option pop
+
+# If not HART#0 branch to cpu halt routine.
+	bnez a0, cpu_halt
+
+# Setup stack pointer.
+	la   sp, __boot_stack_top
+
+# Save the Hart ID and devicetree pointer to the stack.
+	addi sp, sp, -16
+	sd   a0, 8(sp)
+	sd   a1, 0(sp)
+
+	# Enable supervisor user memory access.
+	li   t0, SSTATUS_SUM
+	csrs sstatus, t0
+
+# Set `Supervisor Address Translation and Protection (satp)` register to 0 to
+# disable any address translation.
+	csrw satp, zero
+
+# Set up the supervisor-mode trap vector.
+	la   t0, traps_entry
+	csrw stvec, t0
+
+# Enable supervisor-mode timer and external interrupts, but leave interrupts 
+# disabled until we're ready to jump into userspace.
+	li   t0, SIE_SEIE | SIE_STIE
+	csrs sie, t0
+
+# Disable supervisor-mode interrupts.
+	li   t0, SSTATUS_SIE
+	csrc sstatus, t0
+
+# This call jumps into the Ada code to set up the boot page tables.
+	call boot_initialise_boot_page_tables
+# If the boot page tables were not successfully initialised, zero will have
+# been returned. In this case, halt the CPU.
+	beq a0, zero, cpu_halt
+
+# Install the new base page table address into the `satp` register.
+	csrw satp, a0
+	sfence.vma zero, zero
+
+# Reload the Hart ID and devicetree pointer from the stack into a0 and a1
+# as arguments for the kernel init function, before we reload the stack.
+	ld   a1, 0(sp)
+	ld   a0, 8(sp)
+	addi sp, sp, 16
+
+# Load the temporary higher-half boot stack.
+# This virtual address is the boot stack address mapped into the higher-half.
+# This is mapped in boot.adb in the Initialise_Boot_Page_Tables procedure.
+	la sp, 0xFFFFFFFFFF010000
+
+# Jump to the kernel initialisation function in Ada.
+# Load the address of the function into a register first to avoid
+# any potential issues with the linker and large binaries, due to using
+# a higher-half kernel.
+	lui a2, %hi(boot_initialise_kernel_memory)
+	addi a2, a2, %lo(boot_initialise_kernel_memory)
+
+	jalr zero, 0(a2)
+
+# CPU spin function.
+# This is where unused CPUs are parked in a spinlock.
+.type cpu_halt, @function
+cpu_halt:
+	wfi
+	j cpu_halt

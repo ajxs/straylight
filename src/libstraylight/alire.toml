@@ -1,0 +1,13 @@
+name = "libstraylight"
+description = ""
+version = "0.1.0-dev"
+
+authors = ["Anthony"]
+maintainers = ["Anthony <ajxs@panoptic.online>"]
+maintainers-logins = ["ajxs"]
+licenses = "MIT OR Apache-2.0 WITH LLVM-exception"
+website = "https://github.com/ajxs"
+tags = []
+
+[[depends-on]]
+gnat_riscv_elf = "15.2.1"
