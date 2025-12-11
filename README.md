@@ -20,3 +20,12 @@ The name *Straylight* comes from William Gibson's groundbreaking cyberpunk novel
 |Devicetree|❌|Support for Devicetree parsing will be added in a future update. Currently only a fixed hardware layout is supported.
 |Multi-platform|❌|Currently only supports QEMU's [*virt* platform](https://www.qemu.org/docs/master/system/riscv/virt.html).
 |POSIX Compatibility|❌|POSIX compatibility is not planned.
+
+## Requirements
+
+- Alire
+- FSF GNAT `riscv64-elf` + GPRBuild
+- OpenSBI v1.7+
+- QEMU v10.1.0+
+- GNU MTools
+
