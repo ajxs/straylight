@@ -266,7 +266,7 @@ package body Filesystems.UStar is
 
       Log_Debug ("Filesystems.UStar.Read_File", Logging_Tags_UStar);
 
-      Current_Read_Sector : constant Unsigned_64 :=
+      Current_Read_Sector : Unsigned_64 :=
         Filesystem_Node.all.Data_Location
         + Current_Offset / Unsigned_64 (Sector_Size);
 
@@ -311,6 +311,8 @@ package body Filesystems.UStar is
          Current_Offset :=
            Current_Offset + Unsigned_64 (Bytes_To_Copy_From_Sector);
          Bytes_Left_To_Read := Bytes_Left_To_Read - Bytes_To_Copy_From_Sector;
+
+         Current_Read_Sector := Current_Read_Sector + 1;
       end loop;
 
       Result := Success;
