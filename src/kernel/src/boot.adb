@@ -907,7 +907,7 @@ package body Boot is
         (Framebuffer_Allocation.Virtual_Address,
          Framebuffer_Width,
          Framebuffer_Height,
-         Make_Colour (Red => 0, Green => 255, Blue => 0, Alpha => 255));
+         Make_Colour (Red => 0, Green => 0, Blue => 0, Alpha => 255));
 
       Devices.VirtIO.Graphics.Transfer_To_Host_2d
         (Init_Process.all,
