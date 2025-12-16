@@ -17,6 +17,7 @@ package Function_Results is
 
    No_Free_Entries : constant := -1111_0000;
    Not_Found       : constant := -1111_0001;
+   Not_Supported   : constant := -1111_0002;
 
    --  Memory function result codes.
    Address_Not_In_Heap                 : constant := -7777_0000;
@@ -42,12 +43,6 @@ package Function_Results is
    --  Process function result codes.
    Maximum_Process_Count_Reached : constant := -5555_0000;
    Process_Not_Found             : constant := -5555_0001;
-
-   Device_Nodes_Exhausted : constant := -8888_0000;
-   Devicetree_Invalid     : constant := -8888_0001;
-
-   Lock_Already_Held : constant := -9222_0000;
-   Lock_Not_Held     : constant := -9222_0001;
 
    No_Remaining_VirtIO_Descriptors : constant := -3333_0000;
 

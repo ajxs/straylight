@@ -156,7 +156,7 @@ package Filesystems is
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Filesystems];
 
-   Maximum_File_Read_Size : constant := 16#4000#;
+   Maximum_File_Read_Size : constant := 16#60_000#;
 
    function Compare_Node_Name_With_Wide_String
      (Name1 : Wide_String; Name1_Length : Integer; Name2 : Wide_String)
