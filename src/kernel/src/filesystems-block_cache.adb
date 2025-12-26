@@ -5,7 +5,8 @@
 
 with Devices.Ramdisk;
 with Devices.VirtIO.Block;
-with System_State; use System_State;
+with Memory.Allocators; use Memory.Allocators;
+with System_State;      use System_State;
 
 package body Filesystems.Block_Cache is
    function Can_Block_Cache_Entry_Be_Invalidated
@@ -128,8 +129,6 @@ package body Filesystems.Block_Cache is
       Cache_Entry_Address_Virtual  : Virtual_Address_T := Null_Address;
       Cache_Entry_Address_Physical : Physical_Address_T :=
         Null_Physical_Address;
-
-      System_Block_Cache renames Current_System_State.Block_Cache;
    begin
       if not Is_Valid_Filesystem_Pointer (Filesystem) then
          Log_Error ("Read_Block_From_Filesystem: Unsupported filesystem");
@@ -336,11 +335,11 @@ package body Filesystems.Block_Cache is
          Result := Invalid_Argument;
       end if;
 
-      Acquire_Spinlock (Current_System_State.Block_Cache.Spinlock);
+      Acquire_Spinlock (System_Block_Cache.Spinlock);
 
       Release_Block_Unlocked (Filesystem, Block_Number, Result);
 
-      Release_Spinlock (Current_System_State.Block_Cache.Spinlock);
+      Release_Spinlock (System_Block_Cache.Spinlock);
    end Release_Block;
 
    procedure Release_Block_Unlocked
@@ -354,11 +353,7 @@ package body Filesystems.Block_Cache is
         ("Releasing block: " & Block_Number'Image, Logging_Tags_Block_Cache);
 
       Find_Existing_Block_In_Cache
-        (Current_System_State.Block_Cache,
-         Filesystem,
-         Block_Number,
-         Cache_Index,
-         Result);
+        (System_Block_Cache, Filesystem, Block_Number, Cache_Index, Result);
       if Is_Error (Result) then
          return;
       elsif Result = Success then
@@ -366,8 +361,7 @@ package body Filesystems.Block_Cache is
            ("Found block to release in cache.", Logging_Tags_Block_Cache);
 
          Release_Sleeplock
-           (Current_System_State.Block_Cache.Entries (Cache_Index).Sleeplock,
-            Result);
+           (System_Block_Cache.Entries (Cache_Index).Sleeplock, Result);
          if Is_Error (Result) then
             return;
          end if;
@@ -393,5 +387,28 @@ package body Filesystems.Block_Cache is
       Release_Block
         (Filesystem, Sector_To_Block (Sector_Number, Sector_Size), Result);
    end Release_Sector;
+
+   procedure Initialise_Block_Cache is
+      Result            : Function_Result := Unset;
+      Allocation_Result : Memory_Allocation_Result;
+   begin
+      Log_Debug ("Initialising block cache...", Logging_Tags);
+
+      --  Allocate memory for the block cache entries.
+      --  Each block is conveniently the same size as a page.
+      Allocate_Pages
+        (System_Block_Cache.Entries'Last, Allocation_Result, Result);
+      if Is_Error (Result) then
+         --  Error already printed.
+         Panic;
+      end if;
+
+      System_Block_Cache.Data_Address_Physical :=
+        Allocation_Result.Physical_Address;
+      System_Block_Cache.Data_Address_Virtual :=
+        Allocation_Result.Virtual_Address;
+
+      Log_Debug ("Initialised block cache.", Logging_Tags);
+   end Initialise_Block_Cache;
 
 end Filesystems.Block_Cache;

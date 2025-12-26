@@ -9,16 +9,7 @@ with Locks.Sleeplocks; use Locks.Sleeplocks;
 package Filesystems.Block_Cache is
    pragma Preelaborate;
 
-   type Block_Cache_Entry_T is private;
-
-   type Block_Cache_Entry_Array_T is array (1 .. 64) of Block_Cache_Entry_T;
-
-   type Block_Cache_T is record
-      Spinlock              : Spinlock_T;
-      Data_Address_Virtual  : Virtual_Address_T := Null_Address;
-      Data_Address_Physical : Physical_Address_T := Null_Physical_Address;
-      Entries               : Block_Cache_Entry_Array_T;
-   end record;
+   procedure Initialise_Block_Cache;
 
    procedure Read_Block_From_Filesystem
      (Filesystem           : Filesystem_Access;
@@ -72,6 +63,17 @@ private
       Last_Access  : Unsigned_64 := 0;
       Entry_Used   : Boolean := False;
    end record;
+
+   type Block_Cache_Entry_Array_T is array (1 .. 64) of Block_Cache_Entry_T;
+
+   type Block_Cache_T is record
+      Spinlock              : Spinlock_T;
+      Data_Address_Virtual  : Virtual_Address_T;
+      Data_Address_Physical : Physical_Address_T;
+      Entries               : Block_Cache_Entry_Array_T;
+   end record;
+
+   System_Block_Cache : Block_Cache_T;
 
    procedure Find_Available_Block_Cache_Entry
      (Cache  : Block_Cache_T;

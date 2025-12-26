@@ -49,8 +49,6 @@ private
 
    procedure Initialise_Filesystem;
 
-   procedure Initialise_Block_Cache;
-
    procedure Initialise_Graphics;
 
    ----------------------------------------------------------------------------

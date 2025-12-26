@@ -12,6 +12,7 @@ with Devices.VirtIO.Graphics;
 with Devices.UART;
 with Devices.PLIC;
 with Filesystems;            use Filesystems;
+with Filesystems.Block_Cache;
 with Filesystems.Root;       use Filesystems.Root;
 with Function_Results;       use Function_Results;
 with Graphics;               use Graphics;
@@ -764,31 +765,6 @@ package body Boot is
          Panic ("Constraint_Error: Initialise_Physical_Memory_Manager");
    end Initialise_Physical_Memory_Manager;
 
-   procedure Initialise_Block_Cache is
-      Result            : Function_Result := Unset;
-      Allocation_Result : Memory_Allocation_Result;
-   begin
-      Log_Debug ("Initialising block cache...", Logging_Tags);
-
-      --  Allocate memory for the block cache entries.
-      --  Each block is conveniently the same size as a page.
-      Allocate_Pages
-        (Current_System_State.Block_Cache.Entries'Last,
-         Allocation_Result,
-         Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      Current_System_State.Block_Cache.Data_Address_Physical :=
-        Allocation_Result.Physical_Address;
-      Current_System_State.Block_Cache.Data_Address_Virtual :=
-        Allocation_Result.Virtual_Address;
-
-      Log_Debug ("Initialised block cache.", Logging_Tags);
-   end Initialise_Block_Cache;
-
    procedure Initialise_Kernel_Services is
       Result : Function_Result := Unset;
    begin
@@ -821,7 +797,7 @@ package body Boot is
       System_State.Current_System_State.Idle_Process.all.Kernel_Context (ra) :=
         Address_To_Unsigned_64 (Idle'Address);
 
-      Initialise_Block_Cache;
+      Filesystems.Block_Cache.Initialise_Block_Cache;
 
       Initialise_Filesystem;
 

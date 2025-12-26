@@ -7,19 +7,18 @@ with Interfaces;              use Interfaces;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Addresses;               use Addresses;
-with Devices;                 use Devices;
-with Filesystems;             use Filesystems;
-with Filesystems.Block_Cache; use Filesystems.Block_Cache;
-with Function_Results;        use Function_Results;
-with Locks;                   use Locks;
-with Memory;                  use Memory;
-with Memory.Allocators;       use Memory.Allocators;
-with Memory.Allocators.Heap;  use Memory.Allocators.Heap;
-with Memory.Allocators.Page;  use Memory.Allocators.Page;
-with Memory.Physical;         use Memory.Physical;
-with Memory.Virtual;          use Memory.Virtual;
-with Processes;               use Processes;
+with Addresses;              use Addresses;
+with Devices;                use Devices;
+with Filesystems;            use Filesystems;
+with Function_Results;       use Function_Results;
+with Locks;                  use Locks;
+with Memory;                 use Memory;
+with Memory.Allocators;      use Memory.Allocators;
+with Memory.Allocators.Heap; use Memory.Allocators.Heap;
+with Memory.Allocators.Page; use Memory.Allocators.Page;
+with Memory.Physical;        use Memory.Physical;
+with Memory.Virtual;         use Memory.Virtual;
+with Processes;              use Processes;
 
 package System_State is
    pragma Preelaborate;
@@ -53,7 +52,6 @@ package System_State is
       Next_Process_Id       : Process_Id_T := 1;
       Process_Id_Spinlock   : Spinlock_T;
       Filesystem_Node_Cache : Filesystem_Node_Cache_T;
-      Block_Cache           : Block_Cache_T;
 
       Open_Files : Process_File_Handle_Array;
    end record;
