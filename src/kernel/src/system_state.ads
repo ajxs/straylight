@@ -33,7 +33,6 @@ package System_State is
    --  multiple system states, which can be swapped between.
    ----------------------------------------------------------------------------
    type System_State_T is record
-      System_Time           : System_Time_T := 0;
       Kernel_Heap           : Memory_Heap_T;
       Kernel_Page_Pool      : Page_Pool_T;
       --  This address space holds the canonical mapping structures for all
@@ -111,9 +110,6 @@ package System_State is
      (Virtual_Address : Virtual_Address_T;
       Page_Count      : Positive;
       Result          : out Function_Result);
-
-   function Current_System_time return Unsigned_64
-   is (Current_System_State.System_Time);
 
    procedure Allocate_Process_Id
      (New_Id : out Process_Id_T; Result : out Function_Result);

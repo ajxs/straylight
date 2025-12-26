@@ -8,6 +8,7 @@ with Filesystems.FAT;
 with Filesystems.Root;
 with Filesystems.UStar;
 with Memory.Allocators; use Memory.Allocators;
+with RISCV;
 with System_State;      use System_State;
 
 package body Filesystems is
@@ -29,7 +30,7 @@ package body Filesystems is
 
             Cache.Entries (Cache.Next_Entry_Index).Node := Node;
             Cache.Entries (Cache.Next_Entry_Index).Last_Access :=
-              Current_System_State.System_Time;
+              RISCV.Get_System_Time;
 
             Result := Success;
             return;
@@ -126,8 +127,7 @@ package body Filesystems is
       end if;
 
       Cache.Entries (Cache_Index).Node := New_Node;
-      Cache.Entries (Cache_Index).Last_Access :=
-        Current_System_State.System_Time;
+      Cache.Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
       Cache.Entries (Cache_Index).Handle_Count := 0;
 
       Log_Debug
@@ -175,7 +175,7 @@ package body Filesystems is
       end if;
 
       Filesystem_Node_Cache.Entries (Cache_Index).Last_Access :=
-        Current_System_State.System_Time;
+        RISCV.Get_System_Time;
 
       Node := Filesystem_Node_Cache.Entries (Cache_Index).Node;
       Result := Success;

@@ -12,10 +12,11 @@ with Devices.PLIC;
 with Devices.UART;
 with Function_Results; use Function_Results;
 with Scheduler;
+with RISCV;
+with RISCV.SBI;        use RISCV.SBI;
 with RISCV.Interrupts;
 with System_Calls;
 with System_State;     use System_State;
-with Timer;
 
 package body Traps is
    procedure Handle_Supervisor_Mode_Exception
@@ -219,8 +220,7 @@ package body Traps is
 
    procedure Handle_Timer_Interrupt is
    begin
-      Timer.Update_System_Time;
-      Timer.Set_Interval_For_Next_Timer_Interrupt;
+      Setup_Next_Timer_Interrupt;
 
       Log_Debug ("Scheduling from timer IRQ");
       Scheduler.Run;
@@ -338,5 +338,19 @@ package body Traps is
       when Constraint_Error =>
          Panic ("Constraint_Error: Handle_Supervisor_Mode_Trap");
    end Handle_User_Mode_Trap;
+
+   procedure Setup_Next_Timer_Interrupt is
+      SBI_Ret : SBI_Result_T;
+   begin
+      SBI_Ret :=
+        RISCV.SBI.Set_Timer (RISCV.Get_System_Time + System_Tick_Interval);
+      if SBI_Ret.Error /= 0 then
+         Log_Error ("Error setting next event time: " & SBI_Ret.Error'Image);
+      end if;
+
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Setup_Next_Timer_Interrupt");
+   end Setup_Next_Timer_Interrupt;
 
 end Traps;

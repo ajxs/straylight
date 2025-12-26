@@ -5,7 +5,7 @@
 
 with Devices.Ramdisk;
 with Devices.VirtIO.Block;
-with System_State; use System_State;
+with RISCV;
 
 package body Filesystems.Block_Cache is
    function Can_Block_Cache_Entry_Be_Invalidated
@@ -46,7 +46,7 @@ package body Filesystems.Block_Cache is
       --  No unused entries, search for an entry we can invalidate.
       for I in Cache.Entries'Range loop
          if Can_Block_Cache_Entry_Be_Invalidated
-              (Cache, I, Current_System_State.System_Time)
+              (Cache, I, RISCV.Get_System_Time)
          then
             Index := I;
             Result := Success;

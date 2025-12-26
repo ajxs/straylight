@@ -36,8 +36,18 @@ package Traps is
      Convention    => Assembler,
      External_Name => "trap_handler_user_mode";
 
+   procedure Setup_Next_Timer_Interrupt;
+
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Traps];
+
+   ----------------------------------------------------------------------------
+   --  The kernel's 'tick' interval.
+   --  The timebase in QEMU's RISC-V virt machine is 10_000_000 Hz,
+   --  so a tick interval of 10_000 corresponds to 1 ms.
+   --  The current tick rate is about 100 Hz.
+   ----------------------------------------------------------------------------
+   System_Tick_Interval : constant := 100_000;
 
    procedure Handle_Supervisor_Mode_Interrupt
      (Cause : Unsigned_64; Sepc : Virtual_Address_T; Stval : Unsigned_64);

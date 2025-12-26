@@ -25,7 +25,7 @@ with Memory.Virtual;         use Memory.Virtual;
 with RISCV;                  use RISCV;
 with Scheduler;
 with System_State;           use System_State;
-with Timer;
+with Traps;
 
 package body Boot is
    procedure Allocate_Kernel_Heap is
@@ -769,8 +769,7 @@ package body Boot is
    begin
       Log_Debug ("Initialising kernel services...", Logging_Tags);
 
-      Timer.Update_System_Time;
-      Timer.Set_Interval_For_Next_Timer_Interrupt;
+      Traps.Setup_Next_Timer_Interrupt;
       Log_Debug ("Set initial system tick.", Logging_Tags);
 
       --  Initialise the first process ID to be used.
