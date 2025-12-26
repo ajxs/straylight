@@ -48,10 +48,9 @@ package System_State is
       Root_Filesystem     : Filesystem_Access := null;
       Mounted_Filesystems : Mounted_Filesystem_Array;
 
-      Idle_Process          : Process_Control_Block_Access := null;
-      Next_Process_Id       : Process_Id_T := 1;
-      Process_Id_Spinlock   : Spinlock_T;
-      Filesystem_Node_Cache : Filesystem_Node_Cache_T;
+      Idle_Process        : Process_Control_Block_Access := null;
+      Next_Process_Id     : Process_Id_T := 1;
+      Process_Id_Spinlock : Spinlock_T;
 
       Open_Files : Process_File_Handle_Array;
    end record;
@@ -152,19 +151,6 @@ package System_State is
 
    function Get_Current_Hart_Supervisor_Interrupt_Context return Integer
    with Inline, Volatile_Function;
-
-   procedure Allocate_Filesystem_Node
-     (New_Node : out Filesystem_Node_Access; Result : out Function_Result);
-
-   procedure Add_Filesystem_Node_To_System_Cache
-     (Node : Filesystem_Node_Access; Result : out Function_Result);
-
-   procedure Find_Filesystem_Node_In_System_Cache
-     (Filesystem   : Filesystem_Access;
-      Parent_Index : Unsigned_64;
-      Path         : Wide_String;
-      Node         : out Filesystem_Node_Access;
-      Result       : out Function_Result);
 
    procedure Find_File_Handle
      (Process_Id     : Process_Id_T;

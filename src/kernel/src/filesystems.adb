@@ -3,16 +3,18 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Filesystems.Block_Cache;
 with Filesystems.FAT;
 with Filesystems.Root;
 with Filesystems.UStar;
-with System_State; use System_State;
+with Memory.Allocators; use Memory.Allocators;
+with System_State;      use System_State;
 
 package body Filesystems is
    procedure Add_Filesystem_Node_To_Cache
-     (Cache  : in out Filesystem_Node_Cache_T;
-      Node   : Filesystem_Node_Access;
-      Result : out Function_Result) is
+     (Node : Filesystem_Node_Access; Result : out Function_Result)
+   is
+      Cache renames Filesystem_Node_Cache;
    begin
       Starting_Index : constant Positive := Cache.Next_Entry_Index;
 
@@ -80,8 +82,7 @@ package body Filesystems is
    end Compare_Node_Name_With_Wide_String;
 
    procedure Create_Filesystem_Node_Cache_Entry
-     (Cache             : in out Filesystem_Node_Cache_T;
-      Parent_Filesystem : Filesystem_Access;
+     (Parent_Filesystem : Filesystem_Access;
       Filename          : Wide_String;
       New_Node          : out Filesystem_Node_Access;
       Result            : out Function_Result;
@@ -92,9 +93,10 @@ package body Filesystems is
       Node_Type         : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
       Filesystem        : Filesystem_Access := null)
    is
+      Cache renames Filesystem_Node_Cache;
       Cache_Index : Natural := 0;
    begin
-      Find_Free_Cache_Entry (Cache, Cache_Index, Result);
+      Find_Free_Cache_Entry (Cache_Index, Result);
       if Is_Error (Result) then
          New_Node := null;
          return;
@@ -140,12 +142,11 @@ package body Filesystems is
    end Create_Filesystem_Node_Cache_Entry;
 
    procedure Find_Free_Cache_Entry
-     (Cache       : in out Filesystem_Node_Cache_T;
-      Cache_Index : out Natural;
-      Result      : out Function_Result) is
+     (Cache_Index : out Natural; Result : out Function_Result) is
    begin
-      for Index in Cache.Entries'Range loop
-         if Can_Filesystem_Cache_Entry_Be_Overwritten (Cache.Entries (Index))
+      for Index in Filesystem_Node_Cache.Entries'Range loop
+         if Can_Filesystem_Cache_Entry_Be_Overwritten
+              (Filesystem_Node_Cache.Entries (Index))
          then
             Cache_Index := Index;
             Result := Success;
@@ -158,8 +159,7 @@ package body Filesystems is
    end Find_Free_Cache_Entry;
 
    procedure Find_Filesystem_Node_In_Cache
-     (Cache        : in out Filesystem_Node_Cache_T;
-      Filesystem   : Filesystem_Access;
+     (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;
       Filename     : Wide_String;
       Node         : out Filesystem_Node_Access;
@@ -168,16 +168,16 @@ package body Filesystems is
       Cache_Index : Natural := 0;
    begin
       Search_For_Filesystem_Node_In_Cache
-        (Cache, Filesystem, Parent_Index, Filename, Cache_Index, Result);
+        (Filesystem, Parent_Index, Filename, Cache_Index, Result);
       if Is_Error (Result) or else Cache_Index = 0 then
          Node := null;
          return;
       end if;
 
-      Cache.Entries (Cache_Index).Last_Access :=
+      Filesystem_Node_Cache.Entries (Cache_Index).Last_Access :=
         Current_System_State.System_Time;
 
-      Node := Cache.Entries (Cache_Index).Node;
+      Node := Filesystem_Node_Cache.Entries (Cache_Index).Node;
       Result := Success;
    exception
       when Constraint_Error =>
@@ -301,7 +301,7 @@ package body Filesystems is
             Log_Debug_Wide
               ("Current path token: '" & Next_Path_Token & "'", Logging_Tags);
 
-            Find_Filesystem_Node_In_System_Cache
+            Find_Filesystem_Node_In_Cache
               (Current_Filesystem,
                Filesystem_Node_Parent_Index,
                Next_Path_Token,
@@ -529,12 +529,13 @@ package body Filesystems is
    end Read_File;
 
    procedure Search_For_Filesystem_Node_In_Cache
-     (Cache        : in out Filesystem_Node_Cache_T;
-      Filesystem   : Filesystem_Access;
+     (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;
       Filename     : Wide_String;
       Cache_Index  : out Natural;
-      Result       : out Function_Result) is
+      Result       : out Function_Result)
+   is
+      Cache renames Filesystem_Node_Cache;
    begin
       Cache_Index := 0;
 
@@ -652,5 +653,52 @@ package body Filesystems is
          Log_Error ("Constraint_Error: Get_Sector_Offset_Within_Block");
          return 0;
    end Get_Sector_Offset_Within_Block;
+
+   procedure Initialise_Block_Cache is
+      Result            : Function_Result := Unset;
+      Allocation_Result : Memory_Allocation_Result;
+      System_Block_Cache renames Filesystems.Block_Cache.System_Block_Cache;
+   begin
+      Log_Debug ("Initialising block cache...", Logging_Tags);
+
+      --  Allocate memory for the block cache entries.
+      --  Each block is conveniently the same size as a page.
+      Allocate_Pages
+        (System_Block_Cache.Entries'Last, Allocation_Result, Result);
+      if Is_Error (Result) then
+         --  Error already printed.
+         Panic;
+      end if;
+
+      System_Block_Cache.Data_Address_Physical :=
+        Allocation_Result.Physical_Address;
+      System_Block_Cache.Data_Address_Virtual :=
+        Allocation_Result.Virtual_Address;
+
+      Log_Debug ("Initialised block cache.", Logging_Tags);
+   end Initialise_Block_Cache;
+
+   procedure Allocate_Filesystem_Node
+     (New_Node : out Filesystem_Node_Access; Result : out Function_Result)
+   is
+      Allocated_Address : Virtual_Address_T := Null_Address;
+   begin
+      Allocate_Kernel_Memory
+        (Filesystem_Node_T'Size / 8, Allocated_Address, Result);
+      if Is_Error (Result) then
+         New_Node := null;
+         return;
+      end if;
+
+      New_Node :=
+        Convert_Address_To_Filesystem_Node_Access (Allocated_Address);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Allocate_Filesystem_Node");
+         New_Node := null;
+         Result := Constraint_Exception;
+   end Allocate_Filesystem_Node;
 
 end Filesystems;

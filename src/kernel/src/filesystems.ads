@@ -76,22 +76,6 @@ package Filesystems is
    type Filesystem_Node_Access is access all Filesystem_Node_T
    with Convention => C;
 
-   type Filesystem_Node_Cache_Entry_T is record
-      Node        : Filesystem_Node_Access := null;
-      Last_Access : Unsigned_64 := 0;
-
-      --  The number of processes currently using this node.
-      Handle_Count : Natural := 0;
-   end record;
-
-   type Filesystem_Node_Cache_Entry_Array_T is
-     array (1 .. 256) of Filesystem_Node_Cache_Entry_T;
-
-   type Filesystem_Node_Cache_T is record
-      Entries          : Filesystem_Node_Cache_Entry_Array_T;
-      Next_Entry_Index : Positive := 1;
-   end record;
-
    type File_Open_Mode_T is (File_Open_Mode_Read, File_Open_Mode_Write)
    with Size => 64;
    for File_Open_Mode_T use
@@ -141,20 +125,37 @@ package Filesystems is
      Ada.Unchecked_Conversion (Virtual_Address_T, Filesystem_Node_Access);
 
    procedure Add_Filesystem_Node_To_Cache
-     (Cache  : in out Filesystem_Node_Cache_T;
-      Node   : Filesystem_Node_Access;
-      Result : out Function_Result);
+     (Node : Filesystem_Node_Access; Result : out Function_Result);
 
    procedure Find_Filesystem_Node_In_Cache
-     (Cache        : in out Filesystem_Node_Cache_T;
-      Filesystem   : Filesystem_Access;
+     (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;
       Filename     : Wide_String;
       Node         : out Filesystem_Node_Access;
       Result       : out Function_Result);
 
+   procedure Initialise_Block_Cache;
+
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Filesystems];
+
+   type Filesystem_Node_Cache_Entry_T is record
+      Node        : Filesystem_Node_Access := null;
+      Last_Access : Unsigned_64 := 0;
+
+      --  The number of processes currently using this node.
+      Handle_Count : Natural := 0;
+   end record;
+
+   type Filesystem_Node_Cache_Entry_Array_T is
+     array (1 .. 256) of Filesystem_Node_Cache_Entry_T;
+
+   type Filesystem_Node_Cache_T is record
+      Entries          : Filesystem_Node_Cache_Entry_Array_T;
+      Next_Entry_Index : Positive := 1;
+   end record;
+
+   Filesystem_Node_Cache : Filesystem_Node_Cache_T;
 
    Maximum_File_Read_Size : constant := 16#60_000#;
 
@@ -177,17 +178,14 @@ private
      (Node : Filesystem_Node_Access) return Boolean;
 
    procedure Search_For_Filesystem_Node_In_Cache
-     (Cache        : in out Filesystem_Node_Cache_T;
-      Filesystem   : Filesystem_Access;
+     (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;
       Filename     : Wide_String;
       Cache_Index  : out Natural;
       Result       : out Function_Result);
 
    procedure Find_Free_Cache_Entry
-     (Cache       : in out Filesystem_Node_Cache_T;
-      Cache_Index : out Natural;
-      Result      : out Function_Result);
+     (Cache_Index : out Natural; Result : out Function_Result);
 
    procedure Find_File
      (Process         : in out Process_Control_Block_T;
@@ -207,8 +205,7 @@ private
       Result    : out Function_Result);
 
    procedure Create_Filesystem_Node_Cache_Entry
-     (Cache             : in out Filesystem_Node_Cache_T;
-      Parent_Filesystem : Filesystem_Access;
+     (Parent_Filesystem : Filesystem_Access;
       Filename          : Wide_String;
       New_Node          : out Filesystem_Node_Access;
       Result            : out Function_Result;
@@ -232,5 +229,8 @@ private
      (File_Handle_Array : in out Process_File_Handle_Array;
       File_Handle_Index : out Positive;
       Result            : out Function_Result);
+
+   procedure Allocate_Filesystem_Node
+     (New_Node : out Filesystem_Node_Access; Result : out Function_Result);
 
 end Filesystems;

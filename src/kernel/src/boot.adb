@@ -12,7 +12,6 @@ with Devices.VirtIO.Graphics;
 with Devices.UART;
 with Devices.PLIC;
 with Filesystems;            use Filesystems;
-with Filesystems.Block_Cache;
 with Filesystems.Root;       use Filesystems.Root;
 with Function_Results;       use Function_Results;
 with Graphics;               use Graphics;
@@ -770,10 +769,6 @@ package body Boot is
    begin
       Log_Debug ("Initialising kernel services...", Logging_Tags);
 
-      Log_Debug ("Initialising filesystem node cache...", Logging_Tags);
-      Current_System_State.Filesystem_Node_Cache.Next_Entry_Index := 1;
-      Log_Debug ("Initialised filesystem node cache.", Logging_Tags);
-
       Timer.Update_System_Time;
       Timer.Set_Interval_For_Next_Timer_Interrupt;
       Log_Debug ("Set initial system tick.", Logging_Tags);
@@ -797,7 +792,7 @@ package body Boot is
       System_State.Current_System_State.Idle_Process.all.Kernel_Context (ra) :=
         Address_To_Unsigned_64 (Idle'Address);
 
-      Filesystems.Block_Cache.Initialise_Block_Cache;
+      Initialise_Block_Cache;
 
       Initialise_Filesystem;
 

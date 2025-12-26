@@ -6,10 +6,8 @@
 with Locks;            use Locks;
 with Locks.Sleeplocks; use Locks.Sleeplocks;
 
-package Filesystems.Block_Cache is
+private package Filesystems.Block_Cache is
    pragma Preelaborate;
-
-   procedure Initialise_Block_Cache;
 
    procedure Read_Block_From_Filesystem
      (Filesystem           : Filesystem_Access;
@@ -46,11 +44,6 @@ package Filesystems.Block_Cache is
       Sector_Number : Unsigned_64;
       Sector_Size   : Natural;
       Result        : out Function_Result);
-private
-   Logging_Tags_Block_Cache : constant Log_Tags :=
-     [Log_Tag_Filesystems_Block_Cache];
-
-   Cache_Entry_Age_Threshold : constant Unsigned_64 := 1000000;
 
    --  The block cache entries don't require an individual spinlock.
    --  The block cache as a whole is protected by a single spinlock. No
@@ -74,6 +67,12 @@ private
    end record;
 
    System_Block_Cache : Block_Cache_T;
+
+private
+   Logging_Tags_Block_Cache : constant Log_Tags :=
+     [Log_Tag_Filesystems_Block_Cache];
+
+   Cache_Entry_Age_Threshold : constant Unsigned_64 := 1000000;
 
    procedure Find_Available_Block_Cache_Entry
      (Cache  : Block_Cache_T;

@@ -1008,8 +1008,7 @@ package body Filesystems.FAT is
                   --  If we have a match, create a filesystem node cache entry,
                   --  set the node type, and exit.
                   Create_Filesystem_Node_Cache_Entry
-                    (Current_System_State.Filesystem_Node_Cache,
-                     Filesystem,
+                    (Filesystem,
                      Entry_Filename,
                      Filesystem_Node,
                      Result,

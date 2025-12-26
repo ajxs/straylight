@@ -8,13 +8,6 @@ with RISCV.Interrupts;
 with Scheduler;
 
 package body System_State is
-   procedure Add_Filesystem_Node_To_System_Cache
-     (Node : Filesystem_Node_Access; Result : out Function_Result) is
-   begin
-      Add_Filesystem_Node_To_Cache
-        (Current_System_State.Filesystem_Node_Cache, Node, Result);
-   end Add_Filesystem_Node_To_System_Cache;
-
    procedure Add_Process (New_Process : Process_Control_Block_Access) is
       Curr_Process : Process_Control_Block_Access := null;
       Prev_Process : Process_Control_Block_Access := null;
@@ -47,25 +40,6 @@ package body System_State is
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Add_Process");
    end Add_Process;
-
-   procedure Allocate_Filesystem_Node
-     (New_Node : out Filesystem_Node_Access; Result : out Function_Result)
-   is
-      Allocated_Address : Virtual_Address_T := Null_Address;
-   begin
-      Allocate_Kernel_Memory
-        (Filesystem_Node_T'Size / 8, Allocated_Address, Result);
-
-      New_Node :=
-        Convert_Address_To_Filesystem_Node_Access (Allocated_Address);
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Filesystem_Node");
-         New_Node := null;
-         Result := Constraint_Exception;
-   end Allocate_Filesystem_Node;
 
    procedure Allocate_Kernel_Memory
      (Size              : Positive;
@@ -256,22 +230,6 @@ package body System_State is
 
       Result := Not_Found;
    end Find_File_Handle;
-
-   procedure Find_Filesystem_Node_In_System_Cache
-     (Filesystem   : Filesystem_Access;
-      Parent_Index : Unsigned_64;
-      Path         : Wide_String;
-      Node         : out Filesystem_Node_Access;
-      Result       : out Function_Result) is
-   begin
-      Find_Filesystem_Node_In_Cache
-        (Current_System_State.Filesystem_Node_Cache,
-         Filesystem,
-         Parent_Index,
-         Path,
-         Node,
-         Result);
-   end Find_Filesystem_Node_In_System_Cache;
 
    procedure Free_Kernel_Memory
      (Allocated_Virtual_Address : Virtual_Address_T;

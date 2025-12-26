@@ -5,8 +5,7 @@
 
 with Devices.Ramdisk;
 with Devices.VirtIO.Block;
-with Memory.Allocators; use Memory.Allocators;
-with System_State;      use System_State;
+with System_State; use System_State;
 
 package body Filesystems.Block_Cache is
    function Can_Block_Cache_Entry_Be_Invalidated
@@ -387,28 +386,5 @@ package body Filesystems.Block_Cache is
       Release_Block
         (Filesystem, Sector_To_Block (Sector_Number, Sector_Size), Result);
    end Release_Sector;
-
-   procedure Initialise_Block_Cache is
-      Result            : Function_Result := Unset;
-      Allocation_Result : Memory_Allocation_Result;
-   begin
-      Log_Debug ("Initialising block cache...", Logging_Tags);
-
-      --  Allocate memory for the block cache entries.
-      --  Each block is conveniently the same size as a page.
-      Allocate_Pages
-        (System_Block_Cache.Entries'Last, Allocation_Result, Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      System_Block_Cache.Data_Address_Physical :=
-        Allocation_Result.Physical_Address;
-      System_Block_Cache.Data_Address_Virtual :=
-        Allocation_Result.Virtual_Address;
-
-      Log_Debug ("Initialised block cache.", Logging_Tags);
-   end Initialise_Block_Cache;
 
 end Filesystems.Block_Cache;

@@ -5,7 +5,6 @@
 
 with Filesystems.Block_Cache; use Filesystems.Block_Cache;
 with Memory;                  use Memory;
-with System_State;            use System_State;
 with Utilities;               use Utilities;
 
 package body Filesystems.UStar is
@@ -98,8 +97,7 @@ package body Filesystems.UStar is
             then
                --  If we have a match, create a filesystem node cache entry.
                Create_Filesystem_Node_Cache_Entry
-                 (Current_System_State.Filesystem_Node_Cache,
-                  Filesystem,
+                 (Filesystem,
                   Filename,
                   Filesystem_Node,
                   Result,

@@ -3,8 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with System_State; use System_State;
-
 package body Filesystems.Root is
    procedure Add_Filesystem_Node_To_Root_Filesystem
      (Filesystem      : Filesystem_Access;
@@ -127,8 +125,7 @@ package body Filesystems.Root is
                  and then Current_Node.Parent_Index = Parent_Node_Index
                then
                   Create_Filesystem_Node_Cache_Entry
-                    (Current_System_State.Filesystem_Node_Cache,
-                     Filesystem,
+                    (Filesystem,
                      Filename,
                      Filesystem_Node,
                      Result,
