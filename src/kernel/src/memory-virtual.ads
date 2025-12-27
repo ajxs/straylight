@@ -14,6 +14,16 @@ with Logging;          use Logging;
 package Memory.Virtual is
    pragma Preelaborate;
 
+   ----------------------------------------------------------------------------
+   --  Initialise the kernel's virtual address space.
+   --  This initialises all kernel memory by mapping all of the kernel
+   --  executable's code and data sections into the kernel's address space.
+   --  It also maps the kernel heap and page pool.
+   ----------------------------------------------------------------------------
+   procedure Initialise_Kernel_Address_Space;
+
+   function Get_Kernel_Address_Space_SATP return Unsigned_64;
+
    Maximum_Virtual_Memory_Mapping_Entries : constant := 128;
 
    --  Forward declarations, to allow for recursive pointer.
@@ -72,12 +82,6 @@ package Memory.Virtual is
       Spinlock             : Spinlock_T;
    end record;
 
-   --  This address space holds the canonical mapping structures for all
-   --  kernel memory. When creating new userspace processes, the page
-   --  table entries in this address space's base page table are copied into
-   --  the base table of the new process.
-   Kernel_Address_Space : Virtual_Memory_Space_T;
-
    procedure Create_New_Process_Memory_Space
      (New_Memory_Space : out Virtual_Memory_Space_T;
       Result           : out Function_Result);
@@ -108,10 +112,24 @@ package Memory.Virtual is
    is (Address (Physical_Address) + Physical_Memory_Map_Address)
    with Pure_Function;
 
+   ----------------------------------------------------------------------------
+   --  Copies all kernel memory mappings from the source address space's page
+   --  tables into the destination address space's page tables.
+   --  Note that this only copies the page table entries, not the mapping
+   --  structures in the actual virtual memory space.
+   ----------------------------------------------------------------------------
    procedure Copy_Kernel_Memory_Mappings_Into_Address_Space
      (Source_Addr_Space : Virtual_Memory_Space_T;
       Dest_Addr_Space   : in out Virtual_Memory_Space_T;
       Result            : out Function_Result);
+
+   ----------------------------------------------------------------------------
+   --  Copies all canonical kernel memory mappings from the kernel's
+   --  address space into the destination address space's page tables.
+   ----------------------------------------------------------------------------
+   procedure Copy_Canonical_Kernel_Memory_Mappings_Into_Address_Space
+     (Dest_Addr_Space : in out Virtual_Memory_Space_T;
+      Result          : out Function_Result);
 
    procedure Map_Kernel_Memory
      (Virtual_Addr  : Virtual_Address_T;
@@ -126,6 +144,12 @@ package Memory.Virtual is
 private
    Logging_Tags : constant Log_Tags :=
      [Log_Tag_Memory, Log_Tag_Virtual_Memory_Manager];
+
+   --  This address space holds the canonical mapping structures for all
+   --  kernel memory. When creating new userspace processes, the page
+   --  table entries in this address space's base page table are copied into
+   --  the base table of the new process.
+   Kernel_Address_Space : Virtual_Memory_Space_T;
 
    ----------------------------------------------------------------------------
    --  The following methods are the 'unlocked' versions of the above methods

@@ -179,8 +179,8 @@ package body System_State is
          return;
       end if;
 
-      Copy_Kernel_Memory_Mappings_Into_Address_Space
-        (Kernel_Address_Space, New_Process.all.Memory_Space, Result);
+      Copy_Canonical_Kernel_Memory_Mappings_Into_Address_Space
+        (New_Process.all.Memory_Space, Result);
       if Is_Error (Result) then
          Log_Error ("Failed to copy kernel memory mappings");
          return;
