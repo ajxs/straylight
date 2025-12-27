@@ -498,8 +498,6 @@ package body Boot is
         Convention    => Assembler,
         External_Name => "switch_to_kernel_address_space";
 
-      Kernel_Address_Space renames Current_System_State.Kernel_Address_Space;
-
       Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
 
       Result : Function_Result := Unset;
@@ -593,8 +591,6 @@ package body Boot is
         Current_System_State.Kernel_Page_Pool.Page_Pool_Regions;
 
       Kernel_Heap renames Current_System_State.Kernel_Heap;
-
-      Kernel_Address_Space renames Current_System_State.Kernel_Address_Space;
 
       Result : Function_Result := Unset;
    begin

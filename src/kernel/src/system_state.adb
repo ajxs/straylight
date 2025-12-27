@@ -3,7 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Logging; use Logging;
+with Logging;        use Logging;
+with Memory.Virtual; use Memory.Virtual;
 with RISCV.Interrupts;
 with Scheduler;
 
@@ -179,9 +180,7 @@ package body System_State is
       end if;
 
       Copy_Kernel_Memory_Mappings_Into_Address_Space
-        (Current_System_State.Kernel_Address_Space,
-         New_Process.all.Memory_Space,
-         Result);
+        (Kernel_Address_Space, New_Process.all.Memory_Space, Result);
       if Is_Error (Result) then
          Log_Error ("Failed to copy kernel memory mappings");
          return;
@@ -303,17 +302,6 @@ package body System_State is
       end loop;
    end Idle;
 
-   procedure Map_Kernel_Memory
-     (Virtual_Addr  : Virtual_Address_T;
-      Physical_Addr : Physical_Address_T;
-      Size          : Memory_Region_Size;
-      Region_Flags  : Memory_Region_Flags_T;
-      Result        : out Function_Result) is
-   begin
-      Current_System_State.Kernel_Address_Space.Map
-        (Virtual_Addr, Physical_Addr, Size, Region_Flags, Result);
-   end Map_Kernel_Memory;
-
    procedure Panic (Message : String := "Kernel Panic") is
    begin
       Log_Error ("Panic: " & Message);
@@ -377,11 +365,5 @@ package body System_State is
       when Constraint_Error =>
          Panic ("Constraint_Error: Push_Interrupts_Off");
    end Push_Interrupts_Off;
-
-   procedure Unmap_Kernel_Memory
-     (Addr : Virtual_Address_T; Result : out Function_Result) is
-   begin
-      Current_System_State.Kernel_Address_Space.Unmap (Addr, Result);
-   end Unmap_Kernel_Memory;
 
 end System_State;

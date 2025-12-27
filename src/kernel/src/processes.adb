@@ -4,7 +4,6 @@
 -------------------------------------------------------------------------------
 
 with Memory.Physical; use Memory.Physical;
-with System_State;    use System_State;
 
 package body Processes is
    procedure Allocate_And_Map_New_Process_Memory
@@ -158,7 +157,7 @@ package body Processes is
       --  It's important that this is mapped into the kernel address space,
       --  not the process' address space, because the kernel stack needs to be
       --  accessible before the process' page tables are switched in.
-      Current_System_State.Kernel_Address_Space.Map
+      Map_Kernel_Memory
         (New_Process.Kernel_Stack_Virt_Addr,
          Kernel_Stack_Phys_Address,
          Process_Kernel_Stack_Size,

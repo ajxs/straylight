@@ -17,7 +17,6 @@ with Memory.Allocators;      use Memory.Allocators;
 with Memory.Allocators.Heap; use Memory.Allocators.Heap;
 with Memory.Allocators.Page; use Memory.Allocators.Page;
 with Memory.Physical;        use Memory.Physical;
-with Memory.Virtual;         use Memory.Virtual;
 with Processes;              use Processes;
 
 package System_State is
@@ -33,20 +32,16 @@ package System_State is
    --  multiple system states, which can be swapped between.
    ----------------------------------------------------------------------------
    type System_State_T is record
-      Kernel_Heap           : Memory_Heap_T;
-      Kernel_Page_Pool      : Page_Pool_T;
-      --  This address space holds the canonical mapping structures for all
-      --  kernel memory. When creating new userspace processes, the page
-      --  table entries in this address space's base page table are copied into
-      --  the base table of the new process.
-      Kernel_Address_Space  : Virtual_Memory_Space_T;
+      Kernel_Heap      : Memory_Heap_T;
+      Kernel_Page_Pool : Page_Pool_T;
+
       Physical_Memory_Space : Physical_Memory_Space_T;
-      Processes             : Process_Control_Block_Access := null;
       Devices               : System_Device_Array;
 
       Root_Filesystem     : Filesystem_Access := null;
       Mounted_Filesystems : Mounted_Filesystem_Array;
 
+      Processes           : Process_Control_Block_Access := null;
       Idle_Process        : Process_Control_Block_Access := null;
       Next_Process_Id     : Process_Id_T := 1;
       Process_Id_Spinlock : Spinlock_T;
@@ -68,16 +63,6 @@ package System_State is
    Hart_States : Hart_State_Array_T;
 
    Current_System_State : System_State_T;
-
-   procedure Map_Kernel_Memory
-     (Virtual_Addr  : Virtual_Address_T;
-      Physical_Addr : Physical_Address_T;
-      Size          : Memory_Region_Size;
-      Region_Flags  : Memory_Region_Flags_T;
-      Result        : out Function_Result);
-
-   procedure Unmap_Kernel_Memory
-     (Addr : Virtual_Address_T; Result : out Function_Result);
 
    --  Allocates kernel heap memory, returning both the virtual and physical
    --  addresses of the allocated region.

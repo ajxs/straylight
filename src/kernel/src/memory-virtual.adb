@@ -421,4 +421,21 @@ package body Memory.Virtual is
       return True;
    end Validate_Memory_Region_Permissions;
 
+   procedure Map_Kernel_Memory
+     (Virtual_Addr  : Virtual_Address_T;
+      Physical_Addr : Physical_Address_T;
+      Size          : Memory_Region_Size;
+      Region_Flags  : Memory_Region_Flags_T;
+      Result        : out Function_Result) is
+   begin
+      Kernel_Address_Space.Map
+        (Virtual_Addr, Physical_Addr, Size, Region_Flags, Result);
+   end Map_Kernel_Memory;
+
+   procedure Unmap_Kernel_Memory
+     (Addr : Virtual_Address_T; Result : out Function_Result) is
+   begin
+      Kernel_Address_Space.Unmap (Addr, Result);
+   end Unmap_Kernel_Memory;
+
 end Memory.Virtual;

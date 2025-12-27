@@ -14,10 +14,10 @@ with Logging;          use Logging;
 package Memory.Virtual is
    pragma Preelaborate;
 
-   type Virtual_Memory_Map_T is private;
+   Maximum_Virtual_Memory_Mapping_Entries : constant := 128;
 
    --  Forward declarations, to allow for recursive pointer.
-   type Virtual_Memory_Mapping_T is private;
+   type Virtual_Memory_Mapping_T;
    type Mapping_Access is access all Virtual_Memory_Mapping_T;
 
    subtype Memory_Region_Size is Storage_Offset;
@@ -28,6 +28,26 @@ package Memory.Virtual is
       Execute : Boolean;
       User    : Boolean;
    end record;
+
+   ----------------------------------------------------------------------------
+   --  Descriptor for an allocated memory block.
+   ----------------------------------------------------------------------------
+   type Virtual_Memory_Mapping_T is record
+      Virtual_Addr  : Virtual_Address_T := Null_Address;
+      Physical_Addr : Physical_Address_T := Null_Physical_Address;
+      Size          : Memory_Region_Size := 0;
+      Flags         : Memory_Region_Flags_T := (False, False, False, False);
+      Next_Region   : Mapping_Access := null;
+      Entry_Used    : Boolean := False;
+   end record;
+
+   ----------------------------------------------------------------------------
+   --  Virtual Memory Mapping array type.
+   --  This represents a single address space's mapped regions.
+   ----------------------------------------------------------------------------
+   type Virtual_Memory_Map_T is
+     array (1 .. Maximum_Virtual_Memory_Mapping_Entries)
+     of aliased Virtual_Memory_Mapping_T;
 
    ----------------------------------------------------------------------------
    --  Virtual Memory Space Type.
@@ -51,6 +71,12 @@ package Memory.Virtual is
       User_Address_Space   : Boolean := True;
       Spinlock             : Spinlock_T;
    end record;
+
+   --  This address space holds the canonical mapping structures for all
+   --  kernel memory. When creating new userspace processes, the page
+   --  table entries in this address space's base page table are copied into
+   --  the base table of the new process.
+   Kernel_Address_Space : Virtual_Memory_Space_T;
 
    procedure Create_New_Process_Memory_Space
      (New_Memory_Space : out Virtual_Memory_Space_T;
@@ -87,6 +113,16 @@ package Memory.Virtual is
       Dest_Addr_Space   : in out Virtual_Memory_Space_T;
       Result            : out Function_Result);
 
+   procedure Map_Kernel_Memory
+     (Virtual_Addr  : Virtual_Address_T;
+      Physical_Addr : Physical_Address_T;
+      Size          : Memory_Region_Size;
+      Region_Flags  : Memory_Region_Flags_T;
+      Result        : out Function_Result);
+
+   procedure Unmap_Kernel_Memory
+     (Addr : Virtual_Address_T; Result : out Function_Result);
+
 private
    Logging_Tags : constant Log_Tags :=
      [Log_Tag_Memory, Log_Tag_Virtual_Memory_Manager];
@@ -115,28 +151,6 @@ private
    procedure Deallocate_Memory_Space_Unlocked
      (Virt_Memory_Space : in out Virtual_Memory_Space_T;
       Result            : out Function_Result);
-
-   Maximum_Virtual_Memory_Mapping_Entries : constant := 128;
-
-   ----------------------------------------------------------------------------
-   --  Descriptor for an allocated memory block.
-   ----------------------------------------------------------------------------
-   type Virtual_Memory_Mapping_T is record
-      Virtual_Addr  : Virtual_Address_T := Null_Address;
-      Physical_Addr : Physical_Address_T := Null_Physical_Address;
-      Size          : Memory_Region_Size := 0;
-      Flags         : Memory_Region_Flags_T := (False, False, False, False);
-      Next_Region   : Mapping_Access := null;
-      Entry_Used    : Boolean := False;
-   end record;
-
-   ----------------------------------------------------------------------------
-   --  Virtual Memory Mapping array type.
-   --  This represents a single address space's mapped regions.
-   ----------------------------------------------------------------------------
-   type Virtual_Memory_Map_T is
-     array (1 .. Maximum_Virtual_Memory_Mapping_Entries)
-     of aliased Virtual_Memory_Mapping_T;
 
    function Is_Region_Intersecting
      (Region     : Virtual_Memory_Mapping_T;
