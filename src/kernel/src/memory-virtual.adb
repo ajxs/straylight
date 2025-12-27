@@ -3,14 +3,11 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Memory.Allocators;      use Memory.Allocators;
-with Memory.Allocators.Heap; use Memory.Allocators.Heap;
-with Memory.Allocators.Page; use Memory.Allocators.Page;
 with Memory.Virtual.Paging;
-with Memory.Physical;        use Memory.Physical;
-with RISCV;                  use RISCV;
-with RISCV.Paging;           use RISCV.Paging;
-with System_State;           use System_State;
+with Memory.Physical; use Memory.Physical;
+with RISCV;           use RISCV;
+with RISCV.Paging;    use RISCV.Paging;
+with System_State;    use System_State;
 
 package body Memory.Virtual is
    procedure Copy_Kernel_Memory_Mappings_Into_Address_Space
@@ -480,15 +477,6 @@ package body Memory.Virtual is
 
       Region_Size : Memory_Region_Size := 0;
 
-      Heap_Region_Index : Heap_Memory_Region_Index_T :=
-        Null_Memory_Region_Index;
-
-      Pool_Region_Index : Positive := 1;
-      Kernel_Page_Pool_Regions renames
-        Current_System_State.Kernel_Page_Pool.Page_Pool_Regions;
-
-      Kernel_Heap renames Current_System_State.Kernel_Heap;
-
       Result : Function_Result := Unset;
    begin
       Log_Debug ("Initialising kernel address space...", Logging_Tags);
@@ -575,52 +563,6 @@ package body Memory.Virtual is
          --  Error already printed.
          Panic;
       end if;
-
-      Log_Debug ("Mapping kernel heap regions...", Logging_Tags);
-
-      --  Map all kernel heap regions.
-      Heap_Region_Index := Kernel_Heap.Memory_Regions_Head;
-      while Heap_Region_Index /= Null_Memory_Region_Index loop
-         Map_Kernel_Memory
-           (Kernel_Heap.Memory_Regions (Heap_Region_Index).Virtual_Address,
-            Kernel_Heap.Memory_Regions (Heap_Region_Index).Physical_Address,
-            Kernel_Heap.Memory_Regions (Heap_Region_Index).Size,
-            (True, True, False, False),
-            Result);
-         if Is_Error (Result) then
-            --  Error already printed.
-            Panic;
-         end if;
-
-         Heap_Region_Index :=
-           Kernel_Heap.Memory_Regions (Heap_Region_Index).Next_Region;
-      end loop;
-
-      Log_Debug ("Mapping kernel page pool regions...", Logging_Tags);
-
-      --  Map kernel page pool.
-      while Pool_Region_Index <= Max_Page_Pool_Regions loop
-         if Kernel_Page_Pool_Regions (Pool_Region_Index).Allocated then
-            Log_Debug
-              ("Mapping kernel page pool region..."
-               & Kernel_Page_Pool_Regions (Pool_Region_Index)
-                   .Virtual_Address'Image,
-               Logging_Tags);
-
-            Map_Kernel_Memory
-              (Kernel_Page_Pool_Regions (Pool_Region_Index).Virtual_Address,
-               Kernel_Page_Pool_Regions (Pool_Region_Index).Physical_Address,
-               Page_Pool_Region_Size_In_Bytes,
-               (True, True, False, False),
-               Result);
-            if Is_Error (Result) then
-               --  Error already printed.
-               Panic;
-            end if;
-         end if;
-
-         Pool_Region_Index := Pool_Region_Index + 1;
-      end loop;
 
       Log_Debug ("Initialised kernel address space.", Logging_Tags);
    exception

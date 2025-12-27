@@ -41,9 +41,9 @@ private
 
    procedure Initialise_Hart (Hart_Id : Integer);
 
-   procedure Allocate_Kernel_Heap;
+   procedure Initialise_Kernel_Heap;
 
-   procedure Allocate_Kernel_Page_Pool;
+   procedure Initialise_Kernel_Page_Pool;
 
    procedure Initialise_Filesystem;
 

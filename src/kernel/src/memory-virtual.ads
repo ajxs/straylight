@@ -18,7 +18,6 @@ package Memory.Virtual is
    --  Initialise the kernel's virtual address space.
    --  This initialises all kernel memory by mapping all of the kernel
    --  executable's code and data sections into the kernel's address space.
-   --  It also maps the kernel heap and page pool.
    ----------------------------------------------------------------------------
    procedure Initialise_Kernel_Address_Space;
 
