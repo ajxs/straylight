@@ -10,17 +10,17 @@ package body Locks.Sleeplocks is
    procedure Acquire_Sleeplock
      (Lock       : in out Sleeplock_T;
       Process_Id : Process_Id_T;
-      Result     : out Function_Result)
-   is
-      Acquiring_Process : Process_Control_Block_Access := null;
+      Result     : out Function_Result) is
    begin
-      Acquire_Spinlock (Lock.Spinlock);
-
-      Find_Process_With_Id (Process_Id, Acquiring_Process, Result);
+      Acquiring_Process : constant Process_Control_Block_Access :=
+        Find_Running_Process_With_Id (Process_Id);
       --  The case the process isn't found is an error condition.
-      if Is_Error (Result) then
-         goto Release_Acquire_Lock;
+      if Acquiring_Process = null then
+         Result := Process_Not_Found;
+         return;
       end if;
+
+      Acquire_Spinlock (Lock.Spinlock);
 
       while Lock.Locked /= 0 loop
          Lock_Process_Waiting_For_Channel
@@ -34,7 +34,6 @@ package body Locks.Sleeplocks is
 
       Result := Success;
 
-      <<Release_Acquire_Lock>>
       Release_Spinlock (Lock.Spinlock);
    exception
       when Constraint_Error =>

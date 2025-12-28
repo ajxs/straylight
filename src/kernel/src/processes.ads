@@ -127,10 +127,8 @@ package Processes is
    procedure Exit_Process
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
-   procedure Find_Process_With_Id
-     (Process_Id : Process_Id_T;
-      Process    : out Process_Control_Block_Access;
-      Result     : out Function_Result);
+   function Find_Running_Process_With_Id
+     (Process_Id : Process_Id_T) return Process_Control_Block_Access;
 
    procedure Allocate_Process_Id
      (New_Id : out Process_Id_T; Result : out Function_Result);

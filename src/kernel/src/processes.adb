@@ -308,26 +308,21 @@ package body Processes is
          Result := Constraint_Exception;
    end Exit_Process;
 
-   procedure Find_Process_With_Id
-     (Process_Id : Process_Id_T;
-      Process    : out Process_Control_Block_Access;
-      Result     : out Function_Result)
+   function Find_Running_Process_With_Id
+     (Process_Id : Process_Id_T) return Process_Control_Block_Access
    is
       Current_Process : Process_Control_Block_Access := Process_Queue;
    begin
       while Current_Process /= null loop
          if Current_Process.all.Process_Id = Process_Id then
-            Process := Current_Process;
-            Result := Success;
-            return;
+            return Current_Process;
          end if;
 
          Current_Process := Current_Process.all.Next_Process;
       end loop;
 
-      Process := null;
-      Result := Process_Not_Found;
-   end Find_Process_With_Id;
+      return null;
+   end Find_Running_Process_With_Id;
 
    pragma
      Warnings
