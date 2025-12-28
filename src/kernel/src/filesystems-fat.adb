@@ -5,7 +5,7 @@
 
 with Filesystems.Block_Cache; use Filesystems.Block_Cache;
 with Memory;                  use Memory;
-with System_State;            use System_State;
+with Memory.Kernel;           use Memory.Kernel;
 
 package body Filesystems.FAT is
    procedure Find_File

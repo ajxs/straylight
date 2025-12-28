@@ -28,8 +28,20 @@ package Memory.Allocators.Heap is
    Max_Free_Regions : constant := 1024;
 
    --  Forward declaration to allow for pointer-type used within type.
-   type Free_Region_T is private;
+   type Free_Region_T;
+
    type Free_Region_Access is access all Free_Region_T;
+
+   ----------------------------------------------------------------------------
+   --  Represents a free region within the heap.
+   ----------------------------------------------------------------------------
+   type Free_Region_T is record
+      Virtual_Address  : Virtual_Address_T := Null_Address;
+      Physical_Address : Physical_Address_T := Null_Physical_Address;
+      Size             : Storage_Offset := 0;
+      Next_Region      : Free_Region_Access := null;
+      Entry_Used       : Boolean := False;
+   end record;
 
    --  @NOTE: These types are kept public so that the fields can be accessed
    --  for the purpose of creating virtual memory mappings for the regions.
@@ -130,17 +142,6 @@ private
      (Memory_Heap               : in out Memory_Heap_T;
       Allocated_Virtual_Address : Virtual_Address_T;
       Result                    : out Function_Result);
-
-   ----------------------------------------------------------------------------
-   --  Represents a free region within the heap.
-   ----------------------------------------------------------------------------
-   type Free_Region_T is record
-      Virtual_Address  : Virtual_Address_T := Null_Address;
-      Physical_Address : Physical_Address_T := Null_Physical_Address;
-      Size             : Storage_Offset := 0;
-      Next_Region      : Free_Region_Access := null;
-      Entry_Used       : Boolean := False;
-   end record;
 
    ----------------------------------------------------------------------------
    --  Allocation Header type.

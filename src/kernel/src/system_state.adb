@@ -3,45 +3,19 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Logging;        use Logging;
-with Memory.Virtual; use Memory.Virtual;
+with System;                  use System;
+with System.Storage_Elements; use System.Storage_Elements;
+
+with Addresses;         use Addresses;
+with Logging;           use Logging;
+with Memory;            use Memory;
+with Memory.Allocators; use Memory.Allocators;
+with Memory.Kernel;     use Memory.Kernel;
+with Memory.Virtual;    use Memory.Virtual;
 with RISCV.Interrupts;
 with Scheduler;
 
 package body System_State is
-   procedure Allocate_Kernel_Memory
-     (Size              : Positive;
-      Allocated_Address : out Virtual_Address_T;
-      Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1)
-   is
-      Allocation_Result : Memory_Allocation_Result;
-   begin
-      Current_System_State.Kernel_Heap.Allocate
-        (Size, Allocation_Result, Result, Alignment);
-
-      Allocated_Address := Allocation_Result.Virtual_Address;
-   end Allocate_Kernel_Memory;
-
-   procedure Allocate_Kernel_Physical_Memory
-     (Size              : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
-      Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1) is
-   begin
-      Current_System_State.Kernel_Heap.Allocate
-        (Size, Allocation_Result, Result, Alignment);
-   end Allocate_Kernel_Physical_Memory;
-
-   procedure Allocate_Pages
-     (Number_of_Pages   : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
-      Result            : out Function_Result) is
-   begin
-      Current_System_State.Kernel_Page_Pool.Allocate
-        (Number_of_Pages, Allocation_Result, Result);
-   end Allocate_Pages;
-
    procedure Cleanup_Stopped_Processes (Result : out Function_Result) is
       Curr_Process : Process_Control_Block_Access := null;
       Prev_Process : Process_Control_Block_Access := null;
@@ -172,23 +146,6 @@ package body System_State is
 
       Result := Not_Found;
    end Find_File_Handle;
-
-   procedure Free_Kernel_Memory
-     (Allocated_Virtual_Address : Virtual_Address_T;
-      Result                    : out Function_Result) is
-   begin
-      Current_System_State.Kernel_Heap.Free
-        (Allocated_Virtual_Address, Result);
-   end Free_Kernel_Memory;
-
-   procedure Free_Pages
-     (Virtual_Address : Virtual_Address_T;
-      Page_Count      : Positive;
-      Result          : out Function_Result) is
-   begin
-      Current_System_State.Kernel_Page_Pool.Free
-        (Page_Count, Virtual_Address, Result);
-   end Free_Pages;
 
    function Get_Current_Hart_Supervisor_Interrupt_Context return Integer is
    begin

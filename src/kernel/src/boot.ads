@@ -7,7 +7,6 @@ with System; use System;
 
 with Addresses; use Addresses;
 with Logging;   use Logging;
-with Memory;    use Memory;
 with Processes; use Processes;
 
 package Boot is
@@ -40,10 +39,6 @@ private
    procedure Free_Boot_Memory;
 
    procedure Initialise_Hart (Hart_Id : Integer);
-
-   procedure Initialise_Kernel_Heap;
-
-   procedure Initialise_Kernel_Page_Pool;
 
    procedure Initialise_Filesystem;
 

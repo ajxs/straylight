@@ -8,6 +8,7 @@ with Filesystems.FAT;
 with Filesystems.Root;
 with Filesystems.UStar;
 with Memory.Allocators; use Memory.Allocators;
+with Memory.Kernel;     use Memory.Kernel;
 with RISCV;
 with System_State;      use System_State;
 

@@ -23,7 +23,7 @@ with Function_Results; use Function_Results;
 --         Spinlock           => Locks.Null_Spinlock,
 --         Record_Used        => True);
 --
---      Current_System_State.Mounted_Filesystems (3) :=
+--      Mounted_Filesystems (3) :=
 --        (Filesystem_Type              => Filesystem_Type_UStar,
 --         Filesystem_Meta_Info_Address => Null_Address,
 --         Filesystem_Meta_Info_Size    => 0,

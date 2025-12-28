@@ -3,35 +3,17 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Interfaces;              use Interfaces;
-with System;                  use System;
-with System.Storage_Elements; use System.Storage_Elements;
+with Interfaces; use Interfaces;
 
-with Addresses;              use Addresses;
-with Filesystems;            use Filesystems;
-with Function_Results;       use Function_Results;
-with Memory;                 use Memory;
-with Memory.Allocators;      use Memory.Allocators;
-with Memory.Allocators.Heap; use Memory.Allocators.Heap;
-with Memory.Allocators.Page; use Memory.Allocators.Page;
-with Processes;              use Processes;
+with Filesystems;      use Filesystems;
+with Function_Results; use Function_Results;
+with Processes;        use Processes;
 
 package System_State is
    pragma Preelaborate;
 
    Maximum_Harts : constant := 8;
    subtype Hart_Index_T is Natural range 0 .. (Maximum_Harts - 1);
-
-   subtype System_Time_T is Unsigned_64;
-
-   ----------------------------------------------------------------------------
-   --  An interesting long-term idea would be to allow the system to support
-   --  multiple system states, which can be swapped between.
-   ----------------------------------------------------------------------------
-   type System_State_T is record
-      Kernel_Heap      : Memory_Heap_T;
-      Kernel_Page_Pool : Page_Pool_T;
-   end record;
 
    type Hart_State_T is record
       Current_Process                         : Process_Control_Block_Access :=
@@ -45,40 +27,6 @@ package System_State is
    type Hart_State_Array_T is array (Hart_Index_T) of aliased Hart_State_T;
 
    Hart_States : Hart_State_Array_T;
-
-   Current_System_State : System_State_T;
-
-   --  Allocates kernel heap memory, returning both the virtual and physical
-   --  addresses of the allocated region.
-   --  This is generally used for any kernel memory that needs DMA access
-   --  by a device, like filesystem buffers.
-   procedure Allocate_Kernel_Physical_Memory
-     (Size              : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
-      Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1);
-
-   --  @TODO: Potentially this could be a front-end to both the heap and page
-   --  allocators, depending on the size/alignment requested.
-   procedure Allocate_Kernel_Memory
-     (Size              : Positive;
-      Allocated_Address : out Virtual_Address_T;
-      Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1);
-
-   procedure Free_Kernel_Memory
-     (Allocated_Virtual_Address : Virtual_Address_T;
-      Result                    : out Function_Result);
-
-   procedure Allocate_Pages
-     (Number_of_Pages   : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
-      Result            : out Function_Result);
-
-   procedure Free_Pages
-     (Virtual_Address : Virtual_Address_T;
-      Page_Count      : Positive;
-      Result          : out Function_Result);
 
    procedure Panic (Message : String := "Kernel Panic")
    with No_Return;
