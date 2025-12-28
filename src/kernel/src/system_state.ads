@@ -16,7 +16,6 @@ with Memory;                 use Memory;
 with Memory.Allocators;      use Memory.Allocators;
 with Memory.Allocators.Heap; use Memory.Allocators.Heap;
 with Memory.Allocators.Page; use Memory.Allocators.Page;
-with Memory.Physical;        use Memory.Physical;
 with Processes;              use Processes;
 
 package System_State is
@@ -35,8 +34,7 @@ package System_State is
       Kernel_Heap      : Memory_Heap_T;
       Kernel_Page_Pool : Page_Pool_T;
 
-      Physical_Memory_Space : Physical_Memory_Space_T;
-      Devices               : System_Device_Array;
+      Devices : System_Device_Array;
 
       Root_Filesystem     : Filesystem_Access := null;
       Mounted_Filesystems : Mounted_Filesystem_Array;

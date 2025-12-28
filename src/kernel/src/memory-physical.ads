@@ -16,18 +16,6 @@ with Logging;          use Logging;
 package Memory.Physical is
    pragma Preelaborate;
 
-   --  Forward declarations, to allow for recursive pointer.
-   type Physical_Memory_Block_T is private;
-   type Block_Access is access all Physical_Memory_Block_T;
-
-   type Physical_Memory_Block_Array is private;
-
-   type Physical_Memory_Space_T is record
-      Physical_Memory_Blocks        : Physical_Memory_Block_Array;
-      Physical_Memory_Map_List_Head : Block_Access := null;
-      Spinlock                      : Spinlock_T;
-   end record;
-
    procedure Allocate_Physical_Memory
      (Required_Size     : Positive;
       Allocated_Address : out Physical_Address_T;
@@ -58,6 +46,10 @@ private
 
    subtype Block_Order is Natural range 0 .. Maximum_Block_Order;
 
+   --  Forward declarations, to allow for recursive pointer.
+   type Physical_Memory_Block_T;
+   type Block_Access is access all Physical_Memory_Block_T;
+
    ----------------------------------------------------------------------------
    --  Descriptor for a physical memory block managed by the allocator.
    ----------------------------------------------------------------------------
@@ -72,6 +64,14 @@ private
    type Physical_Memory_Block_Array is
      array (1 .. Maximum_Physical_Memory_Blocks)
      of aliased Physical_Memory_Block_T;
+
+   type Physical_Memory_Space_T is record
+      Physical_Memory_Blocks        : Physical_Memory_Block_Array;
+      Physical_Memory_Map_List_Head : Block_Access := null;
+      Spinlock                      : Spinlock_T;
+   end record;
+
+   Phys_Memory_Space : Physical_Memory_Space_T;
 
    ----------------------------------------------------------------------------
    --  The base block size.

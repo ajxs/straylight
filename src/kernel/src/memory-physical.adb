@@ -6,11 +6,8 @@
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Memory.Virtual;
-with System_State; use System_State;
 
 package body Memory.Physical is
-   Phys_Memory_Space renames Current_System_State.Physical_Memory_Space;
-
    procedure Allocate_Physical_Memory
      (Required_Size     : Positive;
       Allocated_Address : out Physical_Address_T;
@@ -291,10 +288,7 @@ package body Memory.Physical is
       if not Is_List_Empty then
          --  Iterate through the linked list of physical memory blocks
          --  to check for any intersection.
-         Current_Block :=
-           Current_System_State
-             .Physical_Memory_Space
-             .Physical_Memory_Map_List_Head;
+         Current_Block := Phys_Memory_Space.Physical_Memory_Map_List_Head;
 
          while Current_Block /= null loop
             if Is_Region_Intersecting
