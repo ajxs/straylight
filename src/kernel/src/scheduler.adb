@@ -16,8 +16,6 @@ package body Scheduler is
       Next_Process    : out Process_Control_Block_Access;
       Result          : out Function_Result)
    is
-      Process_Queue renames Current_System_State.Processes;
-
       First_Process_To_Check : Process_Control_Block_Access := null;
    begin
       --  If there are no processes in the queue, exit.
@@ -159,7 +157,7 @@ package body Scheduler is
 
       --  If there are no processes ready to run, switch to the idle process.
       if Next_Process = null then
-         Next_Process := Current_System_State.Idle_Process;
+         Next_Process := Idle_Process;
       end if;
 
       --  If there is no ready processes found, the current process will be
@@ -270,7 +268,7 @@ package body Scheduler is
         ("Waking processes waiting for channel: " & Channel'Image,
          Logging_Tags);
 
-      Curr_Process := Current_System_State.Processes;
+      Curr_Process := Process_Queue;
       while Curr_Process /= null loop
          if Curr_Process.all.Status = Process_Blocked_Waiting_For_Response
            and then Curr_Process.all.Blocked_By_Channel = Channel

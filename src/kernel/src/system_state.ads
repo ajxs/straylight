@@ -38,9 +38,6 @@ package System_State is
       Root_Filesystem     : Filesystem_Access := null;
       Mounted_Filesystems : Mounted_Filesystem_Array;
 
-      Processes    : Process_Control_Block_Access := null;
-      Idle_Process : Process_Control_Block_Access := null;
-
       Open_Files : Process_File_Handle_Array;
    end record;
 

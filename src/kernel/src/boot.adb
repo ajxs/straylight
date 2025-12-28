@@ -645,8 +645,7 @@ package body Boot is
       Initialise_Devices;
 
       --  Create the kernel idle process.
-      Create_New_Process
-        (System_State.Current_System_State.Idle_Process, Result);
+      Create_New_Process (Processes.Idle_Process, Result);
       if Is_Error (Result) then
          --  Error already printed.
          Panic;
@@ -655,7 +654,7 @@ package body Boot is
       --  Set the idle process's return address to the idle function.
       --  When the scheduler switches to the idle process, it will 'return' to
       --  the idle function address.
-      System_State.Current_System_State.Idle_Process.all.Kernel_Context (ra) :=
+      Processes.Idle_Process.all.Kernel_Context (ra) :=
         Address_To_Unsigned_64 (Idle'Address);
 
       Initialise_Block_Cache;

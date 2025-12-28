@@ -309,12 +309,11 @@ package body Processes is
    end Exit_Process;
 
    procedure Find_Process_With_Id
-     (Process_Queue_Head : Process_Control_Block_Access;
-      Process_Id         : Process_Id_T;
-      Process            : out Process_Control_Block_Access;
-      Result             : out Function_Result)
+     (Process_Id : Process_Id_T;
+      Process    : out Process_Control_Block_Access;
+      Result     : out Function_Result)
    is
-      Current_Process : Process_Control_Block_Access := Process_Queue_Head;
+      Current_Process : Process_Control_Block_Access := Process_Queue;
    begin
       while Current_Process /= null loop
          if Current_Process.all.Process_Id = Process_Id then

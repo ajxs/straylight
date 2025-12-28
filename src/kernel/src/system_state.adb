@@ -19,15 +19,15 @@ package body System_State is
          & ", address "
          & New_Process.all'Address'Image,
          [Log_Tag_Processes]);
-      if Current_System_State.Processes = null then
+      if Process_Queue = null then
          Log_Debug
            ("No processes in list, setting new process as head",
             [Log_Tag_Processes]);
-         Current_System_State.Processes := New_Process;
+         Process_Queue := New_Process;
          return;
       end if;
 
-      Curr_Process := Current_System_State.Processes;
+      Curr_Process := Process_Queue;
       while Curr_Process /= null loop
          Prev_Process := Curr_Process;
          Curr_Process := Curr_Process.all.Next_Process;
@@ -83,7 +83,7 @@ package body System_State is
    begin
       Log_Debug ("Cleaning up stopped processes...", Logging_Tags);
 
-      Curr_Process := Current_System_State.Processes;
+      Curr_Process := Process_Queue;
       if Curr_Process = null then
          Log_Debug ("No processes to clean up.", Logging_Tags);
 
@@ -99,7 +99,7 @@ package body System_State is
 
             if Prev_Process = null then
                Log_Debug ("Cleaning up process at list head...", Logging_Tags);
-               Current_System_State.Processes := Curr_Process.all.Next_Process;
+               Process_Queue := Curr_Process.all.Next_Process;
             else
                Log_Debug ("Cleaning up process...", Logging_Tags);
                Prev_Process.all.Next_Process := Curr_Process.all.Next_Process;

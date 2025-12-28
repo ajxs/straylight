@@ -95,6 +95,9 @@ package Processes is
       Next_Process : Process_Control_Block_Access := null;
    end record;
 
+   Process_Queue : Process_Control_Block_Access := null;
+   Idle_Process  : Process_Control_Block_Access := null;
+
    ----------------------------------------------------------------------------
    --  Allocates all of the physical memory required for a new process.
    --  This initialises the process' memory space, heap, and stack.
@@ -125,10 +128,9 @@ package Processes is
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
    procedure Find_Process_With_Id
-     (Process_Queue_Head : Process_Control_Block_Access;
-      Process_Id         : Process_Id_T;
-      Process            : out Process_Control_Block_Access;
-      Result             : out Function_Result);
+     (Process_Id : Process_Id_T;
+      Process    : out Process_Control_Block_Access;
+      Result     : out Function_Result);
 
    procedure Allocate_Process_Id
      (New_Id : out Process_Id_T; Result : out Function_Result);

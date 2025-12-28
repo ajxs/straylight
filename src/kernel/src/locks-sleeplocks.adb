@@ -3,9 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Addresses;    use Addresses;
-with Scheduler;    use Scheduler;
-with System_State; use System_State;
+with Addresses; use Addresses;
+with Scheduler; use Scheduler;
 
 package body Locks.Sleeplocks is
    procedure Acquire_Sleeplock
@@ -17,11 +16,7 @@ package body Locks.Sleeplocks is
    begin
       Acquire_Spinlock (Lock.Spinlock);
 
-      Find_Process_With_Id
-        (Current_System_State.Processes,
-         Process_Id,
-         Acquiring_Process,
-         Result);
+      Find_Process_With_Id (Process_Id, Acquiring_Process, Result);
       --  The case the process isn't found is an error condition.
       if Is_Error (Result) then
          goto Release_Acquire_Lock;
