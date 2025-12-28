@@ -130,8 +130,14 @@ package Processes is
       Process            : out Process_Control_Block_Access;
       Result             : out Function_Result);
 
+   procedure Allocate_Process_Id
+     (New_Id : out Process_Id_T; Result : out Function_Result);
+
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Processes];
+
+   Next_Process_Id     : Process_Id_T := 1;
+   Process_Id_Spinlock : Spinlock_T;
 
    --  16KiB process kernel stack starting size.
    Process_Kernel_Stack_Size   : constant := 4 * 16#1000#;

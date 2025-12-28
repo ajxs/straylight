@@ -181,6 +181,29 @@ package body Processes is
          Result := Constraint_Exception;
    end Allocate_And_Map_New_Process_Kernel_Stack;
 
+   --  @TODO: Deallocate process id on error.
+   procedure Allocate_Process_Id
+     (New_Id : out Process_Id_T; Result : out Function_Result) is
+   begin
+      Acquire_Spinlock (Process_Id_Spinlock);
+
+      New_Id := Next_Process_Id;
+      Next_Process_Id := Next_Process_Id + 1;
+
+      Log_Debug
+        ("Allocated new process id:" & New_Id'Image, [Log_Tag_Processes]);
+
+      Result := Success;
+
+      Release_Spinlock (Process_Id_Spinlock);
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Allocate_Process_Id");
+         New_Id := 0;
+         Result := Maximum_Process_Count_Reached;
+         Release_Spinlock (Process_Id_Spinlock);
+   end Allocate_Process_Id;
+
    procedure Deallocate_Process
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is

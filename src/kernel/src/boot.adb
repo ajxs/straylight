@@ -642,9 +642,6 @@ package body Boot is
       Traps.Setup_Next_Timer_Interrupt;
       Log_Debug ("Set initial system tick.", Logging_Tags);
 
-      --  Initialise the first process ID to be used.
-      Current_System_State.Next_Process_Id := 1;
-
       Initialise_Devices;
 
       --  Create the kernel idle process.

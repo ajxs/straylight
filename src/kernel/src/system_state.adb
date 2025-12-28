@@ -75,30 +75,6 @@ package body System_State is
         (Number_of_Pages, Allocation_Result, Result);
    end Allocate_Pages;
 
-   --  @TODO: Deallocate process id on error.
-   procedure Allocate_Process_Id
-     (New_Id : out Process_Id_T; Result : out Function_Result) is
-   begin
-      Acquire_Spinlock (Current_System_State.Process_Id_Spinlock);
-
-      New_Id := Current_System_State.Next_Process_Id;
-      Current_System_State.Next_Process_Id :=
-        Current_System_State.Next_Process_Id + 1;
-
-      Log_Debug
-        ("Allocated new process id:" & New_Id'Image, [Log_Tag_Processes]);
-
-      Result := Success;
-
-      Release_Spinlock (Current_System_State.Process_Id_Spinlock);
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Process_Id");
-         New_Id := 0;
-         Result := Maximum_Process_Count_Reached;
-         Release_Spinlock (Current_System_State.Process_Id_Spinlock);
-   end Allocate_Process_Id;
-
    procedure Cleanup_Stopped_Processes (Result : out Function_Result) is
       Curr_Process : Process_Control_Block_Access := null;
       Prev_Process : Process_Control_Block_Access := null;

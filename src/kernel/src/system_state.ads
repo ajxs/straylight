@@ -11,7 +11,6 @@ with Addresses;              use Addresses;
 with Devices;                use Devices;
 with Filesystems;            use Filesystems;
 with Function_Results;       use Function_Results;
-with Locks;                  use Locks;
 with Memory;                 use Memory;
 with Memory.Allocators;      use Memory.Allocators;
 with Memory.Allocators.Heap; use Memory.Allocators.Heap;
@@ -39,10 +38,8 @@ package System_State is
       Root_Filesystem     : Filesystem_Access := null;
       Mounted_Filesystems : Mounted_Filesystem_Array;
 
-      Processes           : Process_Control_Block_Access := null;
-      Idle_Process        : Process_Control_Block_Access := null;
-      Next_Process_Id     : Process_Id_T := 1;
-      Process_Id_Spinlock : Spinlock_T;
+      Processes    : Process_Control_Block_Access := null;
+      Idle_Process : Process_Control_Block_Access := null;
 
       Open_Files : Process_File_Handle_Array;
    end record;
@@ -93,9 +90,6 @@ package System_State is
      (Virtual_Address : Virtual_Address_T;
       Page_Count      : Positive;
       Result          : out Function_Result);
-
-   procedure Allocate_Process_Id
-     (New_Id : out Process_Id_T; Result : out Function_Result);
 
    procedure Panic (Message : String := "Kernel Panic")
    with No_Return;
