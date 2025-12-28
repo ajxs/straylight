@@ -30,7 +30,7 @@ package Filesystems is
    is record
       Device : access Device_T := null;
 
-      Filesystem_Meta_Info_Address : Virtual_Address_T := Null_Address;
+      Filesystem_Meta_Info_Address : Virtual_Address_T;
       Filesystem_Meta_Info_Size    : Integer := 0;
    end record;
 
@@ -135,6 +135,11 @@ package Filesystems is
       Result       : out Function_Result);
 
    procedure Initialise_Block_Cache;
+
+   System_Root_Filesystem : Filesystem_Access := null;
+   Mounted_Filesystems    : Mounted_Filesystem_Array;
+
+   Open_Files : Process_File_Handle_Array;
 
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Filesystems];

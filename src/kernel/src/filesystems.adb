@@ -263,7 +263,7 @@ package body Filesystems is
    begin
       if Path (Path'First) = '/' then
          --  Absolute path; start at root filesystem.
-         Current_Filesystem := Current_System_State.Root_Filesystem;
+         Current_Filesystem := System_Root_Filesystem;
          --  The root node index of the in-memory root filesystem is 1.
          Filesystem_Node_Parent_Index := 1;
       else
@@ -413,14 +413,12 @@ package body Filesystems is
 
       Log_Debug ("File found", Logging_Tags);
 
-      Find_Unused_File_Handle_Entry
-        (Current_System_State.Open_Files, File_Handle_Index, Result);
+      Find_Unused_File_Handle_Entry (Open_Files, File_Handle_Index, Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      File_Handle :=
-        Current_System_State.Open_Files (File_Handle_Index)'Access;
+      File_Handle := Open_Files (File_Handle_Index)'Access;
 
       File_Handle.all.File_Handle_Id := Unsigned_64 (File_Handle_Index);
       File_Handle.all.Entry_Used := True;

@@ -425,39 +425,38 @@ package body Boot is
    begin
       Log_Debug ("Initialising filesystem...", Logging_Tags);
 
-      Current_System_State.Mounted_Filesystems :=
+      Filesystems.Mounted_Filesystems :=
         [others =>
            (Filesystem_Type              => Filesystem_Type_None,
             Filesystem_Meta_Info_Address => Null_Address,
             Filesystem_Meta_Info_Size    => 0,
             Device                       => null)];
 
-      Current_System_State.Mounted_Filesystems (1) :=
+      Filesystems.Mounted_Filesystems (1) :=
         (Filesystem_Type              => Filesystem_Type_Root,
          Filesystem_Meta_Info_Address => Null_Address,
          Filesystem_Meta_Info_Size    => 0,
          Device                       => Root_Filesystem_Memory_Device'Access);
 
-      Current_System_State.Root_Filesystem :=
-        Current_System_State.Mounted_Filesystems (1)'Access;
+      Filesystems.System_Root_Filesystem :=
+        Filesystems.Mounted_Filesystems (1)'Access;
 
-      Initialise_Root_Filesystem
-        (Current_System_State.Root_Filesystem, Result);
+      Initialise_Root_Filesystem (Filesystems.System_Root_Filesystem, Result);
 
-      Current_System_State.Mounted_Filesystems (2) :=
+      Filesystems.Mounted_Filesystems (2) :=
         (Filesystem_Type              => Filesystem_Type_FAT,
          Filesystem_Meta_Info_Address => Null_Address,
          Filesystem_Meta_Info_Size    => 0,
          Device                       => Disk_Device'Access);
 
-      Current_System_State.Mounted_Filesystems (3) :=
+      Filesystems.Mounted_Filesystems (3) :=
         (Filesystem_Type              => Filesystem_Type_UStar,
          Filesystem_Meta_Info_Address => Null_Address,
          Filesystem_Meta_Info_Size    => 0,
          Device                       => Disk_B_Device'Access);
 
       Add_Filesystem_Node_To_Root_Filesystem
-        (Current_System_State.Root_Filesystem,
+        (Filesystems.System_Root_Filesystem,
          "/",
          0,
          Root_Filesystem_Node_Index,
@@ -468,7 +467,7 @@ package body Boot is
       end if;
 
       Add_Filesystem_Node_To_Root_Filesystem
-        (Current_System_State.Root_Filesystem,
+        (Filesystems.System_Root_Filesystem,
          "Devices",
          Root_Filesystem_Node_Index,
          Devices_Filesystem_Node_Index,
@@ -479,25 +478,25 @@ package body Boot is
       end if;
 
       Add_Filesystem_Node_To_Root_Filesystem
-        (Current_System_State.Root_Filesystem,
+        (Filesystems.System_Root_Filesystem,
          "Disk",
          Devices_Filesystem_Node_Index,
          Disk_Filesystem_Node_Index,
          Result,
          Filesystem_Node_Type_Mounted_Filesystem,
-         Current_System_State.Mounted_Filesystems (2)'Access);
+         Filesystems.Mounted_Filesystems (2)'Access);
       if Is_Error (Result) then
          Panic;
       end if;
 
       Add_Filesystem_Node_To_Root_Filesystem
-        (Current_System_State.Root_Filesystem,
+        (Filesystems.System_Root_Filesystem,
          "Disk_B",
          Devices_Filesystem_Node_Index,
          Disk_Filesystem_Node_Index,
          Result,
          Filesystem_Node_Type_Mounted_Filesystem,
-         Current_System_State.Mounted_Filesystems (3)'Access);
+         Filesystems.Mounted_Filesystems (3)'Access);
       if Is_Error (Result) then
          Panic;
       end if;

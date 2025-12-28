@@ -31,11 +31,6 @@ package System_State is
    type System_State_T is record
       Kernel_Heap      : Memory_Heap_T;
       Kernel_Page_Pool : Page_Pool_T;
-
-      Root_Filesystem     : Filesystem_Access := null;
-      Mounted_Filesystems : Mounted_Filesystem_Array;
-
-      Open_Files : Process_File_Handle_Array;
    end record;
 
    type Hart_State_T is record
