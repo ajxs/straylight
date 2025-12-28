@@ -190,8 +190,6 @@ package body Boot is
       Supervisor_Interrupt_Context : constant Integer :=
         Get_Current_Hart_Supervisor_Interrupt_Context;
 
-      System_Devices renames Current_System_State.Devices;
-
       APIC_Device renames System_Devices (1);
       UART_Device renames System_Devices (2);
       Disk_Device renames System_Devices (3);
@@ -415,8 +413,6 @@ package body Boot is
    end Initialise_Devices;
 
    procedure Initialise_Filesystem is
-      System_Devices renames Current_System_State.Devices;
-
       Disk_Device renames System_Devices (3);
       Disk_B_Device renames System_Devices (5);
       Root_Filesystem_Memory_Device renames System_Devices (4);
@@ -687,7 +683,7 @@ package body Boot is
 
       Framebuffer_Allocation : Memory_Allocation_Result;
 
-      Graphics_Device renames Current_System_State.Devices (6);
+      Graphics_Device renames Devices.System_Devices (6);
    begin
       Devices.VirtIO.Graphics.Get_Display_Info
         (Init_Process.all, Graphics_Device, Result);

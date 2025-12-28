@@ -89,8 +89,8 @@ package Devices is
    type Device_T (Device_Bus : Device_Bus_T := Device_Bus_Memory_Mapped) is
    record
       Device_Class       : Device_Class_T := Device_Class_None;
-      Virtual_Address    : Virtual_Address_T := Null_Address;
-      Physical_Address   : Physical_Address_T := Null_Physical_Address;
+      Virtual_Address    : Virtual_Address_T;
+      Physical_Address   : Physical_Address_T;
       Memory_Size        : Storage_Offset := 0;
       Record_Used        : Boolean := False;
       Interrupt_Line     : Integer := 0;
@@ -106,7 +106,9 @@ package Devices is
       end case;
    end record;
 
-   type System_Device_Array is array (1 .. 16) of aliased Device_T;
+   --  type System_Device_Array is array (1 .. 16) of aliased Device_T;
+
+   System_Devices : array (1 .. 16) of aliased Device_T;
 
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Devices];

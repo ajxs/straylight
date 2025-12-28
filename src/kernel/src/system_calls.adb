@@ -7,6 +7,7 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Addresses;    use Addresses;
+with Devices;
 with Devices.UART;
 with Devices.VirtIO.Graphics;
 with Memory;       use Memory;
@@ -345,7 +346,7 @@ package body System_Calls is
 
       --  @TODO: Revisit device discovery.
       --  This implementation is temporary.
-      UART_Device renames Current_System_State.Devices (2);
+      UART_Device renames Devices.System_Devices (2);
    begin
       Log_Debug ("User Mode Syscall: Print To Serial", Logging_Tags);
 
@@ -505,7 +506,7 @@ package body System_Calls is
 
       Kernel_Framebuffer_Size : Natural := 0;
 
-      Graphics_Device renames Current_System_State.Devices (6);
+      Graphics_Device renames Devices.System_Devices (6);
    begin
       Log_Debug ("User Mode Syscall: Update Framebuffer", Logging_Tags);
 

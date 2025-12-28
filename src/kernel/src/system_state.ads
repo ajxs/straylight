@@ -8,7 +8,6 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Addresses;              use Addresses;
-with Devices;                use Devices;
 with Filesystems;            use Filesystems;
 with Function_Results;       use Function_Results;
 with Memory;                 use Memory;
@@ -32,8 +31,6 @@ package System_State is
    type System_State_T is record
       Kernel_Heap      : Memory_Heap_T;
       Kernel_Page_Pool : Page_Pool_T;
-
-      Devices : System_Device_Array;
 
       Root_Filesystem     : Filesystem_Access := null;
       Mounted_Filesystems : Mounted_Filesystem_Array;

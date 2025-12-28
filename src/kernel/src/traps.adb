@@ -74,8 +74,7 @@ package body Traps is
       Supervisor_Interrupt_Context : constant Integer :=
         Get_Current_Hart_Supervisor_Interrupt_Context;
 
-      System_Devices renames Current_System_State.Devices;
-      PLIC_Device renames System_Devices (1);
+      PLIC_Device renames Devices.System_Devices (1);
 
       Result : Function_Result := Unset;
    begin
