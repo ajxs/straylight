@@ -67,17 +67,6 @@ package Memory.Virtual is
       Memory_Map           : Virtual_Memory_Map_T;
       Memory_Map_List_Head : Mapping_Access := null;
       Address_Space_ID     : Unsigned_16 := 0;
-      --  Virtual memory spaces for user processes share the same page table
-      --  entries for the kernel's address space. This flag is used to restrict
-      --  them from altering higher-half kernel address mappings.
-      --  This system is non-ideal, and should be revisited at some point.
-      --  The main issue is that it's ideal to share the PTEs for the
-      --  higher-half kernel mappings _between_ all processes, but the issue
-      --  arises of how to share the kernel mapping structures between
-      --  processes.
-      --  The temporary solution is to not share the kernel mapping structures,
-      --  but to restrict them being altered via this flag.
-      User_Address_Space   : Boolean := True;
       Spinlock             : Spinlock_T;
    end record;
 
@@ -89,13 +78,27 @@ package Memory.Virtual is
      (Virt_Memory_Space : in out Virtual_Memory_Space_T;
       Result            : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Virtual memory spaces for user processes share the same actual page
+   --  table entries for the kernel's address space between all processes.
+   --  This is done by manually copying the higher-half page table entries into
+   --  each new process' page tables when they are created.
+   --  However the associated mappings are not created in the new process's
+   --  virtual memory space structure, as these are not needed for userspace
+   --  processes.
+   --  The 'Allow_Mapping_Kernel_Addresses' argument is used to protect against
+   --  accidentally clobbering the higher-half kernel mappings.
+   --  This argument should only be set to true when mapping memory in the
+   --  canonical kernel address space.
+   ----------------------------------------------------------------------------
    procedure Map
-     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Virtual_Address   : Virtual_Address_T;
-      Physical_Address  : Physical_Address_T;
-      Size              : Memory_Region_Size;
-      Region_Flags      : Memory_Region_Flags_T;
-      Result            : out Function_Result);
+     (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
+      Virtual_Address                : Virtual_Address_T;
+      Physical_Address               : Physical_Address_T;
+      Size                           : Memory_Region_Size;
+      Region_Flags                   : Memory_Region_Flags_T;
+      Result                         : out Function_Result;
+      Allow_Mapping_Kernel_Addresses : Boolean := False);
 
    procedure Unmap
      (Virt_Memory_Space : in out Virtual_Memory_Space_T;
@@ -159,12 +162,13 @@ private
    --  released.
    ----------------------------------------------------------------------------
    procedure Map_Unlocked
-     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Virtual_Address   : Virtual_Address_T;
-      Physical_Address  : Physical_Address_T;
-      Size              : Memory_Region_Size;
-      Region_Flags      : Memory_Region_Flags_T;
-      Result            : out Function_Result);
+     (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
+      Virtual_Address                : Virtual_Address_T;
+      Physical_Address               : Physical_Address_T;
+      Size                           : Memory_Region_Size;
+      Region_Flags                   : Memory_Region_Flags_T;
+      Result                         : out Function_Result;
+      Allow_Mapping_Kernel_Addresses : Boolean := False);
 
    procedure Unmap_Unlocked
      (Virt_Memory_Space : in out Virtual_Memory_Space_T;

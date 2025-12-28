@@ -182,12 +182,13 @@ package body Memory.Virtual is
    end Is_Region_Intersecting;
 
    procedure Map
-     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Virtual_Address   : Virtual_Address_T;
-      Physical_Address  : Physical_Address_T;
-      Size              : Memory_Region_Size;
-      Region_Flags      : Memory_Region_Flags_T;
-      Result            : out Function_Result) is
+     (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
+      Virtual_Address                : Virtual_Address_T;
+      Physical_Address               : Physical_Address_T;
+      Size                           : Memory_Region_Size;
+      Region_Flags                   : Memory_Region_Flags_T;
+      Result                         : out Function_Result;
+      Allow_Mapping_Kernel_Addresses : Boolean := False) is
    begin
       Acquire_Spinlock (Virt_Memory_Space.Spinlock);
 
@@ -197,35 +198,37 @@ package body Memory.Virtual is
          Physical_Address,
          Size,
          Region_Flags,
-         Result);
+         Result,
+         Allow_Mapping_Kernel_Addresses);
 
       Release_Spinlock (Virt_Memory_Space.Spinlock);
    end Map;
 
    procedure Map_Unlocked
-     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Virtual_Address   : Virtual_Address_T;
-      Physical_Address  : Physical_Address_T;
-      Size              : Memory_Region_Size;
-      Region_Flags      : Memory_Region_Flags_T;
-      Result            : out Function_Result)
+     (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
+      Virtual_Address                : Virtual_Address_T;
+      Physical_Address               : Physical_Address_T;
+      Size                           : Memory_Region_Size;
+      Region_Flags                   : Memory_Region_Flags_T;
+      Result                         : out Function_Result;
+      Allow_Mapping_Kernel_Addresses : Boolean := False)
    is
       Current_Region  : Mapping_Access := null;
       Previous_Region : Mapping_Access := null;
       Real_Size       : Memory_Region_Size := 1;
       New_Index       : Positive := 1;
    begin
-      if Virt_Memory_Space.User_Address_Space
+      if not Allow_Mapping_Kernel_Addresses
         and then not Is_Userspace_Address (Virtual_Address)
       then
          Log_Error ("Invalid non-userspace address", Logging_Tags);
-         Result := Invalid_Address_Argument;
+         Result := Invalid_Argument;
          return;
       end if;
 
       if not Is_Valid_SV39_Virtual_Address (Virtual_Address) then
          Log_Error ("Invalid virtual address", Logging_Tags);
-         Result := Invalid_Address_Argument;
+         Result := Invalid_Argument;
          return;
       end if;
 
@@ -234,19 +237,19 @@ package body Memory.Virtual is
         or else not Is_Address_Page_Aligned (Address (Physical_Address))
       then
          Log_Error ("Invalid non-aligned address", Logging_Tags);
-         Result := Invalid_Non_Aligned_Address;
+         Result := Invalid_Argument;
          return;
       end if;
 
       if Size = 0 then
          Log_Error ("Invalid memory size", Logging_Tags);
-         Result := Invalid_Physical_Memory_Size;
+         Result := Invalid_Argument;
          return;
       end if;
 
       if not Validate_Memory_Region_Permissions (Region_Flags) then
          Log_Error ("Invalid memory permissions", Logging_Tags);
-         Result := Illegal_Region_Permissions;
+         Result := Invalid_Argument;
          return;
       end if;
 
@@ -439,7 +442,12 @@ package body Memory.Virtual is
       Result        : out Function_Result) is
    begin
       Kernel_Address_Space.Map
-        (Virtual_Addr, Physical_Addr, Size, Region_Flags, Result);
+        (Virtual_Addr,
+         Physical_Addr,
+         Size,
+         Region_Flags,
+         Result,
+         Allow_Mapping_Kernel_Addresses => True);
    end Map_Kernel_Memory;
 
    procedure Unmap_Kernel_Memory
@@ -486,8 +494,6 @@ package body Memory.Virtual is
          --  Error already printed.
          Panic;
       end if;
-
-      Kernel_Address_Space.User_Address_Space := False;
 
       Region_Size :=
         Text_Section_End_Marker'Address - Text_Section_Start_Marker'Address;

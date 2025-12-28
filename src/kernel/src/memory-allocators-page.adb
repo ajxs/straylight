@@ -124,7 +124,7 @@ package body Memory.Allocators.Page is
             --  but the start of the address + the count of pages extends
             --  beyond the edge of the region, then return an error.
             if (Region_Index + Page_Count) > Page_Pool_Region_Size then
-               Result := Invalid_Address_Argument;
+               Result := Invalid_Argument;
                return;
             end if;
 
@@ -137,7 +137,8 @@ package body Memory.Allocators.Page is
          end if;
       end loop;
 
-      Result := Invalid_Address_Argument;
+      Log_Error ("Free: Virtual address not found in any allocated region");
+      Result := Invalid_Argument;
 
    exception
       when Constraint_Error =>

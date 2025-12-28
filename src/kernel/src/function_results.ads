@@ -25,9 +25,7 @@ package Function_Results is
    Invalid_Non_Aligned_Address         : constant := -7777_0004;
    Invalid_Physical_Memory_Size        : constant := -7777_0006;
    Invalid_Table_Index                 : constant := -7777_0007;
-   Invalid_Address_Argument            : constant := -7777_0009;
    Heap_Exhausted                      : constant := -7777_0012;
-   Illegal_Region_Permissions          : constant := -7777_0011;
    No_Block_Small_Enough               : constant := -7777_0014;
    No_Block_Large_Enough               : constant := -7777_0015;
    Memory_Block_Cannot_Be_Consolidated : constant := 7777_0019;
