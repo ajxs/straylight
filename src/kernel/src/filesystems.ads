@@ -141,6 +141,12 @@ package Filesystems is
 
    Open_Files : Process_File_Handle_Array;
 
+   procedure Find_File_Handle
+     (Process_Id     : Process_Id_T;
+      File_Handle_Id : Unsigned_64;
+      File_Handle    : out Process_File_Handle_Access;
+      Result         : out Function_Result);
+
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Filesystems];
 

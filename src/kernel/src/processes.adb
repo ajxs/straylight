@@ -3,7 +3,12 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Memory.Physical; use Memory.Physical;
+with Memory.Allocators; use Memory.Allocators;
+with Memory.Kernel;     use Memory.Kernel;
+with Memory.Physical;   use Memory.Physical;
+with RISCV.Interrupts;
+with System_State;      use System_State;
+with Scheduler;
 
 package body Processes is
    procedure Allocate_And_Map_New_Process_Memory
@@ -383,4 +388,133 @@ package body Processes is
          Log_Error ("Constraint_Error: Add_Process");
          Result := Constraint_Exception;
    end Add_Process;
+
+   procedure Create_New_Process
+     (New_Process : out Process_Control_Block_Access;
+      Result      : out Function_Result)
+   is
+      Allocation_Result : Memory_Allocation_Result;
+   begin
+      Allocate_Kernel_Physical_Memory
+        (Process_Control_Block_T'Size / 8, Allocation_Result, Result);
+      if Is_Error (Result) then
+         Log_Error ("Failed to allocate process memory");
+         return;
+      end if;
+
+      New_Process :=
+        Convert_Address_To_Process_Control_Block_Access
+          (Allocation_Result.Virtual_Address);
+
+      Allocate_Process_Id (New_Process.all.Process_Id, Result);
+      --  Error already printed.
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Log_Debug
+        ("Allocated new process: "
+         & ASCII.LF
+         & "  PID# "
+         & New_Process.all.Process_Id'Image
+         & ASCII.LF
+         & "  Addr: "
+         & Allocation_Result.Virtual_Address'Image,
+         [Log_Tag_Processes]);
+
+      Allocate_And_Map_New_Process_Memory (New_Process.all, Result);
+      if Is_Error (Result) then
+         Log_Error ("Failed to initialise process");
+         return;
+      end if;
+
+      Copy_Canonical_Kernel_Memory_Mappings_Into_Address_Space
+        (New_Process.all.Memory_Space, Result);
+      if Is_Error (Result) then
+         Log_Error ("Failed to copy kernel memory mappings");
+         return;
+      end if;
+
+      New_Process.all.Memory_Space.Address_Space_ID :=
+        Unsigned_16 (New_Process.all.Process_Id);
+
+      New_Process.all.Kernel_Context (sp) :=
+        Address_To_Unsigned_64
+          (New_Process.all.Kernel_Stack_Virt_Addr
+           + New_Process.all.Kernel_Stack_Size);
+
+      --  The userspace stack pointer is set when the process is first
+      --  scheduled, and control is passed to userspace.
+
+      --  When the process is first scheduled, control will 'return' to this
+      --  function once the scheduler procedure returns.
+      New_Process.all.Kernel_Context (ra) :=
+        Address_To_Unsigned_64 (Scheduler.Process_Start'Address);
+
+      New_Process.all.Status := Process_Ready;
+
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Create_New_Process");
+         Result := Constraint_Exception;
+   end Create_New_Process;
+
+   procedure Cleanup_Stopped_Processes (Result : out Function_Result) is
+      Curr_Process : Process_Control_Block_Access := null;
+      Prev_Process : Process_Control_Block_Access := null;
+
+      Logging_Tags : constant Log_Tags := [Log_Tag_Idle];
+   begin
+      Log_Debug ("Cleaning up stopped processes...", Logging_Tags);
+
+      Curr_Process := Process_Queue;
+      if Curr_Process = null then
+         Log_Debug ("No processes to clean up.", Logging_Tags);
+
+         Panic ("STOP HERE FOR NOW.");
+      end if;
+
+      while Curr_Process /= null loop
+         if Curr_Process.all.Status = Process_Stopped then
+            Deallocate_Process (Curr_Process.all, Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+
+            if Prev_Process = null then
+               Log_Debug ("Cleaning up process at list head...", Logging_Tags);
+               Process_Queue := Curr_Process.all.Next_Process;
+            else
+               Log_Debug ("Cleaning up process...", Logging_Tags);
+               Prev_Process.all.Next_Process := Curr_Process.all.Next_Process;
+            end if;
+         else
+            --  Only update the 'previous process' if the current one was not
+            --  cleared, otherwise we'll break the linked list.
+            Prev_Process := Curr_Process;
+         end if;
+
+         Curr_Process := Curr_Process.all.Next_Process;
+      end loop;
+
+      Result := Success;
+   end Cleanup_Stopped_Processes;
+
+   procedure Idle is
+      Logging_Tags : constant Log_Tags := [Log_Tag_Idle];
+      Result       : Function_Result := Unset;
+   begin
+      loop
+         Log_Debug ("System Idle.", Logging_Tags);
+         RISCV.Interrupts.Disable_Supervisor_Interrupts;
+
+         Cleanup_Stopped_Processes (Result);
+         if Is_Error (Result) then
+            Panic;
+         end if;
+
+         RISCV.Interrupts.Enable_Supervisor_Interrupts;
+      end loop;
+   end Idle;
+
 end Processes;

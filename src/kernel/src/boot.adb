@@ -530,7 +530,7 @@ package body Boot is
       --  When the scheduler switches to the idle process, it will 'return' to
       --  the idle function address.
       Processes.Idle_Process.all.Kernel_Context (ra) :=
-        Address_To_Unsigned_64 (Idle'Address);
+        Address_To_Unsigned_64 (Processes.Idle'Address);
 
       Initialise_Block_Cache;
 

@@ -137,6 +137,13 @@ package Processes is
      (New_Process : Process_Control_Block_Access;
       Result      : out Function_Result);
 
+   procedure Create_New_Process
+     (New_Process : out Process_Control_Block_Access;
+      Result      : out Function_Result);
+
+   procedure Idle
+   with No_Return;
+
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Processes];
 
@@ -170,5 +177,7 @@ private
      (Process_Id             : Process_Id_T;
       Kernel_Stack_Virt_Addr : out Virtual_Address_T;
       Result                 : out Function_Result);
+
+   procedure Cleanup_Stopped_Processes (Result : out Function_Result);
 
 end Processes;

@@ -3,11 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Interfaces; use Interfaces;
-
-with Filesystems;      use Filesystems;
-with Function_Results; use Function_Results;
-with Processes;        use Processes;
+with Processes; use Processes;
 
 package System_State is
    pragma Preelaborate;
@@ -31,13 +27,6 @@ package System_State is
    procedure Panic (Message : String := "Kernel Panic")
    with No_Return;
 
-   procedure Create_New_Process
-     (New_Process : out Process_Control_Block_Access;
-      Result      : out Function_Result);
-
-   procedure Idle
-   with No_Return;
-
    --  @TODO: Implement.
    --  Currently the kernel only supports a single hart.
    function Get_Current_Hart_Id return Hart_Index_T
@@ -59,14 +48,5 @@ package System_State is
 
    function Get_Current_Hart_Supervisor_Interrupt_Context return Integer
    with Inline, Volatile_Function;
-
-   procedure Find_File_Handle
-     (Process_Id     : Process_Id_T;
-      File_Handle_Id : Unsigned_64;
-      File_Handle    : out Process_File_Handle_Access;
-      Result         : out Function_Result);
-
-private
-   procedure Cleanup_Stopped_Processes (Result : out Function_Result);
 
 end System_State;

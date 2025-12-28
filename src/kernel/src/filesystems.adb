@@ -700,4 +700,24 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Allocate_Filesystem_Node;
 
+   procedure Find_File_Handle
+     (Process_Id     : Process_Id_T;
+      File_Handle_Id : Unsigned_64;
+      File_Handle    : out Process_File_Handle_Access;
+      Result         : out Function_Result) is
+   begin
+      for File_Handle_Entry of Open_Files loop
+         if File_Handle_Entry.Entry_Used
+           and then File_Handle_Entry.File_Handle_Id = File_Handle_Id
+           and then File_Handle_Entry.Process_Id = Process_Id
+         then
+            File_Handle := File_Handle_Entry'Access;
+            Result := Success;
+            return;
+         end if;
+      end loop;
+
+      Result := Not_Found;
+   end Find_File_Handle;
+
 end Filesystems;
