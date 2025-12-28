@@ -91,8 +91,6 @@ package System_State is
    procedure Panic (Message : String := "Kernel Panic")
    with No_Return;
 
-   procedure Add_Process (New_Process : Process_Control_Block_Access);
-
    procedure Create_New_Process
      (New_Process : out Process_Control_Block_Access;
       Result      : out Function_Result);

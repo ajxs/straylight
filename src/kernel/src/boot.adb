@@ -536,7 +536,10 @@ package body Boot is
       Init_Process.all.Kernel_Context (ra) :=
         Address_To_Unsigned_64 (Start_Init_Process'Address);
 
-      System_State.Add_Process (Init_Process);
+      Add_Process (Init_Process, Result);
+      if Is_Error (Result) then
+         Panic ("Error adding init process");
+      end if;
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Initialise_Init_Process");

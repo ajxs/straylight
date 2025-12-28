@@ -133,6 +133,10 @@ package Processes is
    procedure Allocate_Process_Id
      (New_Id : out Process_Id_T; Result : out Function_Result);
 
+   procedure Add_Process
+     (New_Process : Process_Control_Block_Access;
+      Result      : out Function_Result);
+
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Processes];
 

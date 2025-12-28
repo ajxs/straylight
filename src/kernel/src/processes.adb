@@ -190,8 +190,7 @@ package body Processes is
       New_Id := Next_Process_Id;
       Next_Process_Id := Next_Process_Id + 1;
 
-      Log_Debug
-        ("Allocated new process id:" & New_Id'Image, [Log_Tag_Processes]);
+      Log_Debug ("Allocated new process id:" & New_Id'Image, Logging_Tags);
 
       Result := Success;
 
@@ -348,4 +347,40 @@ package body Processes is
    end Get_Process_Kernel_Stack_Virtual_Address;
    pragma
      Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
+
+   procedure Add_Process
+     (New_Process : Process_Control_Block_Access; Result : out Function_Result)
+   is
+      Curr_Process : Process_Control_Block_Access := null;
+      Prev_Process : Process_Control_Block_Access := null;
+   begin
+      Log_Debug
+        ("Adding process id "
+         & New_Process.all.Process_Id'Image
+         & ", address "
+         & New_Process.all'Address'Image,
+         Logging_Tags);
+      if Process_Queue = null then
+         Log_Debug
+           ("No processes in list, setting new process as head", Logging_Tags);
+         Process_Queue := New_Process;
+         Result := Success;
+         return;
+      end if;
+
+      Curr_Process := Process_Queue;
+      while Curr_Process /= null loop
+         Prev_Process := Curr_Process;
+         Curr_Process := Curr_Process.all.Next_Process;
+      end loop;
+
+      Prev_Process.all.Next_Process := New_Process;
+
+      Log_Debug ("Added process to end of list", Logging_Tags);
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Add_Process");
+         Result := Constraint_Exception;
+   end Add_Process;
 end Processes;

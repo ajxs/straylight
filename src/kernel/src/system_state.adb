@@ -9,39 +9,6 @@ with RISCV.Interrupts;
 with Scheduler;
 
 package body System_State is
-   procedure Add_Process (New_Process : Process_Control_Block_Access) is
-      Curr_Process : Process_Control_Block_Access := null;
-      Prev_Process : Process_Control_Block_Access := null;
-   begin
-      Log_Debug
-        ("Adding process id "
-         & New_Process.all.Process_Id'Image
-         & ", address "
-         & New_Process.all'Address'Image,
-         [Log_Tag_Processes]);
-      if Process_Queue = null then
-         Log_Debug
-           ("No processes in list, setting new process as head",
-            [Log_Tag_Processes]);
-         Process_Queue := New_Process;
-         return;
-      end if;
-
-      Curr_Process := Process_Queue;
-      while Curr_Process /= null loop
-         Prev_Process := Curr_Process;
-         Curr_Process := Curr_Process.all.Next_Process;
-      end loop;
-
-      Prev_Process.all.Next_Process := New_Process;
-
-      Log_Debug ("Added process to end of list", [Log_Tag_Processes]);
-
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Add_Process");
-   end Add_Process;
-
    procedure Allocate_Kernel_Memory
      (Size              : Positive;
       Allocated_Address : out Virtual_Address_T;

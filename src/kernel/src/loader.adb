@@ -216,9 +216,10 @@ package body Loader is
         ("Finished loading new process. Adding to process queue.",
          Logging_Tags);
 
-      System_State.Add_Process (New_Process);
-
-      Result := Success;
+      Add_Process (New_Process, Result);
+      if Is_Error (Result) then
+         Panic ("Error adding new process");
+      end if;
    exception
       when Constraint_Error =>
          Log_Error
