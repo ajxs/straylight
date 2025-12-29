@@ -7,7 +7,7 @@ with Memory.Virtual.Paging;
 with Memory.Physical; use Memory.Physical;
 with RISCV;           use RISCV;
 with RISCV.Paging;    use RISCV.Paging;
-with System_State;    use System_State;
+with Hart_State;      use Hart_State;
 
 package body Memory.Virtual is
    procedure Copy_Kernel_Memory_Mappings_Into_Address_Space

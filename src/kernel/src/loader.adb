@@ -10,7 +10,7 @@ with Addresses;       use Addresses;
 with Filesystems;     use Filesystems;
 with Memory;          use Memory;
 with Memory.Physical; use Memory.Physical;
-with System_State;    use System_State;
+with Hart_State;      use Hart_State;
 
 package body Loader is
    procedure Load_New_Process_From_Filesystem

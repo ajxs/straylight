@@ -7,7 +7,7 @@ with Memory.Allocators; use Memory.Allocators;
 with Memory.Kernel;     use Memory.Kernel;
 with Memory.Physical;   use Memory.Physical;
 with RISCV.Interrupts;
-with System_State;      use System_State;
+with Hart_State;        use Hart_State;
 with Scheduler;
 
 package body Processes is

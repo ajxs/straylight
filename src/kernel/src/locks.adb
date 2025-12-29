@@ -6,7 +6,7 @@
 with Logging;       use Logging;
 with RISCV;         use RISCV;
 with RISCV.Atomics; use RISCV.Atomics;
-with System_State;  use System_State;
+with Hart_State;    use Hart_State;
 
 package body Locks is
    procedure Acquire_Spinlock (Lock : in out Spinlock_T) is

@@ -22,7 +22,7 @@ with Memory.Kernel;     use Memory.Kernel;
 with Memory.Physical;   use Memory.Physical;
 with Memory.Virtual;    use Memory.Virtual;
 with Scheduler;
-with System_State;      use System_State;
+with Hart_State;        use Hart_State;
 with Traps;
 
 package body Boot is
@@ -383,9 +383,9 @@ package body Boot is
 
    procedure Initialise_Hart (Hart_Id : Integer) is
    begin
-      System_State.Hart_States (Hart_Id).Current_Process := null;
-      System_State.Hart_States (Hart_Id).Interrupts_Off_Counter := 0;
-      System_State.Hart_States (Hart_Id)
+      Hart_State.Hart_States (Hart_Id).Current_Process := null;
+      Hart_State.Hart_States (Hart_Id).Interrupts_Off_Counter := 0;
+      Hart_State.Hart_States (Hart_Id)
         .Were_Interrupts_Enabled_Before_Push_Off :=
         True;
    exception

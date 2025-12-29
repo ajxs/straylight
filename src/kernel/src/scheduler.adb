@@ -6,9 +6,9 @@
 with Interfaces;              use Interfaces;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Addresses;    use Addresses;
+with Addresses;  use Addresses;
 with RISCV.Interrupts;
-with System_State; use System_State;
+with Hart_State; use Hart_State;
 
 package body Scheduler is
    procedure Get_Next_Scheduled_Process

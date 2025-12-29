@@ -1,6 +1,6 @@
 with Memory.Physical; use Memory.Physical;
 with Memory.Virtual;  use Memory.Virtual;
-with System_State;    use System_State;
+with Hart_State;      use Hart_State;
 
 package body Memory.Kernel is
    procedure Allocate_Kernel_Memory

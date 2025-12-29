@@ -5,7 +5,7 @@
 
 with Processes; use Processes;
 
-package System_State is
+package Hart_State is
    pragma Preelaborate;
 
    Maximum_Harts : constant := 8;
@@ -49,4 +49,4 @@ package System_State is
    function Get_Current_Hart_Supervisor_Interrupt_Context return Integer
    with Inline, Volatile_Function;
 
-end System_State;
+end Hart_State;

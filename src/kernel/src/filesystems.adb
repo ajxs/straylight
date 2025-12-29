@@ -10,7 +10,7 @@ with Filesystems.UStar;
 with Memory.Allocators; use Memory.Allocators;
 with Memory.Kernel;     use Memory.Kernel;
 with RISCV;
-with System_State;      use System_State;
+with Hart_State;        use Hart_State;
 
 package body Filesystems is
    procedure Add_Filesystem_Node_To_Cache
@@ -400,7 +400,7 @@ package body Filesystems is
       File_Handle_Index : Positive := 1;
    begin
       Log_Debug_Wide
-        ("System_State.Filesystem: Open_File: '" & Path & "'", Logging_Tags);
+        ("Hart_State.Filesystem: Open_File: '" & Path & "'", Logging_Tags);
 
       Find_File (Process, Path, Filesystem_Node, Result);
       if Is_Error (Result) then

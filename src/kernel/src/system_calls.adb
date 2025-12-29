@@ -6,15 +6,15 @@
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Addresses;    use Addresses;
+with Addresses;  use Addresses;
 with Devices;
 with Devices.UART;
 with Devices.VirtIO.Graphics;
-with Memory;       use Memory;
+with Memory;     use Memory;
 with Memory.Allocators;
-with RISCV;        use RISCV;
+with RISCV;      use RISCV;
 with Scheduler;
-with System_State; use System_State;
+with Hart_State; use Hart_State;
 
 package body System_Calls is
    procedure Handle_Allocate_Memory_Syscall

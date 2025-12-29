@@ -6,7 +6,7 @@
 with Logging; use Logging;
 with RISCV.Interrupts;
 
-package body System_State is
+package body Hart_State is
    function Get_Current_Hart_Supervisor_Interrupt_Context return Integer is
    begin
       --  This is the supervisor interrupt context for the current hart.
@@ -109,4 +109,4 @@ package body System_State is
          Panic ("Constraint_Error: Push_Interrupts_Off");
    end Push_Interrupts_Off;
 
-end System_State;
+end Hart_State;

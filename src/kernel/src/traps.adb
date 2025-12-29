@@ -16,7 +16,7 @@ with RISCV;
 with RISCV.SBI;        use RISCV.SBI;
 with RISCV.Interrupts;
 with System_Calls;
-with System_State;     use System_State;
+with Hart_State;       use Hart_State;
 
 package body Traps is
    procedure Handle_Supervisor_Mode_Exception
