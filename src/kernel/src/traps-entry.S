@@ -3,6 +3,7 @@
 #  SPDX-License-Identifier: GPL-3.0-or-later
 ###############################################################################
 
+#include "hart.h"
 #include "riscv.h"
 #include "traps.h"
 
@@ -47,14 +48,18 @@ traps_entry:
 	bnez  t6, save_process_state_to_kernel_stack
 
 user_mode_trap:
+# Since t6 has been saved in sscratch is currently a scratch variable, use 
+# this to load the PCB pointer from the Hart state (tp).
+	ld t6, HART_STATE_PCB_POINTER_OFFSET(tp)
+
 # Save the user stack pointer to the PCB.
 # We can safely do this because user-mode traps can't be nested, and this value
 # won't be changed until we need to return to user mode.
-	sd sp, PCB_OFFSET_USER_SP(tp)
+	sd sp, PCB_OFFSET_USER_SP(t6)
 
 # Load the kernel stack pointer.
 # The offset points to the entry for sp in the kernel context saved registers.
-	ld sp, KERNEL_CONTEXT_OFFSET_SP(tp)
+	ld sp, KERNEL_CONTEXT_OFFSET_SP(t6)
 
 save_process_state_to_kernel_stack:
 # Restore t6 from sscratch.
@@ -76,6 +81,8 @@ save_process_state_to_kernel_stack:
 		.set offset, offset+1
 	.endr
 
+# Since we've saved the hart state, we can use whatever gp registers we need
+# below this point.
 # Save sepc.
 	csrr t6, sepc
 	sd t6, TRAP_CONTEXT_OFFSET_SEPC(sp)
@@ -91,22 +98,24 @@ save_process_state_to_kernel_stack:
 	csrr t6, scause
 	sd t6, TRAP_CONTEXT_OFFSET_SCAUSE(sp)
 
+	ld t5, HART_STATE_PCB_POINTER_OFFSET(tp)
+
 # Save the trap context pointer.
 # This is important, so that we can recover the previous trap context after 
 # returning from the trap handler.
 # It's possible to get this value directly from the stack pointer, but this 
 # method is more robust in case the stack pointer is modified in the trap
 # handler.
-	ld t6, PCB_OFFSET_TRAP_CONTEXT(tp)
+	ld t6, PCB_OFFSET_TRAP_CONTEXT(t5)
 	sd t6, TRAP_CONTEXT_OFFSET_TP(sp)
 
 # Now the trap context is saved on the stack, store a pointer in the 
 # process control block, so that we can access the trap context in the handler
 # routines.
-	sd sp, PCB_OFFSET_TRAP_CONTEXT(tp)
+	sd sp, PCB_OFFSET_TRAP_CONTEXT(t5)
 
 	# Jump to the trap handler routine.
-	mv   a0, tp
+	mv   a0, t5
 	csrr a1, scause
 	csrr a2, sepc
 	csrr a3, stval
@@ -123,8 +132,9 @@ call_supervisor_trap_handler:
 
 restore_trap_frame:
 # Restore the trap context pointer.
+	ld t5, HART_STATE_PCB_POINTER_OFFSET(tp)
 	ld t6, TRAP_CONTEXT_OFFSET_TP(sp)
-	sd t6, PCB_OFFSET_TRAP_CONTEXT(tp)
+	sd t6, PCB_OFFSET_TRAP_CONTEXT(t5)
 
 # Restore scause.
 	ld t6, TRAP_CONTEXT_OFFSET_SCAUSE(sp)
@@ -167,9 +177,17 @@ restore_trap_frame:
 # the PCB's kernel context by the scheduler. This will ensure that the correct
 # stack pointer is saved.
 	addi sp, sp, TRAP_CONTEXT_SIZE
-	sd sp, KERNEL_CONTEXT_OFFSET_SP(tp)
 
-	ld sp, PCB_OFFSET_USER_SP(tp)
+# temporarily save t6 in sscratch, then use it to load the PCB pointer.
+	csrw sscratch, t6
+
+	ld t6, HART_STATE_PCB_POINTER_OFFSET(tp)
+	sd sp, KERNEL_CONTEXT_OFFSET_SP(t6)
+
+	ld sp, PCB_OFFSET_USER_SP(t6)
+
+# Restore t6 from sscratch before returning to user mode.
+	csrr t6, sscratch
 
 return_to_user_mode:
 	sret
@@ -181,8 +199,15 @@ restore_gp_pointers_and_return_to_supervisor_mode:
 		.set i, i+1
 	.endr
 
+# temporarily save t6 in sscratch, then use it to load the PCB pointer.
+	csrw sscratch, t6
+	ld t6, HART_STATE_PCB_POINTER_OFFSET(tp)
+
 	addi sp, sp, TRAP_CONTEXT_SIZE
-	sd sp, KERNEL_CONTEXT_OFFSET_SP(tp)
+	sd sp, KERNEL_CONTEXT_OFFSET_SP(t6)
+
+# Restore t6 from sscratch before returning to supervisor mode.
+	csrr t6, sscratch
 
 return_to_supervisor_mode:
 	sret

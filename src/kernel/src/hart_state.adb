@@ -16,35 +16,6 @@ package body Hart_State is
       return ((Get_Current_Hart_Id * 2) + 1);
    end Get_Current_Hart_Supervisor_Interrupt_Context;
 
-   function Get_Current_Hart_State return Hart_State_Access is
-   begin
-      return Hart_States (Get_Current_Hart_Id)'Access;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Current_Hart_State");
-         return null;
-   end Get_Current_Hart_State;
-
-   function Get_Process_Running_On_Current_Hart
-      return Process_Control_Block_Access
-   is
-      Current_Hart_State : Hart_State_Access := null;
-   begin
-      Current_Hart_State := Get_Current_Hart_State;
-
-      if Current_Hart_State = null then
-         Log_Error
-           ("No current hart state in Get_Process_Running_On_Current_Hart");
-         return null;
-      end if;
-
-      return Current_Hart_State.all.Current_Process;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Process_Running_On_Current_Hart");
-         return null;
-   end Get_Process_Running_On_Current_Hart;
-
    procedure Panic (Message : String := "Kernel Panic") is
    begin
       Log_Error ("Panic: " & Message);
@@ -78,7 +49,8 @@ package body Hart_State is
         Current_Hart_State.all.Interrupts_Off_Counter - 1;
 
       if Current_Hart_State.all.Interrupts_Off_Counter = 0
-        and then Current_Hart_State.all.Were_Interrupts_Enabled_Before_Push_Off
+        and then Current_Hart_State.all
+                   .Were_Interrupts_Enabled_Before_Initial_Push_Off
       then
          RISCV.Interrupts.Enable_Supervisor_Interrupts;
       end if;
@@ -96,7 +68,8 @@ package body Hart_State is
       end if;
 
       if Current_Hart_State.all.Interrupts_Off_Counter = 0 then
-         Current_Hart_State.all.Were_Interrupts_Enabled_Before_Push_Off :=
+         Current_Hart_State.all
+           .Were_Interrupts_Enabled_Before_Initial_Push_Off :=
            RISCV.Interrupts.Are_Supervisor_Interrupts_Enabled;
       end if;
 

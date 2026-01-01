@@ -45,9 +45,6 @@ scheduler_load_kernel_context:
 	# Refer to: https://blog.stephenmarz.com/2021/02/01/wrong-about-sfence/
 	sfence.vma zero, a1
 
-	# Store a pointer to this process in the 'tp' register.
-	mv tp, a2
-
 	# Add the offset of the kernel context to the thread pointer.
 	addi a2, a2, PCB_OFFSET_KERNEL_CONTEXT
 

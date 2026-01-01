@@ -382,12 +382,20 @@ package body Boot is
    end Initialise_Filesystem;
 
    procedure Initialise_Hart (Hart_Id : Integer) is
+      procedure Save_Hart_State_Pointer (Hart_State_Address : Address)
+      with
+        Import,
+        Convention    => Assembler,
+        External_Name => "store_hart_state_pointer";
    begin
       Hart_State.Hart_States (Hart_Id).Current_Process := null;
+      Hart_State.Hart_States (Hart_Id).Hart_Id := Hart_Index_T (Hart_Id);
       Hart_State.Hart_States (Hart_Id).Interrupts_Off_Counter := 0;
       Hart_State.Hart_States (Hart_Id)
-        .Were_Interrupts_Enabled_Before_Push_Off :=
+        .Were_Interrupts_Enabled_Before_Initial_Push_Off :=
         True;
+
+      Save_Hart_State_Pointer (Hart_State.Hart_States (Hart_Id)'Address);
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Initialise_Hart");
@@ -436,6 +444,8 @@ package body Boot is
 
       Log_Debug ("Booting Hart" & Hart_Id'Image & "...", Logging_Tags);
 
+      Initialise_Hart (Hart_Id);
+
       Initialise_Physical_Memory_Manager;
 
       Initialise_Kernel_Address_Space;
@@ -443,8 +453,6 @@ package body Boot is
       Initialise_Kernel_Heap;
 
       Initialise_Kernel_Page_Pool;
-
-      Initialise_Hart (Hart_Id);
 
       Log_Debug ("Initialising boot secondary stack...", Logging_Tags);
 
@@ -475,7 +483,6 @@ package body Boot is
 
       Switch_To_Kernel_Address_Space
         (Get_Kernel_Address_Space_SATP, Boot_Secondary_Stack_Top);
-
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Initialise_Kernel_Memory");
