@@ -11,19 +11,29 @@ package Hart_State is
    Maximum_Harts : constant := 8;
    subtype Hart_Index_T is Natural range 0 .. (Maximum_Harts - 1);
 
+   type Hart_Status_T is
+     (Hart_Status_Unknown,
+      Hart_State_Initialised,
+      Hart_Status_Stopped,
+      Hart_Status_Running,
+      Hart_Status_Invalid);
+
    type Hart_State_T is record
-      Current_Process                                 :
+      Current_Process                            :
         Process_Control_Block_Access := null;
-      Hart_Id                                         : Hart_Index_T := 0;
-      Interrupts_Off_Counter                          : Natural := 0;
-      Were_Interrupts_Enabled_Before_Initial_Push_Off : Boolean := True;
+      Hart_Id                                    : Hart_Index_T := 0;
+      Interrupts_Off_Counter                     : Natural := 0;
+      Interrupts_Enabled_Before_Initial_Push_Off : Boolean := True;
+      Hart_Status                                : Hart_Status_T :=
+        Hart_Status_Unknown;
    end record;
    for Hart_State_T use
      record
        Current_Process at 0 range 0 .. 63;
        Hart_Id at 8 range 0 .. 31;
        Interrupts_Off_Counter at 12 range 0 .. 31;
-       Were_Interrupts_Enabled_Before_Initial_Push_Off at 16 range 0 .. 0;
+       Interrupts_Enabled_Before_Initial_Push_Off at 16 range 0 .. 0;
+       Hart_Status at 20 range 0 .. 31;
      end record;
 
    type Hart_State_Access is access all Hart_State_T with Convention => C;

@@ -26,6 +26,8 @@ OPENSBI_BIN_DIR := /home/ajxs/src/opensbi/build/platform/generic/firmware
 OPENSBI_BIN     := ${OPENSBI_BIN_DIR}/fw_jump.bin
 BIOS            := ${OPENSBI_BIN}
 
+HART_COUNT := 3
+
 # @TODO: Why did I specify the VirtIO MMIO buses here? I can't recall now.
 QEMU_FLAGS :=        \
 	-bios ${BIOS}      \
@@ -33,6 +35,7 @@ QEMU_FLAGS :=        \
 	-m 128M            \
 	-machine virt      \
 	-usb               \
+	-smp ${HART_COUNT}  \
 	-net none          \
 	-global virtio-mmio.force-legacy=false                   \
 	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \

@@ -11,9 +11,10 @@
 # Arguments:
 # a0: Base page table address
 # a1: stack top address
+# a2: Return address.
 ###############################################################################
-.global switch_to_kernel_address_space
-switch_to_kernel_address_space:
+.global boot_switch_to_kernel_address_space
+boot_switch_to_kernel_address_space:
 	# Load the kernel address space page table.
 	sfence.vma zero, zero
 	csrw satp, a0
@@ -21,5 +22,5 @@ switch_to_kernel_address_space:
 
 	mv sp, a1
 
-	# Jump into the kernel proper.
-	j boot_initialise_kernel_services
+	# Jump to the specified return address.
+	jalr a2

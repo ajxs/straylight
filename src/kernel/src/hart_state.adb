@@ -50,7 +50,7 @@ package body Hart_State is
 
       if Current_Hart_State.all.Interrupts_Off_Counter = 0
         and then Current_Hart_State.all
-                   .Were_Interrupts_Enabled_Before_Initial_Push_Off
+                   .Interrupts_Enabled_Before_Initial_Push_Off
       then
          RISCV.Interrupts.Enable_Supervisor_Interrupts;
       end if;
@@ -68,8 +68,7 @@ package body Hart_State is
       end if;
 
       if Current_Hart_State.all.Interrupts_Off_Counter = 0 then
-         Current_Hart_State.all
-           .Were_Interrupts_Enabled_Before_Initial_Push_Off :=
+         Current_Hart_State.all.Interrupts_Enabled_Before_Initial_Push_Off :=
            RISCV.Interrupts.Are_Supervisor_Interrupts_Enabled;
       end if;
 

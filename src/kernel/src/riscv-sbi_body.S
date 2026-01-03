@@ -22,3 +22,21 @@ sbi_debug_console_print:
 	ecall
 
 	ret
+
+.global sbi_hart_start
+.type sbi_hart_start, @function
+sbi_hart_start:
+	li a7, 0x48534D
+	li a6, 0x0
+	ecall
+
+	ret
+
+.global sbi_get_hart_status
+.type sbi_get_hart_status, @function
+sbi_get_hart_status:
+	li a7, 0x48534D
+	li a6, 0x2
+	ecall
+
+	ret

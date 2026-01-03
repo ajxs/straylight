@@ -238,26 +238,33 @@ package body Boot.Early is
       Bss_Section_End_Marker : constant Integer
       with Import, External_Name => "__bss_end";
 
-      Boot_Stack_Start_Marker : constant Integer
-      with Import, External_Name => "__boot_stack_bottom";
+      --  All harts require an initial boot stack to use prior to jumping into
+      --  the 'higher-half' kernel address space. The stacks for each hart are
+      --  statically allocated in the linker script in one block, and mapped
+      --  altogether at a fixed address.
+      --  These are loaded by each hart in the boot-entry code, e.g.
+      --  SP := __boot_stacks_bottom +
+      --    (Hart_ID * BOOT_STACK_SIZE) + BOOT_STACK_SIZE
+      Boot_Stacks_Start_Marker : constant Integer
+      with Import, External_Name => "__boot_stacks_bottom";
 
-      Boot_Stack_End_Marker : constant Integer
-      with Import, External_Name => "__boot_stack_top";
+      Boot_Stacks_End_Marker : constant Integer
+      with Import, External_Name => "__boot_stacks_top";
 
-      --  This is the address at which the kernel's boot stack is mapped into
+      --  This is the address at which the kernel's boot stacks are mapped into
       --  the kernel's higher half address space.
-      Kernel_Boot_Stack_Bottom_Virtual_Address : constant Address :=
+      Kernel_Boot_Stacks_Base_Virtual_Address : constant Address :=
         To_Address (16#FFFF_FFFF_FF00_0000#);
 
-      Base_Page_Table_Addr : Physical_Address_T := Null_Physical_Address;
-
-      Boot_Stack_Size : Storage_Offset := 0;
+      Boot_Stacks_Size : Storage_Offset := 0;
 
       Result : Function_Result := Unset;
    begin
       Early_Debug_Console_Print (Str_Initialising_Page_Tables);
 
-      Allocate_New_Boot_Page_Table (Base_Page_Table_Addr, Result);
+      --  Allocate the root boot page table. This will be reused by other
+      --  harts when they're initialised.
+      Allocate_New_Boot_Page_Table (Boot_Root_Page_Table_Addr, Result);
       --  In the case this was not successful, the error message will
       --  have already been printed by the function.
       if Is_Error (Result) then
@@ -265,7 +272,7 @@ package body Boot.Early is
       end if;
 
       Map_Boot_Memory_Section
-        (Base_Page_Table_Addr,
+        (Boot_Root_Page_Table_Addr,
          Boot_Text_Section_Start_Marker'Address,
          Boot_Text_Section_End_Marker'Address,
          Physical_Address_T (Boot_Text_Section_Start_Marker'Address),
@@ -276,7 +283,7 @@ package body Boot.Early is
       end if;
 
       Map_Boot_Memory_Section
-        (Base_Page_Table_Addr,
+        (Boot_Root_Page_Table_Addr,
          Boot_Data_Section_Start_Marker'Address,
          Boot_Data_Section_End_Marker'Address,
          Physical_Address_T (Boot_Data_Section_Start_Marker'Address),
@@ -287,7 +294,7 @@ package body Boot.Early is
       end if;
 
       Map_Boot_Memory_Section
-        (Base_Page_Table_Addr,
+        (Boot_Root_Page_Table_Addr,
          Boot_Rodata_Section_Start_Marker'Address,
          Boot_Rodata_Section_End_Marker'Address,
          Physical_Address_T (Boot_Rodata_Section_Start_Marker'Address),
@@ -298,7 +305,7 @@ package body Boot.Early is
       end if;
 
       Map_Boot_Memory_Section
-        (Base_Page_Table_Addr,
+        (Boot_Root_Page_Table_Addr,
          Text_Section_Start_Marker'Address,
          Text_Section_End_Marker'Address,
          Physical_Address_T
@@ -313,7 +320,7 @@ package body Boot.Early is
         > Rodata_Section_Start_Marker'Address
       then
          Map_Boot_Memory_Section
-           (Base_Page_Table_Addr,
+           (Boot_Root_Page_Table_Addr,
             Rodata_Section_Start_Marker'Address,
             Rodata_Section_End_Marker'Address,
             Physical_Address_T
@@ -329,7 +336,7 @@ package body Boot.Early is
       if Data_Section_End_Marker'Address > Data_Section_Start_Marker'Address
       then
          Map_Boot_Memory_Section
-           (Base_Page_Table_Addr,
+           (Boot_Root_Page_Table_Addr,
             Data_Section_Start_Marker'Address,
             Data_Section_End_Marker'Address,
             Physical_Address_T
@@ -344,7 +351,7 @@ package body Boot.Early is
 
       if Bss_Section_End_Marker'Address > Bss_Section_Start_Marker'Address then
          Map_Boot_Memory_Section
-           (Base_Page_Table_Addr,
+           (Boot_Root_Page_Table_Addr,
             Bss_Section_Start_Marker'Address,
             Bss_Section_End_Marker'Address,
             Physical_Address_T
@@ -359,7 +366,7 @@ package body Boot.Early is
 
       --  Map all physical memory into the kernel's address space.
       Map_Boot_Memory_Section
-        (Base_Page_Table_Addr,
+        (Boot_Root_Page_Table_Addr,
          To_Address (Physical_Memory_Map_Address),
          To_Address (Physical_Memory_Map_Address)
          + Memory.Physical_Memory_Map_Limit,
@@ -370,22 +377,22 @@ package body Boot.Early is
          return 0;
       end if;
 
-      --  Map the boot stack into the higher-half boot memory space.
-      Boot_Stack_Size :=
-        Boot_Stack_End_Marker'Address - Boot_Stack_Start_Marker'Address;
+      --  Map the boot stacks into the higher-half boot memory space.
+      Boot_Stacks_Size :=
+        Boot_Stacks_End_Marker'Address - Boot_Stacks_Start_Marker'Address;
 
       Map_Boot_Memory_Section
-        (Base_Page_Table_Addr,
-         Kernel_Boot_Stack_Bottom_Virtual_Address,
-         Kernel_Boot_Stack_Bottom_Virtual_Address + Boot_Stack_Size,
-         Physical_Address_T (Boot_Stack_Start_Marker'Address),
+        (Boot_Root_Page_Table_Addr,
+         Kernel_Boot_Stacks_Base_Virtual_Address,
+         Kernel_Boot_Stacks_Base_Virtual_Address + Boot_Stacks_Size,
+         Physical_Address_T (Boot_Stacks_Start_Marker'Address),
          (True, True, False, False),
          Result);
       if Is_Error (Result) then
          return 0;
       end if;
 
-      return RISCV.Create_SATP (Address (Base_Page_Table_Addr), 0);
+      return RISCV.Create_SATP (Address (Boot_Root_Page_Table_Addr), 0);
    exception
       when Constraint_Error =>
          return 0;

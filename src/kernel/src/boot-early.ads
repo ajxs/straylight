@@ -3,7 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Interfaces;              use Interfaces;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Function_Results; use Function_Results;
@@ -27,18 +26,10 @@ private package Boot.Early is
      External_Name  => "boot_initialise_boot_page_tables",
      Linker_Section => ".boot_text";
 
+private
    procedure Allocate_New_Boot_Page_Table
      (Page_Table_Addr : out Physical_Address_T; Result : out Function_Result)
    with Linker_Section => ".boot_text";
-
-   ----------------------------------------------------------------------------
-   --  A pool of 'Boot Page Tables' is statically allocated in the linker
-   --  script, in the '.boot_data' section. This pool is used to allocate page
-   --  tables to map the kernel before the jump into higher-half memory.
-   --  This memory will be 'freed' once userspace has been initialised.
-   ----------------------------------------------------------------------------
-   Boot_Page_Table_Pool_Status : array (1 .. 16) of Boolean := [others => True]
-   with Linker_Section => ".boot_data";
 
    procedure Create_Virtual_Memory_Mapping
      (Base_Page_Table_Addr : Physical_Address_T;
@@ -71,7 +62,23 @@ private package Boot.Early is
    procedure Early_Debug_Console_Print (Str : String)
    with Linker_Section => ".boot_text";
 
-private
+   --  A pool of 'Boot Page Tables' is statically allocated in the linker
+   --  script, in the '.boot_data' section. This pool is used to allocate page
+   --  tables to map the kernel before the jump into higher-half memory.
+   --  This memory will be 'freed' once userspace has been initialised.
+   Boot_Page_Table_Pool_Status : array (1 .. 16) of Boolean := [others => True]
+   with Linker_Section => ".boot_data";
+
+   --  The root page table address is stored statically, because after it's
+   --  initialised, it will be reused by other non-boot harts.
+   --  Once it's initialised by the boot hart, the boot address space won't
+   --  change afterwards.
+   Boot_Root_Page_Table_Addr : Physical_Address_T
+   with
+     Export,
+     External_Name  => "boot_root_page_table",
+     Linker_Section => ".boot_data";
+
    ----------------------------------------------------------------------------
    --  Because the boot code needs to be linked in its own section, it can't
    --  access normal the RISCV library code, which is linked in .text.

@@ -63,6 +63,15 @@ package body Logging is
    end Log_Error;
 
    procedure Log_To_Debug_Console (Message : String; Level : Log_Level_T) is
+   begin
+      Acquire_Spinlock (Logging_Spinlock);
+      Log_To_Debug_Console_Unlocked (Message, Level);
+      Release_Spinlock (Logging_Spinlock);
+   end Log_To_Debug_Console;
+
+   procedure Log_To_Debug_Console_Unlocked
+     (Message : String; Level : Log_Level_T)
+   is
       System_Time : constant Unsigned_64 := RISCV.Get_System_Time;
    begin
       case Level is
@@ -81,7 +90,7 @@ package body Logging is
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Log_To_Debug_Console");
-   end Log_To_Debug_Console;
+   end Log_To_Debug_Console_Unlocked;
 
    procedure Print_String_To_SBI_Console (Message : String) is
       Physical_Address : Address := Null_Address;

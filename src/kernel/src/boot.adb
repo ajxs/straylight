@@ -3,7 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Interfaces;              use Interfaces;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Devices;           use Devices;
@@ -15,14 +14,15 @@ with Filesystems;       use Filesystems;
 with Filesystems.Root;  use Filesystems.Root;
 with Function_Results;  use Function_Results;
 with Graphics;          use Graphics;
+with Hart_State;        use Hart_State;
 with Loader;
 with Locks;
 with Memory.Allocators; use Memory.Allocators;
 with Memory.Kernel;     use Memory.Kernel;
 with Memory.Physical;   use Memory.Physical;
 with Memory.Virtual;    use Memory.Virtual;
+with RISCV.SBI;
 with Scheduler;
-with Hart_State;        use Hart_State;
 with Traps;
 
 package body Boot is
@@ -388,18 +388,37 @@ package body Boot is
         Convention    => Assembler,
         External_Name => "store_hart_state_pointer";
    begin
-      Hart_State.Hart_States (Hart_Id).Current_Process := null;
-      Hart_State.Hart_States (Hart_Id).Hart_Id := Hart_Index_T (Hart_Id);
-      Hart_State.Hart_States (Hart_Id).Interrupts_Off_Counter := 0;
-      Hart_State.Hart_States (Hart_Id)
-        .Were_Interrupts_Enabled_Before_Initial_Push_Off :=
-        True;
+      Hart_States (Hart_Id) :=
+        (Current_Process                            => null,
+         Hart_Id                                    => Hart_Index_T (Hart_Id),
+         Interrupts_Off_Counter                     => 0,
+         Interrupts_Enabled_Before_Initial_Push_Off => False,
+         Hart_Status                                => Hart_State_Initialised);
 
-      Save_Hart_State_Pointer (Hart_State.Hart_States (Hart_Id)'Address);
+      Save_Hart_State_Pointer (Hart_States (Hart_Id)'Address);
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Initialise_Hart");
    end Initialise_Hart;
+
+   procedure Initialise_Idle_Process is
+      Result : Function_Result := Unset;
+   begin
+      Create_New_Process (Processes.Idle_Process, Result);
+      if Is_Error (Result) then
+         --  Error already printed.
+         Panic;
+      end if;
+
+      --  Set the idle process's return address to the idle function.
+      --  When the scheduler switches to the idle process, it will 'return'
+      --  to the idle function address.
+      Processes.Idle_Process.all.Kernel_Context (ra) :=
+        Address_To_Unsigned_64 (Processes.Idle'Address);
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Initialise_Idle_Process");
+   end Initialise_Idle_Process;
 
    procedure Initialise_Init_Process is
       Result : Function_Result := Unset;
@@ -425,26 +444,24 @@ package body Boot is
          Panic ("Constraint_Error: Initialise_Init_Process");
    end Initialise_Init_Process;
 
-   procedure Initialise_Kernel_Memory
-     (Hart_Id : Integer; DTB_Address : Address)
-   is
-      procedure Switch_To_Kernel_Address_Space
-        (SATP : Unsigned_64; Stack_Pointer : Address)
-      with
-        No_Return,
-        Import,
-        Convention    => Assembler,
-        External_Name => "switch_to_kernel_address_space";
-
-      Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
-
+   procedure Kernel_Main (Hart_Id : Integer; DTB_Address : Address) is
       Result : Function_Result := Unset;
    begin
-      pragma Unreferenced (DTB_Address);
+      --  This needs to be the first function called on each hart to set up
+      --  the hart's state structure. This needs be called before any logging
+      --  can take place, since the spinlock mechanism requires being able to
+      --  determine the current hart id.
+      Initialise_Hart (Hart_Id);
 
       Log_Debug ("Booting Hart" & Hart_Id'Image & "...", Logging_Tags);
 
-      Initialise_Hart (Hart_Id);
+      --  This logging line is to avoid an obscure compile-time error if the
+      --  DTB_Address argument is set as 'unreferenced'.
+      --  Error: pragma "Unreferenced" argument must be in same declarative
+      --  part
+      Log_Debug ("DTB_Address: " & DTB_Address'Image, Logging_Tags);
+
+      Log_Debug ("Initialising core kernel subsystems...", Logging_Tags);
 
       Initialise_Physical_Memory_Manager;
 
@@ -454,14 +471,26 @@ package body Boot is
 
       Initialise_Kernel_Page_Pool;
 
-      Log_Debug ("Initialising boot secondary stack...", Logging_Tags);
+      Log_Debug
+        ("Initialising boot secondary stack for Hart " & Hart_Id'Image & "...",
+         Logging_Tags);
 
+      --  Allocate the boot secondary stack for all harts.
+      --  However only the current hart will be mapped here.
       Allocate_Physical_Memory
-        (Boot_Secondary_Stack_Size, Boot_Secondary_Stack_Phys_Address, Result);
+        (Boot_Secondary_Stack_Size * Maximum_Harts,
+         Boot_Secondary_Stack_Phys_Address_Base,
+         Result);
       if Is_Error (Result) then
          --  Error already printed.
          Panic;
       end if;
+
+      Boot_Secondary_Stack_Phys_Address : constant Physical_Address_T :=
+        Get_Boot_Secondary_Stack_Physical_Address (Hart_Id);
+
+      Boot_Secondary_Stack_Virtual_Address : constant Virtual_Address_T :=
+        Get_Boot_Secondary_Stack_Virtual_Address (Hart_Id);
 
       Map_Kernel_Memory
         (Boot_Secondary_Stack_Virtual_Address,
@@ -474,19 +503,26 @@ package body Boot is
          Panic;
       end if;
 
-      Boot_Secondary_Stack_Top :=
+      Boot_Secondary_Stack_Top : constant Virtual_Address_T :=
         Boot_Secondary_Stack_Virtual_Address + Boot_Secondary_Stack_Size;
 
       Log_Debug ("Initialised boot secondary stack.", Logging_Tags);
 
+      --  Once the kernel address space is set up, we can mark this hart as
+      --  running. Once all harts are running, the boot memory is no longer
+      --  needed, and can be safely freed.
+      Hart_States (Hart_Id).Hart_Status := Hart_Status_Running;
+
       Log_Debug ("Jumping to kernel address space...", Logging_Tags);
 
       Switch_To_Kernel_Address_Space
-        (Get_Kernel_Address_Space_SATP, Boot_Secondary_Stack_Top);
+        (Get_Kernel_Address_Space_SATP,
+         Boot_Secondary_Stack_Top,
+         Initialise_Kernel_Services'Address);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Kernel_Memory");
-   end Initialise_Kernel_Memory;
+         Panic ("Constraint_Error: Kernel_Main");
+   end Kernel_Main;
 
    procedure Initialise_Physical_Memory_Manager is
       Kernel_End : constant Natural
@@ -517,27 +553,12 @@ package body Boot is
    end Initialise_Physical_Memory_Manager;
 
    procedure Initialise_Kernel_Services is
-      Result : Function_Result := Unset;
    begin
       Log_Debug ("Initialising kernel services...", Logging_Tags);
 
-      Traps.Setup_Next_Timer_Interrupt;
-      Log_Debug ("Set initial system tick.", Logging_Tags);
-
       Initialise_Devices;
 
-      --  Create the kernel idle process.
-      Create_New_Process (Processes.Idle_Process, Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      --  Set the idle process's return address to the idle function.
-      --  When the scheduler switches to the idle process, it will 'return' to
-      --  the idle function address.
-      Processes.Idle_Process.all.Kernel_Context (ra) :=
-        Address_To_Unsigned_64 (Processes.Idle'Address);
+      Initialise_Idle_Process;
 
       Initialise_Block_Cache;
 
@@ -545,14 +566,14 @@ package body Boot is
 
       Initialise_Init_Process;
 
-      Free_Boot_Memory;
+      Start_Non_Boot_Harts;
+
+      Traps.Setup_Next_Timer_Interrupt;
+      Log_Debug ("Set initial system tick.", Logging_Tags);
 
       Log_Debug ("Starting scheduler...", Logging_Tags);
 
       Scheduler.Run;
-   exception
-      when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Kernel_Services");
    end Initialise_Kernel_Services;
 
    procedure Initialise_Graphics is
@@ -666,20 +687,26 @@ package body Boot is
       --  requires a process context to operate in.
       Initialise_Graphics;
 
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
-         "/Devices/Disk/Programs/print_random_words.elf",
-         Result);
+      --  Loader.Load_New_Process_From_Filesystem
+      --    (Init_Process.all,
+      --     "/Devices/Disk/Programs/print_random_words.elf",
+      --     Result);
 
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
-         "/Devices/Disk/Programs/print_more_words.elf",
-         Result);
+      --  Loader.Load_New_Process_From_Filesystem
+      --    (Init_Process.all,
+      --     "/Devices/Disk/Programs/print_more_words.elf",
+      --     Result);
 
       Loader.Load_New_Process_From_Filesystem
         (Init_Process.all,
          "/Devices/Disk/Programs/print_fractal_pattern.elf",
          Result);
+
+      --  Wait for all the harts to start before freeing the boot memory.
+      --  Since their boot stacks are in the boot memory region that would be
+      --  freed here.
+      Wait_For_All_Harts_To_Start;
+      Free_Boot_Memory;
 
       Exit_Process (Init_Process.all, Result);
       if Is_Error (Result) then
@@ -698,4 +725,163 @@ package body Boot is
          Panic ("Constraint_Error: Start_Init_Process");
    end Start_Init_Process;
 
+   procedure Wait_For_All_Harts_To_Start is
+      --  A timeout is declared here to avoid an infinite loop in case
+      --  something goes wrong with hart startup.
+      Hart_Spinup_Wait_Timeout : constant Integer := 1000000;
+      All_Harts_Started        : Boolean := False;
+   begin
+      --  Loop continuously, polling all the harts until we can see that
+      --  they've all been initialised.
+      for I in 1 .. Hart_Spinup_Wait_Timeout loop
+         for Hart_Id in 0 .. Maximum_Harts - 1 loop
+            All_Harts_Started := True;
+
+            --  All harts should be in either the Running or Invalid state.
+            --  Invalid indicates that the hart is not present.
+            if not (Hart_States (Hart_Id).Hart_Status = Hart_Status_Running
+                    or else Hart_States (Hart_Id).Hart_Status
+                            = Hart_Status_Invalid)
+            then
+               All_Harts_Started := False;
+            end if;
+         end loop;
+
+         if All_Harts_Started then
+            Log_Debug ("All harts have started.", Logging_Tags);
+            return;
+         end if;
+      end loop;
+
+      Log_Debug ("Timeout waiting for all harts to start.", Logging_Tags);
+   end Wait_For_All_Harts_To_Start;
+
+   procedure Start_Non_Boot_Harts is
+      Non_Boot_Hart_Entry_Marker : constant Integer
+      with Import, External_Name => "non_boot_hart_entry";
+
+      SBI_Result : RISCV.SBI.SBI_Result_T;
+   begin
+      Log_Debug ("Starting non-boot harts...", Logging_Tags);
+
+      for Hart_Id in 0 .. Hart_State.Maximum_Harts - 1 loop
+         if Hart_Id /= Get_Current_Hart_Id then
+            Hart_States (Hart_Id).Hart_Status := Hart_Status_Unknown;
+
+            SBI_Result := RISCV.SBI.Get_Hart_Status (Unsigned_32 (Hart_Id));
+
+            --  SBI_ERR_INVALID_PARAM indicates that the hart is not present.
+            --  For more documentation, refer to:
+            --  https://github.com/
+            --    riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-hsm.adoc
+            if SBI_Result.Error /= 0 then
+               if SBI_Result.Error = RISCV.SBI.SBI_ERR_INVALID_PARAM then
+                  Hart_States (Hart_Id).Hart_Status := Hart_Status_Invalid;
+
+                  Log_Debug
+                    ("Hart" & Hart_Id'Image & " is not present.",
+                     Logging_Tags);
+               else
+                  Log_Error
+                    ("Error getting hart"
+                     & Hart_Id'Image
+                     & " status: "
+                     & SBI_Result.Error'Image);
+               end if;
+            else
+               Log_Debug
+                 ("Hart"
+                  & Hart_Id'Image
+                  & " status: "
+                  & SBI_Result.Value'Image,
+                  Logging_Tags);
+
+               SBI_Result :=
+                 RISCV.SBI.Hart_Start
+                   (Unsigned_32 (Hart_Id),
+                    Address_To_Unsigned_64
+                      (Non_Boot_Hart_Entry_Marker'Address),
+                    Get_Kernel_Address_Space_SATP);
+               if SBI_Result.Error /= RISCV.SBI.SBI_SUCCESS then
+                  Panic
+                    ("Error starting non-boot hart"
+                     & Hart_Id'Image
+                     & ": "
+                     & SBI_Result.Error'Image);
+               end if;
+            end if;
+         end if;
+      end loop;
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Start_Non_Boot_Harts");
+   end Start_Non_Boot_Harts;
+
+   procedure Non_Boot_Hart_Entry (Hart_Id : Integer) is
+      Result : Function_Result := Unset;
+   begin
+      --  This needs to be the first function called on each hart to set up
+      --  the hart's state structure. This needs be called before any logging
+      --  can take place, since the spinlock mechanism requires being able to
+      --  determine the current hart id.
+      Initialise_Hart (Hart_Id);
+
+      Log_Debug ("Starting non-boot hart: " & Hart_Id'Image, Logging_Tags);
+
+      --  Map the boot secondary stack for this hart.
+      Boot_Secondary_Stack_Phys_Address : constant Physical_Address_T :=
+        Get_Boot_Secondary_Stack_Physical_Address (Hart_Id);
+
+      Boot_Secondary_Stack_Virtual_Address : constant Virtual_Address_T :=
+        Get_Boot_Secondary_Stack_Virtual_Address (Hart_Id);
+
+      Map_Kernel_Memory
+        (Boot_Secondary_Stack_Virtual_Address,
+         Boot_Secondary_Stack_Phys_Address,
+         Boot_Secondary_Stack_Size,
+         (True, True, False, False),
+         Result);
+      if Is_Error (Result) then
+         --  Error already printed.
+         Panic;
+      end if;
+
+      Boot_Secondary_Stack_Top : constant Virtual_Address_T :=
+        Boot_Secondary_Stack_Virtual_Address + Boot_Secondary_Stack_Size;
+
+      Log_Debug ("Parking non-boot hart: " & Hart_Id'Image, Logging_Tags);
+
+      Hart_States (Hart_Id).Hart_Status := Hart_Status_Running;
+
+      --  Enter the kernel address space properly, and park this hart.
+      Switch_To_Kernel_Address_Space
+        (Get_Kernel_Address_Space_SATP,
+         Boot_Secondary_Stack_Top,
+         Park_Non_Boot_Hart'Address);
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Non_Boot_Hart_Entry");
+   end Non_Boot_Hart_Entry;
+
+   --  An issue currently exists here with phantom Constraint_Error warnings.
+   --  To work around this, we disable warnings for these functions.
+   pragma Warnings (Off, "Constraint_Error");
+   function Get_Boot_Secondary_Stack_Virtual_Address
+     (Hart_Id : Integer) return Virtual_Address_T is
+   begin
+      return
+        Boot_Secondary_Stack_Virtual_Address_Base
+        + Storage_Offset (Hart_Id * Boot_Secondary_Stack_Size);
+   end Get_Boot_Secondary_Stack_Virtual_Address;
+   pragma Warnings (On);
+
+   pragma Warnings (Off, "Constraint_Error");
+   function Get_Boot_Secondary_Stack_Physical_Address
+     (Hart_Id : Integer) return Physical_Address_T is
+   begin
+      return
+        Boot_Secondary_Stack_Phys_Address_Base
+        + Storage_Offset (Hart_Id * Boot_Secondary_Stack_Size);
+   end Get_Boot_Secondary_Stack_Physical_Address;
+   pragma Warnings (On);
 end Boot;

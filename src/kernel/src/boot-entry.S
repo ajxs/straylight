@@ -5,6 +5,8 @@
 
 #include "riscv.h"
 
+#define BOOT_STACK_SIZE 0x2000
+
 .section .boot_text
 
 ###############################################################################
@@ -19,13 +21,17 @@ _start:
 	lla  gp, __global_pointer$
 .option pop
 
-# If not HART#0 branch to cpu halt routine.
-	bnez a0, cpu_halt
+# Get boot stack pointer.
+	li t1, BOOT_STACK_SIZE
+	mul t2, t1, a0
 
-# Setup stack pointer.
-	la   sp, __boot_stack_top
+	la t0, __boot_stacks_bottom
+	add t0, t0, t2
+	add t0, t0, t1
+	mv sp, t0
 
-# Save the Hart ID and devicetree pointer to the stack.
+# Save the Hart ID and devicetree pointer to the stack, since calling the 
+# kernel init functions in Ada will overwrite a0 and a1.
 	addi sp, sp, -16
 	sd   a0, 8(sp)
 	sd   a1, 0(sp)
@@ -83,7 +89,60 @@ _start:
 
 # CPU spin function.
 # This is where unused CPUs are parked in a spinlock.
+.global cpu_halt
 .type cpu_halt, @function
 cpu_halt:
 	wfi
 	j cpu_halt
+
+
+.global non_boot_hart_entry
+.type non_boot_hart_entry, @function
+non_boot_hart_entry:
+.option push
+.option norelax
+# Load the global pointer location defined in the linker script into gp.
+	lla  gp, __global_pointer$
+.option pop
+
+	# Enable supervisor user memory access.
+	li   t0, SSTATUS_SUM
+	csrs sstatus, t0
+
+# Set up the supervisor-mode trap vector.
+	la   t0, traps_entry
+	csrw stvec, t0
+
+# Create SATP value for boot page table.
+	ld   t0, boot_root_page_table
+	srli t0, t0, 12
+# Mask PPN.
+	li   t1, (1 << 44) - 1
+	and  t0, t0, t1
+# Set MODE to Sv39
+	li   t1, 8
+	slli t1, t1, 60
+# Combine MODE and PPN.
+	or   t0, t0, t1
+
+	sfence.vma zero, zero
+	csrw satp, t0
+	sfence.vma zero, zero
+
+# Get boot stack pointer.
+	li t1, BOOT_STACK_SIZE
+	mul t2, t1, a0
+
+	la t0, __boot_stacks_bottom
+	add t0, t0, t2
+	add t0, t0, t1
+	mv sp, t0
+
+# Jump to the kernel initialisation function in Ada.
+# Load the address of the function into a register first to avoid
+# any potential issues with the linker and large binaries, due to using
+# a higher-half kernel.
+	lui t0, %hi(boot_non_boot_hart_entry)
+	addi t0, t0, %lo(boot_non_boot_hart_entry)
+
+	jalr zero, 0(t0)

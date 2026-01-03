@@ -3,14 +3,16 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-/** The size of the kernel's boot stack. */
-BOOT_STACK_SIZE = 64K;
+/** 
+ * The size of the boot stacks used for all harts. 
+ * 8 stacks of 8KiB each are allocated.
+ */
+BOOT_STACKS_SIZE = 8K * 8;
 
 KERNEL_PHYSICAL_MEMORY_ADDRESS = 0x80200000;
 KERNEL_VIRTUAL_MEMORY_ADDRESS = 0xFFFFFFFF00000000;
 
 ENTRY (_start)
-EXTERN(boot_ramdisk)
 
 SECTIONS
 {
@@ -30,9 +32,9 @@ SECTIONS
 		*(.boot_data*)
 
 		. = ALIGN (4K);
-		__boot_stack_bottom = .;
-		. += BOOT_STACK_SIZE;
-		__boot_stack_top = .;
+		__boot_stacks_bottom = .;
+		. += BOOT_STACKS_SIZE;
+		__boot_stacks_top = .;
 
 		. = ALIGN (4K);
 		__boot_page_tables = .;
