@@ -6,11 +6,14 @@
 #include "riscv.h"
 
 #define BOOT_STACK_SIZE 0x2000
+#define BOOT_STACKS_HIGHER_HALF_BASE 0xFFFFFFFFFF000000
 
 .section .boot_text
 
 ###############################################################################
 # Boot entry point.
+# a0: Hart ID
+# a1: Pointer to device tree blob
 ###############################################################################
 .global _start
 .type _start, @function
@@ -21,11 +24,17 @@ _start:
 	lla  gp, __global_pointer$
 .option pop
 
-# Get boot stack pointer.
+# Setup the boot stack pointer.
+# SP := __boot_stacks_bottom + (Hart_ID * BOOT_STACK_SIZE) + BOOT_STACK_SIZE
+# It's important to set up the stack this way, because SBI doesn't guarantee
+# that hart 0 will be the boot hart.
+# Realistically, the boot hart will be finished with its boot stack by the time
+# the non-boot harts start up, so it could use whatever memory it needed, 
+# but this is done for the sake of correctness.
 	li t1, BOOT_STACK_SIZE
 	mul t2, t1, a0
 
-	la t0, __boot_stacks_bottom
+	lla t0, __boot_stacks_bottom
 	add t0, t0, t2
 	add t0, t0, t1
 	mv sp, t0
@@ -45,7 +54,7 @@ _start:
 	csrw satp, zero
 
 # Set up the supervisor-mode trap vector.
-	la   t0, traps_entry
+	lla   t0, traps_entry
 	csrw stvec, t0
 
 # Enable supervisor-mode timer and external interrupts, but leave interrupts 
@@ -73,10 +82,16 @@ _start:
 	ld   a0, 8(sp)
 	addi sp, sp, 16
 
-# Load the temporary higher-half boot stack.
+# Load the higher-half boot stack.
 # This virtual address is the boot stack address mapped into the higher-half.
-# This is mapped in boot.adb in the Initialise_Boot_Page_Tables procedure.
-	la sp, 0xFFFFFFFFFF010000
+# This is mapped in boot-early.adb in Initialise_Boot_Page_Tables.
+	li t1, BOOT_STACK_SIZE
+	mul t2, t1, a0
+	lla  t0, BOOT_STACKS_HIGHER_HALF_BASE
+	add t0, t0, t2
+	add t0, t0, t1
+
+	mv  sp, t0
 
 # Jump to the kernel initialisation function in Ada.
 # Load the address of the function into a register first to avoid
@@ -96,6 +111,13 @@ cpu_halt:
 	j cpu_halt
 
 
+###############################################################################
+# Non-boot hart entry point.
+# Once non-boot harts have been started by the boot hart via SBI,
+# they will jump to this entry point.
+# a0: Hart ID
+# a1: Opaque pointer (unused)
+###############################################################################
 .global non_boot_hart_entry
 .type non_boot_hart_entry, @function
 non_boot_hart_entry:
@@ -129,7 +151,8 @@ non_boot_hart_entry:
 	csrw satp, t0
 	sfence.vma zero, zero
 
-# Get boot stack pointer.
+# Setup the boot stack pointer.
+# SP := __boot_stacks_bottom + (Hart_ID * BOOT_STACK_SIZE) + BOOT_STACK_SIZE
 	li t1, BOOT_STACK_SIZE
 	mul t2, t1, a0
 

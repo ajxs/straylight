@@ -57,7 +57,7 @@ private
      [Log_Transport_Debug_Console => True];
 
    Active_Logging_Tags : constant array (Log_Tag_T) of Boolean :=
-     [Log_Tag_Boot                    => True,
+     [Log_Tag_Boot                    => False,
       Log_Tag_Devices                 => False,
       Log_Tag_Devices_VirtIO          => False,
       Log_Tag_Devices_VirtIO_Graphics => False,
