@@ -7,7 +7,7 @@ with Devices.VirtIO.Block; use Devices.VirtIO.Block;
 with Memory.Allocators;    use Memory.Allocators;
 with Memory.Kernel;        use Memory.Kernel;
 with RISCV.Atomics;        use RISCV.Atomics;
-with Scheduler;            use Scheduler;
+with Processes.Scheduler;  use Processes.Scheduler;
 
 package body Devices.VirtIO is
    procedure Acknowledge_Interrupt

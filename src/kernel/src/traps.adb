@@ -11,7 +11,7 @@ with Devices.VirtIO;
 with Devices.PLIC;
 with Devices.UART;
 with Function_Results; use Function_Results;
-with Scheduler;
+with Processes.Scheduler;
 with RISCV;
 with RISCV.SBI;        use RISCV.SBI;
 with RISCV.Interrupts;

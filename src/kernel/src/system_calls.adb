@@ -13,7 +13,7 @@ with Devices.VirtIO.Graphics;
 with Memory;     use Memory;
 with Memory.Allocators;
 with RISCV;      use RISCV;
-with Scheduler;
+with Processes.Scheduler;
 with Hart_State; use Hart_State;
 
 package body System_Calls is
@@ -398,7 +398,7 @@ package body System_Calls is
          Panic;
       end if;
 
-      Scheduler.Run;
+      Processes.Scheduler.Run;
       Panic ("Exited process still running");
    end Handle_Process_Exit_Syscall;
 
@@ -410,7 +410,7 @@ package body System_Calls is
 
       Process.Status := Process_Ready;
 
-      Scheduler.Run;
+      Processes.Scheduler.Run;
 
       Result := Success;
    end Handle_Process_Yield_Syscall;

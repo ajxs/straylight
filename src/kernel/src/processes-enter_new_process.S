@@ -7,9 +7,9 @@
 
 .section .text
 
-.global scheduler_enter_new_process
-.type scheduler_enter_new_process, @function
-scheduler_enter_new_process:
+.global processes_enter_new_process
+.type processes_enter_new_process, @function
+processes_enter_new_process:
 	csrw sepc, a1
 
 	mv sp, a2

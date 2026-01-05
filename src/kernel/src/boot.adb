@@ -14,7 +14,6 @@ with Filesystems;       use Filesystems;
 with Filesystems.Root;  use Filesystems.Root;
 with Function_Results;  use Function_Results;
 with Graphics;          use Graphics;
-with Hart_State;        use Hart_State;
 with Loader;
 with Locks;
 with Memory.Allocators; use Memory.Allocators;
@@ -22,7 +21,7 @@ with Memory.Kernel;     use Memory.Kernel;
 with Memory.Physical;   use Memory.Physical;
 with Memory.Virtual;    use Memory.Virtual;
 with RISCV.SBI;
-with Scheduler;
+with Processes.Scheduler;
 with Traps;
 
 package body Boot is
@@ -401,25 +400,6 @@ package body Boot is
          Panic ("Constraint_Error: Initialise_Hart");
    end Initialise_Hart;
 
-   procedure Initialise_Idle_Process is
-      Result : Function_Result := Unset;
-   begin
-      Create_New_Process (Processes.Idle_Process, Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      --  Set the idle process's return address to the idle function.
-      --  When the scheduler switches to the idle process, it will 'return'
-      --  to the idle function address.
-      Processes.Idle_Process.all.Kernel_Context (ra) :=
-        Address_To_Unsigned_64 (Processes.Idle'Address);
-   exception
-      when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Idle_Process");
-   end Initialise_Idle_Process;
-
    procedure Initialise_Init_Process is
       Result : Function_Result := Unset;
    begin
@@ -558,7 +538,7 @@ package body Boot is
 
       Initialise_Devices;
 
-      Initialise_Idle_Process;
+      Initialise_Hart_Idle_Process (Get_Current_Hart_Id);
 
       Initialise_Block_Cache;
 
@@ -573,7 +553,7 @@ package body Boot is
 
       Log_Debug ("Starting scheduler...", Logging_Tags);
 
-      Scheduler.Run;
+      Processes.Scheduler.Run;
    end Initialise_Kernel_Services;
 
    procedure Initialise_Graphics is
@@ -687,15 +667,15 @@ package body Boot is
       --  requires a process context to operate in.
       Initialise_Graphics;
 
-      --  Loader.Load_New_Process_From_Filesystem
-      --    (Init_Process.all,
-      --     "/Devices/Disk/Programs/print_random_words.elf",
-      --     Result);
+      Loader.Load_New_Process_From_Filesystem
+        (Init_Process.all,
+         "/Devices/Disk/Programs/print_random_words.elf",
+         Result);
 
-      --  Loader.Load_New_Process_From_Filesystem
-      --    (Init_Process.all,
-      --     "/Devices/Disk/Programs/print_more_words.elf",
-      --     Result);
+      Loader.Load_New_Process_From_Filesystem
+        (Init_Process.all,
+         "/Devices/Disk/Programs/print_more_words.elf",
+         Result);
 
       Loader.Load_New_Process_From_Filesystem
         (Init_Process.all,
@@ -718,7 +698,7 @@ package body Boot is
       --  We don't call scheduler from the Exit_process procedure because we
       --  want to keep the ability to exit userland processes without
       --  interrupting the normal scheduling.
-      Scheduler.Run;
+      Processes.Scheduler.Run;
       Panic ("Init_Process still running after exit.");
    exception
       when Constraint_Error =>
@@ -817,7 +797,7 @@ package body Boot is
          Panic ("Constraint_Error: Start_Non_Boot_Harts");
    end Start_Non_Boot_Harts;
 
-   procedure Non_Boot_Hart_Entry (Hart_Id : Integer) is
+   procedure Non_Boot_Hart_Entry (Hart_Id : Hart_Index_T) is
       Result : Function_Result := Unset;
    begin
       --  This needs to be the first function called on each hart to set up

@@ -3,12 +3,11 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Hart_State;        use Hart_State;
 with Memory.Allocators; use Memory.Allocators;
 with Memory.Kernel;     use Memory.Kernel;
 with Memory.Physical;   use Memory.Physical;
 with RISCV.Interrupts;
-with Hart_State;        use Hart_State;
-with Scheduler;
 
 package body Processes is
    procedure Allocate_And_Map_New_Process_Memory
@@ -449,7 +448,7 @@ package body Processes is
       --  When the process is first scheduled, control will 'return' to this
       --  function once the scheduler procedure returns.
       New_Process.all.Kernel_Context (ra) :=
-        Address_To_Unsigned_64 (Scheduler.Process_Start'Address);
+        Address_To_Unsigned_64 (Process_Start'Address);
 
       New_Process.all.Status := Process_Ready;
 
@@ -513,8 +512,63 @@ package body Processes is
             Panic;
          end if;
 
+         --  It's important to explicitly re-enable interrupts here, rather
+         --  than using the push/pop interrupt state functions, as the
+         --  interrupts were previously disabled when entering the scheduler.
+         --  Otherwise the kernel would get stuck in the idle loop.
          RISCV.Interrupts.Enable_Supervisor_Interrupts;
       end loop;
    end Idle;
+
+   procedure Process_Start is
+      procedure Enter_New_Process
+        (Process_Address : Virtual_Address_T;
+         Sepc            : Virtual_Address_T;
+         Stack_Pointer   : Virtual_Address_T)
+      with
+        No_Return,
+        Import,
+        Convention    => Assembler,
+        External_Name => "processes_enter_new_process";
+   begin
+      Curr_Process : constant Process_Control_Block_Access :=
+        Get_Process_Running_On_Current_Hart;
+
+      if Curr_Process = null then
+         Panic ("Process_Start: No current process.");
+      end if;
+
+      Log_Debug
+        ("New process starting with PID#" & Curr_Process.all.Process_Id'Image,
+         Logging_Tags);
+
+      --  Run the next process.
+      Enter_New_Process
+        (Curr_Process.all'Address,
+         Curr_Process.all.Process_Entry_Point,
+         Process_Stack_Virtual_Address + Curr_Process.all.Stack_Size);
+   exception
+      when others =>
+         Panic ("Constraint_Error: Process_Start");
+   end Process_Start;
+
+   procedure Initialise_Hart_Idle_Process (Hart_Id : Integer) is
+      Result : Function_Result := Unset;
+   begin
+      Create_New_Process (Hart_Idle_Processes (Hart_Id), Result);
+      if Is_Error (Result) then
+         --  Error already printed.
+         Panic;
+      end if;
+
+      --  Set the idle process's return address to the idle function.
+      --  When the scheduler switches to the idle process, it will 'return'
+      --  to the idle function address.
+      Hart_Idle_Processes (Hart_Id).all.Kernel_Context (ra) :=
+        Address_To_Unsigned_64 (Idle'Address);
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Initialise_Hart_Idle_Process");
+   end Initialise_Hart_Idle_Process;
 
 end Processes;

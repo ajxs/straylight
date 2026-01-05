@@ -3,14 +3,10 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Interfaces;              use Interfaces;
-with System.Storage_Elements; use System.Storage_Elements;
-
-with Addresses;  use Addresses;
-with RISCV.Interrupts;
 with Hart_State; use Hart_State;
+with RISCV.Interrupts;
 
-package body Scheduler is
+package body Processes.Scheduler is
    procedure Get_Next_Scheduled_Process
      (Current_Process : Process_Control_Block_Access;
       Next_Process    : out Process_Control_Block_Access;
@@ -90,7 +86,7 @@ package body Scheduler is
          & Process.Process_Id'Image
          & " now blocked on channel: "
          & Channel'Image,
-         Logging_Tags);
+         Logging_Tags_Scheduler);
 
       Run;
 
@@ -106,6 +102,8 @@ package body Scheduler is
    procedure Run is
       Prev_Process : Process_Control_Block_Access := null;
       Next_Process : Process_Control_Block_Access := null;
+
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
 
       --  Save the current kernel context, and load a new one.
       --  Interrupts are re-enabled in this procedure.
@@ -142,13 +140,7 @@ package body Scheduler is
       --   - Before returning to a previously running process.
       RISCV.Interrupts.Disable_Supervisor_Interrupts;
 
-      Current_Hart_State : constant Hart_State_Access :=
-        Get_Current_Hart_State;
-      if Current_Hart_State = null then
-         Panic ("Scheduler.Run: Unable to get current hart state");
-      end if;
-
-      Prev_Process := Current_Hart_State.all.Current_Process;
+      Prev_Process := Hart_States (Hart_Id).Current_Process;
 
       Get_Next_Scheduled_Process (Prev_Process, Next_Process, Result);
       if Is_Error (Result) then
@@ -157,13 +149,13 @@ package body Scheduler is
 
       --  If there are no processes ready to run, switch to the idle process.
       if Next_Process = null then
-         Next_Process := Idle_Process;
+         Next_Process := Hart_Idle_Processes (Hart_Id);
       end if;
 
       --  If there is no ready processes found, the current process will be
       --  set as null, to trigger the scheduler to start searching for the
       --  next process from the beginning of the process queue next time.
-      Current_Hart_State.all.Current_Process := Next_Process;
+      Hart_States (Hart_Id).Current_Process := Next_Process;
 
       Next_Process.all.Status := Process_Running;
 
@@ -174,7 +166,7 @@ package body Scheduler is
          Log_Debug
            ("Scheduler.Run: Switching from none to next process with PID#"
             & Next_Process.all.Process_Id'Image,
-            Logging_Tags);
+            Logging_Tags_Scheduler);
 
          Load_Kernel_Context
            (Get_Process_SATP (Next_Process.all),
@@ -186,7 +178,7 @@ package body Scheduler is
          Log_Debug
            ("Scheduler.Run: Continuing to run current process with PID#"
             & Next_Process.all.Process_Id'Image,
-            Logging_Tags);
+            Logging_Tags_Scheduler);
       else
          --  Otherwise, switch to the next process' kernel context.
          --  The next process will resume execution from here, if it
@@ -210,7 +202,7 @@ package body Scheduler is
             & Prev_Process.all.Process_Id'Image
             & " to PID#: "
             & Next_Process.all.Process_Id'Image,
-            Logging_Tags);
+            Logging_Tags_Scheduler);
 
          Switch_Kernel_Context
            (Get_Process_SATP (Next_Process.all),
@@ -221,43 +213,11 @@ package body Scheduler is
 
       --  A previously pre-empted process will resume execution here when
       --  control returns to it, after being scheduled again.
-      Log_Debug ("Scheduler.Run: Returning to caller", Logging_Tags);
+      Log_Debug ("Scheduler.Run: Returning to caller", Logging_Tags_Scheduler);
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Scheduler.Run");
    end Run;
-
-   procedure Process_Start is
-      procedure Enter_New_Process
-        (Process_Address : Virtual_Address_T;
-         Sepc            : Virtual_Address_T;
-         Stack_Pointer   : Virtual_Address_T)
-      with
-        No_Return,
-        Import,
-        Convention    => Assembler,
-        External_Name => "scheduler_enter_new_process";
-   begin
-      Curr_Process : constant Process_Control_Block_Access :=
-        Get_Process_Running_On_Current_Hart;
-
-      if Curr_Process = null then
-         Panic ("Process_Start: No current process.");
-      end if;
-
-      Log_Debug
-        ("New process starting with PID#" & Curr_Process.all.Process_Id'Image,
-         Logging_Tags);
-
-      --  Run the next process.
-      Enter_New_Process
-        (Curr_Process.all'Address,
-         Curr_Process.all.Process_Entry_Point,
-         Process_Stack_Virtual_Address + Curr_Process.all.Stack_Size);
-   exception
-      when others =>
-         Panic ("Constraint_Error: Process_Start");
-   end Process_Start;
 
    procedure Wake_Processes_Waiting_For_Channel
      (Channel : Blocking_Channel_T; Result : out Function_Result)
@@ -266,7 +226,7 @@ package body Scheduler is
    begin
       Log_Debug
         ("Waking processes waiting for channel: " & Channel'Image,
-         Logging_Tags);
+         Logging_Tags_Scheduler);
 
       Curr_Process := Process_Queue;
       while Curr_Process /= null loop
@@ -275,7 +235,7 @@ package body Scheduler is
          then
             Log_Debug
               ("Waking process with PID# " & Curr_Process.all.Process_Id'Image,
-               Logging_Tags);
+               Logging_Tags_Scheduler);
             Curr_Process.all.Status := Process_Ready;
             Curr_Process.all.Blocked_By_Channel := 0;
          end if;
@@ -289,4 +249,5 @@ package body Scheduler is
          Log_Error ("Constraint_Error: Wake_Processes_Waiting_For_Channel");
          Result := Constraint_Exception;
    end Wake_Processes_Waiting_For_Channel;
-end Scheduler;
+
+end Processes.Scheduler;

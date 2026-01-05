@@ -95,9 +95,6 @@ package Processes is
       Next_Process : Process_Control_Block_Access := null;
    end record;
 
-   Process_Queue : Process_Control_Block_Access := null;
-   Idle_Process  : Process_Control_Block_Access := null;
-
    ----------------------------------------------------------------------------
    --  Allocates all of the physical memory required for a new process.
    --  This initialises the process' memory space, heap, and stack.
@@ -141,14 +138,15 @@ package Processes is
      (New_Process : out Process_Control_Block_Access;
       Result      : out Function_Result);
 
-   procedure Idle
-   with No_Return;
+   procedure Initialise_Hart_Idle_Process (Hart_Id : Integer);
 
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Processes];
 
    Next_Process_Id     : Process_Id_T := 1;
    Process_Id_Spinlock : Spinlock_T;
+
+   Process_Queue : Process_Control_Block_Access := null;
 
    --  16KiB process kernel stack starting size.
    Process_Kernel_Stack_Size   : constant := 4 * 16#1000#;
@@ -179,5 +177,12 @@ private
       Result                 : out Function_Result);
 
    procedure Cleanup_Stopped_Processes (Result : out Function_Result);
+
+   --  This is the entry point for a newly-created process.
+   --  Newly-created processes have their initial 'return address' set to this
+   --  procedure, so when they are first scheduled, and the process 'returns'
+   --  from the context switch, they will start executing here.
+   procedure Process_Start
+   with No_Return;
 
 end Processes;

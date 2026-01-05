@@ -3,8 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Addresses; use Addresses;
-with Scheduler; use Scheduler;
+with Addresses;           use Addresses;
+with Processes.Scheduler; use Processes.Scheduler;
 
 package body Locks.Sleeplocks is
    procedure Acquire_Sleeplock

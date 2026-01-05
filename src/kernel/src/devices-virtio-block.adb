@@ -3,8 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with RISCV.Atomics; use RISCV.Atomics;
-with Scheduler;     use Scheduler;
+with RISCV.Atomics;       use RISCV.Atomics;
+with Processes.Scheduler; use Processes.Scheduler;
 
 package body Devices.VirtIO.Block is
    function Get_Block_Request_Physical_Address

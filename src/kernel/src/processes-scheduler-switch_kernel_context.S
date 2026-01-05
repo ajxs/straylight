@@ -64,5 +64,4 @@ scheduler_load_kernel_context:
 	ld s10, 96(a2)
 	ld s11, 104(a2)
 
-scheduler_return_to_new_context:
 	ret

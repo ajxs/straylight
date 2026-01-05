@@ -42,6 +42,9 @@ package Hart_State is
 
    Hart_States : Hart_State_Array_T;
 
+   --  Each Hart has its own idle process.
+   Hart_Idle_Processes : array (Hart_Index_T) of Process_Control_Block_Access;
+
    procedure Panic (Message : String := "Kernel Panic")
    with No_Return;
 
@@ -69,6 +72,10 @@ package Hart_State is
 
    --  These functions allow for turning interrupts on/off in nested critical
    --  sections.
+   --  They function by incrementing/decrementing a counter in the hart state
+   --  tracking how many times interrupts have been disabled. When the counter
+   --  reaches zero, interrupts are re-enabled (if they were enabled before
+   --  the first push).
    procedure Push_Interrupts_Off;
 
    procedure Pop_Interrupts_Off;

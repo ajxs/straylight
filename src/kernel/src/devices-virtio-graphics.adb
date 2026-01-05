@@ -1,7 +1,7 @@
-with Memory.Allocators; use Memory.Allocators;
-with Memory.Kernel;     use Memory.Kernel;
-with RISCV.Atomics;     use RISCV.Atomics;
-with Scheduler;         use Scheduler;
+with Memory.Allocators;   use Memory.Allocators;
+with Memory.Kernel;       use Memory.Kernel;
+with RISCV.Atomics;       use RISCV.Atomics;
+with Processes.Scheduler; use Processes.Scheduler;
 
 package body Devices.VirtIO.Graphics is
    procedure Attach_Framebuffer_To_Resource

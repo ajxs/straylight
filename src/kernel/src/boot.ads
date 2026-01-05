@@ -6,9 +6,10 @@
 with Interfaces; use Interfaces;
 with System;     use System;
 
-with Addresses; use Addresses;
-with Logging;   use Logging;
-with Processes; use Processes;
+with Addresses;  use Addresses;
+with Hart_State; use Hart_State;
+with Logging;    use Logging;
+with Processes;  use Processes;
 
 package Boot is
    pragma Preelaborate;
@@ -57,13 +58,11 @@ private
 
    procedure Initialise_Init_Process;
 
-   procedure Initialise_Idle_Process;
-
    procedure Start_Init_Process;
 
    procedure Start_Non_Boot_Harts;
 
-   procedure Non_Boot_Hart_Entry (Hart_Id : Integer)
+   procedure Non_Boot_Hart_Entry (Hart_Id : Hart_Index_T)
    with
      Export,
      Convention    => Assembler,
