@@ -146,7 +146,8 @@ private
    Next_Process_Id     : Process_Id_T := 1;
    Process_Id_Spinlock : Spinlock_T;
 
-   Process_Queue : Process_Control_Block_Access := null;
+   Process_Queue          : Process_Control_Block_Access := null;
+   Process_Queue_Spinlock : Spinlock_T;
 
    --  16KiB process kernel stack starting size.
    Process_Kernel_Stack_Size   : constant := 4 * 16#1000#;

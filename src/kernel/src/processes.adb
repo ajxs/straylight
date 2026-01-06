@@ -263,6 +263,7 @@ package body Processes is
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
    begin
+      Acquire_Spinlock (Process.Spinlock);
       Log_Debug ("Freeing process stack physical memory...", Logging_Tags);
       Free_Physical_Memory (Process.Stack_Phys_Addr, Result);
       if Is_Error (Result) then
@@ -289,6 +290,7 @@ package body Processes is
       if Is_Error (Result) then
          return;
       end if;
+      Release_Spinlock (Process.Spinlock);
 
       Log_Debug ("Deallocated process address space.", Logging_Tags);
 
@@ -358,6 +360,8 @@ package body Processes is
       Curr_Process : Process_Control_Block_Access := null;
       Prev_Process : Process_Control_Block_Access := null;
    begin
+      Acquire_Spinlock (Process_Queue_Spinlock);
+
       Log_Debug
         ("Adding process id "
          & New_Process.all.Process_Id'Image
@@ -369,6 +373,8 @@ package body Processes is
            ("No processes in list, setting new process as head", Logging_Tags);
          Process_Queue := New_Process;
          Result := Success;
+
+         Release_Spinlock (Process_Queue_Spinlock);
          return;
       end if;
 
@@ -379,6 +385,8 @@ package body Processes is
       end loop;
 
       Prev_Process.all.Next_Process := New_Process;
+
+      Release_Spinlock (Process_Queue_Spinlock);
 
       Log_Debug ("Added process to end of list", Logging_Tags);
       Result := Success;
@@ -464,13 +472,17 @@ package body Processes is
 
       Logging_Tags : constant Log_Tags := [Log_Tag_Idle];
    begin
+      Acquire_Spinlock (Process_Queue_Spinlock);
+
       Log_Debug ("Cleaning up stopped processes...", Logging_Tags);
 
       Curr_Process := Process_Queue;
       if Curr_Process = null then
          Log_Debug ("No processes to clean up.", Logging_Tags);
 
-         Panic ("STOP HERE FOR NOW.");
+         --  This has been placed here temporarily for development purposes.
+         --  If there are no running processes, the kernel will panic.
+         Panic ("No running processes.");
       end if;
 
       while Curr_Process /= null loop
@@ -495,6 +507,8 @@ package body Processes is
 
          Curr_Process := Curr_Process.all.Next_Process;
       end loop;
+
+      Release_Spinlock (Process_Queue_Spinlock);
 
       Result := Success;
    end Cleanup_Stopped_Processes;
