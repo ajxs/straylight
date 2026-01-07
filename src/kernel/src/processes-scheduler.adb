@@ -164,7 +164,9 @@ package body Processes.Scheduler is
       --  scheduler is running.
       if Prev_Process = null then
          Log_Debug
-           ("Scheduler.Run: Switching from none to next process with PID#"
+           ("Scheduler.Run: Hart "
+            & Hart_Id'Image
+            & " switching from none to next process with PID#"
             & Next_Process.all.Process_Id'Image,
             Logging_Tags_Scheduler);
 
@@ -176,7 +178,9 @@ package body Processes.Scheduler is
          --  If the next process to run is the same as the previous
          --  process, simply return.
          Log_Debug
-           ("Scheduler.Run: Continuing to run current process with PID#"
+           ("Scheduler.Run: Hart "
+            & Hart_Id'Image
+            & " continuing to run current process with PID#"
             & Next_Process.all.Process_Id'Image,
             Logging_Tags_Scheduler);
       else
@@ -193,12 +197,16 @@ package body Processes.Scheduler is
          --  reasons a process can yield control.
          if Prev_Process.all.Status = Process_Running then
             Panic
-              ("Scheduler.Run: Current process is still running: PID#"
+              ("Scheduler.Run: Hart "
+               & Hart_Id'Image
+               & " current process is still running: PID#"
                & Prev_Process.all.Process_Id'Image);
          end if;
 
          Log_Debug
-           ("Scheduler.Run: Switching from PID#: "
+           ("Scheduler.Run: Hart "
+            & Hart_Id'Image
+            & " switching from PID#: "
             & Prev_Process.all.Process_Id'Image
             & " to PID#: "
             & Next_Process.all.Process_Id'Image,
