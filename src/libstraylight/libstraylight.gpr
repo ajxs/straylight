@@ -11,7 +11,8 @@ project Libstraylight is
 
    for Languages use (
      "Ada",
-     "Asm_Cpp"
+     "Asm_Cpp",
+	  "C"
    );
 
    type Library_Type_Type is ("relocatable", "static", "static-pic");

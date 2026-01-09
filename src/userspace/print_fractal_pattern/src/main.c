@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <libstraylight.h>
 
 int main()
@@ -9,10 +10,9 @@ int main()
 	const uint16_t horizontal_resolution = 640;
 	const uint16_t vertical_resolution = 480;
 
-	uintptr_t framebuffer_address = 0;
-	uint64_t result = allocate_memory(
-			horizontal_resolution * vertical_resolution * 4, &framebuffer_address);
-	if (result != 0)
+	uintptr_t framebuffer_address = (uintptr_t)malloc(
+			horizontal_resolution * vertical_resolution * 4);
+	if (framebuffer_address == 0)
 	{
 		log_error("Failed to allocate framebuffer memory");
 		return 1;
@@ -40,11 +40,11 @@ int main()
 			}
 		}
 
-		result = straylight_graphics_update_framebuffer(framebuffer_address);
+		uint64_t result = straylight_graphics_update_framebuffer(framebuffer_address);
 		if (result != 0)
 		{
 			log_error("Failed to update framebuffer");
-			return 1;
+			exit(EXIT_FAILURE);
 		}
 
 		if (direction == 0)
@@ -65,5 +65,5 @@ int main()
 		}
 	}
 
-	return 0;
+	exit(EXIT_SUCCESS);
 }

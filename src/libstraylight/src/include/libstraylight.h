@@ -22,6 +22,4 @@ uint32_t straylight_graphics_make_colour(
 		uint8_t blue,
 		uint8_t alpha);
 
-uint64_t allocate_memory(uint64_t size, uintptr_t *addr);
-
 #endif

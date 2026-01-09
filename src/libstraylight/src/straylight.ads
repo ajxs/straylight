@@ -74,9 +74,8 @@ private
    procedure Log_Error_C (String_Address : Address)
    with Export, Convention => C, External_Name => "log_error";
 
-   function Allocate_Memory_C
-     (Size : Unsigned_64; Addr : out Address) return Syscall_Result_T
-   with Export, Convention => C, External_Name => "allocate_memory";
+   function Malloc (Size : Unsigned_64) return System.Address
+   with Export, Convention => C, External_Name => "malloc";
 
    procedure Log_To_Kernel
      (Message_Type   : Log_Message_Type_T;

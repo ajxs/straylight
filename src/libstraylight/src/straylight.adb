@@ -34,16 +34,6 @@ package body Straylight is
          Volatile => True);
    end Allocate_Memory;
 
-   function Allocate_Memory_C
-     (Size : Unsigned_64; Addr : out Address) return Syscall_Result_T
-   is
-      Result : Syscall_Result_T;
-   begin
-      Allocate_Memory (Size, Addr, Result);
-
-      return Result;
-   end Allocate_Memory_C;
-
    procedure Exit_Process (Exit_Code : Unsigned_64) is
    begin
       System.Machine_Code.Asm
@@ -123,6 +113,18 @@ package body Straylight is
       when Constraint_Error =>
          null;
    end Log_To_Kernel;
+
+   function Malloc (Size : Unsigned_64) return System.Address is
+      Addr   : Address := System.Null_Address;
+      Result : Syscall_Result_T;
+   begin
+      Allocate_Memory (Size, Addr, Result);
+      if Result = Syscall_Result_Success then
+         return Addr;
+      else
+         return System.Null_Address;
+      end if;
+   end Malloc;
 
    procedure Open_File
      (Path           : Wide_String;

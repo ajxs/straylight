@@ -4,12 +4,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-void memcpy(
-	void* dest,
-	void* src,
-	size_t size
-);
+int memcmp(const void *a, const void *b, size_t size);
 
-int strlen(char* str);
+void *memcpy(void *dest, const void *src, size_t size);
 
-#endif 
+void *memmove(void *dest, const void *src, size_t size);
+
+void *memset(void *dest, int value, size_t size);
+
+size_t strlen(const char *str);
+
+#endif
