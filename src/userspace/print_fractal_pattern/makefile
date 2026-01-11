@@ -9,19 +9,19 @@ MAKEFLAGS += --warn-undefined-variables
 MAKEFLAGS += --no-builtin-rules
 
 # Get the Alire compiler prefix for the RISC-V target.
-alire_compiler_prefix := $(shell \
-    alr -C ../../kernel printenv --unix \
-    | awk -F= '/GNAT_RISCV64_ELF_ALIRE_PREFIX=/ {gsub(/"/,"",$$2); print $$2}')
+ALIRE_TOOLCHAIN_PREFIX := $(shell \
+	alr -C ../../kernel printenv --unix \
+	| awk -F= '/GNAT_RISCV64_ELF_ALIRE_PREFIX=/ {gsub(/"/,"",$$2); print $$2}')
 
-# Now derive the GCC path etc.
-CC := $(alire_compiler_prefix)/bin/riscv64-elf-gcc
+CC := $(ALIRE_TOOLCHAIN_PREFIX)/bin/riscv64-elf-gcc
 
 SRC_DIR := src
 
-INCLUDE_DIRS := src/include ../../libstraylight/src/include
+INCLUDE_DIRS := src/include ../../libstraylight/src/include ../../libc/src/include
 INCLUDE_FLAG := ${foreach d, ${INCLUDE_DIRS}, -I$d}
 
-STRAYLIGHT_LIBC := ../../libstraylight/lib/libstraylight.a
+LIBSTRAYLIGHT   := ../../libstraylight/lib/libstraylight.a
+STRAYLIGHT_LIBC := ../../libc/build/straylight_libc.a
 
 CFLAGS :=                   \
 	-fno-stack-protector      \
@@ -36,7 +36,7 @@ LDFLAGS :=            \
 	-ffreestanding      \
 	-nostdlib
 
-LIBS := -lgcc ${STRAYLIGHT_LIBC}
+LIBS := -lgcc ${STRAYLIGHT_LIBC} ${LIBSTRAYLIGHT}
 
 AS_SOURCES :=
 

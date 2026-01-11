@@ -38,7 +38,8 @@ project Print_More_Words is
 
    package Linker is
       for Switches (others) use (
-        "-Wl,--gc-sections"
+        "-Wl,--gc-sections",
+        "../../libc/build/straylight_libc.a"
       );
    end Linker;
 

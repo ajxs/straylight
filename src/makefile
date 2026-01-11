@@ -16,6 +16,9 @@ KERNEL_BINARY   := ${KERNEL_DIR}/bin/straylight.elf
 LIBSTRAYLIGHT_DIR    := libstraylight
 LIBSTRAYLIGHT_BINARY := ${LIBSTRAYLIGHT_DIR}/lib/libstraylight.a
 
+LIBC_DIR             := libc
+LIBC_BINARY          := ${LIBC_DIR}/straylight_libc.a
+
 SERIAL_FILENAME := serial.log
 
 USERSPACE_DIR   := userspace
@@ -56,9 +59,12 @@ QEMU_LOG_FILE            := qemu.log
 # all: ${KERNEL_BINARY}
 all: ${KERNEL_BINARY} ${USERSPACE_IMG}
 
+libs: ${LIBSTRAYLIGHT_BINARY} ${LIBC_BINARY}
+
 clean:
 	alr -C "${KERNEL_DIR}" clean
 	alr -C "${LIBSTRAYLIGHT_DIR}" clean
+	make -C "${LIBC_DIR}" clean
 	make -C "${USERSPACE_DIR}" clean
 
 debug: kernel
@@ -85,13 +91,18 @@ kernel: ${KERNEL_BINARY}
 
 libstraylight: ${LIBSTRAYLIGHT_BINARY}
 
+libc: ${LIBC_BINARY}
+
 userspace: ${USERSPACE_IMG}
 
 ${KERNEL_BINARY}: ${USERSPACE_IMG} ${BOOT_RAMDISK_IMAGE}
 	alr -C "${KERNEL_DIR}" build
 
-${LIBSTRAYLIGHT_BINARY}:
+${LIBSTRAYLIGHT_BINARY}: ${LIBC_BINARY}
 	alr -C "${LIBSTRAYLIGHT_DIR}" build
+
+${LIBC_BINARY}: 
+	make -C "${LIBC_DIR}"
 
 ${BUILD_DIR}:
 	mkdir -p ${BUILD_DIR}

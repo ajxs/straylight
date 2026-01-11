@@ -1,5 +1,5 @@
-#ifndef STRAYLIGHT_STDLIB_H
-#define STRAYLIGHT_STDLIB_H 1
+#ifndef STRAYLIGHT_LIBC_STDLIB_H
+#define STRAYLIGHT_LIBC_STDLIB_H 1
 
 #include <stddef.h>
 #include <stdint.h>

@@ -114,18 +114,6 @@ package body Straylight is
          null;
    end Log_To_Kernel;
 
-   function Malloc (Size : Unsigned_64) return System.Address is
-      Addr   : Address := System.Null_Address;
-      Result : Syscall_Result_T;
-   begin
-      Allocate_Memory (Size, Addr, Result);
-      if Result = Syscall_Result_Success then
-         return Addr;
-      else
-         return System.Null_Address;
-      end if;
-   end Malloc;
-
    procedure Open_File
      (Path           : Wide_String;
       Mode           : File_Open_Mode_T;

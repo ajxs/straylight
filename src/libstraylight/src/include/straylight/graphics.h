@@ -1,12 +1,7 @@
+#ifndef STRAYLIGHT_GRAPHICS_H
+#define STRAYLIGHT_GRAPHICS_H 1
+
 #include <stdint.h>
-
-#ifndef STRAYLIGHT_LIBC_H
-#define STRAYLIGHT_LIBC_H 1
-
-void exit(int status);
-void log_debug(char *test_string);
-void log_error(char *test_string);
-void print_to_serial(char *test_string);
 
 void straylight_graphics_fill_framebuffer(
 		uintptr_t framebuffer_address,

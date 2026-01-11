@@ -1,3 +1,8 @@
+/**
+ *  Copyright (c) 2026, Ajxs.
+ *  SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 .section .text
 
 .global _start

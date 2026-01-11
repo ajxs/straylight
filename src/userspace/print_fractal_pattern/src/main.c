@@ -1,7 +1,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <libstraylight.h>
+#include <straylight/logging.h>
+#include <straylight/graphics.h>
 
 int main()
 {

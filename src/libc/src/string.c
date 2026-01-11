@@ -27,6 +27,8 @@ void *memcpy(
 	{
 		((uint8_t *)dest)[i] = ((uint8_t *)src)[i];
 	}
+
+	return dest;
 }
 
 void *memmove(void *dest, const void *src, size_t size)

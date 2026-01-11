@@ -31,7 +31,17 @@ package body System_Calls is
       Allocation_Size      : Natural := 0;
       Allocation_Alignment : Natural := 1;
    begin
-      Log_Debug ("User Mode Syscall: Allocate Memory", Logging_Tags);
+      Log_Debug
+        ("User Mode Syscall: Allocate Memory:"
+         & "  PID: "
+         & Process.Process_Id'Image
+         & ASCII.LF
+         & "  Size: "
+         & Allocation_Size'Image
+         & ASCII.LF
+         & "  Alignment: "
+         & Allocation_Alignment'Image,
+         Logging_Tags);
 
       Allocation_Size := Natural (Trap_Context.Gp_Registers (a1));
       if Allocation_Size = 0 then

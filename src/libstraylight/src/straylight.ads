@@ -25,11 +25,9 @@ package Straylight is
 
    procedure Log_Error (Str : String);
 
-   procedure Exit_Process (Exit_Code : Unsigned_64)
-   with Export, Convention => C, External_Name => "exit";
+   procedure Exit_Process (Exit_Code : Unsigned_64);
 
-   procedure Yield_Process
-   with Export, Convention => C, External_Name => "yield";
+   procedure Yield_Process;
 
    procedure Print_To_Serial (Str : String);
 
@@ -73,9 +71,6 @@ private
 
    procedure Log_Error_C (String_Address : Address)
    with Export, Convention => C, External_Name => "log_error";
-
-   function Malloc (Size : Unsigned_64) return System.Address
-   with Export, Convention => C, External_Name => "malloc";
 
    procedure Log_To_Kernel
      (Message_Type   : Log_Message_Type_T;
