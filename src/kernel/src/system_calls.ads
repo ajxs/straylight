@@ -3,6 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Ada.Unchecked_Conversion;
 with Interfaces; use Interfaces;
 
 with Filesystems;      use Filesystems;
@@ -12,14 +13,6 @@ with Processes;        use Processes;
 
 package System_Calls is
    pragma Preelaborate;
-
-   --  @TODO: Replace with main function result type?
-   subtype Syscall_Result_T is Unsigned_64;
-
-   Syscall_Result_Success : constant Syscall_Result_T := 0;
-   --  Failure is given an arbitrary value to increase the Hamming distance
-   --  between it and other values.
-   Syscall_Result_Failure : constant Syscall_Result_T := 9998_0000;
 
    Syscall_Exit_Process    : constant := 5446_0000;
    Syscall_Yield_Process   : constant := 5446_0001;
@@ -74,5 +67,22 @@ private
 
    function Unsigned_64_To_File_Open_Mode
      (Mode : Unsigned_64) return File_Open_Mode_T;
+
+   Syscall_Result_Success : constant := 0;
+
+   type Syscall_Error_Result_T is new Integer with Convention => C, Size => 64;
+
+   Syscall_Error_Invalid_Argument      : constant Syscall_Error_Result_T := -1;
+   Syscall_Error_Invalid_Address       : constant Syscall_Error_Result_T := -2;
+   Syscall_Error_No_Memory             : constant Syscall_Error_Result_T := -3;
+   Syscall_Error_File_Not_Found        : constant Syscall_Error_Result_T := -4;
+   Syscall_Error_File_Handle_Not_Found : constant Syscall_Error_Result_T := -5;
+   Syscall_Error_Other                 : constant Syscall_Error_Result_T :=
+     -99;
+
+   function Syscall_Error_Result_To_Unsigned_64 is new
+     Ada.Unchecked_Conversion
+       (Source => Syscall_Error_Result_T,
+        Target => Unsigned_64);
 
 end System_Calls;

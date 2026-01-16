@@ -669,16 +669,6 @@ package body Boot is
 
       Loader.Load_New_Process_From_Filesystem
         (Init_Process.all,
-         "/Devices/Disk/Programs/print_random_words.elf",
-         Result);
-
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
-         "/Devices/Disk/Programs/print_more_words.elf",
-         Result);
-
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
          "/Devices/Disk/Programs/print_fractal_pattern.elf",
          Result);
 
@@ -720,8 +710,8 @@ package body Boot is
             --  All harts should be in either the Running or Invalid state.
             --  Invalid indicates that the hart is not present.
             if not (Hart_States (Hart_Id).Hart_Status = Hart_Status_Running
-                    or else Hart_States (Hart_Id).Hart_Status
-                            = Hart_Status_Invalid)
+                    or else
+                      Hart_States (Hart_Id).Hart_Status = Hart_Status_Invalid)
             then
                All_Harts_Started := False;
             end if;

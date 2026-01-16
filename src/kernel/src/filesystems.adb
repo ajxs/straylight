@@ -565,16 +565,17 @@ package body Filesystems is
    procedure Seek_File
      (File_Handle : Process_File_Handle_Access;
       New_Offset  : Unsigned_64;
-      Result      : out Function_Result) is
+      Result      : out Function_Result)
+   is
+      Effective_New_Offset : Unsigned_64 := New_Offset;
    begin
       if New_Offset > File_Handle.all.File.all.Size then
-         Log_Error
+         Log_Debug
            ("Seek_File: New offset is beyond end of file", Logging_Tags);
-         Result := Invalid_Argument;
-         return;
+         Effective_New_Offset := File_Handle.all.File.all.Size - 1;
       end if;
 
-      File_Handle.all.Position := New_Offset;
+      File_Handle.all.Position := Effective_New_Offset;
       Result := Success;
    exception
       when Constraint_Error =>

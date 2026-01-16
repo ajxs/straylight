@@ -37,7 +37,7 @@ CFLAGS :=                   \
 	-fno-stack-protector      \
 	-ffreestanding            \
 	-ggdb                     \
-	${INCLUDE_FLAG}           \
+	-I$(INC_DIR)              \
 	-std=gnu99                \
 	-Wall                     \
 	-Wextra

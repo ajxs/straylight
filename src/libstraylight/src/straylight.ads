@@ -4,10 +4,10 @@ with System;     use System;
 package Straylight is
    pragma Preelaborate;
 
-   subtype Syscall_Result_T is Unsigned_64;
+   type Function_Result is new Integer;
 
-   Syscall_Result_Success : constant Syscall_Result_T := 0;
-   Syscall_Result_Failure : constant Syscall_Result_T := 1;
+   Function_Result_Success : constant Function_Result := 0;
+   Function_Result_Failure : constant Function_Result := 1;
 
    subtype File_Handle_Id_T is Unsigned_64;
    type File_Open_Mode_T is new Integer;
@@ -18,7 +18,7 @@ package Straylight is
    procedure Allocate_Memory
      (Size      : Unsigned_64;
       Addr      : out Address;
-      Result    : out Syscall_Result_T;
+      Result    : out Function_Result;
       Alignment : Unsigned_64 := 1);
 
    procedure Log_Debug (Str : String);
@@ -35,19 +35,19 @@ package Straylight is
      (Path           : Wide_String;
       Mode           : File_Open_Mode_T;
       File_Handle_Id : out File_Handle_Id_T;
-      Result         : out Syscall_Result_T);
+      Result         : out Function_Result);
 
    procedure Read_File
      (File_Handle_Id : File_Handle_Id_T;
       Buffer_Address : Address;
       Size           : Unsigned_64;
       Bytes_Read     : out Unsigned_64;
-      Result         : out Syscall_Result_T);
+      Result         : out Function_Result);
 
    procedure Seek_File
      (File_Handle_Id : File_Handle_Id_T;
       New_Offset     : Unsigned_64;
-      Result         : out Syscall_Result_T);
+      Result         : out Function_Result);
 
 private
    Syscall_Exit_Process    : constant := 5446_0000;
@@ -63,6 +63,10 @@ private
    Syscall_Seek_File : constant := 5446_0109;
 
    Syscall_Update_Framebuffer : constant := 5446_0209;
+
+   type Syscall_Result_T is new Integer with Size => 64;
+
+   Syscall_Result_Success : constant Syscall_Result_T := 0;
 
    type Log_Message_Type_T is (Log_Message_Debug, Log_Message_Error);
 
@@ -82,4 +86,16 @@ private
 
    procedure Print_To_Serial_C (String_Address : Address)
    with Export, Convention => C, External_Name => "print_to_serial";
+
+   function Do_Syscall
+     (Syscall_Number : Unsigned_64;
+      Arg1           : Unsigned_64 := 0;
+      Arg2           : Unsigned_64 := 0;
+      Arg3           : Unsigned_64 := 0) return Syscall_Result_T
+   with
+     Volatile_Function,
+     Import,
+     Convention    => Assembler,
+     External_Name => "straylight_syscall";
+
 end Straylight;

@@ -45,13 +45,23 @@ package body System_Calls is
 
       Allocation_Size := Natural (Trap_Context.Gp_Registers (a1));
       if Allocation_Size = 0 then
-         Log_Error ("Allocation size is zero", Logging_Tags);
+         Log_Error ("Allocation size is zero");
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64
+             (Syscall_Error_Invalid_Argument);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
       Allocation_Alignment := Natural (Trap_Context.Gp_Registers (a2));
       if Allocation_Alignment < 1 then
-         Log_Error ("Invalid allocation alignment", Logging_Tags);
+         Log_Error ("Invalid allocation alignment");
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64
+             (Syscall_Error_Invalid_Argument);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
@@ -61,25 +71,25 @@ package body System_Calls is
          Result,
          Storage_Offset (Allocation_Alignment));
       if Is_Error (Result) then
-         Log_Error ("Error allocating memory: " & Result'Image, Logging_Tags);
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
-         return;
+         Log_Error ("Error allocating memory: " & Result'Image);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_No_Memory);
+
+         goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
-      Trap_Context.Gp_Registers (a1) :=
+      Trap_Context.Gp_Registers (a0) :=
         Address_To_Unsigned_64 (Allocation_Result.Virtual_Address);
       Result := Success;
       return;
 
       <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
-      Result := Success;
+      Result := Syscall_Unsuccessful_Without_Kernel_Error;
    exception
       when Constraint_Error =>
          Log_Debug
            ("Constraint_Error: Handle_Allocate_Memory_Syscall", Logging_Tags);
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          Result := Constraint_Exception;
    end Handle_Allocate_Memory_Syscall;
 
@@ -108,13 +118,21 @@ package body System_Calls is
 
       if not Is_Userspace_Address (String_Address) then
          Log_Error ("Invalid non-userspace address", Logging_Tags);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
-      if String_Length > Maximum_String_Length then
+      if String_Length > Maximum_String_Length or else String_Length < 0 then
          Log_Error
-           ("String length exceeds maximum length: " & String_Length'Image,
-            Logging_Tags);
+           ("Invalid string length: " & String_Length'Image, Logging_Tags);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64
+             (Syscall_Error_Invalid_Argument);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
@@ -135,12 +153,10 @@ package body System_Calls is
       return;
 
       <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
-      Result := Success;
+      Result := Syscall_Unsuccessful_Without_Kernel_Error;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Handle_Logging_Syscall");
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          Result := Constraint_Exception;
    end Handle_Logging_Syscall;
 
@@ -173,6 +189,10 @@ package body System_Calls is
 
       if not Is_Userspace_Address (Path_String_Address) then
          Log_Error ("Invalid non-userspace address");
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
@@ -180,6 +200,11 @@ package body System_Calls is
          Log_Error
            ("Path length exceeds maximum length: " & Path_String_Length'Image,
             Logging_Tags);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64
+             (Syscall_Error_Invalid_Argument);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
@@ -199,27 +224,31 @@ package body System_Calls is
       begin
          Filesystems.Open_File
            (Process, New_Path_String, File_Open_Mode, File_Handle, Result);
-         if Is_Error (Result) or else Result = File_Not_Found then
+         if Result = File_Not_Found then
+            Log_Error ("File not found");
+
+            Trap_Context.Gp_Registers (a0) :=
+              Syscall_Error_Result_To_Unsigned_64
+                (Syscall_Error_File_Not_Found);
+
+            goto Syscall_Unsuccessful_No_Kernel_Error;
+         elsif Is_Error (Result) then
             Log_Error ("Error opening file: " & Result'Image, Logging_Tags);
-            Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
             return;
          end if;
 
          Log_Debug ("Opened file handle", Logging_Tags);
       end Read_Path_String_And_Open_File;
 
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
-      Trap_Context.Gp_Registers (a1) := File_Handle.all.File_Handle_Id;
+      Trap_Context.Gp_Registers (a0) := File_Handle.all.File_Handle_Id;
       Result := Success;
       return;
 
       <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
-      Result := Success;
+      Result := Syscall_Unsuccessful_Without_Kernel_Error;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Handle_Open_File_Syscall");
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          Result := Constraint_Exception;
    end Handle_Open_File_Syscall;
 
@@ -241,17 +270,29 @@ package body System_Calls is
       File_Handle_Id := Trap_Context.Gp_Registers (a1);
       New_Offset := Trap_Context.Gp_Registers (a2);
 
+      --  This function returns 'Not_Found' if the file handle is not found.
+      --  any other error is treated as a kernel error.
       Find_File_Handle
         (Process.Process_Id, File_Handle_Id, File_Handle, Result);
-      if Is_Error (Result) then
-         Log_Error ("Error finding file handle: " & Result'Image);
+      if Result = Not_Found then
+         Log_Error ("File handle not found");
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64
+             (Syscall_Error_File_Handle_Not_Found);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
+      elsif Is_Error (Result) then
+         --  Error already printed.
+         return;
       end if;
 
+      --  In the case of an invalid offset beyond the end of the file, the
+      --  Filesystems.Seek_File procedure will adjust the offset to the end
+      --  of the file, and return a success result.
       Seek_File (File_Handle, New_Offset, Result);
       if Is_Error (Result) then
          Log_Error ("Error seeking file: " & Result'Image);
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          return;
       end if;
 
@@ -260,12 +301,10 @@ package body System_Calls is
       return;
 
       <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
-      Result := Success;
+      Result := Syscall_Unsuccessful_Without_Kernel_Error;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Handle_Seek_File_Syscall");
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          Result := Constraint_Exception;
    end Handle_Seek_File_Syscall;
 
@@ -295,12 +334,10 @@ package body System_Calls is
 
       if not Is_Userspace_Address (Buffer_Address) then
          Log_Error ("Invalid non-userspace address");
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
 
-      Bytes_To_Read := Natural (Trap_Context.Gp_Registers (a3));
-      if Bytes_To_Read = 0 then
-         Log_Error ("Invalid bytes to read: " & Bytes_To_Read'Image);
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
@@ -308,7 +345,19 @@ package body System_Calls is
         (Process.Process_Id, File_Handle_Id, File_Handle, Result);
       if Is_Error (Result) then
          Log_Error ("Error finding file handle: " & Result'Image);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64
+             (Syscall_Error_File_Handle_Not_Found);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
+      end if;
+
+      Bytes_To_Read := Natural (Trap_Context.Gp_Registers (a3));
+      if Bytes_To_Read = 0 then
+         Log_Error ("Invalid bytes to read: " & Bytes_To_Read'Image);
+         Bytes_Read := 0;
+         goto Return_Bytes_Read;
       end if;
 
       Filesystems.Read_File
@@ -320,22 +369,19 @@ package body System_Calls is
          Result);
       if Is_Error (Result) then
          Log_Error ("Error reading file: " & Result'Image);
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          return;
       end if;
 
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
-      Trap_Context.Gp_Registers (a1) := Unsigned_64 (Bytes_Read);
+      <<Return_Bytes_Read>>
+      Trap_Context.Gp_Registers (a0) := Unsigned_64 (Bytes_Read);
       Result := Success;
       return;
 
       <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
-      Result := Success;
+      Result := Syscall_Unsuccessful_Without_Kernel_Error;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Handle_Read_File_Syscall");
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          Result := Constraint_Exception;
    end Handle_Read_File_Syscall;
 
@@ -366,33 +412,41 @@ package body System_Calls is
 
       if not Is_Userspace_Address (String_Address) then
          Log_Error ("Invalid non-userspace address", Logging_Tags);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
       if String_Length > Maximum_String_Length then
          Log_Error ("String length exceeds maximum length", Logging_Tags);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64
+             (Syscall_Error_Invalid_Argument);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
-      Read_String :
+      Print_String :
       declare
          String_Buffer : String (1 .. String_Length)
          with Import, Alignment => 1, Address => String_Address;
       begin
          Devices.UART.Put_String
            (UART_Device.Virtual_Address, String_Buffer (1 .. String_Length));
-      end Read_String;
+      end Print_String;
 
+      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
       Result := Success;
       return;
 
       <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
-      Result := Success;
+      Result := Syscall_Unsuccessful_Without_Kernel_Error;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Handle_Print_To_Serial_Syscall");
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          Result := Constraint_Exception;
    end Handle_Print_To_Serial_Syscall;
 
@@ -480,13 +534,12 @@ package body System_Calls is
       end case;
 
       if Is_Error (Result) then
-         return;
+         Panic ("Kernel Error in Syscall Handler: " & Result'Image);
       end if;
 
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Handle_User_Mode_Syscall");
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          Result := Constraint_Exception;
    end Handle_User_Mode_Syscall;
 
@@ -525,6 +578,10 @@ package body System_Calls is
 
       if not Is_Userspace_Address (User_Framebuffer_Address) then
          Log_Error ("Invalid non-userspace address", Logging_Tags);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
@@ -553,8 +610,8 @@ package body System_Calls is
          Graphics_Device.Bus_Info_VirtIO.Framebuffer_Height,
          Result);
       if Is_Error (Result) then
-         Log_Error ("Error transferring: " & Result'Image, Logging_Tags);
-         goto Syscall_Unsuccessful_No_Kernel_Error;
+         --  Error already logged.
+         return;
       end if;
 
       Devices.VirtIO.Graphics.Resource_Flush
@@ -567,9 +624,8 @@ package body System_Calls is
          Graphics_Device.Bus_Info_VirtIO.Framebuffer_Height,
          Result);
       if Is_Error (Result) then
-         Log_Error
-           ("Error updating framebuffer: " & Result'Image, Logging_Tags);
-         goto Syscall_Unsuccessful_No_Kernel_Error;
+         Log_Error ("Error transferring: " & Result'Image);
+         return;
       end if;
 
       Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
@@ -577,12 +633,10 @@ package body System_Calls is
       return;
 
       <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
-      Result := Success;
+      Result := Syscall_Unsuccessful_Without_Kernel_Error;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Handle_Update_Framebuffer_Syscall");
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Failure;
          Result := Constraint_Exception;
    end Handle_Update_Framebuffer_Syscall;
 

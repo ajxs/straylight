@@ -50,6 +50,8 @@ package Function_Results is
    Cache_Entry_Not_Found : constant := 1777_0002;
    Invalid_Filesystem    : constant := -1777_0003;
 
+   Syscall_Unsuccessful_Without_Kernel_Error : constant := 8888_0000;
+
    function Is_Error (Result : Function_Result) return Boolean
    is (Result <= 0)
    with Pure_Function;
