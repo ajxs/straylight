@@ -1,5 +1,5 @@
 #####################################################################
-#  Copyright (c) 2025, Ajxs.
+#  Copyright (c) 2026, Ajxs.
 #  SPDX-License-Identifier: GPL-3.0-or-later
 #####################################################################
 
@@ -17,26 +17,31 @@ CC := $(ALIRE_TOOLCHAIN_PREFIX)/bin/riscv64-elf-gcc
 
 SRC_DIR := src
 
-INCLUDE_DIRS := src/include ../../libstraylight/src/include ../../libc/src/include
+SYSROOT_DIR       := ../../libc/
+
+LIBSTRAYLIGHT_DIR := ../../libstraylight
+LIBC_DIR          := ${SYSROOT_DIR}/lib
+
+INCLUDE_DIRS := src/include ${LIBSTRAYLIGHT_DIR}/src/include
 INCLUDE_FLAG := ${foreach d, ${INCLUDE_DIRS}, -I$d}
 
-LIBSTRAYLIGHT   := ../../libstraylight/lib/libstraylight.a
-STRAYLIGHT_LIBC := ../../libc/build/straylight_libc.a
+LIBSTRAYLIGHT   := libstraylight
 
 CFLAGS :=                   \
-	-fno-stack-protector      \
-	-ffreestanding            \
+	--sysroot=${SYSROOT_DIR}  \
 	-ggdb                     \
 	${INCLUDE_FLAG}           \
 	-std=gnu99                \
 	-Wall                     \
 	-Wextra
 
-LDFLAGS :=            \
-	-ffreestanding      \
-	-nostdlib
+LDFLAGS := -nostdlib
 
-LIBS := -lgcc ${STRAYLIGHT_LIBC} ${LIBSTRAYLIGHT}
+LIBS := \
+	-L${LIBC_DIR}              \
+	-L${LIBSTRAYLIGHT_DIR}/lib \
+	-lc                        \
+	-l${LIBSTRAYLIGHT}
 
 AS_SOURCES :=
 
