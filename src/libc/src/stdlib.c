@@ -8,7 +8,7 @@
 void *malloc(size_t size)
 {
 	int64_t result =
-			(int64_t)straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_ALLOCATE_MEMORY, size);
+			straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_ALLOCATE_MEMORY, size);
 	if (is_syscall_result_error(result))
 	{
 		errno = result;

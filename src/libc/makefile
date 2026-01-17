@@ -1,12 +1,6 @@
 #####################################################################
-#  Copyright (c) 2019, AJXS.
-#  This program is free software; you can redistribute it and/or modify it
-#  under the terms of the GNU General Public License as published by the
-#  Free Software Foundation; either version 3 of the License, or
-#  (at your option) any later version.
-#
-#  Authors:
-#     Anthony <ajxs [at] panoptic.online>
+#  Copyright (c) 2026, Ajxs.
+#  SPDX-License-Identifier: GPL-3.0-or-later
 #####################################################################
 
 .POSIX:
@@ -27,10 +21,10 @@ AR := $(TOOLCHAIN_PREFIX)-ar
 
 # Directories
 SRC_DIR := src
-OBJ_DIR := build
-INC_DIR := ${SRC_DIR}/include
+OBJ_DIR := lib
+INC_DIR := include
 
-LIB := ${OBJ_DIR}/straylight_libc.a
+LIB := ${OBJ_DIR}/libc.a
 
 # Flags
 CFLAGS :=                   \

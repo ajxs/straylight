@@ -3,6 +3,6 @@
 
 #include <stdint.h>
 
-int64_t errno = 0;
+extern int64_t errno;
 
 #endif

@@ -11,4 +11,6 @@ void *malloc(size_t size);
 
 [[noreturn]] void exit(int exit_code);
 
+void initialise_straylight_libc();
+
 #endif
