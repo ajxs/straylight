@@ -6,12 +6,13 @@
 with Filesystems.Block_Cache; use Filesystems.Block_Cache;
 with Memory;                  use Memory;
 with Memory.Kernel;           use Memory.Kernel;
+with Utilities;               use Utilities;
 
 package body Filesystems.FAT is
    procedure Find_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result) is
@@ -25,7 +26,7 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Log_Debug_Wide ("Finding file: '" & Filename & "'", Logging_Tags_FAT);
+      Log_Debug ("Finding file: '" & Filename & "'", Logging_Tags_FAT);
 
       if Filesystem.all.Filesystem_Meta_Info_Address = Null_Address then
          Get_Filesystem_Meta_Info (Filesystem, Reading_Process, Result);
@@ -43,8 +44,9 @@ package body Filesystems.FAT is
            Address   => Filesystem.all.Filesystem_Meta_Info_Address;
       begin
          if Parent_Node = null
-           or else Parent_Node.all.Node_Type
-                   = Filesystem_Node_Type_Mounted_Filesystem
+           or else
+             Parent_Node.all.Node_Type
+             = Filesystem_Node_Type_Mounted_Filesystem
          then
             Find_File_In_Root_Directory
               (Filesystem,
@@ -82,7 +84,7 @@ package body Filesystems.FAT is
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result) is
@@ -109,7 +111,7 @@ package body Filesystems.FAT is
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result)
@@ -160,8 +162,7 @@ package body Filesystems.FAT is
             goto Free_Buffer;
          end if;
 
-         Parse_Directory_Buffer :
-         declare
+         Parse_Directory_Buffer : declare
             Directory : Directory_Index_T (1 .. Maximum_Directory_Entries)
             with Import, Address => Cluster_Buffer_Address, Alignment => 1;
          begin
@@ -223,7 +224,7 @@ package body Filesystems.FAT is
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result)
@@ -261,8 +262,7 @@ package body Filesystems.FAT is
          goto Free_Buffer;
       end if;
 
-      Parse_Directory_Buffer :
-      declare
+      Parse_Directory_Buffer : declare
          Directory : Directory_Index_T (1 .. Maximum_Directory_Entries)
          with Import, Address => Directory_Buffer_Address, Alignment => 1;
       begin
@@ -297,7 +297,7 @@ package body Filesystems.FAT is
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result) is
@@ -430,8 +430,7 @@ package body Filesystems.FAT is
       Filename_Length : in out Natural;
       Result          : out Function_Result) is
    begin
-      Copy_Name :
-      for I in 1 .. 8 loop
+      Copy_Name : for I in 1 .. 8 loop
          --  The DOS filename is padded by spaces.
          --  If we encounter a space we can assume we've reached the end
          --  of the file name.
@@ -454,8 +453,7 @@ package body Filesystems.FAT is
          Filename (Filename_Length) := '.';
 
          --  Copy the file extension into the filename.
-         Copy_Extension :
-         for I in 1 .. 3 loop
+         Copy_Extension : for I in 1 .. 3 loop
             --  The DOS file extension is padded by spaces.
             --  If we encounter a space we can assume we've reached the end
             --  of the file name.
@@ -622,8 +620,7 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Parse_Boot_Sector :
-      declare
+      Parse_Boot_Sector : declare
          Boot_Sector : aliased Boot_Sector_T
          with Import, Alignment => 1, Address => Sector_Address;
 
@@ -935,18 +932,25 @@ package body Filesystems.FAT is
    procedure Search_FAT_Directory_For_File
      (Filesystem      : Filesystem_Access;
       Directory       : Directory_Index_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result)
    is
       --  Whether a long file name entry is currently being read.
       Entry_Has_Long_Filename : Boolean := False;
-      Entry_Filename          : Filesystem_Node_Path_T :=
-        [others => Wide_Character'Val (0)];
+      --  The UCS-2-encoded filename read from the current directory entry.
+      Entry_Filename          :
+        Wide_String (1 .. Filesystem_Node_Max_Byte_Length) :=
+          [others => Wide_Character'Val (0)];
       Entry_Filename_Length   : Natural := 0;
+
+      --  The UCS-2-encoded filename converted to the OS' native UTF-8 format.
+      --  This is used to compare against the target filename.
+      UTF8_Encoded_Filename             : Filesystem_Node_Name_T;
+      UTF8_Encoded_Filename_Byte_Length : Natural := 0;
    begin
-      Log_Debug_Wide
+      Log_Debug
         ("Searching directory for file '" & Filename & "'", Logging_Tags_FAT);
 
       Filesystem_Node := null;
@@ -992,36 +996,46 @@ package body Filesystems.FAT is
                --  Every sequence of LFN entries is followed by its
                --  corresponding DOS 8.3 entry, so at this point we have
                --  either the full filename of the long directory entry, or the
-               --  full DOS directory entry, and can now compare it against the
-               --  target filename to see if we've found a match.
+               --  full DOS directory entry, and can now convert it to UTF-8,
+               --  and compare it against the target filename.
+               Read_FAT_Filename_Into_Filesystem_Node_Name
+                 (Entry_Filename,
+                  Entry_Filename_Length,
+                  UTF8_Encoded_Filename,
+                  UTF8_Encoded_Filename_Byte_Length,
+                  Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
 
-               Log_Debug_Wide
-                 ("Parsed entry with filename: '"
-                  & Entry_Filename (1 .. Entry_Filename_Length)
+               Log_Debug
+                 ("Parsed FAT file entry with filename: '"
+                  & UTF8_Encoded_Filename
+                      (1 .. UTF8_Encoded_Filename_Byte_Length)
                   & "'",
                   Logging_Tags_FAT);
 
                --  Check if the parsed filename matches the target filename.
-               if Compare_Node_Name_With_Wide_String
-                    (Entry_Filename, Entry_Filename_Length, Filename)
+               if Does_Node_Name_Match_Path_Name
+                    (UTF8_Encoded_Filename,
+                     UTF8_Encoded_Filename_Byte_Length,
+                     Filename)
                then
+                  First_Cluster : constant Unsigned_32 :=
+                    Get_First_Cluster_Of_Dir_Entry (Directory (Dir_Idx));
+
                   --  If we have a match, create a filesystem node cache entry,
                   --  set the node type, and exit.
                   Create_Filesystem_Node_Cache_Entry
                     (Filesystem,
-                     Entry_Filename,
+                     Filename,
                      Filesystem_Node,
                      Result,
                      Size          =>
                        Unsigned_64 (Directory (Dir_Idx).File_Size),
-                     Data_Location =>
-                       Unsigned_64
-                         (Get_First_Cluster_Of_Dir_Entry
-                            (Directory (Dir_Idx))),
+                     Data_Location => Unsigned_64 (First_Cluster),
                      Index         =>
-                       Get_Directory_Entry_Node_Index
-                         (Get_First_Cluster_Of_Dir_Entry (Directory (Dir_Idx)),
-                          Dir_Idx),
+                       Get_Directory_Entry_Node_Index (First_Cluster, Dir_Idx),
                      Parent_Index  => Parent_Node.all.Index);
                   if Is_Error (Result) then
                      Filesystem_Node := null;
@@ -1269,4 +1283,48 @@ package body Filesystems.FAT is
 
       Result := Success;
    end Validate_FAT_Filesystem;
+
+   procedure Read_FAT_Filename_Into_Filesystem_Node_Name
+     (FAT_Filename                     : Wide_String;
+      FAT_Filename_Length              : Natural;
+      Filesystem_Node_Name             : out Filesystem_Node_Name_T;
+      Filesystem_Node_Name_Byte_Length : out Integer;
+      Result                           : out Function_Result)
+   is
+      Current_Node_Name_Index : Natural := 1;
+
+      --  Each UCS-2 character requires up to 3 bytes to encode in UTF-8.
+      --  This buffer holds those 1-3 bytes for each character conversion.
+      Converted_UCS2_Char_Buffer      : UTF8_Encoded_UCS2_Char_Buffer_T;
+      --  The length of the converted UTF-8 character in bytes.
+      Converted_UCS2_Char_Byte_Length : Integer := 0;
+   begin
+      Filesystem_Node_Name := [others => Character'Val (0)];
+      Filesystem_Node_Name_Byte_Length := 0;
+
+      for I in 1 .. FAT_Filename_Length loop
+         Encode_UCS2_Wide_Char_As_UTF8_Buffer
+           (FAT_Filename (I),
+            Converted_UCS2_Char_Buffer,
+            Converted_UCS2_Char_Byte_Length);
+
+         for J in 1 .. Converted_UCS2_Char_Byte_Length loop
+            Filesystem_Node_Name_Byte_Length :=
+              Filesystem_Node_Name_Byte_Length + 1;
+
+            Filesystem_Node_Name (Current_Node_Name_Index) :=
+              Converted_UCS2_Char_Buffer (J);
+
+            Current_Node_Name_Index := Current_Node_Name_Index + 1;
+         end loop;
+      end loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Read_FAT_Filename_Into_Filesystem_Node_Name");
+
+         Result := Constraint_Exception;
+   end Read_FAT_Filename_Into_Filesystem_Node_Name;
 end Filesystems.FAT;

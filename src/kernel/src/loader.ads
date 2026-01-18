@@ -6,6 +6,7 @@
 with Interfaces; use Interfaces;
 
 with ELF;              use ELF;
+with Filesystems;      use Filesystems;
 with Function_Results; use Function_Results;
 with Logging;          use Logging;
 with Memory.Virtual;   use Memory.Virtual;
@@ -16,7 +17,7 @@ package Loader is
 
    procedure Load_New_Process_From_Filesystem
      (Loading_Process : in out Process_Control_Block_T;
-      Path            : Wide_String;
+      Path            : Filesystem_Path_T;
       Result          : out Function_Result);
 
 private

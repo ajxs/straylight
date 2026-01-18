@@ -5,19 +5,17 @@
 
 with Filesystems.Block_Cache; use Filesystems.Block_Cache;
 with Memory;                  use Memory;
-with Utilities;               use Utilities;
 
 package body Filesystems.UStar is
    function Compare_Filename_Against_UStar_Filename
-     (Filename : Wide_String; UStar_Filename : String) return Boolean is
+     (Filename : Filesystem_Path_T; UStar_Filename : String) return Boolean is
    begin
       if Filename'Length /= UStar_Filename'Length then
          return False;
       end if;
 
       for I in 1 .. UStar_Filename'Length loop
-         if Convert_Wide_Char_To_ASCII (Filename (I)) /= UStar_Filename (I)
-         then
+         if Filename (I) /= UStar_Filename (I) then
             return False;
          end if;
       end loop;
@@ -33,7 +31,7 @@ package body Filesystems.UStar is
    procedure Find_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result)

@@ -9,7 +9,7 @@ package Filesystems.UStar is
    procedure Find_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result);
@@ -53,7 +53,7 @@ private
    procedure Print_File_Header (Header : Tar_File_Header);
 
    function Compare_Filename_Against_UStar_Filename
-     (Filename : Wide_String; UStar_Filename : String) return Boolean;
+     (Filename : Filesystem_Path_T; UStar_Filename : String) return Boolean;
 
    function Get_UStar_String_Length (Str : String) return Integer;
 

@@ -14,7 +14,7 @@ package Filesystems.Root is
 
    procedure Add_Filesystem_Node_To_Root_Filesystem
      (Filesystem      : Filesystem_Access;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Index    : Filesystem_Node_Index_T;
       New_Node_Index  : out Filesystem_Node_Index_T;
       Result          : out Function_Result;
@@ -23,7 +23,7 @@ package Filesystems.Root is
 
    procedure Find_File
      (Filesystem        : Filesystem_Access;
-      Filename          : Wide_String;
+      Filename          : Filesystem_Path_T;
       Parent_Node_Index : Unsigned_64;
       Filesystem_Node   : out Filesystem_Node_Access;
       Result            : out Function_Result);
@@ -42,15 +42,16 @@ private
    Maximum_Root_Filesystem_Filename_Length : constant := 32;
 
    type Root_Filesystem_Node_T is record
-      Filename        :
-        Wide_String (1 .. Maximum_Root_Filesystem_Filename_Length) :=
-          [others => Wide_Character'Val (0)];
-      Filename_Length : Natural := 0;
-      Index           : Filesystem_Node_Index_T := 0;
-      Parent_Index    : Filesystem_Node_Index_T := 0;
-      Filesystem      : Filesystem_Access := null;
-      Node_Type       : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
-      Entry_Used      : Boolean := False;
+      Filename             :
+        Filesystem_Path_T (1 .. Maximum_Root_Filesystem_Filename_Length) :=
+          [others => Character'Val (0)];
+      Filename_Byte_Length : Natural := 0;
+      Index                : Filesystem_Node_Index_T := 0;
+      Parent_Index         : Filesystem_Node_Index_T := 0;
+      Filesystem           : Filesystem_Access := null;
+      Node_Type            : Filesystem_Node_Type_T :=
+        Filesystem_Node_Type_File;
+      Entry_Used           : Boolean := False;
    end record;
 
    type Root_Filesystem_Node_Array is
@@ -64,5 +65,10 @@ private
      (Root_Filesystem : Root_Filesystem_T;
       Free_Index      : out Positive;
       Result          : out Function_Result);
+
+   function Does_Root_FS_Node_Name_Match_Path_Name
+     (Node_Name             : Filesystem_Path_T;
+      Node_Name_Byte_Length : Integer;
+      Path                  : Filesystem_Path_T) return Boolean;
 
 end Filesystems.Root;

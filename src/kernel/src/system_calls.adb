@@ -136,8 +136,7 @@ package body System_Calls is
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
-      Read_String :
-      declare
+      Read_String : declare
          String_Buffer : String (1 .. String_Length)
          with Import, Alignment => 1, Address => String_Address;
       begin
@@ -208,9 +207,8 @@ package body System_Calls is
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
-      Read_Path_String_And_Open_File :
-      declare
-         User_Path_String : Wide_String (1 .. Path_String_Length)
+      Read_Path_String_And_Open_File : declare
+         User_Path_String : Filesystem_Path_T (1 .. Path_String_Length)
          with
            Import,
            Convention => C,
@@ -219,7 +217,7 @@ package body System_Calls is
 
          --  Copy the userland path string into a new variable to ensure it is
          --  in the correct format, and within the kernel address space.
-         New_Path_String : constant Wide_String :=
+         New_Path_String : constant Filesystem_Path_T :=
            User_Path_String (1 .. Path_String_Length);
       begin
          Filesystems.Open_File
@@ -429,8 +427,7 @@ package body System_Calls is
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
-      Print_String :
-      declare
+      Print_String : declare
          String_Buffer : String (1 .. String_Length)
          with Import, Alignment => 1, Address => String_Address;
       begin

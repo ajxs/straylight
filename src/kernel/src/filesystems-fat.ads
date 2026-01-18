@@ -14,7 +14,7 @@ package Filesystems.FAT is
    procedure Find_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result);
@@ -73,18 +73,18 @@ private
    with Size => 200, Scalar_Storage_Order => System.Low_Order_First;
    for BIOS_Parameter_Block_T use
      record
-       Bytes_Per_Sector at 0 range 0 .. 15;
-       Sectors_Per_Cluster at 0 range 16 .. 23;
+       Bytes_Per_Sector      at 0 range 0 .. 15;
+       Sectors_Per_Cluster   at 0 range 16 .. 23;
        Reserved_Sector_Count at 0 range 24 .. 39;
-       Table_Count at 0 range 40 .. 47;
-       Root_Entry_Count at 0 range 48 .. 63;
-       Total_Sector_Count at 0 range 64 .. 79;
-       Media_Type at 0 range 80 .. 87;
-       Table_Size at 0 range 88 .. 103;
-       Sectors_Per_Track at 0 range 104 .. 119;
-       Head_Side_Count at 0 range 120 .. 135;
-       Hidden_Sector_Count at 0 range 136 .. 167;
-       Large_Sector_Count at 0 range 168 .. 199;
+       Table_Count           at 0 range 40 .. 47;
+       Root_Entry_Count      at 0 range 48 .. 63;
+       Total_Sector_Count    at 0 range 64 .. 79;
+       Media_Type            at 0 range 80 .. 87;
+       Table_Size            at 0 range 88 .. 103;
+       Sectors_Per_Track     at 0 range 104 .. 119;
+       Head_Side_Count       at 0 range 120 .. 135;
+       Hidden_Sector_Count   at 0 range 136 .. 167;
+       Large_Sector_Count    at 0 range 168 .. 199;
      end record;
 
    ----------------------------------------------------------------------------
@@ -102,12 +102,12 @@ private
    with Size => 208, Scalar_Storage_Order => System.Low_Order_First;
    for Extended_BIOS_Parameter_Block use
      record
-       Physical_Drive_Number at 0 range 00 .. 07;
-       Reserved at 0 range 08 .. 15;
+       Physical_Drive_Number   at 0 range 00 .. 07;
+       Reserved                at 0 range 08 .. 15;
        Extended_Boot_Signature at 0 range 16 .. 23;
-       Volume_Id at 0 range 24 .. 55;
-       Volume_Label at 0 range 56 .. 143;
-       File_System_Type at 0 range 144 .. 207;
+       Volume_Id               at 0 range 24 .. 55;
+       Volume_Label            at 0 range 56 .. 143;
+       File_System_Type        at 0 range 144 .. 207;
      end record;
 
    ----------------------------------------------------------------------------
@@ -136,18 +136,18 @@ private
    with Size => 432, Scalar_Storage_Order => System.Low_Order_First;
    for FAT32_Extended_BIOS_Parameter_Block use
      record
-       Table_Size at 0 range 0 .. 31;
-       Drive_Desc at 0 range 32 .. 47;
-       Version at 0 range 48 .. 63;
-       Root_Cluster at 0 range 64 .. 95;
-       Info_Sector at 0 range 96 .. 111;
+       Table_Size       at 0 range 0 .. 31;
+       Drive_Desc       at 0 range 32 .. 47;
+       Version          at 0 range 48 .. 63;
+       Root_Cluster     at 0 range 64 .. 95;
+       Info_Sector      at 0 range 96 .. 111;
        Backup_BS_Sector at 0 range 112 .. 127;
-       Reserved at 0 range 128 .. 223;
-       Drive_Number at 0 range 224 .. 231;
-       Reserved_1 at 0 range 232 .. 239;
-       Boot_Signature at 0 range 240 .. 247;
-       Volume_ID at 0 range 248 .. 279;
-       Volume_Label at 0 range 280 .. 367;
+       Reserved         at 0 range 128 .. 223;
+       Drive_Number     at 0 range 224 .. 231;
+       Reserved_1       at 0 range 232 .. 239;
+       Boot_Signature   at 0 range 240 .. 247;
+       Volume_ID        at 0 range 248 .. 279;
+       Volume_Label     at 0 range 280 .. 367;
        File_System_Type at 0 range 368 .. 431;
      end record;
 
@@ -180,11 +180,11 @@ private
    with Size => 4096;
    for Boot_Sector_T use
      record
-       Boot_Jump at 0 range 0 .. 23;
-       OEM_Name at 0 range 24 .. 87;
-       BPB at 0 range 88 .. 287;
+       Boot_Jump           at 0 range 0 .. 23;
+       OEM_Name            at 0 range 24 .. 87;
+       BPB                 at 0 range 88 .. 287;
        EBPB_Reserved_Space at 0 range 288 .. 719;
-       Reserved at 0 range 720 .. 4095;
+       Reserved            at 0 range 720 .. 4095;
      end record;
 
    ----------------------------------------------------------------------------
@@ -203,14 +203,14 @@ private
    with Size => 8;
    for Directory_Entry_Attributes_T use
      record
-       Read_Only at 0 range 0 .. 0;
-       Hidden at 0 range 1 .. 1;
+       Read_Only    at 0 range 0 .. 0;
+       Hidden       at 0 range 1 .. 1;
        System_Entry at 0 range 2 .. 2;
        Volume_Label at 0 range 3 .. 3;
-       Directory at 0 range 4 .. 4;
-       Archive at 0 range 5 .. 5;
-       Device at 0 range 6 .. 6;
-       Reserved at 0 range 7 .. 7;
+       Directory    at 0 range 4 .. 4;
+       Archive      at 0 range 5 .. 5;
+       Device       at 0 range 6 .. 6;
+       Reserved     at 0 range 7 .. 7;
      end record;
 
    ----------------------------------------------------------------------------
@@ -234,19 +234,19 @@ private
    with Size => 256, Scalar_Storage_Order => System.Low_Order_First;
    for FAT_Directory_Entry_T use
      record
-       File_Name at 0 range 0 .. 63;
-       File_Ext at 0 range 64 .. 87;
-       Attributes at 0 range 88 .. 95;
-       Reserved at 0 range 96 .. 103;
-       Creation_Seconds at 0 range 104 .. 111;
-       Creation_Time at 0 range 112 .. 127;
-       Creation_Date at 0 range 128 .. 143;
+       File_Name          at 0 range 0 .. 63;
+       File_Ext           at 0 range 64 .. 87;
+       Attributes         at 0 range 88 .. 95;
+       Reserved           at 0 range 96 .. 103;
+       Creation_Seconds   at 0 range 104 .. 111;
+       Creation_Time      at 0 range 112 .. 127;
+       Creation_Date      at 0 range 128 .. 143;
        Last_Accessed_Date at 0 range 144 .. 159;
        First_Cluster_High at 0 range 160 .. 175;
        Last_Modified_Time at 0 range 176 .. 191;
        Last_Modified_Date at 0 range 192 .. 207;
-       First_Cluster_Low at 0 range 208 .. 223;
-       File_Size at 0 range 224 .. 255;
+       First_Cluster_Low  at 0 range 208 .. 223;
+       File_Size          at 0 range 224 .. 255;
      end record;
 
    ----------------------------------------------------------------------------
@@ -258,7 +258,7 @@ private
    ----------------------------------------------------------------------------
    --  An entry in a FAT12 formatted table.
    ----------------------------------------------------------------------------
-   type FAT12_Table_Entry_T is mod 2**12 with Size => 12;
+   type FAT12_Table_Entry_T is mod 2 ** 12 with Size => 12;
 
    ----------------------------------------------------------------------------
    --  The file allocation table in a FAT12 formatted device.
@@ -291,7 +291,7 @@ private
    ----------------------------------------------------------------------------
    --  The Long File Name Sequence file name sequence number.
    ----------------------------------------------------------------------------
-   type File_Name_Number_T is mod 2**5;
+   type File_Name_Number_T is mod 2 ** 5;
 
    ----------------------------------------------------------------------------
    --  LFN Directory Entry sequence type.
@@ -306,10 +306,10 @@ private
    with Size => 8;
    for Long_File_Name_Sequence use
      record
-       Number at 0 range 0 .. 4;
-       Empty_1 at 0 range 5 .. 5;
+       Number     at 0 range 0 .. 4;
+       Empty_1    at 0 range 5 .. 5;
        Last_Entry at 0 range 6 .. 6;
-       Empty_2 at 0 range 7 .. 7;
+       Empty_2    at 0 range 7 .. 7;
      end record;
 
    ----------------------------------------------------------------------------
@@ -328,14 +328,14 @@ private
    with Size => 256;
    for Long_File_Name_Directory_Entry use
      record
-       Sequence at 0 range 0 .. 7;
-       Name_1 at 0 range 8 .. 87;
-       Attributes at 0 range 88 .. 95;
-       Entry_Type at 0 range 96 .. 103;
-       Checksum at 0 range 104 .. 111;
-       Name_2 at 0 range 112 .. 207;
+       Sequence      at 0 range 0 .. 7;
+       Name_1        at 0 range 8 .. 87;
+       Attributes    at 0 range 88 .. 95;
+       Entry_Type    at 0 range 96 .. 103;
+       Checksum      at 0 range 104 .. 111;
+       Name_2        at 0 range 112 .. 207;
        First_Cluster at 0 range 208 .. 223;
-       Name_3 at 0 range 224 .. 255;
+       Name_3        at 0 range 224 .. 255;
      end record;
 
    function Is_Last_Directory_Entry
@@ -390,7 +390,7 @@ private
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result);
@@ -399,7 +399,7 @@ private
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result);
@@ -408,7 +408,7 @@ private
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result);
@@ -417,7 +417,7 @@ private
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result);
@@ -425,7 +425,7 @@ private
    procedure Search_FAT_Directory_For_File
      (Filesystem      : Filesystem_Access;
       Directory       : Directory_Index_T;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result);
@@ -516,5 +516,16 @@ private
 
    procedure Validate_FAT_Filesystem
      (Filesystem_Info : FAT_Filesystem_Info_T; Result : out Function_Result);
+
+   ----------------------------------------------------------------------------
+   --  'Reads' a UCS-2 formatted filename from a FAT directory entry into a
+   --  UTF-8 encoded filesystem node name.
+   ----------------------------------------------------------------------------
+   procedure Read_FAT_Filename_Into_Filesystem_Node_Name
+     (FAT_Filename                     : Wide_String;
+      FAT_Filename_Length              : Natural;
+      Filesystem_Node_Name             : out Filesystem_Node_Name_T;
+      Filesystem_Node_Name_Byte_Length : out Integer;
+      Result                           : out Function_Result);
 
 end Filesystems.FAT;

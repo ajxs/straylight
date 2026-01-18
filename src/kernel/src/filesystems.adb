@@ -85,7 +85,7 @@ package body Filesystems is
 
    procedure Create_Filesystem_Node_Cache_Entry
      (Parent_Filesystem : Filesystem_Access;
-      Filename          : Wide_String;
+      Filename          : Filesystem_Path_T;
       New_Node          : out Filesystem_Node_Access;
       Result            : out Function_Result;
       Index             : Filesystem_Node_Index_T := 0;
@@ -111,15 +111,15 @@ package body Filesystems is
       end if;
 
       New_Node.all :=
-        (Index             => Index,
-         Parent_Index      => Parent_Index,
-         Filename          => [others => Wide_Character'Val (0)],
-         Filename_Length   => 0,
-         Data_Location     => Data_Location,
-         Size              => Size,
-         Node_Type         => Node_Type,
-         Parent_Filesystem => Parent_Filesystem,
-         Filesystem        => Filesystem);
+        (Index                => Index,
+         Parent_Index         => Parent_Index,
+         Filename             => [others => Character'Val (0)],
+         Filename_Byte_Length => 0,
+         Data_Location        => Data_Location,
+         Size                 => Size,
+         Node_Type            => Node_Type,
+         Parent_Filesystem    => Parent_Filesystem,
+         Filesystem           => Filesystem);
 
       Set_Filesystem_Node_Name (New_Node.all, Filename, Result);
       if Is_Error (Result) then
@@ -162,7 +162,7 @@ package body Filesystems is
    procedure Find_Filesystem_Node_In_Cache
      (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;
-      Filename     : Wide_String;
+      Filename     : Filesystem_Path_T;
       Node         : out Filesystem_Node_Access;
       Result       : out Function_Result)
    is
@@ -205,14 +205,14 @@ package body Filesystems is
    end Find_Unused_File_Handle_Entry;
 
    procedure Get_Next_Path_Component
-     (Path              : Wide_String;
-      Start_Index       : in out Integer;
-      End_Index         : out Integer;
-      Next_Token_Length : out Integer) is
+     (Path                   : Filesystem_Path_T;
+      Start_Index            : in out Integer;
+      End_Index              : out Integer;
+      Next_Token_Byte_Length : out Integer) is
    begin
-      Next_Token_Length := 0;
+      Next_Token_Byte_Length := 0;
 
-      --  Skip leading slashes.
+      --  Skip any leading slashes.
       while Start_Index <= Path'Last loop
          exit when Path (Start_Index) /= '/';
          Start_Index := Start_Index + 1;
@@ -226,7 +226,7 @@ package body Filesystems is
          End_Index := End_Index + 1;
       end loop;
 
-      Next_Token_Length := End_Index - Start_Index;
+      Next_Token_Byte_Length := End_Index - Start_Index;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Get_Next_Path_Component", Logging_Tags);
@@ -237,9 +237,10 @@ package body Filesystems is
    begin
       return
         Node /= null
-        and then (Node.all.Node_Type = Filesystem_Node_Type_Directory
-                  or else Node.all.Node_Type
-                          = Filesystem_Node_Type_Mounted_Filesystem);
+        and then
+          (Node.all.Node_Type = Filesystem_Node_Type_Directory
+           or else
+             Node.all.Node_Type = Filesystem_Node_Type_Mounted_Filesystem);
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Is_Searchable_Filesystem_Node");
@@ -248,7 +249,7 @@ package body Filesystems is
 
    procedure Find_File
      (Process         : in out Process_Control_Block_T;
-      Path            : Wide_String;
+      Path            : Filesystem_Path_T;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result)
    is
@@ -262,6 +263,8 @@ package body Filesystems is
       Next_Token_End_Index   : Integer := 1;
       Next_Token_Length      : Integer := 1;
    begin
+      Log_Debug ("Filesystems.Find_File: '" & Path & "'", Logging_Tags);
+
       if Path (Path'First) = '/' then
          --  Absolute path; start at root filesystem.
          Current_Filesystem := System_Root_Filesystem;
@@ -293,13 +296,14 @@ package body Filesystems is
          end if;
 
          declare
-            --  Create a new Wide_String for the next path token.
+            --  Create a new string for the next path token.
             --  This is ideal because string slicing in Ada keeps the original
             --  string indexes, which can be more complicated to work with.
-            Next_Path_Token : constant Wide_String (1 .. Next_Token_Length) :=
-              Path (Next_Token_Start_Index .. Next_Token_End_Index - 1);
+            Next_Path_Token :
+              constant Filesystem_Path_T (1 .. Next_Token_Length) :=
+                Path (Next_Token_Start_Index .. Next_Token_End_Index - 1);
          begin
-            Log_Debug_Wide
+            Log_Debug
               ("Current path token: '" & Next_Path_Token & "'", Logging_Tags);
 
             Find_Filesystem_Node_In_Cache
@@ -313,7 +317,7 @@ package body Filesystems is
             end if;
 
             if Filesystem_Node /= null then
-               Log_Debug_Wide ("Found node in system cache.", Logging_Tags);
+               Log_Debug ("Found node in system cache.", Logging_Tags);
             else
                case Current_Filesystem.all.Filesystem_Type is
                   when Filesystem_Type_UStar =>
@@ -356,6 +360,11 @@ package body Filesystems is
          end;
 
          if Filesystem_Node = null then
+            Log_Debug
+              ("Filesystem node not found for token: '"
+               & Path (Next_Token_Start_Index .. Next_Token_End_Index - 1)
+               & "'",
+               Logging_Tags);
             exit;
          end if;
 
@@ -390,7 +399,7 @@ package body Filesystems is
 
    procedure Open_File
      (Process     : in out Process_Control_Block_T;
-      Path        : Wide_String;
+      Path        : Filesystem_Path_T;
       Mode        : File_Open_Mode_T;
       File_Handle : out Process_File_Handle_Access;
       Result      : out Function_Result)
@@ -399,20 +408,19 @@ package body Filesystems is
 
       File_Handle_Index : Positive := 1;
    begin
-      Log_Debug_Wide
-        ("Hart_State.Filesystem: Open_File: '" & Path & "'", Logging_Tags);
+      Log_Debug ("Filesystems.Open_File: '" & Path & "'", Logging_Tags);
 
       Find_File (Process, Path, Filesystem_Node, Result);
       if Is_Error (Result) then
          File_Handle := null;
          return;
       elsif Result = File_Not_Found then
-         Log_Debug ("File not found", Logging_Tags);
+         Log_Debug ("File not found: '" & Path & "'", Logging_Tags);
          File_Handle := null;
          return;
       end if;
 
-      Log_Debug ("File found", Logging_Tags);
+      Log_Debug ("File found: '" & Path & "'", Logging_Tags);
 
       Find_Unused_File_Handle_Entry (Open_Files, File_Handle_Index, Result);
       if Is_Error (Result) then
@@ -530,7 +538,7 @@ package body Filesystems is
    procedure Search_For_Filesystem_Node_In_Cache
      (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;
-      Filename     : Wide_String;
+      Filename     : Filesystem_Path_T;
       Cache_Index  : out Natural;
       Result       : out Function_Result)
    is
@@ -541,12 +549,13 @@ package body Filesystems is
       for Index in Cache.Entries'Range loop
          if Cache.Entries (Index).Node /= null then
             if Filesystem = Cache.Entries (Index).Node.all.Parent_Filesystem
-              and then Parent_Index
-                       = Cache.Entries (Index).Node.all.Parent_Index
-              and then Compare_Node_Name_With_Wide_String
-                         (Cache.Entries (Index).Node.all.Filename,
-                          Cache.Entries (Index).Node.all.Filename_Length,
-                          Filename)
+              and then
+                Parent_Index = Cache.Entries (Index).Node.all.Parent_Index
+              and then
+                Does_Node_Name_Match_Path_Name
+                  (Cache.Entries (Index).Node.all.Filename,
+                   Cache.Entries (Index).Node.all.Filename_Byte_Length,
+                   Filename)
             then
                Cache_Index := Index;
                exit;
@@ -585,17 +594,17 @@ package body Filesystems is
 
    procedure Set_Filesystem_Node_Name
      (Node      : in out Filesystem_Node_T;
-      Node_Name : Wide_String;
+      Node_Name : Filesystem_Path_T;
       Result    : out Function_Result) is
    begin
-      if Node_Name'Length > Filesystem_Node_Path_T'Last then
+      if Node_Name'Length > Filesystem_Node_Name_T'Last then
          Log_Error
            ("Filesystem node name too long: " & Node_Name'Length'Image);
          Result := Invalid_Argument;
          return;
       end if;
 
-      Node.Filename_Length := Node_Name'Length;
+      Node.Filename_Byte_Length := Node_Name'Length;
       for Index in Node_Name'Range loop
          Node.Filename (Index) := Node_Name (Index);
       end loop;
@@ -720,5 +729,28 @@ package body Filesystems is
 
       Result := Not_Found;
    end Find_File_Handle;
+
+   function Does_Node_Name_Match_Path_Name
+     (Node_Name             : Filesystem_Node_Name_T;
+      Node_Name_Byte_Length : Integer;
+      Path                  : Filesystem_Path_T) return Boolean is
+   begin
+      if Node_Name_Byte_Length /= Path'Length then
+         return False;
+      end if;
+
+      for Index in Path'Range loop
+         if Node_Name (Index) /= Path (Index) then
+            return False;
+         end if;
+      end loop;
+
+      return True;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Does_Node_Name_Match_Path_Name", Logging_Tags);
+         return False;
+   end Does_Node_Name_Match_Path_Name;
 
 end Filesystems;

@@ -7,7 +7,6 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Addresses;       use Addresses;
-with Filesystems;     use Filesystems;
 with Memory;          use Memory;
 with Memory.Physical; use Memory.Physical;
 with Hart_State;      use Hart_State;
@@ -15,7 +14,7 @@ with Hart_State;      use Hart_State;
 package body Loader is
    procedure Load_New_Process_From_Filesystem
      (Loading_Process : in out Process_Control_Block_T;
-      Path            : Wide_String;
+      Path            : Filesystem_Path_T;
       Result          : out Function_Result)
    is
       Executable_File : Process_File_Handle_Access := null;
@@ -35,8 +34,9 @@ package body Loader is
       Bytes_To_Read              : Natural := 0;
       Bytes_Read                 : Natural := 0;
    begin
-      Log_Debug_Wide
+      Log_Debug
         ("Loading new process from filesystem: '" & Path & "'", Logging_Tags);
+
       Open_File
         (Loading_Process, Path, File_Open_Mode_Read, Executable_File, Result);
       if Is_Error (Result) then
@@ -157,8 +157,7 @@ package body Loader is
                return;
             end if;
 
-            Load_Segment_Data_Into_Allocated_Address :
-            begin
+            Load_Segment_Data_Into_Allocated_Address : begin
                --  This is the virtual mapping address for the newly allocated
                --  physical memory.
                Region_Address : constant Virtual_Address_T :=

@@ -6,7 +6,7 @@
 package body Filesystems.Root is
    procedure Add_Filesystem_Node_To_Root_Filesystem
      (Filesystem      : Filesystem_Access;
-      Filename        : Wide_String;
+      Filename        : Filesystem_Path_T;
       Parent_Index    : Filesystem_Node_Index_T;
       New_Node_Index  : out Filesystem_Node_Index_T;
       Result          : out Function_Result;
@@ -48,18 +48,18 @@ package body Filesystems.Root is
          end if;
 
          Root_Filesystem.Nodes (New_Entry_Index) :=
-           (Entry_Used      => True,
-            Index           => Filesystem_Node_Index_T (New_Entry_Index),
-            Parent_Index    => Parent_Index,
-            Filename        => [others => Wide_Character'Val (0)],
-            Filename_Length => 0,
-            Node_Type       => Node_Type,
-            Filesystem      => Node_Filesystem);
+           (Entry_Used           => True,
+            Index                => Filesystem_Node_Index_T (New_Entry_Index),
+            Parent_Index         => Parent_Index,
+            Filename             => [others => Character'Val (0)],
+            Filename_Byte_Length => 0,
+            Node_Type            => Node_Type,
+            Filesystem           => Node_Filesystem);
 
          Root_Filesystem.Nodes (New_Entry_Index).Filename
            (1 .. Filename'Length) :=
            Filename (Filename'Range);
-         Root_Filesystem.Nodes (New_Entry_Index).Filename_Length :=
+         Root_Filesystem.Nodes (New_Entry_Index).Filename_Byte_Length :=
            Filename'Length;
 
          New_Node_Index := Root_Filesystem.Nodes (New_Entry_Index).Index;
@@ -97,7 +97,7 @@ package body Filesystems.Root is
 
    procedure Find_File
      (Filesystem        : Filesystem_Access;
-      Filename          : Wide_String;
+      Filename          : Filesystem_Path_T;
       Parent_Node_Index : Unsigned_64;
       Filesystem_Node   : out Filesystem_Node_Access;
       Result            : out Function_Result) is
@@ -112,15 +112,16 @@ package body Filesystems.Root is
       begin
          for Current_Node of Root_Filesystem.Nodes loop
             if Current_Node.Entry_Used then
-               Log_Debug_Wide
+               Log_Debug
                  ("Parsed entry with filename: '"
-                  & Current_Node.Filename (1 .. Current_Node.Filename_Length)
+                  & Current_Node.Filename
+                      (1 .. Current_Node.Filename_Byte_Length)
                   & "'",
                   Logging_Tags_FS_Root);
 
-               if Compare_Node_Name_With_Wide_String
+               if Does_Root_FS_Node_Name_Match_Path_Name
                     (Current_Node.Filename,
-                     Current_Node.Filename_Length,
+                     Current_Node.Filename_Byte_Length,
                      Filename)
                  and then Current_Node.Parent_Index = Parent_Node_Index
                then
@@ -189,4 +190,28 @@ package body Filesystems.Root is
          Log_Error ("Constraint_Error: Initialise_Root_Filesystem");
          Result := Constraint_Exception;
    end Initialise_Root_Filesystem;
+
+   function Does_Root_FS_Node_Name_Match_Path_Name
+     (Node_Name             : Filesystem_Path_T;
+      Node_Name_Byte_Length : Integer;
+      Path                  : Filesystem_Path_T) return Boolean is
+   begin
+      if Node_Name_Byte_Length /= Path'Length then
+         return False;
+      end if;
+
+      for Index in 1 .. Node_Name_Byte_Length loop
+         if Node_Name (Index) /= Path (Index) then
+            return False;
+         end if;
+      end loop;
+
+      return True;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Does_Root_FS_Node_Name_Match_Path_Name");
+         return False;
+   end Does_Root_FS_Node_Name_Match_Path_Name;
+
 end Filesystems.Root;

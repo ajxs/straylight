@@ -19,6 +19,8 @@ package Filesystems is
 
    Block_Size : constant := 16#1000#;
 
+   Filesystem_Node_Max_Byte_Length : constant Integer := 256;
+
    type Filesystem_Type_T is
      (Filesystem_Type_None,
       Filesystem_Type_FAT,
@@ -44,21 +46,33 @@ package Filesystems is
       Filesystem_Node_Type_Directory,
       Filesystem_Node_Type_Mounted_Filesystem);
 
-   subtype Filesystem_Node_Path_T is Wide_String (1 .. 256);
+   --  This type is an alias for the type used internally to represent paths
+   --  within the system. This type is used for all function arguments
+   --  representing a filesystem path or node name.
+   subtype Filesystem_Path_T is String;
 
+   --  A filesystem node's name is stored as a fixed-size array of
+   --  UTF-8 encoded bytes, with a separate length field indicating how
+   --  many bytes are actually used.
+   subtype Filesystem_Node_Name_T is
+     Filesystem_Path_T (1 .. Filesystem_Node_Max_Byte_Length);
+
+   --  Unique index of an individual node within its filesystem.
+   --  This type is a generic identifier, which is only meaningful within the
+   --  context of the filesystem the node belongs to.
+   --  It is used to uniquely identify files, and instruct the OS on how
+   --  to locate them physically within the filesystem.
    subtype Filesystem_Node_Index_T is Unsigned_64;
 
    type Filesystem_Node_T is record
-      --  @TODO: This will need to change in the future.
-      Filename        : Filesystem_Node_Path_T :=
-        [others => Wide_Character'Val (0)];
-      Filename_Length : Integer := 0;
+      --  @TODO: In the future it might be worthwhile allocating the names of
+      --  filesystem nodes on the heap, to avoid allocating the full maximum
+      --  path length for every node in memory.
+      Filename             : Filesystem_Node_Name_T :=
+        [others => Character'Val (0)];
+      Filename_Byte_Length : Integer := 0;
 
-      --  Unique index of this node within the filesystem.
-      --  This is a generic identifier, which is only meaningful within the
-      --  context of the filesystem it belongs to.
-      --  It is used to uniquely identify files, and instruct the OS on how
-      --  to find them.
+      --  The index uniquely identifies this node within its filesystem.
       Index             : Filesystem_Node_Index_T := 0;
       Parent_Index      : Filesystem_Node_Index_T := 0;
       Parent_Filesystem : Filesystem_Access := null;
@@ -98,7 +112,7 @@ package Filesystems is
 
    procedure Open_File
      (Process     : in out Process_Control_Block_T;
-      Path        : Wide_String;
+      Path        : Filesystem_Path_T;
       Mode        : File_Open_Mode_T;
       File_Handle : out Process_File_Handle_Access;
       Result      : out Function_Result);
@@ -130,7 +144,7 @@ package Filesystems is
    procedure Find_Filesystem_Node_In_Cache
      (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;
-      Filename     : Wide_String;
+      Filename     : Filesystem_Path_T;
       Node         : out Filesystem_Node_Access;
       Result       : out Function_Result);
 
@@ -174,11 +188,16 @@ private
      (Name1 : Wide_String; Name1_Length : Integer; Name2 : Wide_String)
       return Boolean;
 
+   function Does_Node_Name_Match_Path_Name
+     (Node_Name             : Filesystem_Node_Name_T;
+      Node_Name_Byte_Length : Integer;
+      Path                  : Filesystem_Path_T) return Boolean;
+
    procedure Get_Next_Path_Component
-     (Path              : Wide_String;
-      Start_Index       : in out Integer;
-      End_Index         : out Integer;
-      Next_Token_Length : out Integer);
+     (Path                   : Filesystem_Path_T;
+      Start_Index            : in out Integer;
+      End_Index              : out Integer;
+      Next_Token_Byte_Length : out Integer);
 
    function Is_Searchable_Device_Node
      (Node : Filesystem_Node_Access) return Boolean
@@ -191,7 +210,7 @@ private
    procedure Search_For_Filesystem_Node_In_Cache
      (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;
-      Filename     : Wide_String;
+      Filename     : Filesystem_Path_T;
       Cache_Index  : out Natural;
       Result       : out Function_Result);
 
@@ -200,7 +219,7 @@ private
 
    procedure Find_File
      (Process         : in out Process_Control_Block_T;
-      Path            : Wide_String;
+      Path            : Filesystem_Path_T;
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result);
 
@@ -212,12 +231,12 @@ private
 
    procedure Set_Filesystem_Node_Name
      (Node      : in out Filesystem_Node_T;
-      Node_Name : Wide_String;
+      Node_Name : Filesystem_Path_T;
       Result    : out Function_Result);
 
    procedure Create_Filesystem_Node_Cache_Entry
      (Parent_Filesystem : Filesystem_Access;
-      Filename          : Wide_String;
+      Filename          : Filesystem_Path_T;
       New_Node          : out Filesystem_Node_Access;
       Result            : out Function_Result;
       Index             : Filesystem_Node_Index_T := 0;
