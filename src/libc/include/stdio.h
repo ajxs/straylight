@@ -18,4 +18,10 @@ typedef struct
 	bool eof;
 } FILE;
 
+FILE *fopen(const char *restrict file_path, const char *restrict mode);
+
+size_t fread(void *restrict ptr, size_t size, size_t count, FILE *restrict stream);
+
+int fseek(FILE *stream, long offset, int origin);
+
 #endif
