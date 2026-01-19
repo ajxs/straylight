@@ -1,6 +1,6 @@
+#include "string.h"
 #include <stddef.h>
 #include <stdint.h>
-#include "string.h"
 
 int memcmp(const void *a, const void *b, size_t size)
 {
@@ -18,10 +18,7 @@ int memcmp(const void *a, const void *b, size_t size)
 	return 0;
 }
 
-void *memcpy(
-		void *dest,
-		const void *src,
-		size_t size)
+void *memcpy(void *dest, const void *src, size_t size)
 {
 	for (size_t i = 0; i < size; i++)
 	{

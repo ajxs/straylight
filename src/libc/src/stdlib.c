@@ -1,14 +1,13 @@
+#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
-
-#include <errno.h>
 #include <stdlib.h>
 #include <straylight_syscall.h>
 
 void *malloc(size_t size)
 {
 	int64_t result =
-			straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_ALLOCATE_MEMORY, size);
+	    straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_ALLOCATE_MEMORY, size);
 	if (is_syscall_result_error(result))
 	{
 		errno = result;

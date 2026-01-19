@@ -1,0 +1,8 @@
+BasedOnStyle: LLVM
+
+BreakBeforeBraces: Allman
+UseTab: ForIndentation
+IndentWidth: 2
+TabWidth: 2
+
+ColumnLimit: 80
