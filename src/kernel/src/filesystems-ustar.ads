@@ -52,9 +52,6 @@ private
 
    procedure Print_File_Header (Header : Tar_File_Header);
 
-   function Compare_Filename_Against_UStar_Filename
-     (Filename : Filesystem_Path_T; UStar_Filename : String) return Boolean;
-
    function Get_UStar_String_Length (Str : String) return Integer;
 
    function Is_Valid_Record (Header : Tar_File_Header) return Boolean

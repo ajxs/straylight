@@ -66,9 +66,4 @@ private
       Free_Index      : out Positive;
       Result          : out Function_Result);
 
-   function Does_Root_FS_Node_Name_Match_Path_Name
-     (Node_Name             : Filesystem_Path_T;
-      Node_Name_Byte_Length : Integer;
-      Path                  : Filesystem_Path_T) return Boolean;
-
 end Filesystems.Root;

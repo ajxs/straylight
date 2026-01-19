@@ -735,17 +735,9 @@ package body Filesystems is
       Node_Name_Byte_Length : Integer;
       Path                  : Filesystem_Path_T) return Boolean is
    begin
-      if Node_Name_Byte_Length /= Path'Length then
-         return False;
-      end if;
-
-      for Index in Path'Range loop
-         if Node_Name (Index) /= Path (Index) then
-            return False;
-         end if;
-      end loop;
-
-      return True;
+      return
+        Node_Name (Node_Name'First .. Node_Name_Byte_Length)
+        = Path (Path'Range);
    exception
       when Constraint_Error =>
          Log_Error

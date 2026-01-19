@@ -56,8 +56,7 @@ package body Filesystems.Root is
             Node_Type            => Node_Type,
             Filesystem           => Node_Filesystem);
 
-         Root_Filesystem.Nodes (New_Entry_Index).Filename
-           (1 .. Filename'Length) :=
+         Root_Filesystem.Nodes (New_Entry_Index).Filename (Filename'Range) :=
            Filename (Filename'Range);
          Root_Filesystem.Nodes (New_Entry_Index).Filename_Byte_Length :=
            Filename'Length;
@@ -119,10 +118,10 @@ package body Filesystems.Root is
                   & "'",
                   Logging_Tags_FS_Root);
 
-               if Does_Root_FS_Node_Name_Match_Path_Name
-                    (Current_Node.Filename,
-                     Current_Node.Filename_Byte_Length,
-                     Filename)
+               if Current_Node.Filename
+                    (Current_Node.Filename'First
+                     .. Current_Node.Filename_Byte_Length)
+                 = Filename (Filename'Range)
                  and then Current_Node.Parent_Index = Parent_Node_Index
                then
                   Create_Filesystem_Node_Cache_Entry
@@ -190,28 +189,5 @@ package body Filesystems.Root is
          Log_Error ("Constraint_Error: Initialise_Root_Filesystem");
          Result := Constraint_Exception;
    end Initialise_Root_Filesystem;
-
-   function Does_Root_FS_Node_Name_Match_Path_Name
-     (Node_Name             : Filesystem_Path_T;
-      Node_Name_Byte_Length : Integer;
-      Path                  : Filesystem_Path_T) return Boolean is
-   begin
-      if Node_Name_Byte_Length /= Path'Length then
-         return False;
-      end if;
-
-      for Index in 1 .. Node_Name_Byte_Length loop
-         if Node_Name (Index) /= Path (Index) then
-            return False;
-         end if;
-      end loop;
-
-      return True;
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Does_Root_FS_Node_Name_Match_Path_Name");
-         return False;
-   end Does_Root_FS_Node_Name_Match_Path_Name;
 
 end Filesystems.Root;

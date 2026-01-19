@@ -21,23 +21,9 @@ package body Utilities is
          return ' ';
    end Convert_Wide_Char_To_ASCII;
 
-   function Convert_Wide_Wide_Char_To_Wide_Char
-     (Wide_Wide_Char : Wide_Wide_Character) return Wide_Character is
-   begin
-      Code : constant Natural := Wide_Wide_Character'Pos (Wide_Wide_Char);
-      if Code <= Wide_Character'Pos (Wide_Character'Last) then
-         return Wide_Character'Val (Code);
-      else
-         return 'X';
-      end if;
-   exception
-      when Constraint_Error =>
-         return 'X';
-   end Convert_Wide_Wide_Char_To_Wide_Char;
-
    procedure Encode_UCS2_Wide_Char_As_UTF8_Buffer
      (Wide_Char                 : Wide_Character;
-      Output_Buffer             : out UTF8_Encoded_UCS2_Char_Buffer_T;
+      Output_Buffer             : out UTF8_Converted_Char_Bufer_T;
       Output_Buffer_Byte_Length : out Natural)
    is
       Code : constant Natural := Wide_Character'Pos (Wide_Char);

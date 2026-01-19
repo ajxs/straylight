@@ -7,27 +7,6 @@ with Filesystems.Block_Cache; use Filesystems.Block_Cache;
 with Memory;                  use Memory;
 
 package body Filesystems.UStar is
-   function Compare_Filename_Against_UStar_Filename
-     (Filename : Filesystem_Path_T; UStar_Filename : String) return Boolean is
-   begin
-      if Filename'Length /= UStar_Filename'Length then
-         return False;
-      end if;
-
-      for I in 1 .. UStar_Filename'Length loop
-         if Filename (I) /= UStar_Filename (I) then
-            return False;
-         end if;
-      end loop;
-
-      return True;
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Compare_Filename_Against_UStar_Filename");
-         return False;
-   end Compare_Filename_Against_UStar_Filename;
-
    procedure Find_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -90,9 +69,7 @@ package body Filesystems.UStar is
                & "'",
                Logging_Tags_UStar);
 
-            if Compare_Filename_Against_UStar_Filename
-                 (Filename, Header.Name (1 .. Filename_Length))
-            then
+            if Filename = Header.Name (1 .. Filename_Length) then
                --  If we have a match, create a filesystem node cache entry.
                Create_Filesystem_Node_Cache_Entry
                  (Filesystem,

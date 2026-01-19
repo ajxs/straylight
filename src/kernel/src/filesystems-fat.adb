@@ -1295,7 +1295,7 @@ package body Filesystems.FAT is
 
       --  Each UCS-2 character requires up to 3 bytes to encode in UTF-8.
       --  This buffer holds those 1-3 bytes for each character conversion.
-      Converted_UCS2_Char_Buffer      : UTF8_Encoded_UCS2_Char_Buffer_T;
+      Converted_UCS2_Char_Buffer      : UTF8_Converted_Char_Bufer_T;
       --  The length of the converted UTF-8 character in bytes.
       Converted_UCS2_Char_Byte_Length : Integer := 0;
    begin
