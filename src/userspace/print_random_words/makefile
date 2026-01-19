@@ -29,8 +29,9 @@ LIBSTRAYLIGHT   := libstraylight
 
 CFLAGS :=                   \
 	--sysroot=${SYSROOT_DIR}  \
-	-ggdb                     \
+	-nostdlib                 \
 	${INCLUDE_FLAG}           \
+	-ggdb                     \
 	-std=gnu99                \
 	-Wall                     \
 	-Wextra
@@ -46,13 +47,13 @@ LIBS := \
 AS_SOURCES :=
 
 C_SOURCES  :=               \
-	${SRC_DIR}/print_fractal_pattern.c
+	${SRC_DIR}/print_random_words.c
 
 OBJECTS    := ${AS_SOURCES:.S=.o}
 OBJECTS    += ${C_SOURCES:.c=.o}
 
 BUILD_DIR     := build
-KERNEL_BINARY := ${BUILD_DIR}/print_fractal_pattern.elf
+KERNEL_BINARY := ${BUILD_DIR}/print_random_words.elf
 
 .PHONY: all clean
 
@@ -66,7 +67,10 @@ clean:
 	rm -rf ${BUILD_DIR}
 
 ${KERNEL_BINARY}: ${OBJECTS} ${BUILD_DIR}
-	${CC} ${LDFLAGS} ${OBJECTS} -o ${KERNEL_BINARY} ${LIBS}
+	${CC}      \
+	${LDFLAGS} \
+	${LIBC_DIR}/crt0.o \
+	${OBJECTS} -o ${KERNEL_BINARY} ${LIBS}
 
 %.o: %.S
 	${CC} ${INCLUDE_FLAG} -g -c $< -o $@ ${CFLAGS}
