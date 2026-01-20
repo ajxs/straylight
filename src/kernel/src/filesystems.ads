@@ -125,6 +125,9 @@ package Filesystems is
       Bytes_Read     : out Natural;
       Result         : out Function_Result);
 
+   procedure Close_File
+     (File_Handle : Process_File_Handle_Access; Result : out Function_Result);
+
    procedure Seek_File
      (File_Handle : Process_File_Handle_Access;
       New_Offset  : Unsigned_64;

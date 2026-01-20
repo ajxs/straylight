@@ -745,4 +745,19 @@ package body Filesystems is
          return False;
    end Does_Node_Name_Match_Path_Name;
 
+   procedure Close_File
+     (File_Handle : Process_File_Handle_Access; Result : out Function_Result)
+   is
+   begin
+      Log_Debug ("Filesystems.Close_File", Logging_Tags);
+
+      File_Handle.all.Entry_Used := False;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Close_File", Logging_Tags);
+         Result := Constraint_Exception;
+   end Close_File;
+
 end Filesystems;

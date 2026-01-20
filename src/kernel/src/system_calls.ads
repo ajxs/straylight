@@ -22,9 +22,10 @@ package System_Calls is
    Syscall_Free_Memory     : constant := 5446_0005;
    Syscall_Print_To_Serial : constant := 5446_0006;
 
-   Syscall_Open_File : constant := 5446_0107;
-   Syscall_Read_File : constant := 5446_0108;
-   Syscall_Seek_File : constant := 5446_0109;
+   Syscall_Open_File  : constant := 5446_0107;
+   Syscall_Read_File  : constant := 5446_0108;
+   Syscall_Seek_File  : constant := 5446_0109;
+   Syscall_Close_File : constant := 5446_0110;
 
    Syscall_Update_Framebuffer : constant := 5446_0209;
 
@@ -60,6 +61,9 @@ private
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
    procedure Handle_Seek_File_Syscall
+     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+
+   procedure Handle_Close_File_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
    procedure Handle_Update_Framebuffer_Syscall

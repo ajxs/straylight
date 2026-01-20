@@ -383,6 +383,53 @@ package body System_Calls is
          Result := Constraint_Exception;
    end Handle_Read_File_Syscall;
 
+   procedure Handle_Close_File_Syscall
+     (Process : in out Process_Control_Block_T; Result : out Function_Result)
+   is
+      Trap_Context : Process_Context_T
+      with
+        Import,
+        Convention => C,
+        Alignment  => 1,
+        Address    => Process.Trap_Context_Addr;
+
+      File_Handle_Id : Unsigned_64 := 0;
+      File_Handle    : Process_File_Handle_Access := null;
+   begin
+      Log_Debug ("User Mode Syscall: Close File", Logging_Tags);
+
+      File_Handle_Id := Trap_Context.Gp_Registers (a1);
+
+      Find_File_Handle
+        (Process.Process_Id, File_Handle_Id, File_Handle, Result);
+      if Is_Error (Result) then
+         Log_Error ("Error finding file handle: " & Result'Image);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64
+             (Syscall_Error_File_Handle_Not_Found);
+
+         goto Syscall_Unsuccessful_No_Kernel_Error;
+      end if;
+
+      Close_File (File_Handle, Result);
+      if Is_Error (Result) then
+         Log_Error ("Error closing file: " & Result'Image);
+         return;
+      end if;
+
+      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
+      Result := Success;
+      return;
+
+      <<Syscall_Unsuccessful_No_Kernel_Error>>
+      Result := Syscall_Unsuccessful_Without_Kernel_Error;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Handle_Close_File_Syscall");
+         Result := Constraint_Exception;
+   end Handle_Close_File_Syscall;
+
    procedure Handle_Print_To_Serial_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
@@ -522,6 +569,9 @@ package body System_Calls is
 
          when Syscall_Seek_File          =>
             Handle_Seek_File_Syscall (Process, Result);
+
+         when Syscall_Close_File         =>
+            Handle_Close_File_Syscall (Process, Result);
 
          when Syscall_Update_Framebuffer =>
             Handle_Update_Framebuffer_Syscall (Process, Result);
