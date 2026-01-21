@@ -272,13 +272,15 @@ package body Memory.Allocators.Heap is
       Real_Allocation_Size := Size + (Allocation_Header_T'Size / 8);
 
       while Curr_Region /= null loop
-         --  If the region aligment is 1, there's no need to calculate offset.
+         --  If the region alignment is 1, there's no need to calculate offset.
          if Alignment /= 1 then
             Alignment_Offset :=
               Calculate_Region_Alignment_Offset
                 (Curr_Region.all.Virtual_Address, Alignment);
          end if;
 
+         --  This logging statement is given its own special tag because of the
+         --  performance massive cost to logging the comparison of each region.
          Log_Debug
            ("Testing free region:"
             & ASCII.LF
@@ -290,7 +292,7 @@ package body Memory.Allocators.Heap is
             & ASCII.LF
             & "  align:  "
             & Alignment_Offset'Image,
-            Logging_Tags);
+            [Log_Tag_Heap_Test_Region]);
 
          if (Curr_Region.all.Size = Real_Allocation_Size)
            and then Alignment_Offset = 0
@@ -528,8 +530,7 @@ package body Memory.Allocators.Heap is
         - Storage_Offset (Allocation_Header_T'Size / 8);
 
       --  Read the allocation header to determine the size of the allocation.
-      Read_Header :
-      declare
+      Read_Header : declare
          Header : Allocation_Header_T
          with Import, Alignment => 1, Address => Region_Virtual_Address;
       begin
@@ -619,6 +620,19 @@ package body Memory.Allocators.Heap is
       Curr_Region : Free_Region_Access := null;
       Prev_Region : Free_Region_Access := null;
    begin
+      Log_Debug
+        ("Inserting free region:"
+         & ASCII.LF
+         & "  VAddr: "
+         & Virtual_Address'Image
+         & ASCII.LF
+         & "  PAddr: "
+         & Physical_Address'Image
+         & ASCII.LF
+         & "  Size:  "
+         & Size'Image,
+         Logging_Tags);
+
       --  Find an unused entry in the list, and initialise it.
       New_Entry := Find_Unused_Free_Region_Entry (Memory_Heap);
       if New_Entry = null then

@@ -9,6 +9,8 @@
 
 void *malloc(size_t size);
 
+void free(void *ptr);
+
 [[noreturn]] void exit(int exit_code);
 
 void initialise_straylight_libc();

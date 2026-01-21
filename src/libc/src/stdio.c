@@ -71,3 +71,17 @@ int fseek(FILE *stream, long offset, int origin)
 
 	return 0;
 }
+
+int fclose(FILE *stream)
+{
+	int64_t result = straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_FILE_CLOSE,
+	                                            stream->file_handle_id);
+	if (is_syscall_result_error(result))
+	{
+		errno = result;
+		return -1;
+	}
+
+	free(stream);
+	return 0;
+}

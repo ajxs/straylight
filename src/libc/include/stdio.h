@@ -1,9 +1,9 @@
 #ifndef STRAYLIGHT_LIBC_STDIO_H
 #define STRAYLIGHT_LIBC_STDIO_H 1
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #define NULL ((void *)0)
 
@@ -20,7 +20,10 @@ typedef struct
 
 FILE *fopen(const char *restrict file_path, const char *restrict mode);
 
-size_t fread(void *restrict ptr, size_t size, size_t count, FILE *restrict stream);
+size_t fread(void *restrict ptr, size_t size, size_t count,
+             FILE *restrict stream);
+
+int fclose(FILE *stream);
 
 int fseek(FILE *stream, long offset, int origin);
 

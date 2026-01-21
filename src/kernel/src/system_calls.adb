@@ -31,18 +31,6 @@ package body System_Calls is
       Allocation_Size      : Natural := 0;
       Allocation_Alignment : Natural := 1;
    begin
-      Log_Debug
-        ("User Mode Syscall: Allocate Memory:"
-         & "  PID: "
-         & Process.Process_Id'Image
-         & ASCII.LF
-         & "  Size: "
-         & Allocation_Size'Image
-         & ASCII.LF
-         & "  Alignment: "
-         & Allocation_Alignment'Image,
-         Logging_Tags);
-
       Allocation_Size := Natural (Trap_Context.Gp_Registers (a1));
       if Allocation_Size = 0 then
          Log_Error ("Allocation size is zero");
@@ -64,6 +52,19 @@ package body System_Calls is
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
+
+      Log_Debug
+        ("User Mode Syscall: Allocate Memory:"
+         & ASCII.LF
+         & "  PID:       "
+         & Process.Process_Id'Image
+         & ASCII.LF
+         & "  Size:      "
+         & Allocation_Size'Image
+         & ASCII.LF
+         & "  Alignment: "
+         & Allocation_Alignment'Image,
+         Logging_Tags);
 
       Process.Heap.Allocate
         (Allocation_Size,
@@ -92,6 +93,50 @@ package body System_Calls is
            ("Constraint_Error: Handle_Allocate_Memory_Syscall", Logging_Tags);
          Result := Constraint_Exception;
    end Handle_Allocate_Memory_Syscall;
+
+   procedure Handle_Free_Memory_Syscall
+     (Process : in out Process_Control_Block_T; Result : out Function_Result)
+   is
+      Trap_Context : Process_Context_T
+      with
+        Import,
+        Convention => C,
+        Alignment  => 1,
+        Address    => Process.Trap_Context_Addr;
+
+      Address_To_Free : Virtual_Address_T := Null_Address;
+   begin
+      Address_To_Free :=
+        Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
+
+      Log_Debug
+        ("User Mode Syscall: Free Memory:"
+         & ASCII.LF
+         & "  PID:       "
+         & Process.Process_Id'Image
+         & ASCII.LF
+         & "  Address:   "
+         & Address_To_Free'Image,
+         Logging_Tags);
+
+      Process.Heap.Free (Address_To_Free, Result);
+      if Is_Error (Result) then
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+         goto Syscall_Unsuccessful_No_Kernel_Error;
+      end if;
+
+      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
+      Result := Success;
+      return;
+
+      <<Syscall_Unsuccessful_No_Kernel_Error>>
+      Result := Syscall_Unsuccessful_Without_Kernel_Error;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Handle_Free_Memory_Syscall");
+         Result := Constraint_Exception;
+   end Handle_Free_Memory_Syscall;
 
    procedure Handle_Logging_Syscall
      (Process   : in out Process_Control_Block_T;
@@ -560,6 +605,9 @@ package body System_Calls is
 
          when Syscall_Allocate_Memory    =>
             Handle_Allocate_Memory_Syscall (Process, Result);
+
+         when Syscall_Free_Memory        =>
+            Handle_Free_Memory_Syscall (Process, Result);
 
          when Syscall_Open_File          =>
             Handle_Open_File_Syscall (Process, Result);

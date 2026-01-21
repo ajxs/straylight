@@ -51,6 +51,9 @@ private
    procedure Handle_Allocate_Memory_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
+   procedure Handle_Free_Memory_Syscall
+     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+
    procedure Handle_Print_To_Serial_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
