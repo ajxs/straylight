@@ -219,9 +219,11 @@ package body Memory.Virtual is
       New_Index       : Positive := 1;
    begin
       if not Allow_Mapping_Kernel_Addresses
-        and then not Is_Userspace_Address (Virtual_Address)
+        and then
+          not Is_Valid_Userspace_Address_Range
+                (Virtual_Address, Integer (Size))
       then
-         Log_Error ("Invalid non-userspace address", Logging_Tags);
+         Log_Error ("Invalid non-userspace address range", Logging_Tags);
          Result := Invalid_Argument;
          return;
       end if;

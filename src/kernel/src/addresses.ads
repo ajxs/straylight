@@ -97,8 +97,9 @@ package Addresses is
    is (Addr - Higher_Half_Offset)
    with Pure_Function;
 
-   function Is_Userspace_Address (Addr : Address) return Boolean
-   is (Addr < User_Address_Space_Limit);
+   function Is_Valid_Userspace_Address_Range
+     (Base_Address : Virtual_Address_T; Size : Integer) return Boolean
+   is (Base_Address + Storage_Offset (Size) < User_Address_Space_Limit);
 
    function Get_Lower_Physical_Address
      (Addr : Address) return Physical_Address_T

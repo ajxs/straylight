@@ -161,8 +161,9 @@ package body System_Calls is
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
       String_Length := Integer (Trap_Context.Gp_Registers (a2));
 
-      if not Is_Userspace_Address (String_Address) then
-         Log_Error ("Invalid non-userspace address", Logging_Tags);
+      if not Is_Valid_Userspace_Address_Range (String_Address, String_Length)
+      then
+         Log_Error ("Invalid non-userspace address range", Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
            Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
@@ -231,8 +232,10 @@ package body System_Calls is
       File_Open_Mode :=
         Unsigned_64_To_File_Open_Mode (Trap_Context.Gp_Registers (a3));
 
-      if not Is_Userspace_Address (Path_String_Address) then
-         Log_Error ("Invalid non-userspace address");
+      if not Is_Valid_Userspace_Address_Range
+               (Path_String_Address, Path_String_Length)
+      then
+         Log_Error ("Invalid non-userspace address range");
 
          Trap_Context.Gp_Registers (a0) :=
            Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
@@ -375,8 +378,16 @@ package body System_Calls is
       Buffer_Address :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a2));
 
-      if not Is_Userspace_Address (Buffer_Address) then
-         Log_Error ("Invalid non-userspace address");
+      Bytes_To_Read := Natural (Trap_Context.Gp_Registers (a3));
+      if Bytes_To_Read = 0 then
+         Log_Error ("Invalid bytes to read: " & Bytes_To_Read'Image);
+         Bytes_Read := 0;
+         goto Return_Bytes_Read;
+      end if;
+
+      if not Is_Valid_Userspace_Address_Range (Buffer_Address, Bytes_To_Read)
+      then
+         Log_Error ("Invalid non-userspace address range");
 
          Trap_Context.Gp_Registers (a0) :=
            Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
@@ -394,13 +405,6 @@ package body System_Calls is
              (Syscall_Error_File_Handle_Not_Found);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
-
-      Bytes_To_Read := Natural (Trap_Context.Gp_Registers (a3));
-      if Bytes_To_Read = 0 then
-         Log_Error ("Invalid bytes to read: " & Bytes_To_Read'Image);
-         Bytes_Read := 0;
-         goto Return_Bytes_Read;
       end if;
 
       Filesystems.Read_File
@@ -500,8 +504,9 @@ package body System_Calls is
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
       String_Length := Integer (Trap_Context.Gp_Registers (a2));
 
-      if not Is_Userspace_Address (String_Address) then
-         Log_Error ("Invalid non-userspace address", Logging_Tags);
+      if not Is_Valid_Userspace_Address_Range (String_Address, String_Length)
+      then
+         Log_Error ("Invalid non-userspace address range", Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
            Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
@@ -671,20 +676,22 @@ package body System_Calls is
       User_Framebuffer_Address :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
 
-      if not Is_Userspace_Address (User_Framebuffer_Address) then
-         Log_Error ("Invalid non-userspace address", Logging_Tags);
+      Kernel_Framebuffer_Size :=
+        Integer
+          (Graphics_Device.Bus_Info_VirtIO.Framebuffer_Width
+           * Graphics_Device.Bus_Info_VirtIO.Framebuffer_Height)
+        * 4;
+
+      if not Is_Valid_Userspace_Address_Range
+               (User_Framebuffer_Address, Kernel_Framebuffer_Size)
+      then
+         Log_Error ("Invalid non-userspace address range", Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
            Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
-
-      Kernel_Framebuffer_Size :=
-        Integer
-          (Graphics_Device.Bus_Info_VirtIO.Framebuffer_Width
-           * Graphics_Device.Bus_Info_VirtIO.Framebuffer_Height)
-        * 4;
 
       Copy
         (Source => User_Framebuffer_Address,
