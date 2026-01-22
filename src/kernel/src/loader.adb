@@ -6,7 +6,6 @@
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Addresses;       use Addresses;
 with Memory;          use Memory;
 with Memory.Physical; use Memory.Physical;
 with Hart_State;      use Hart_State;

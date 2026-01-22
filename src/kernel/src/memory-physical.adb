@@ -3,8 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with System.Storage_Elements; use System.Storage_Elements;
-
 with Memory.Virtual;
 
 package body Memory.Physical is
@@ -29,8 +27,7 @@ package body Memory.Physical is
       --  that no more physical memory is mapped into a process' virtual
       --  address space than is allocated here, as it would expose
       --  uninitialised memory to the process.
-      Initialise_Allocated_Physical_Memory :
-      declare
+      Initialise_Allocated_Physical_Memory : declare
          Mapped_Address : Virtual_Address_T := Null_Address;
       begin
          Mapped_Address :=
@@ -224,8 +221,7 @@ package body Memory.Physical is
       --  Iterate through the linked list of physical memory blocks,
       --  consolidating each block with the next until the list is exhausted.
       while Current_Block /= null loop
-         Consolidate_Loop :
-         loop
+         Consolidate_Loop : loop
             Consolidate_Adjacent_Memory_Blocks (Current_Block.all, Result);
             if Is_Error (Result) then
                return;
@@ -316,8 +312,7 @@ package body Memory.Physical is
       --  Find the tail of the list, to attach new blocks to.
       Tail_Block := Get_List_Tail;
 
-      Allocate_Blocks :
-      loop
+      Allocate_Blocks : loop
          --  If we've evenly arrived at the end of the memory region, exit.
          exit Allocate_Blocks when Current_Block_Addr = Region_Length;
 
@@ -387,7 +382,7 @@ package body Memory.Physical is
          end if;
       end loop;
 
-   --  The function result will have been set by the last divide call.
+      --  The function result will have been set by the last divide call.
    end Divide_Block_To_Specified_Order;
 
    procedure Divide_Physical_Memory_Block
@@ -531,7 +526,7 @@ package body Memory.Physical is
 
    function Get_Block_Size_In_Bytes (Order : Block_Order) return Natural is
    begin
-      return Base_Block_Size * (2**Order);
+      return Base_Block_Size * (2 ** Order);
    exception
       when Constraint_Error =>
          return 0;
@@ -705,8 +700,7 @@ package body Memory.Physical is
       end if;
 
       --  Move the allocated memory to the new address.
-      Move_Memory_To_New_Address :
-      declare
+      Move_Memory_To_New_Address : declare
       begin
          Mapped_Old_Address : constant Virtual_Address_T :=
            Memory.Virtual.Get_Physical_Address_Virtual_Mapping (Addr);

@@ -5,7 +5,7 @@
 
 with Ada.Unchecked_Conversion;
 
-with Addresses; use Addresses;
+with Memory; use Memory;
 
 package RISCV.Paging is
    pragma Preelaborate;
@@ -21,14 +21,14 @@ package RISCV.Paging is
 
    --  Type for the indexes into the page table array stored within a
    --  virtual address.
-   type Page_Table_Index_T is mod 2**9;
+   type Page_Table_Index_T is mod 2 ** 9;
 
    --  Page aligned address type.
-   type Page_Aligned_Address_T is mod 2**44;
+   type Page_Aligned_Address_T is mod 2 ** 44;
 
    --  Type for the index into the leaf page table stored within a
    --  virtual address.
-   type Page_Offset_T is mod 2**12;
+   type Page_Offset_T is mod 2 ** 12;
 
    --  Type for the 'array' of page table indexes stored within a virtual
    --  address.
@@ -46,8 +46,8 @@ package RISCV.Paging is
    with Size => 64;
    for Page_Table_Virtual_Address_T use
      record
-       Offset at 0 range 0 .. 11;
-       VPN at 0 range 12 .. 38;
+       Offset   at 0 range 0 .. 11;
+       VPN      at 0 range 12 .. 38;
        Sign_Ext at 0 range 39 .. 63;
      end record;
 
@@ -70,16 +70,16 @@ package RISCV.Paging is
    with Size => 64, Volatile;
    for Page_Table_Entry_SV39_T use
      record
-       V at 0 range 0 .. 0;
-       R at 0 range 1 .. 1;
-       W at 0 range 2 .. 2;
-       X at 0 range 3 .. 3;
-       U at 0 range 4 .. 4;
-       G at 0 range 5 .. 5;
-       A at 0 range 6 .. 6;
-       D at 0 range 7 .. 7;
-       RSW at 0 range 8 .. 9;
-       PPN at 0 range 10 .. 53;
+       V        at 0 range 0 .. 0;
+       R        at 0 range 1 .. 1;
+       W        at 0 range 2 .. 2;
+       X        at 0 range 3 .. 3;
+       U        at 0 range 4 .. 4;
+       G        at 0 range 5 .. 5;
+       A        at 0 range 6 .. 6;
+       D        at 0 range 7 .. 7;
+       RSW      at 0 range 8 .. 9;
+       PPN      at 0 range 10 .. 53;
        Reserved at 0 range 54 .. 63;
      end record;
 

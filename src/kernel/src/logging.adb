@@ -6,11 +6,11 @@
 with Interfaces; use Interfaces;
 with System;     use System;
 
-with Addresses;  use Addresses;
+with Hart_State; use Hart_State;
+with Memory;     use Memory;
 with RISCV;
 with RISCV.SBI;
 with Utilities;  use Utilities;
-with Hart_State; use Hart_State;
 
 package body Logging is
    procedure Log_Message

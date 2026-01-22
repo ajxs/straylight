@@ -4,7 +4,6 @@
 -------------------------------------------------------------------------------
 
 with Filesystems.Block_Cache; use Filesystems.Block_Cache;
-with Memory;                  use Memory;
 with Memory.Kernel;           use Memory.Kernel;
 with Utilities;               use Utilities;
 

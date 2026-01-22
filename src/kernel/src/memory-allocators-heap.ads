@@ -3,9 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Interfaces;              use Interfaces;
-with System.Storage_Elements; use System.Storage_Elements;
-
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
 with Logging;          use Logging;
@@ -204,16 +201,18 @@ private
      (Memory_Region   : Heap_Memory_Region_T;
       Virtual_Address : Virtual_Address_T) return Boolean
    is ((Virtual_Address >= Memory_Region.Virtual_Address)
-       and then (Virtual_Address
-                 < (Memory_Region.Virtual_Address + Memory_Region.Size)))
+       and then
+         (Virtual_Address
+          < (Memory_Region.Virtual_Address + Memory_Region.Size)))
    with Pure_Function, Inline;
 
    function Is_Physical_Address_within_Memory_Region
      (Memory_Region    : Heap_Memory_Region_T;
       Physical_Address : Physical_Address_T) return Boolean
    is ((Physical_Address >= Memory_Region.Physical_Address)
-       and then (Physical_Address
-                 < Memory_Region.Physical_Address + Memory_Region.Size))
+       and then
+         (Physical_Address
+          < Memory_Region.Physical_Address + Memory_Region.Size))
    with Pure_Function, Inline;
 
    ----------------------------------------------------------------------------
@@ -227,9 +226,9 @@ private
       Length           : Storage_Offset) return Boolean
    is ((Virtual_Address < (Region.Virtual_Address + Region.Size)
         and then (Virtual_Address + Length) > Region.Virtual_Address)
-       or else (Physical_Address < (Region.Physical_Address + Region.Size)
-                and then (Physical_Address + Length)
-                         > Region.Physical_Address))
+       or else
+         (Physical_Address < (Region.Physical_Address + Region.Size)
+          and then (Physical_Address + Length) > Region.Physical_Address))
    with Pure_Function;
 
    function Find_Unused_Memory_Region_Entry

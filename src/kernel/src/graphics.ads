@@ -1,8 +1,8 @@
 with Interfaces; use Interfaces;
 
-with Addresses;        use Addresses;
 with Function_Results; use Function_Results;
 with Logging;          use Logging;
+with Memory;           use Memory;
 
 package Graphics is
    pragma Preelaborate;

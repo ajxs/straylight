@@ -5,8 +5,8 @@
 
 with Interfaces; use Interfaces;
 
-with Addresses; use Addresses;
 with Logging;   use Logging;
+with Memory;    use Memory;
 with Processes; use Processes;
 
 -------------------------------------------------------------------------------

@@ -3,8 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with System.Storage_Elements; use System.Storage_Elements;
-
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
 with RISCV.Paging;     use RISCV.Paging;
@@ -62,9 +60,9 @@ package Memory.Allocators.Page is
      (Region : Page_Pool_Region_T; Virtual_Address : Virtual_Address_T)
       return Boolean
    is (Virtual_Address >= Region.Virtual_Address
-       and then Virtual_Address
-                < Region.Virtual_Address
-                  + (Page_Pool_Region_Size * Small_Page_Size));
+       and then
+         Virtual_Address
+         < Region.Virtual_Address + (Page_Pool_Region_Size * Small_Page_Size));
 
 private
    ----------------------------------------------------------------------------

@@ -3,10 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Interfaces;              use Interfaces;
-with System.Storage_Elements; use System.Storage_Elements;
-
-with Addresses;        use Addresses;
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
 with Logging;          use Logging;

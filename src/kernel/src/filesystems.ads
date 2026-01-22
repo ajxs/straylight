@@ -8,10 +8,10 @@ with Interfaces;              use Interfaces;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Addresses;        use Addresses;
 with Devices;          use Devices;
 with Function_Results; use Function_Results;
 with Logging;          use Logging;
+with Memory;           use Memory;
 with Processes;        use Processes;
 
 package Filesystems is

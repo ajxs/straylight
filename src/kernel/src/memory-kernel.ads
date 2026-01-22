@@ -1,6 +1,3 @@
-with System.Storage_Elements; use System.Storage_Elements;
-
-with Addresses;              use Addresses;
 with Function_Results;       use Function_Results;
 with Logging;                use Logging;
 with Memory.Allocators;      use Memory.Allocators;

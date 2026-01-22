@@ -6,7 +6,6 @@
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Addresses;  use Addresses;
 with Devices;
 with Devices.UART;
 with Devices.VirtIO.Graphics;

@@ -6,9 +6,9 @@
 with Interfaces; use Interfaces;
 with System;     use System;
 
-with Addresses;  use Addresses;
 with Hart_State; use Hart_State;
 with Logging;    use Logging;
+with Memory;     use Memory;
 with Processes;  use Processes;
 
 package Boot is

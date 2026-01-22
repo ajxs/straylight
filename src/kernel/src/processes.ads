@@ -8,7 +8,6 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 with Interfaces;              use Interfaces;
 
-with Addresses;              use Addresses;
 with Function_Results;       use Function_Results;
 with Locks;                  use Locks;
 with Logging;                use Logging;

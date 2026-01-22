@@ -4,7 +4,6 @@
 -------------------------------------------------------------------------------
 
 with Filesystems.Block_Cache; use Filesystems.Block_Cache;
-with Memory;                  use Memory;
 
 package body Filesystems.UStar is
    procedure Find_File

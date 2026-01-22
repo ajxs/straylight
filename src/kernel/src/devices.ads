@@ -7,9 +7,9 @@ with Interfaces;              use Interfaces;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Addresses; use Addresses;
 with Locks;     use Locks;
 with Logging;   use Logging;
+with Memory;    use Memory;
 with Memory.Allocators;
 with Processes; use Processes;
 

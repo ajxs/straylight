@@ -3,8 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Addresses; use Addresses;
-
 package Memory.Allocators is
    pragma Preelaborate;
 
