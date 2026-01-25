@@ -455,7 +455,7 @@ package body Filesystems is
       Remaining_Bytes_In_File : Natural := 0;
    begin
       Log_Debug
-        ("Read_File: "
+        ("Filesystems.Read_File: "
          & ASCII.LF
          & "  Bytes_To_Read: "
          & Bytes_To_Read'Image
@@ -466,7 +466,7 @@ package body Filesystems is
 
       if Bytes_To_Read > Maximum_File_Read_Size or else Bytes_To_Read = 0 then
          Log_Error
-           ("Read_File: Requested read size too large: "
+           ("Filesystems.Read_File: Invalid Bytes_To_Read: "
             & Bytes_To_Read'Image);
          Bytes_Read := 0;
          Result := Invalid_Argument;
@@ -483,7 +483,7 @@ package body Filesystems is
       end if;
 
       if Real_Bytes_To_Read = 0 then
-         Log_Debug ("No bytes to read.", Logging_Tags);
+         Log_Debug ("Filesystems.Read_File: No bytes to read.", Logging_Tags);
          Bytes_Read := 0;
          Result := Success;
          return;

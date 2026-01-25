@@ -9,12 +9,14 @@
 
 #define MAX_PATH 256
 
+#define FREAD_BUFFER_SIZE 4096
+
 typedef struct
 {
 	uint64_t file_handle_id;
-	uintptr_t buffer_address;
+	void *buffer_address;
 	size_t buffer_size;
-	size_t current_position;
+	size_t buffer_offset;
 	bool eof;
 } FILE;
 
@@ -26,5 +28,7 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 int fclose(FILE *stream);
 
 int fseek(FILE *stream, long offset, int origin);
+
+int feof(FILE *stream);
 
 #endif
