@@ -16,7 +16,8 @@ package body Devices.VirtIO is
       Device_Registers : VirtIO_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
-      Interrupt_Status : Unsigned_32 := 0;
+      Interrupt_Status   : Unsigned_32 := 0;
+      Interrupt_Ack_Mask : constant := 3;
    begin
       if Device.Device_Bus /= Device_Bus_VirtIO_MMIO then
          Log_Error ("Invalid device bus for VirtIO device");
@@ -28,8 +29,7 @@ package body Devices.VirtIO is
 
       --  Acknowledge the interrupt and process any completed requests.
       --  Wakeup any processes waiting on the completed request.
-      Acknowledge_Interrupt_Channel :
-      declare
+      Acknowledge_Interrupt_Channel : declare
          Q_Used : constant Virtqueue_Used_T
          with
            Import,
@@ -54,8 +54,7 @@ package body Devices.VirtIO is
             --  indicating that the request was successful.
             --  This block has not been moved to its own function because the
             --  import can raise a Constraint_Error.
-            Check_Request_Status :
-            declare
+            Check_Request_Status : declare
                Request_Status_Array : VirtIO_Status_Byte_Array_T
                with
                  Import,
@@ -96,9 +95,7 @@ package body Devices.VirtIO is
                return;
             end if;
 
-            --  Tell the processor to not move loads or stores
-            --  past this point, to ensure that the critical section's memory
-            --  references happen strictly after the lock is acquired.
+            --  Tell the processor to not move loads or stores past this point.
             Fence;
 
             Device.Bus_Info_VirtIO.Request_Serviced_Index :=
@@ -108,7 +105,8 @@ package body Devices.VirtIO is
 
       Fence;
 
-      Device_Registers.Interrupt_Acknowledge := (Interrupt_Status and 3);
+      Device_Registers.Interrupt_Acknowledge :=
+        (Interrupt_Status and Interrupt_Ack_Mask);
 
       Log_Debug ("Acknowledged VirtIO Device Interrupt", Logging_Tags_VirtIO);
 
@@ -171,19 +169,23 @@ package body Devices.VirtIO is
       loop
          Allocate_Descriptor (Device, Descriptor_Indexes (Index), Result);
          if Is_Error (Result) then
-            Log_Error ("Error allocating graphics request descriptors");
+            Log_Error ("Error allocating descriptors");
 
-            --  @TODO: More comprehensive error handling strategy here.
-            for Allocated_Index in
-              Descriptor_Index_T
-                range 0 .. Descriptor_Index_T (Num_Descriptors - 1)
-            loop
-               if Descriptor_Indexes (Allocated_Index) /= 0 then
+            --  Free any allocated descriptors.
+            if Index > 0 then
+               Log_Error ("Freeing allocated descriptors...");
+
+               for Allocated_Index in Descriptor_Index_T range 0 .. Index - 1
+               loop
                   --  Result can be ignored here.
                   Free_Descriptor
-                    (Device, Allocated_Index, Free_Descriptor_Result);
-               end if;
-            end loop;
+                    (Device,
+                     Descriptor_Indexes (Allocated_Index),
+                     Free_Descriptor_Result);
+               end loop;
+            end if;
+
+            return;
          end if;
       end loop;
 
@@ -224,8 +226,7 @@ package body Devices.VirtIO is
          & Device.Bus_Info_VirtIO.Request_Status_Array.Virtual_Address'Image,
          Logging_Tags_VirtIO);
 
-      Initialise_Request_Status_Array :
-      declare
+      Initialise_Request_Status_Array : declare
          Request_Status_Array : VirtIO_Status_Byte_Array_T
          with
            Import,
@@ -281,25 +282,10 @@ package body Devices.VirtIO is
          Logging_Tags_VirtIO);
 
       if Device.Bus_Info_VirtIO.Device_Type = VirtIO_Device_Type_Block then
-         Log_Debug
-           ("Allocating Block Device Request Array...", Logging_Tags_VirtIO);
-
-         Allocate_Kernel_Physical_Memory
-           ((Devices.VirtIO.Block.Block_Request_T'Size / 8)
-            * Maximum_VirtIO_Queue_Length,
-            Allocation_Result,
-            Result);
+         Initialise_Block_Device (Device, Result);
          if Is_Error (Result) then
-            Log_Error
-              ("Error allocating block request memory: " & Result'Image);
             return;
          end if;
-
-         Device.Bus_Info_VirtIO.Block_Request_Array_Addresses :=
-           Allocation_Result;
-
-         Log_Debug
-           ("Allocated Block Device Request Array.", Logging_Tags_VirtIO);
       end if;
 
       Result := Success;
@@ -487,6 +473,7 @@ package body Devices.VirtIO is
          Log_Error
            ("Device feature negotiation unsuccessful.", Logging_Tags_VirtIO);
          Result := Unhandled_Exception;
+         return;
       end if;
 
       Log_Debug

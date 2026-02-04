@@ -3,8 +3,10 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with RISCV.Atomics;       use RISCV.Atomics;
+with Memory.Allocators;   use Memory.Allocators;
+with Memory.Kernel;       use Memory.Kernel;
 with Processes.Scheduler; use Processes.Scheduler;
+with RISCV.Atomics;       use RISCV.Atomics;
 
 package body Devices.VirtIO.Block is
    function Get_Block_Request_Physical_Address
@@ -234,5 +236,34 @@ package body Devices.VirtIO.Block is
          Log_Error ("Constraint_Error: Read_Write_Unlocked");
          Result := Constraint_Exception;
    end Read_Write_Unlocked;
+
+   procedure Initialise_Block_Device
+     (Device : in out Device_T; Result : out Function_Result)
+   is
+      Allocation_Result : Memory_Allocation_Result;
+   begin
+      Log_Debug
+        ("Allocating Block Device Request Array...", Logging_Tags_VirtIO);
+
+      Allocate_Kernel_Physical_Memory
+        ((Block_Request_T'Size / 8) * Maximum_VirtIO_Queue_Length,
+         Allocation_Result,
+         Result);
+      if Is_Error (Result) then
+         Log_Error ("Error allocating block request memory: " & Result'Image);
+         return;
+      end if;
+
+      Device.Bus_Info_VirtIO.Block_Request_Array_Addresses :=
+        Allocation_Result;
+
+      Log_Debug ("Allocated Block Device Request Array.", Logging_Tags_VirtIO);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Initialise_Block_Device");
+         Result := Constraint_Exception;
+   end Initialise_Block_Device;
 
 end Devices.VirtIO.Block;

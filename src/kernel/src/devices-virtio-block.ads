@@ -6,13 +6,8 @@
 package Devices.VirtIO.Block is
    pragma Preelaborate;
 
-   type Block_Request_Type_T is private;
-
-   type Block_Request_T is record
-      Request_Type : Block_Request_Type_T;
-      Reserved     : Unsigned_32;
-      Sector       : Unsigned_64;
-   end record;
+   procedure Initialise_Block_Device
+     (Device : in out Device_T; Result : out Function_Result);
 
    procedure Read_Sector
      (Reading_Process       : in out Process_Control_Block_T;
@@ -60,17 +55,20 @@ private
       VIRTIO_BLK_T_DISCARD      => 11,
       VIRTIO_BLK_T_WRITE_ZEROES => 13);
 
-   type Block_Request_Array_T is
-     array (VirtIO_Descriptor_Array_Index_T) of Block_Request_T
-   with Convention => C;
-
-   --  This needs to be specified here, after the type is 'fully-defined'.
+   type Block_Request_T is record
+      Request_Type : Block_Request_Type_T;
+      Reserved     : Unsigned_32;
+      Sector       : Unsigned_64;
+   end record;
    for Block_Request_T use
      record
        Request_Type at 0 range 0 .. 31;
        Reserved     at 4 range 0 .. 31;
        Sector       at 8 range 0 .. 63;
      end record;
+   type Block_Request_Array_T is
+     array (VirtIO_Descriptor_Array_Index_T) of Block_Request_T
+   with Convention => C;
 
    function Convert_Request_Block_Number_To_Sector
      (Block_Number : Unsigned_64) return Unsigned_64
