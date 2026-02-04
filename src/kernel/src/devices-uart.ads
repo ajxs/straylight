@@ -93,7 +93,7 @@ private
      record
        ERBFI at 0 range 0 .. 0;
        ETBEI at 0 range 1 .. 1;
-       ELSI at 0 range 2 .. 2;
+       ELSI  at 0 range 2 .. 2;
        EDSSI at 0 range 3 .. 3;
      end record;
 

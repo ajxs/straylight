@@ -7,20 +7,24 @@ with Utilities; use Utilities;
 
 package body Devices.UART is
    procedure Acknowledge_Interrupt
-     (Device_Address : Address; Result : out Function_Result) is
+     (Device_Address : Address; Result : out Function_Result)
+   is
+      Interrupt_None              : constant := 0;
+      Interrupt_Rx_Data_Available : constant := 4;
+      Interrupt_Char_Timeout      : constant := 12;
    begin
       Highest_Status_Interrupt : constant Unsigned_8 :=
         Read_Unsigned_8 (Device_Address + Interrupt_Ident_FIFO_Control)
         and 2#1111#;
 
-      if Highest_Status_Interrupt = 0 then
+      if Highest_Status_Interrupt = Interrupt_None then
          Log_Debug ("Spurious UART Interrupt.", Logging_Tags);
-      elsif Highest_Status_Interrupt = 4 or else Highest_Status_Interrupt = 12
+      elsif Highest_Status_Interrupt = Interrupt_Rx_Data_Available
+        or else Highest_Status_Interrupt = Interrupt_Char_Timeout
       then
          --  Handle 'Received Data Available' and
          --  'Character Timeout Indication' interrupts together.
-         Read_Incoming_Data :
-         declare
+         Read_Incoming_Data : declare
             Incoming_Character : Character := ASCII.NUL;
             Incoming_Message   : String (1 .. 128) := [others => ASCII.NUL];
             Incoming_Index     : Natural := 1;
@@ -77,12 +81,17 @@ package body Devices.UART is
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
    procedure Put_Char (Device_Address : Address; Data : Character) is
+      Put_Char_Timeout : constant := 1_000_000;
    begin
-      while Is_Tx_Empty (Device_Address) = False loop
-         null;
+      for I in 1 .. Put_Char_Timeout loop
+         if Is_Tx_Empty (Device_Address) then
+            Write_Unsigned_8 (Device_Address, Character'Pos (Data));
+            return;
+         end if;
       end loop;
 
-      Write_Unsigned_8 (Device_Address, Character'Pos (Data));
+      Log_Error
+        ("Timeout while waiting to put character to UART.", Logging_Tags);
    end Put_Char;
 
    ----------------------------------------------------------------------------
@@ -91,34 +100,28 @@ package body Devices.UART is
    ----------------------------------------------------------------------------
    procedure Put_String (Device_Address : Address; Data : String) is
    begin
-      Print_Loop :
-      for C of Data loop
+      Print_Loop : for C of Data loop
          Put_Char (Device_Address, C);
       end loop Print_Loop;
    end Put_String;
 
    procedure Put_String_Wide (Device_Address : Address; Data : Wide_String) is
    begin
-      Print_Loop :
-      for C of Data loop
+      Print_Loop : for C of Data loop
          Put_Char (Device_Address, Convert_Wide_Char_To_ASCII (C));
       end loop Print_Loop;
    end Put_String_Wide;
 
    function Read_Character (Device_Address : Address) return Character is
-      Timeout_Counter : Natural := 0;
+      Read_Timeout_Limit : constant := 1_000;
    begin
-      while Is_Rx_Empty (Device_Address) loop
-         Timeout_Counter := Timeout_Counter + 1;
-         if Timeout_Counter > 1_000 then
-            return Character'Val (0);
+      for I in 1 .. Read_Timeout_Limit loop
+         if not Is_Rx_Empty (Device_Address) then
+            return Character'Val (Read_Unsigned_8 (Device_Address));
          end if;
       end loop;
 
-      return Character'Val (Read_Unsigned_8 (Device_Address));
-   exception
-      when Constraint_Error =>
-         return Character'Val (0);
+      return Character'Val (0);
    end Read_Character;
 
    ----------------------------------------------------------------------------
@@ -133,8 +136,7 @@ package body Devices.UART is
       --  The value to write into the divisor high register.
       Divisor_High_Byte : Unsigned_8;
    begin
-      Get_Divisor :
-      begin
+      Get_Divisor : begin
          Divisor := Unsigned_16 (MAXIMUM_BAUD_RATE / Rate);
       exception
          --  If an invalid value is generated, set the divisor to 1.
@@ -142,8 +144,7 @@ package body Devices.UART is
             Divisor := 1;
       end Get_Divisor;
 
-      Get_Divisor_Value :
-      begin
+      Get_Divisor_Value : begin
          Divisor_Low_Byte := Unsigned_8 (Divisor and 16#FF#);
          Divisor_High_Byte := Unsigned_8 (Shift_Right (Divisor, 8) and 16#FF#);
       exception
@@ -156,7 +157,7 @@ package body Devices.UART is
 
       --  Enable DLAB.
       Set_Divisor_Latch_State (Device_Address, True);
-      --  Set baud rate divisor low byte to 3 38400 baud.
+      --  Set baud rate divisor low byte.
       Write_Unsigned_8 (Device_Address, Divisor_Low_Byte);
       --  Set baud rate divisor high byte.
       Write_Unsigned_8 (Device_Address + 1, Divisor_High_Byte);
@@ -206,15 +207,13 @@ package body Devices.UART is
    begin
       --  Get the current status of this device's interrupts to
       --  preserve the current interrupt status.
-      Get_Interrupt_Status :
-      begin
+      Get_Interrupt_Status : begin
          Interrupt_Status :=
            Byte_To_Port_Interrupt_Status
              (Read_Unsigned_8 (Device_Address + Interrupt_Enable));
       end Get_Interrupt_Status;
 
-      Set_Interrupt_Status :
-      begin
+      Set_Interrupt_Status : begin
          --  Set the interrupt status var to the desired value.
          case Interrupt_Type is
             when Modem_Line_Status =>
