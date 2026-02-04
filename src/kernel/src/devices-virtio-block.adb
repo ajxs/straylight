@@ -10,10 +10,13 @@ package body Devices.VirtIO.Block is
    function Get_Block_Request_Physical_Address
      (Device : Device_T; Index : Unsigned_16) return Physical_Address_T is
    begin
+      Block_Request_Size : constant Unsigned_64 := Block_Request_T'Size / 8;
+
       return
         Device.Bus_Info_VirtIO.Block_Request_Array_Addresses.Physical_Address
         + Physical_Address_T
-            (Unsigned_64_To_Address (Unsigned_64 (Index * 16)));
+            (Unsigned_64_To_Address
+               (Unsigned_64 (Index) * Block_Request_Size));
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Get_Block_Request_Physical_Address");
@@ -70,6 +73,13 @@ package body Devices.VirtIO.Block is
       Device_Registers : VirtIO_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
    begin
+      --  If this is a write operation, ensure the device is not read-only.
+      if Write and then Device_Registers.Device_Features.VIRTIO_BLK_F_RO then
+         Log_Error ("Attempt to write to read-only VirtIO Block Device");
+         Result := Operation_Unsupported;
+         return;
+      end if;
+
       Allocate_Descriptors (Device, 3, Descriptor_Indexes, Result);
       if Is_Error (Result) then
          return;
@@ -81,8 +91,7 @@ package body Devices.VirtIO.Block is
       Device.Bus_Info_VirtIO.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
-      Initialise_Status :
-      declare
+      Initialise_Status : declare
          Request_Status_Array : VirtIO_Status_Byte_Array_T
          with
            Import,
@@ -93,8 +102,7 @@ package body Devices.VirtIO.Block is
          Request_Status_Array (Descriptor_Indexes (0)) := 255;
       end Initialise_Status;
 
-      Setup_Queues :
-      declare
+      Setup_Queues : declare
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
@@ -130,11 +138,18 @@ package body Devices.VirtIO.Block is
               VIRTIO_BLK_T_IN;
          end if;
 
+         Block_Request_Array_Addresses : constant Physical_Address_T :=
+           Get_Block_Request_Physical_Address (Device, Descriptor_Indexes (0));
+         --  Any exception will return a null address.
+         if Block_Request_Array_Addresses = Null_Physical_Address then
+            Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
+            Result := Unhandled_Exception;
+            return;
+         end if;
+
          Descriptors (Descriptor_Indexes (0)) :=
-           (Address =>
-              Get_Block_Request_Physical_Address
-                (Device, Descriptor_Indexes (0)),
-            Length  => 16,
+           (Address => Block_Request_Array_Addresses,
+            Length  => Block_Request_T'Size / 8,
             Flags   => VIRTQ_DESC_F_NEXT,
             Next    => Descriptor_Indexes (1));
 
@@ -184,6 +199,36 @@ package body Devices.VirtIO.Block is
       if Is_Error (Result) then
          return;
       end if;
+
+      Read_Request_Status : declare
+         Request_Status_Array : VirtIO_Status_Byte_Array_T
+         with
+           Import,
+           Address   =>
+             Device.Bus_Info_VirtIO.Request_Status_Array.Virtual_Address,
+           Alignment => 1;
+
+         VIRTIO_BLK_S_OK     : constant := 0;
+         VIRTIO_BLK_S_IOERR  : constant := 1;
+         VIRTIO_BLK_S_UNSUPP : constant := 2;
+      begin
+         case Request_Status_Array (Descriptor_Indexes (0)) is
+            when VIRTIO_BLK_S_OK     =>
+               Result := Success;
+
+            when VIRTIO_BLK_S_IOERR  =>
+               Log_Error ("I/O Error on VirtIO Block Device");
+               Result := Device_IO_Error;
+
+            when VIRTIO_BLK_S_UNSUPP =>
+               Log_Error ("Unsupported Operation on VirtIO Block Device");
+               Result := Operation_Unsupported;
+
+            when others              =>
+               Log_Error ("Unknown Status on VirtIO Block Device");
+               Result := Unhandled_Exception;
+         end case;
+      end Read_Request_Status;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Read_Write_Unlocked");

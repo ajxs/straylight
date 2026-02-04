@@ -43,6 +43,8 @@ package Function_Results is
    Process_Not_Found             : constant := -5555_0001;
 
    No_Remaining_VirtIO_Descriptors : constant := -3333_0000;
+   Device_IO_Error                 : constant := -3333_0001;
+   Operation_Unsupported           : constant := -3333_0002;
 
    --  Filesystem function result codes.
    File_Not_Found        : constant := 1777_0000;

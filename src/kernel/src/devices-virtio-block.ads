@@ -65,8 +65,12 @@ private
    with Convention => C;
 
    --  This needs to be specified here, after the type is 'fully-defined'.
-   pragma Convention (C, Block_Request_Type_T);
-   for Block_Request_T'Size use 128;
+   for Block_Request_T use
+     record
+       Request_Type at 0 range 0 .. 31;
+       Reserved     at 4 range 0 .. 31;
+       Sector       at 8 range 0 .. 63;
+     end record;
 
    function Convert_Request_Block_Number_To_Sector
      (Block_Number : Unsigned_64) return Unsigned_64
