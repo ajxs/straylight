@@ -23,38 +23,61 @@ package body Utilities is
 
    procedure Encode_UCS2_Wide_Char_As_UTF8_Buffer
      (Wide_Char                 : Wide_Character;
-      Output_Buffer             : out UTF8_Converted_Char_Bufer_T;
+      Output_Buffer             : out UTF8_Converted_Char_Buffer_T;
       Output_Buffer_Byte_Length : out Natural)
    is
       Code : constant Natural := Wide_Character'Pos (Wide_Char);
+
+      UTF8_One_Byte_Max        : constant := 16#7F#;
+      UTF8_Two_Byte_Max        : constant := 16#7FF#;
+      UTF8_Two_Byte_Prefix     : constant := 16#C0#;
+      UTF8_Three_Byte_Prefix   : constant := 16#E0#;
+      UTF8_Continuation_Prefix : constant := 16#80#;
+      UTF8_Continuation_Mask   : constant := 16#3F#;
+      Surrogate_Range_Start    : constant := 16#D800#;
+      Surrogate_Range_End      : constant := 16#DFFF#;
    begin
+      Output_Buffer := [others => Character'Val (0)];
+
       --  Reject surrogate range (invalid Unicode scalar values)
-      if Code in 16#D800# .. 16#DFFF# then
+      if Code in Surrogate_Range_Start .. Surrogate_Range_End then
          raise Constraint_Error;
       end if;
 
-      if Code <= 16#7F# then
+      if Code <= UTF8_One_Byte_Max then
          --  1-byte UTF-8
          Output_Buffer (Output_Buffer'First) := Character'Val (Code);
          Output_Buffer_Byte_Length := 1;
-
-      elsif Code <= 16#7FF# then
+      elsif Code <= UTF8_Two_Byte_Max then
          --  2-byte UTF-8
          Output_Buffer (Output_Buffer'First) :=
-           Character'Val (16#C0# or (Unsigned_16 (Code) / 16#40#));
-         Output_Buffer (Output_Buffer'First + 1) :=
-           Character'Val (16#80# or (Unsigned_16 (Code) and 16#3F#));
-         Output_Buffer_Byte_Length := 2;
+           Character'Val
+             (UTF8_Two_Byte_Prefix or Shift_Right (Unsigned_16 (Code), 6));
 
+         Output_Buffer (Output_Buffer'First + 1) :=
+           Character'Val
+             (UTF8_Continuation_Prefix
+              or (Unsigned_16 (Code) and UTF8_Continuation_Mask));
+
+         Output_Buffer_Byte_Length := 2;
       else
          --  3-byte UTF-8
          Output_Buffer (Output_Buffer'First) :=
-           Character'Val (16#E0# or (Unsigned_16 (Code) / 16#1000#));
+           Character'Val
+             (UTF8_Three_Byte_Prefix or Shift_Right (Unsigned_16 (Code), 12));
+
          Output_Buffer (Output_Buffer'First + 1) :=
            Character'Val
-             (16#80# or ((Unsigned_16 (Code) / 16#40#) and 16#3F#));
+             (UTF8_Continuation_Prefix
+              or
+                ((Shift_Right (Unsigned_16 (Code), 6))
+                 and UTF8_Continuation_Mask));
+
          Output_Buffer (Output_Buffer'First + 2) :=
-           Character'Val (16#80# or (Unsigned_16 (Code) and 16#3F#));
+           Character'Val
+             (UTF8_Continuation_Prefix
+              or (Unsigned_16 (Code) and UTF8_Continuation_Mask));
+
          Output_Buffer_Byte_Length := 3;
       end if;
    exception
