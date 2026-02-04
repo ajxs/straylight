@@ -19,7 +19,7 @@ package Filesystems is
 
    Block_Size : constant := 16#1000#;
 
-   Filesystem_Node_Max_Byte_Length : constant Integer := 256;
+   Filesystem_Node_Name_Max_Byte_Length : constant Integer := 256;
 
    type Filesystem_Type_T is
      (Filesystem_Type_None,
@@ -55,7 +55,7 @@ package Filesystems is
    --  UTF-8 encoded bytes, with a separate length field indicating how
    --  many bytes are actually used.
    subtype Filesystem_Node_Name_T is
-     Filesystem_Path_T (1 .. Filesystem_Node_Max_Byte_Length);
+     Filesystem_Path_T (1 .. Filesystem_Node_Name_Max_Byte_Length);
 
    --  Unique index of an individual node within its filesystem.
    --  This type is a generic identifier, which is only meaningful within the

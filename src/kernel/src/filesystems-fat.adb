@@ -98,9 +98,7 @@ package body Filesystems.FAT is
             Filesystem_Node,
             Result);
       else
-         Log_Error
-           ("Find_File_In_Directory only supports FAT16 at present.",
-            Logging_Tags_FAT);
+         Log_Error ("Only FAT16 supported.", Logging_Tags_FAT);
          Filesystem_Node := null;
          Result := Invalid_Argument;
       end if;
@@ -313,6 +311,10 @@ package body Filesystems.FAT is
          if Is_Error (Result) then
             Log_Error ("Error reading root dir: " & Result'Image);
          end if;
+      else
+         Log_Error ("Only FAT16 supported.", Logging_Tags_FAT);
+         Filesystem_Node := null;
+         Result := Invalid_Filesystem;
       end if;
    exception
       when Constraint_Error =>
@@ -790,7 +792,7 @@ package body Filesystems.FAT is
             FAT_Entry := Unsigned_32 (FAT16_Table (Index));
          end;
       else
-         Log_Error ("Read_FAT_Entry only supports FAT16 at present.");
+         Log_Error ("Only FAT16 supported.");
          FAT_Entry := 0;
          Result := Invalid_Argument;
          return;
@@ -882,6 +884,15 @@ package body Filesystems.FAT is
          return;
       end if;
 
+      --  Since each LFN entry contains 13 UCS-2 characters, ensure that
+      --  adding another 13 characters to the name won't exceed the maximum
+      --  length of a file name that we can support.
+      if Name_offset + 13 > Filename'Length then
+         Log_Error ("LFN entry filename exceeds maximum supported length.");
+         Result := Invalid_Filename;
+         return;
+      end if;
+
       --  The offset into the name is always the sequence number
       --  multiplied by the maximum string length that each
       --  entry holds, which is 13.
@@ -940,7 +951,7 @@ package body Filesystems.FAT is
       Entry_Has_Long_Filename : Boolean := False;
       --  The UCS-2-encoded filename read from the current directory entry.
       Entry_Filename          :
-        Wide_String (1 .. Filesystem_Node_Max_Byte_Length) :=
+        Wide_String (1 .. Filesystem_Node_Name_Max_Byte_Length) :=
           [others => Wide_Character'Val (0)];
       Entry_Filename_Length   : Natural := 0;
 
@@ -1145,8 +1156,37 @@ package body Filesystems.FAT is
       Offset_Within_Cluster      : Natural := 0;
       Bytes_To_Copy_From_Cluster : Natural := 0;
       Bytes_Left_To_Read         : Natural := 0;
+
+      Actual_Bytes_To_Read : Natural := Bytes_To_Read;
    begin
       Bytes_Read := 0;
+
+      --  Validate that the read doesn't exceed the file size.
+      if Start_Offset >= Filesystem_Node.all.Size then
+         Log_Error
+           ("Read offset exceeds file size: "
+            & Start_Offset'Image
+            & " >= "
+            & Filesystem_Node.all.Size'Image,
+            Logging_Tags_FAT);
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      --  Truncate the read if it would exceed the file size.
+      if Start_Offset + Unsigned_64 (Bytes_To_Read) > Filesystem_Node.all.Size
+      then
+         Actual_Bytes_To_Read :=
+           Natural (Filesystem_Node.all.Size - Start_Offset);
+
+         Log_Debug
+           ("Truncating read from "
+            & Bytes_To_Read'Image
+            & " to "
+            & Actual_Bytes_To_Read'Image
+            & " bytes to stay within file size",
+            Logging_Tags_FAT);
+      end if;
 
       --  Allocate a buffer to hold each cluster we need to read.
       Cluster_Size :=
@@ -1195,7 +1235,7 @@ package body Filesystems.FAT is
       --  the necessary bytes from each cluster until the requested
       --  number of bytes have been read.
       loop
-         Bytes_Left_To_Read := Bytes_To_Read - Bytes_Read;
+         Bytes_Left_To_Read := Actual_Bytes_To_Read - Bytes_Read;
 
          Offset_Within_Cluster :=
            Natural (Current_Offset mod Unsigned_64 (Cluster_Size));
@@ -1227,7 +1267,7 @@ package body Filesystems.FAT is
 
          --  If we've read all the bytes we need to, exit.
          Bytes_Read := Bytes_Read + Bytes_To_Copy_From_Cluster;
-         if Bytes_Read = Bytes_To_Read then
+         if Bytes_Read = Actual_Bytes_To_Read then
             exit;
          end if;
 
