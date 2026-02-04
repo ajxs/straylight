@@ -7,14 +7,14 @@ with Utilities; use Utilities;
 
 package body Devices.UART is
    procedure Acknowledge_Interrupt
-     (Device_Address : Address; Result : out Function_Result)
+     (Device : Device_T; Result : out Function_Result)
    is
       Interrupt_None              : constant := 0;
       Interrupt_Rx_Data_Available : constant := 4;
       Interrupt_Char_Timeout      : constant := 12;
    begin
       Highest_Status_Interrupt : constant Unsigned_8 :=
-        Read_Unsigned_8 (Device_Address + Interrupt_Ident_FIFO_Control)
+        Read_Unsigned_8 (Device.Virtual_Address + Interrupt_Ident_FIFO_Control)
         and 2#1111#;
 
       if Highest_Status_Interrupt = Interrupt_None then
@@ -30,8 +30,8 @@ package body Devices.UART is
             Incoming_Index     : Natural := 1;
          begin
             --  Received Data Available.
-            while not Is_Rx_Empty (Device_Address) loop
-               Incoming_Character := Read_Character (Device_Address);
+            while not Is_Rx_Empty (Device) loop
+               Incoming_Character := Read_Character (Device);
 
                if Incoming_Index <= Incoming_Message'Length then
                   Incoming_Message (Incoming_Index) := Incoming_Character;
@@ -60,32 +60,33 @@ package body Devices.UART is
    --   - All interrupts are disabled during initialisation.
    ----------------------------------------------------------------------------
    procedure Initialise
-     (Device_Address : Address; Rate : Baud_Rate := MAXIMUM_BAUD_RATE) is
+     (Device : Device_T; Rate : Baud_Rate := MAXIMUM_BAUD_RATE) is
    begin
       --  Disable all interrupts.
-      Write_Unsigned_8 (Device_Address + Interrupt_Enable, 0);
+      Write_Unsigned_8 (Device.Virtual_Address + Interrupt_Enable, 0);
 
       --  Set the baud rate.
-      Set_Baud_Rate (Device_Address, Rate);
+      Set_Baud_Rate (Device, Rate);
 
       --  Configure the port with 8 bit word length.
       --  No parity bit, one stop bit.
-      Write_Unsigned_8 (Device_Address + Line_Control, 16#03#);
+      Write_Unsigned_8 (Device.Virtual_Address + Line_Control, 16#03#);
 
       --  Enable FIFO.
-      Write_Unsigned_8 (Device_Address + Interrupt_Ident_FIFO_Control, 16#C7#);
+      Write_Unsigned_8
+        (Device.Virtual_Address + Interrupt_Ident_FIFO_Control, 16#C7#);
    end Initialise;
 
    ----------------------------------------------------------------------------
    --  Implementation Notes:
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
-   procedure Put_Char (Device_Address : Address; Data : Character) is
+   procedure Put_Char (Device : Device_T; Data : Character) is
       Put_Char_Timeout : constant := 1_000_000;
    begin
       for I in 1 .. Put_Char_Timeout loop
-         if Is_Tx_Empty (Device_Address) then
-            Write_Unsigned_8 (Device_Address, Character'Pos (Data));
+         if Is_Tx_Empty (Device) then
+            Write_Unsigned_8 (Device.Virtual_Address, Character'Pos (Data));
             return;
          end if;
       end loop;
@@ -98,26 +99,26 @@ package body Devices.UART is
    --  Implementation Notes:
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
-   procedure Put_String (Device_Address : Address; Data : String) is
+   procedure Put_String (Device : Device_T; Data : String) is
    begin
       Print_Loop : for C of Data loop
-         Put_Char (Device_Address, C);
+         Put_Char (Device, C);
       end loop Print_Loop;
    end Put_String;
 
-   procedure Put_String_Wide (Device_Address : Address; Data : Wide_String) is
+   procedure Put_String_Wide (Device : Device_T; Data : Wide_String) is
    begin
       Print_Loop : for C of Data loop
-         Put_Char (Device_Address, Convert_Wide_Char_To_ASCII (C));
+         Put_Char (Device, Convert_Wide_Char_To_ASCII (C));
       end loop Print_Loop;
    end Put_String_Wide;
 
-   function Read_Character (Device_Address : Address) return Character is
+   function Read_Character (Device : Device_T) return Character is
       Read_Timeout_Limit : constant := 1_000;
    begin
       for I in 1 .. Read_Timeout_Limit loop
-         if not Is_Rx_Empty (Device_Address) then
-            return Character'Val (Read_Unsigned_8 (Device_Address));
+         if not Is_Rx_Empty (Device) then
+            return Character'Val (Read_Unsigned_8 (Device.Virtual_Address));
          end if;
       end loop;
 
@@ -128,7 +129,7 @@ package body Devices.UART is
    --  Implementation Notes:
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
-   procedure Set_Baud_Rate (Device_Address : Address; Rate : Baud_Rate) is
+   procedure Set_Baud_Rate (Device : Device_T; Rate : Baud_Rate) is
       --  The baud rate divisor for this baud rate.
       Divisor           : Unsigned_16;
       --  The value to write into the divisor low register.
@@ -156,28 +157,27 @@ package body Devices.UART is
       end Get_Divisor_Value;
 
       --  Enable DLAB.
-      Set_Divisor_Latch_State (Device_Address, True);
+      Set_Divisor_Latch_State (Device, True);
       --  Set baud rate divisor low byte.
-      Write_Unsigned_8 (Device_Address, Divisor_Low_Byte);
+      Write_Unsigned_8 (Device.Virtual_Address, Divisor_Low_Byte);
       --  Set baud rate divisor high byte.
-      Write_Unsigned_8 (Device_Address + 1, Divisor_High_Byte);
+      Write_Unsigned_8 (Device.Virtual_Address + 1, Divisor_High_Byte);
       --  Disable DLAB.
-      Set_Divisor_Latch_State (Device_Address, False);
+      Set_Divisor_Latch_State (Device, False);
    end Set_Baud_Rate;
 
    ----------------------------------------------------------------------------
    --  Implementation Notes:
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
-   procedure Set_Divisor_Latch_State
-     (Device_Address : Address; State : Boolean)
-   is
+   procedure Set_Divisor_Latch_State (Device : Device_T; State : Boolean) is
       --  The existing line map status value.
       Line_Control_Status : Unsigned_8;
    begin
       --  Get the existing line control status, and modify accordingly
       --  to set the divisor latch state.
-      Line_Control_Status := Read_Unsigned_8 (Device_Address + Line_Control);
+      Line_Control_Status :=
+        Read_Unsigned_8 (Device.Virtual_Address + Line_Control);
 
       case State is
          when True  =>
@@ -188,7 +188,8 @@ package body Devices.UART is
       end case;
 
       --  Write the DLAB state.
-      Write_Unsigned_8 (Device_Address + Line_Control, Line_Control_Status);
+      Write_Unsigned_8
+        (Device.Virtual_Address + Line_Control, Line_Control_Status);
    exception
       when Constraint_Error =>
          null;
@@ -199,7 +200,7 @@ package body Devices.UART is
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
    procedure Set_Interrupt_Generation
-     (Device_Address : Address;
+     (Device         : Device_T;
       Interrupt_Type : UART_Interrupt_Type;
       Status         : Boolean)
    is
@@ -210,7 +211,7 @@ package body Devices.UART is
       Get_Interrupt_Status : begin
          Interrupt_Status :=
            Byte_To_Port_Interrupt_Status
-             (Read_Unsigned_8 (Device_Address + Interrupt_Enable));
+             (Read_Unsigned_8 (Device.Virtual_Address + Interrupt_Enable));
       end Get_Interrupt_Status;
 
       Set_Interrupt_Status : begin
@@ -235,7 +236,7 @@ package body Devices.UART is
 
       --  Write to the Interrupt enable register.
       Write_Unsigned_8
-        (Device_Address + Interrupt_Enable,
+        (Device.Virtual_Address + Interrupt_Enable,
          Port_Interrupt_Status_To_Byte (Interrupt_Status));
    end Set_Interrupt_Generation;
 end Devices.UART;

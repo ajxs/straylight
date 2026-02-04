@@ -528,7 +528,7 @@ package body System_Calls is
          with Import, Alignment => 1, Address => String_Address;
       begin
          Devices.UART.Put_String
-           (UART_Device.Virtual_Address, String_Buffer (1 .. String_Length));
+           (UART_Device, String_Buffer (1 .. String_Length));
       end Print_String;
 
       Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;

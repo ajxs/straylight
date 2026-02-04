@@ -27,9 +27,10 @@ package body Traps is
    is
       function Is_Stack_Overflow return Boolean
       is ((Cause = 13 or else Cause = 15)
-          and then Stval
-                   < Address_To_Unsigned_64
-                       (Trapping_Process.Kernel_Stack_Virt_Addr));
+          and then
+            Stval
+            < Address_To_Unsigned_64
+                (Trapping_Process.Kernel_Stack_Virt_Addr));
    begin
       if Is_Stack_Overflow then
          Panic
@@ -109,8 +110,7 @@ package body Traps is
             if System_Device.Device_Bus = Device_Bus_VirtIO_MMIO then
                Devices.VirtIO.Acknowledge_Interrupt (System_Device, Result);
             elsif System_Device.Device_Class = Device_Class_Serial then
-               Devices.UART.Acknowledge_Interrupt
-                 (System_Device.Virtual_Address, Result);
+               Devices.UART.Acknowledge_Interrupt (System_Device, Result);
             else
                Log_Error ("Unable to handle interrupt for unknown device.");
                Result := Success;

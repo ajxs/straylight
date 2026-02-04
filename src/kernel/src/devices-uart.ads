@@ -38,33 +38,33 @@ package Devices.UART is
    --  and stop bits for a particular serial port.
    ----------------------------------------------------------------------------
    procedure Initialise
-     (Device_Address : Address; Rate : Baud_Rate := MAXIMUM_BAUD_RATE);
+     (Device : Device_T; Rate : Baud_Rate := MAXIMUM_BAUD_RATE);
 
    ----------------------------------------------------------------------------
    --  Enables or disables the generation of interrupts of a particular type.
    ----------------------------------------------------------------------------
    procedure Set_Interrupt_Generation
-     (Device_Address : Address;
+     (Device         : Device_T;
       Interrupt_Type : UART_Interrupt_Type;
       Status         : Boolean);
 
    procedure Acknowledge_Interrupt
-     (Device_Address : Address; Result : out Function_Result);
+     (Device : Device_T; Result : out Function_Result);
 
    ----------------------------------------------------------------------------
    --  Prints a string to the specified device.
    ----------------------------------------------------------------------------
-   procedure Put_String (Device_Address : Address; Data : String);
+   procedure Put_String (Device : Device_T; Data : String);
 
    ----------------------------------------------------------------------------
    --  Prints a wide string to the specified device.
    ----------------------------------------------------------------------------
-   procedure Put_String_Wide (Device_Address : Address; Data : Wide_String);
+   procedure Put_String_Wide (Device : Device_T; Data : Wide_String);
 
    ----------------------------------------------------------------------------
    --  Prints a character to a UART port.
    ----------------------------------------------------------------------------
-   procedure Put_Char (Device_Address : Address; Data : Character);
+   procedure Put_Char (Device : Device_T; Data : Character);
 private
    --  Register offsets.
    Rx_Buffer_Tx_Holding         : constant := 0;
@@ -119,12 +119,13 @@ private
    --  This is used during the various transmission functions to ensure that
    --  an overflow exception is not generated.
    ----------------------------------------------------------------------------
-   function Is_Tx_Empty (Device_Address : Address) return Boolean
-   is ((Read_Unsigned_8 (Device_Address + Line_Status) and 16#20#) /= 0)
+   function Is_Tx_Empty (Device : Device_T) return Boolean
+   is ((Read_Unsigned_8 (Device.Virtual_Address + Line_Status) and 16#20#)
+       /= 0)
    with Volatile_Function;
 
-   function Is_Rx_Empty (Device_Address : Address) return Boolean
-   is ((Read_Unsigned_8 (Device_Address + Line_Status) and 16#01#) = 0)
+   function Is_Rx_Empty (Device : Device_T) return Boolean
+   is ((Read_Unsigned_8 (Device.Virtual_Address + Line_Status) and 16#01#) = 0)
    with Volatile_Function;
 
    ----------------------------------------------------------------------------
@@ -133,14 +134,13 @@ private
    --  For more information regarding the use of this procedure refer to the
    --  16550 UART documentation.
    ----------------------------------------------------------------------------
-   procedure Set_Divisor_Latch_State
-     (Device_Address : Address; State : Boolean);
+   procedure Set_Divisor_Latch_State (Device : Device_T; State : Boolean);
 
    ----------------------------------------------------------------------------
    --  Sets the baud rate for a particular UART port.
    ----------------------------------------------------------------------------
-   procedure Set_Baud_Rate (Device_Address : Address; Rate : Baud_Rate);
+   procedure Set_Baud_Rate (Device : Device_T; Rate : Baud_Rate);
 
-   function Read_Character (Device_Address : Address) return Character;
+   function Read_Character (Device : Device_T) return Character;
 
 end Devices.UART;

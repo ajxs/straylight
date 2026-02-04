@@ -251,11 +251,9 @@ package body Boot is
                   Panic;
                end if;
             elsif System_Devices (I).Device_Class = Device_Class_Serial then
-               Devices.UART.Initialise (UART_Device.Virtual_Address);
+               Devices.UART.Initialise (UART_Device);
                Devices.UART.Set_Interrupt_Generation
-                 (UART_Device.Virtual_Address,
-                  Devices.UART.Rx_Data_Available,
-                  True);
+                 (UART_Device, Devices.UART.Rx_Data_Available, True);
             end if;
 
             --  If the device has an interrupt line, then enable it.
