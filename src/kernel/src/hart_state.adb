@@ -7,7 +7,7 @@ with Logging; use Logging;
 with RISCV.Interrupts;
 
 package body Hart_State is
-   function Get_Current_Hart_Supervisor_Interrupt_Context return Integer is
+   function Get_Current_Hart_Supervisor_Interrupt_Context return Natural is
    begin
       --  This is the supervisor interrupt context for the current hart.
       --  Each Hart has two contexts, one for machine mode, and one for
@@ -49,8 +49,8 @@ package body Hart_State is
         Current_Hart_State.all.Interrupts_Off_Counter - 1;
 
       if Current_Hart_State.all.Interrupts_Off_Counter = 0
-        and then Current_Hart_State.all
-                   .Interrupts_Enabled_Before_Initial_Push_Off
+        and then
+          Current_Hart_State.all.Interrupts_Enabled_Before_Initial_Push_Off
       then
          RISCV.Interrupts.Enable_Supervisor_Interrupts;
       end if;

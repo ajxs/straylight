@@ -63,7 +63,7 @@ package body Boot is
       Device_Virtual_Address : Virtual_Address_T :=
         Device_Mapping_Virtual_Address;
 
-      Supervisor_Interrupt_Context : constant Integer :=
+      Supervisor_Interrupt_Context : constant Natural :=
         Get_Current_Hart_Supervisor_Interrupt_Context;
 
       APIC_Device renames System_Devices (1);
@@ -264,21 +264,29 @@ package body Boot is
                   Logging_Tags);
 
                Devices.PLIC.Set_IRQ_Enable_State
-                 (APIC_Device.Virtual_Address,
+                 (APIC_Device,
                   Supervisor_Interrupt_Context,
                   System_Devices (I).Interrupt_Line,
-                  True);
+                  True,
+                  Result);
+               if Is_Error (Result) then
+                  Panic;
+               end if;
 
                Devices.PLIC.Set_Interrupt_Priority
-                 (APIC_Device.Virtual_Address,
+                 (APIC_Device,
                   System_Devices (I).Interrupt_Line,
-                  System_Devices (I).Interrupt_Priority);
+                  System_Devices (I).Interrupt_Priority,
+                  Result);
+               if Is_Error (Result) then
+                  Panic;
+               end if;
             end if;
          end if;
       end loop;
 
       Devices.PLIC.Set_IRQ_Priority_Threshold
-        (APIC_Device.Virtual_Address, Supervisor_Interrupt_Context, 1);
+        (APIC_Device, Supervisor_Interrupt_Context, 1);
 
       Log_Debug ("Initialised devices.", Logging_Tags);
    exception

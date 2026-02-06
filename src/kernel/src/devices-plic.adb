@@ -7,48 +7,58 @@ with MMIO;
 
 package body Devices.PLIC is
    function Claim_Supervisor_Interrupt
-     (Device_Address : Address; Context : Integer) return Unsigned_32 is
+     (Device : Device_T; Context : Natural) return Unsigned_32 is
    begin
       return
-        MMIO.Read_Unsigned_32
-          (Get_Interrupt_Claim_Address (Device_Address, Context));
+        MMIO.Read_Unsigned_32 (Get_Interrupt_Claim_Address (Device, Context));
    end Claim_Supervisor_Interrupt;
 
    procedure Complete_Supervisor_Interrupt
-     (Device_Address : Address; Context : Integer; Interrupt_ID : Unsigned_32)
-   is
+     (Device : Device_T; Context : Natural; Interrupt_ID : Unsigned_32) is
    begin
       MMIO.Write_Unsigned_32
-        (Get_Interrupt_Claim_Address (Device_Address, Context), Interrupt_ID);
+        (Get_Interrupt_Claim_Address (Device, Context), Interrupt_ID);
    end Complete_Supervisor_Interrupt;
 
    procedure Set_Interrupt_Priority
-     (Device_Address : Address; IRQ : Integer; IRQ_Priority : Integer)
+     (Device       : Device_T;
+      IRQ          : Natural;
+      IRQ_Priority : Natural;
+      Result       : out Function_Result)
    is
       type Interrupt_Source_Priority_Array is
         array (0 .. 1023) of aliased Unsigned_32
       with Convention => C;
 
       Interrupt_Source_Priority : Interrupt_Source_Priority_Array
-      with Import, Alignment => 1, Address => Device_Address;
+      with Import, Alignment => 1, Address => Device.Virtual_Address, Volatile;
    begin
+      if IRQ > 1023 then
+         Result := Invalid_Argument;
+         return;
+      end if;
+
       Interrupt_Source_Priority (IRQ) := Unsigned_32 (IRQ_Priority);
+
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Set_Interrupt_Priority");
+         Result := Constraint_Exception;
    end Set_Interrupt_Priority;
 
    pragma
      Warnings
        (Off, "pragma Restrictions (No_Exception_Propagation) in effect");
    procedure Set_IRQ_Enable_State
-     (Device_Address : Address;
-      Context        : Integer;
-      Interrupt_Line : Integer;
-      State          : Boolean)
+     (Device         : Device_T;
+      Context        : Natural;
+      Interrupt_Line : Natural;
+      State          : Boolean;
+      Result         : out Function_Result)
    is
-      Interupt_Enable_Address : constant System.Address :=
-        Device_Address + 16#2000#;
+      Interrupt_Enable_Address : constant System.Address :=
+        Device.Virtual_Address + 16#2000#;
 
       Current_IRQ_Enable_State : Unsigned_32 := 0;
    begin
@@ -66,7 +76,7 @@ package body Devices.PLIC is
       --  and write it back.
       Current_IRQ_Enable_State :=
         MMIO.Read_Unsigned_32
-          (Interupt_Enable_Address + Context_Offset + Register_Offset);
+          (Interrupt_Enable_Address + Context_Offset + Register_Offset);
 
       if State then
          Current_IRQ_Enable_State :=
@@ -78,28 +88,28 @@ package body Devices.PLIC is
       end if;
 
       MMIO.Write_Unsigned_32
-        (Interupt_Enable_Address + Context_Offset + Register_Offset,
+        (Interrupt_Enable_Address + Context_Offset + Register_Offset,
          Current_IRQ_Enable_State);
+
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Set_IRQ_Enable_State");
+         Result := Constraint_Exception;
    end Set_IRQ_Enable_State;
    pragma
      Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
 
    procedure Set_IRQ_Priority_Threshold
-     (Device_Address : Address; Context : Integer; Threshold : Integer)
+     (Device : Device_T; Context : Natural; Threshold : Natural)
    is
       Priority_Threshold_Address : constant System.Address :=
-        Device_Address + 16#20_0000#;
+        Device.Virtual_Address + 16#20_0000#;
    begin
       Context_Offset : constant Storage_Offset :=
         Storage_Offset (Context) * 16#1000#;
 
       MMIO.Write_Unsigned_32
         (Priority_Threshold_Address + Context_Offset, Unsigned_32 (Threshold));
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Set_IRQ_Priority_Threshold");
    end Set_IRQ_Priority_Threshold;
 end Devices.PLIC;

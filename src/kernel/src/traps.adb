@@ -81,7 +81,7 @@ package body Traps is
    begin
       Interrupt_ID :=
         Devices.PLIC.Claim_Supervisor_Interrupt
-          (PLIC_Device.Virtual_Address, Supervisor_Interrupt_Context);
+          (PLIC_Device, Supervisor_Interrupt_Context);
 
       Log_Debug
         ("External Interrupt: "
@@ -123,9 +123,7 @@ package body Traps is
       end loop;
 
       Devices.PLIC.Complete_Supervisor_Interrupt
-        (PLIC_Device.Virtual_Address,
-         Supervisor_Interrupt_Context,
-         Interrupt_ID);
+        (PLIC_Device, Supervisor_Interrupt_Context, Interrupt_ID);
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Handle_External_Interrupt");

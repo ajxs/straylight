@@ -29,11 +29,11 @@ package Hart_State is
    end record;
    for Hart_State_T use
      record
-       Current_Process at 0 range 0 .. 63;
-       Hart_Id at 8 range 0 .. 31;
-       Interrupts_Off_Counter at 12 range 0 .. 31;
+       Current_Process                            at 0  range 0 .. 63;
+       Hart_Id                                    at 8  range 0 .. 31;
+       Interrupts_Off_Counter                     at 12 range 0 .. 31;
        Interrupts_Enabled_Before_Initial_Push_Off at 16 range 0 .. 0;
-       Hart_Status at 20 range 0 .. 31;
+       Hart_Status                                at 20 range 0 .. 31;
      end record;
 
    type Hart_State_Access is access all Hart_State_T with Convention => C;
@@ -80,7 +80,7 @@ package Hart_State is
 
    procedure Pop_Interrupts_Off;
 
-   function Get_Current_Hart_Supervisor_Interrupt_Context return Integer
+   function Get_Current_Hart_Supervisor_Interrupt_Context return Natural
    with Inline, Volatile_Function;
 
 end Hart_State;
