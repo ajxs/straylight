@@ -132,6 +132,7 @@ package body Filesystems.Block_Cache is
       if not Is_Valid_Filesystem_Pointer (Filesystem) then
          Log_Error ("Read_Block_From_Filesystem: Unsupported filesystem");
          Result := Invalid_Argument;
+         return;
       end if;
 
       Log_Debug
@@ -176,6 +177,19 @@ package body Filesystems.Block_Cache is
          Find_Available_Block_Cache_Entry
            (System_Block_Cache, Cache_Index, Result);
          if Is_Error (Result) then
+            Release_Spinlock (System_Block_Cache.Spinlock);
+            return;
+         end if;
+
+         --  Acquire the cache entry's sleeplock.
+         --  In this case, it's unlikely the newly allocated block will be in
+         --  use by another process.
+         Acquire_Sleeplock
+           (System_Block_Cache.Entries (Cache_Index).Sleeplock,
+            Reading_Process.Process_Id,
+            Result);
+         if Is_Error (Result) then
+            Release_Spinlock (System_Block_Cache.Spinlock);
             return;
          end if;
 
@@ -259,16 +273,6 @@ package body Filesystems.Block_Cache is
       Current_Read_Addr_Virtual  : Virtual_Address_T := Null_Address;
       Current_Read_Addr_Physical : Physical_Address_T := Null_Physical_Address;
    begin
-      --  After releasing the spinlock, acquire the cache entry's sleeplock.
-      --  What this means is that if this block is currently being used by
-      --  another process, the current process will 'sleep' here until the
-      --  other process is done with it.
-      --  If it's free, the current process will acquire the lock and continue.
-      Acquire_Sleeplock
-        (Cache.Entries (Cache_Index).Sleeplock,
-         Reading_Process.Process_Id,
-         Result);
-
       Get_Block_Cache_Entry_Data_Address
         (Cache,
          Cache_Index,
@@ -332,6 +336,7 @@ package body Filesystems.Block_Cache is
       if not Is_Valid_Filesystem_Pointer (Filesystem) then
          Log_Error ("Release_Block: Unsupported filesystem");
          Result := Invalid_Argument;
+         return;
       end if;
 
       Acquire_Spinlock (System_Block_Cache.Spinlock);
