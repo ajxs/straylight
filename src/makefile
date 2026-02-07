@@ -25,7 +25,8 @@ USERSPACE_DIR   := userspace
 USERSPACE_IMG   := ${USERSPACE_DIR}/build/userspace.img
 USERSPACE_TAR_IMG   := ${USERSPACE_DIR}/build/userspace.tar.img
 
-OPENSBI_BIN_DIR := /home/ajxs/src/opensbi/build/platform/generic/firmware
+OPENSBI_DIR     := opensbi
+OPENSBI_BIN_DIR := ${OPENSBI_DIR}/build/platform/generic/firmware
 OPENSBI_BIN     := ${OPENSBI_BIN_DIR}/fw_jump.bin
 BIOS            := ${OPENSBI_BIN}
 
@@ -67,7 +68,7 @@ clean:
 	make -C "${LIBC_DIR}" clean
 	make -C "${USERSPACE_DIR}" clean
 
-debug: kernel
+debug: kernel ${BIOS}
 	qemu-system-riscv64      \
 		${QEMU_FLAGS}          \
 		-d ${QEMU_DEBUG_FLAGS} \
@@ -77,12 +78,12 @@ debug: kernel
 		-monitor stdio         \
 		-serial ${QEMU_DEBUG_SERIAL_OUTPUT}
 
-emu: kernel
+emu: kernel ${BIOS}
 	qemu-system-riscv64     \
 		${QEMU_FLAGS}         \
 		-serial ${QEMU_SERIAL_OUTPUT}
 
-emu-log: kernel
+emu-log: kernel ${BIOS}
 	qemu-system-riscv64     \
 		${QEMU_FLAGS}         \
 		-serial ${QEMU_DEBUG_SERIAL_OUTPUT}
@@ -95,7 +96,7 @@ libc: ${LIBC_BINARY}
 
 userspace: ${USERSPACE_IMG}
 
-${KERNEL_BINARY}: ${USERSPACE_IMG} ${BOOT_RAMDISK_IMAGE}
+${KERNEL_BINARY}: ${USERSPACE_IMG}
 	alr -C "${KERNEL_DIR}" build
 
 ${LIBSTRAYLIGHT_BINARY}: ${LIBC_BINARY}
@@ -104,8 +105,8 @@ ${LIBSTRAYLIGHT_BINARY}: ${LIBC_BINARY}
 ${LIBC_BINARY}: 
 	make -C "${LIBC_DIR}"
 
-${BUILD_DIR}:
-	mkdir -p ${BUILD_DIR}
-
 ${USERSPACE_IMG}: libstraylight
 	make -C "${USERSPACE_DIR}"
+
+${BIOS}:
+	CROSS_COMPILE=riscv64-linux-gnu- PLATFORM_RISCV_XLEN=64 make -C ${OPENSBI_DIR} PLATFORM=generic install
