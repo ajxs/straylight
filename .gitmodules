@@ -1,0 +1,3 @@
+[submodule "src/opensbi"]
+	path = src/opensbi
+	url = https://github.com/riscv-software-src/opensbi.git
