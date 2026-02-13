@@ -8,12 +8,25 @@
 #define BOOT_STACK_SIZE 0x2000
 #define BOOT_STACKS_HIGHER_HALF_BASE 0xFFFFFFFFFF000000
 
+.section .boot_rodata
+
+# The kernel is linked at a higher-half virtual address, which can't be reached
+# with a single PC-relative load instruction.
+# Storing the addresses of the Ada entry functions in .boot_rodata allows us 
+# to load them with asingle PC-relative load instructions.
+boot_initialise_kernel_memory_addr:
+	.quad boot_initialise_kernel_memory
+
+boot_non_boot_hart_entry_addr:
+	.quad boot_non_boot_hart_entry
+
+
 .section .boot_text
 
 ###############################################################################
 # Boot entry point.
 # a0: Hart ID
-# a1: Pointer to device tree blob
+# a1: Pointer to the Devicetree blob
 ###############################################################################
 .global _start
 .type _start, @function
@@ -67,6 +80,7 @@ _start:
 	csrc sstatus, t0
 
 # This call jumps into the Ada code to set up the boot page tables.
+	mv a0, a1
 	call boot_initialise_boot_page_tables
 # If the boot page tables were not successfully initialised, zero will have
 # been returned. In this case, halt the CPU.
@@ -85,22 +99,17 @@ _start:
 # Load the higher-half boot stack.
 # This virtual address is the boot stack address mapped into the higher-half.
 # This is mapped in boot-early.adb in Initialise_Boot_Page_Tables.
-	li t1, BOOT_STACK_SIZE
+	li  t1, BOOT_STACK_SIZE
 	mul t2, t1, a0
-	lla  t0, BOOT_STACKS_HIGHER_HALF_BASE
+	li  t0, BOOT_STACKS_HIGHER_HALF_BASE
 	add t0, t0, t2
 	add t0, t0, t1
 
 	mv  sp, t0
 
 # Jump to the kernel initialisation function in Ada.
-# Load the address of the function into a register first to avoid
-# any potential issues with the linker and large binaries, due to using
-# a higher-half kernel.
-	lui a2, %hi(boot_initialise_kernel_memory)
-	addi a2, a2, %lo(boot_initialise_kernel_memory)
-
-	jalr zero, 0(a2)
+	ld  t0, boot_initialise_kernel_memory_addr
+	jr  t0
 
 # CPU spin function.
 # This is where unused CPUs are parked in a spinlock.
@@ -147,25 +156,19 @@ non_boot_hart_entry:
 # Combine MODE and PPN.
 	or   t0, t0, t1
 
-	sfence.vma zero, zero
 	csrw satp, t0
 	sfence.vma zero, zero
 
 # Setup the boot stack pointer.
 # SP := __boot_stacks_bottom + (Hart_ID * BOOT_STACK_SIZE) + BOOT_STACK_SIZE
-	li t1, BOOT_STACK_SIZE
+	li  t1, BOOT_STACK_SIZE
 	mul t2, t1, a0
 
-	la t0, __boot_stacks_bottom
+	lla t0, __boot_stacks_bottom
 	add t0, t0, t2
 	add t0, t0, t1
-	mv sp, t0
+	mv  sp, t0
 
 # Jump to the kernel initialisation function in Ada.
-# Load the address of the function into a register first to avoid
-# any potential issues with the linker and large binaries, due to using
-# a higher-half kernel.
-	lui t0, %hi(boot_non_boot_hart_entry)
-	addi t0, t0, %lo(boot_non_boot_hart_entry)
-
-	jalr zero, 0(t0)
+	ld  t0, boot_non_boot_hart_entry_addr
+	jr  t0

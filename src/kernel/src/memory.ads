@@ -120,20 +120,6 @@ package Memory is
      Convention    => Assembler,
      External_Name => "addresses_get_address_word_high";
 
-   function Convert_BEU32_To_LEU32 (BEU32 : Unsigned_32) return Unsigned_32
-   with
-     Pure_Function,
-     Import,
-     Convention    => Assembler,
-     External_Name => "addresses_convert_beu32_to_leu32";
-
-   function Convert_BEU64_To_LEU64 (BEU64 : Unsigned_64) return Unsigned_64
-   with
-     Pure_Function,
-     Import,
-     Convention    => Assembler,
-     External_Name => "addresses_convert_beu64_to_leu64";
-
    function Unsigned_32_To_Address (U32 : Unsigned_32) return Address
    is (To_Address (Integer_Address (U32)))
    with Inline, Pure_Function;

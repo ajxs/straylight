@@ -3,8 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Interfaces; use Interfaces;
-
 with Logging; use Logging;
 
 package body Utilities is

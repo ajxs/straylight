@@ -3,6 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Boot.Devicetree; use Boot.Devicetree;
+
 package body Boot.Early is
    procedure Allocate_New_Boot_Page_Table
      (Page_Table_Addr : out Physical_Address_T; Result : out Function_Result)
@@ -61,15 +63,15 @@ package body Boot.Early is
 
       Curr_Table_Addr : Physical_Address_T := Base_Page_Table_Addr;
    begin
-      Test_Region_Alignment :
-      declare
+      Test_Region_Alignment : declare
       begin
          Region_Boundary : constant Integer_Address :=
            Integer_Address (Early_Page_Size_In_Bytes (Region_Size));
 
          if not Is_Address_Aligned (Virtual_Address, Region_Boundary)
-           or else not Is_Address_Aligned
-                         (Address (Physical_Address), Region_Boundary)
+           or else
+             not Is_Address_Aligned
+                   (Address (Physical_Address), Region_Boundary)
          then
             Early_Debug_Console_Print (Str_Error_Address_Non_Aligned);
 
@@ -78,10 +80,8 @@ package body Boot.Early is
          end if;
       end Test_Region_Alignment;
 
-      Walk_Page_Tables :
-      for Table_Level in reverse 0 .. 2 loop
-         Read_Table_Entry :
-         declare
+      Walk_Page_Tables : for Table_Level in reverse 0 .. 2 loop
+         Read_Table_Entry : declare
             --  The current level page table.
             Page_Table : Page_Table_T
             with Import, Alignment => 1, Address => Address (Curr_Table_Addr);
@@ -180,14 +180,14 @@ package body Boot.Early is
       --  their boundary.
       if Remaining_Size >= Huge_Page_Size
         and then Is_Address_Aligned (Virtual_Address, Huge_Page_Size)
-        and then Is_Address_Aligned
-                   (Address (Physical_Address), Huge_Page_Size)
+        and then
+          Is_Address_Aligned (Address (Physical_Address), Huge_Page_Size)
       then
          return Huge;
       elsif Remaining_Size >= Large_Page_Size
         and then Is_Address_Aligned (Virtual_Address, Large_Page_Size)
-        and then Is_Address_Aligned
-                   (Address (Physical_Address), Large_Page_Size)
+        and then
+          Is_Address_Aligned (Address (Physical_Address), Large_Page_Size)
       then
          return Large;
       end if;
@@ -195,7 +195,9 @@ package body Boot.Early is
       return Small;
    end Get_Largest_Page_Size_For_Remaining_Region;
 
-   function Initialise_Boot_Page_Tables return Unsigned_64 is
+   function Initialise_Boot_Page_Tables
+     (DTB_Address : Physical_Address_T) return Unsigned_64
+   is
       Boot_Text_Section_Start_Marker : constant Integer
       with Import, External_Name => "__boot_text_start";
 
@@ -392,11 +394,90 @@ package body Boot.Early is
          return 0;
       end if;
 
+      Map_Devicetree (Boot_Root_Page_Table_Addr, DTB_Address, Result);
+      if Is_Error (Result) then
+         Early_Debug_Console_Print (Str_Error_Unhandled);
+         return 0;
+      end if;
+
       return RISCV.Create_SATP (Address (Boot_Root_Page_Table_Addr), 0);
    exception
       when Constraint_Error =>
          return 0;
    end Initialise_Boot_Page_Tables;
+
+   procedure Map_Devicetree
+     (Base_Page_Table_Addr : Physical_Address_T;
+      DTB_Address          : Physical_Address_T;
+      Result               : out Function_Result)
+   is
+      Devicetree_Page_Size : Integer := 1;
+   begin
+      DTB_Higher_Half_Virtual_Address : constant Address :=
+        Address (DTB_Address) + Higher_Half_Offset;
+
+      --  Map the first page of the devicetree blob into the kernel's
+      --  higher half address space, then read the full size of the devicetree
+      --  from the header to determine the total amount of pages to be mapped
+      --  for the devicetree.
+      Map_Boot_Memory_Section
+        (Base_Page_Table_Addr,
+         DTB_Higher_Half_Virtual_Address,
+         DTB_Higher_Half_Virtual_Address + 16#1000#,
+         DTB_Address,
+         (True, False, False, False),
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Read_Devicetree_Header : declare
+         Devicetree_Header : FDT_Header_T
+         with
+           Import,
+           Alignment  => 1,
+           Convention => C,
+           Address    => Address (DTB_Address);
+      begin
+         if Convert_BEU32_To_LEU32 (Devicetree_Header.Magic) /= 16#D00DFEED#
+         then
+            Result := Unhandled_Exception;
+            return;
+         end if;
+
+         --  Calculate how many pages are needed to map the devicetree,
+         --  rounding up to the nearest page.
+         Devicetree_Page_Size :=
+           (Integer (Convert_BEU32_To_LEU32 (Devicetree_Header.Totalsize))
+            + 16#FFF#)
+           / 16#1000#;
+      end Read_Devicetree_Header;
+
+      --  Map the remaining pages for the Devicetree blob, if needed.
+      if Devicetree_Page_Size > 8 then
+         --  If the devicetree blob is larger than 8 pages, it's unlikely
+         --  to be valid. In this case exit.
+         Result := Unhandled_Exception;
+         return;
+      elsif Devicetree_Page_Size > 1 then
+         Map_Boot_Memory_Section
+           (Base_Page_Table_Addr,
+            DTB_Higher_Half_Virtual_Address + Storage_Offset (16#1000#),
+            DTB_Higher_Half_Virtual_Address
+            + Storage_Offset (16#1000# * Devicetree_Page_Size),
+            DTB_Address + Storage_Offset (16#1000#),
+            (True, False, False, False),
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+      end if;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Result := Constraint_Exception;
+   end Map_Devicetree;
 
    procedure Map_Boot_Memory_Section
      (Base_Page_Table_Addr  : Physical_Address_T;
@@ -437,6 +518,8 @@ package body Boot.Early is
          Curr_Addr_Phys := Curr_Addr_Phys + Next_Region_Size_In_Bytes;
 
       end loop;
+
+      Result := Success;
    exception
       when Constraint_Error =>
          Early_Debug_Console_Print (Str_Error_Unhandled);

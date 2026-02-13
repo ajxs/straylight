@@ -5,6 +5,7 @@
 
 with System.Storage_Elements; use System.Storage_Elements;
 
+with Boot.Devicetree;
 with Devices;           use Devices;
 with Devices.VirtIO;
 with Devices.VirtIO.Graphics;
@@ -430,7 +431,8 @@ package body Boot is
          Panic ("Constraint_Error: Initialise_Init_Process");
    end Initialise_Init_Process;
 
-   procedure Kernel_Main (Hart_Id : Integer; DTB_Address : Address) is
+   procedure Kernel_Main (Hart_Id : Integer; DTB_Address : Physical_Address_T)
+   is
       Result : Function_Result := Unset;
    begin
       --  This needs to be the first function called on each hart to set up
@@ -441,11 +443,17 @@ package body Boot is
 
       Log_Debug ("Booting Hart" & Hart_Id'Image & "...", Logging_Tags);
 
-      --  This logging line is to avoid an obscure compile-time error if the
-      --  DTB_Address argument is set as 'unreferenced'.
-      --  Error: pragma "Unreferenced" argument must be in same declarative
-      --  part
-      Log_Debug ("DTB_Address: " & DTB_Address'Image, Logging_Tags);
+      --  The Devicetree blob was mapped into the higher-half address space
+      --  at this offset in Boot.Early.Map_Devicetree.
+      Devicetree_Higher_Half_Address : constant Address :=
+        Address (DTB_Address) + Higher_Half_Offset;
+
+      Boot.Devicetree.Parse_Devicetree
+        (Devicetree_Higher_Half_Address, Result);
+      if Is_Error (Result) then
+         --  Error already printed.
+         Panic;
+      end if;
 
       Log_Debug ("Initialising core kernel subsystems...", Logging_Tags);
 
@@ -678,10 +686,10 @@ package body Boot is
          "/Devices/Disk/Programs/print_fractal_pattern.elf",
          Result);
 
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
-         "/Devices/Disk/Programs/print_random_words.elf",
-         Result);
+      --  Loader.Load_New_Process_From_Filesystem
+      --    (Init_Process.all,
+      --     "/Devices/Disk/Programs/print_random_words.elf",
+      --     Result);
 
       --  Wait for all the harts to start before freeing the boot memory.
       --  Since their boot stacks are in the boot memory region that would be

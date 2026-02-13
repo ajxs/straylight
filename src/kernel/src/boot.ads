@@ -19,7 +19,7 @@ package Boot is
    --  initial boot page tables have been set up, and supervisor address
    --  translation (paging) has been enabled.
    ----------------------------------------------------------------------------
-   procedure Kernel_Main (Hart_Id : Integer; DTB_Address : Address)
+   procedure Kernel_Main (Hart_Id : Integer; DTB_Address : Physical_Address_T)
    with
      No_Return,
      Export,

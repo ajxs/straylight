@@ -12,6 +12,7 @@ package Logging is
      (Log_Tag_Allocator,
       Log_Tag_Boot,
       Log_Tag_Devices,
+      Log_Tag_Devicetree,
       Log_Tag_Devices_Ramdisk,
       Log_Tag_Devices_VirtIO,
       Log_Tag_Devices_VirtIO_Graphics,
@@ -60,6 +61,7 @@ private
    Active_Logging_Tags : constant array (Log_Tag_T) of Boolean :=
      [Log_Tag_Boot                    => False,
       Log_Tag_Devices                 => False,
+      Log_Tag_Devicetree              => False,
       Log_Tag_Devices_VirtIO          => False,
       Log_Tag_Devices_VirtIO_Graphics => False,
       Log_Tag_Filesystems             => False,

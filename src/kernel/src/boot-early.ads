@@ -19,7 +19,8 @@ with RISCV.Paging;     use RISCV.Paging;
 -------------------------------------------------------------------------------
 
 private package Boot.Early is
-   function Initialise_Boot_Page_Tables return Unsigned_64
+   function Initialise_Boot_Page_Tables
+     (DTB_Address : Physical_Address_T) return Unsigned_64
    with
      Export,
      Convention     => Assembler,
@@ -54,6 +55,23 @@ private
       Region_Flags          : Memory_Region_Flags_T;
       Result                : out Function_Result)
    with Linker_Section => ".boot_text";
+
+   ----------------------------------------------------------------------------
+   --  Maps the Devicetree blob passed by the bootloader into the kernel's
+   --  higher-half address space.
+   ----------------------------------------------------------------------------
+   procedure Map_Devicetree
+     (Base_Page_Table_Addr : Physical_Address_T;
+      DTB_Address          : Physical_Address_T;
+      Result               : out Function_Result)
+   with Linker_Section => ".boot_text";
+
+   function Convert_BEU32_To_LEU32 (BEU32 : Unsigned_32) return Unsigned_32
+   is ((Shift_Right (BEU32, 24) and 16#0000_00FF#)
+       or (Shift_Right (BEU32, 8) and 16#0000_FF00#)
+       or (Shift_Left (BEU32, 8) and 16#00FF_0000#)
+       or (Shift_Left (BEU32, 24) and 16#FF00_0000#))
+   with Pure_Function, Linker_Section => ".boot_text";
 
    ----------------------------------------------------------------------------
    --  Early debug console print function.
