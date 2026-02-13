@@ -67,11 +67,20 @@ save_process_state_to_kernel_stack:
 
 	addi sp, sp, -TRAP_CONTEXT_SIZE
 
+# Note: For supervisor-mode traps, the stack pointer in x2 saved here points
+# to the kernel stack frame, not the stack at the time the trap occurred.
 	.set  i, 0
 	.rept 32
 		save_gp_register %i, sp
 		.set i, i+1
 	.endr
+
+# Read the FS field from sstatus to determine whether we need to save
+# the floating point registers.
+	csrr t0, sstatus
+	srli t0, t0, 13
+	andi t0, t0, 3       # extract FS field (bits 14:13)
+	beqz t0, skip_fp_save
 
 	.set  i, 0
 	.set offset, 32
@@ -80,6 +89,8 @@ save_process_state_to_kernel_stack:
 		.set i, i+1
 		.set offset, offset+1
 	.endr
+
+skip_fp_save:
 
 # Since we've saved the hart state, we can use whatever gp registers we need
 # below this point.
@@ -148,6 +159,13 @@ restore_trap_frame:
 	ld t6, TRAP_CONTEXT_OFFSET_SEPC(sp)
 	csrw sepc, t6
 
+# Read the FS field from sstatus to determine whether we need to restore 
+# the floating point registers.
+	csrr t6, sstatus
+	srli t6, t6, 13
+	andi t6, t6, 3       # extract FS field (bits 14:13)
+	beqz t6, skip_fp_restore
+
 	.set  i, 0
 	.set offset, 32
 	.rept 32
@@ -155,6 +173,8 @@ restore_trap_frame:
 		.set i, i+1
 		.set offset, offset+1
 	.endr
+
+skip_fp_restore:
 
 # Test whether we're returning to supervisor mode.
 # This determines whether we reload the user stack pointer from the PCB.
