@@ -104,6 +104,7 @@ addresses_convert_beu64_to_leu64:
 .type addresses_get_address_word_high, @function
 addresses_get_address_word_high:
 	srli   a0, a0, 32
+	sext.w a0, a0
 	ret
 
 ###############################################################################
@@ -116,6 +117,5 @@ addresses_get_address_word_high:
 .global addresses_get_address_word_low
 .type addresses_get_address_word_low, @function
 addresses_get_address_word_low:
-	li   t0, 0xffffffff
-	and  a0, a0, t0
+	sext.w a0, a0
 	ret
