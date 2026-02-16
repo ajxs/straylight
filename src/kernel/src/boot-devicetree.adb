@@ -83,7 +83,11 @@ package body Boot.Devicetree is
          end loop;
       end Read_Reserved_Memory_Regions;
 
-      Parse_Structure_Block (Structure_Block_Address, String_Table_Address);
+      Parse_Structure_Block
+        (Structure_Block_Address, String_Table_Address, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Result := Success;
    exception
@@ -109,8 +113,6 @@ package body Boot.Devicetree is
         Address   => Structure_Block_Address + Curr_Offset,
         Alignment => 1;
    begin
-      Log_Debug ("Property:", Devicetree_Logging_Tags);
-
       Read_Property_Name_String
         (String_Table_Address,
          Storage_Offset (Convert_BEU32_To_LEU32 (Property.Name_Offset)),
@@ -127,7 +129,9 @@ package body Boot.Devicetree is
    end Parse_Property;
 
    procedure Parse_Structure_Block
-     (Structure_Block_Address : Address; String_Table_Address : Address)
+     (Structure_Block_Address : Address;
+      String_Table_Address    : Address;
+      Result                  : out Function_Result)
    is
       Curr_Offset : Storage_Offset := 0;
 
@@ -145,6 +149,15 @@ package body Boot.Devicetree is
       FDT_NOP        : constant := 4;
       FDT_END        : constant := 9;
 
+      Cells_Context_Stack     : FDT_Cells_Context_Stack_T (1 .. 16);
+      Cells_Context_Stack_Ptr : Natural := Cells_Context_Stack'First;
+
+      --  Devicetree specification v0.4 section 2.3.5 states:
+      --  'If missing, a client program should assume a default value of 2 for
+      --  #address-cells, and a value of 1 for #size-cells.'
+      Current_Cells_Context : FDT_Cells_Context_T :=
+        (Address_Cells => 2, Size_Cells => 1);
+
    begin
       while True loop
          Read_Structure : declare
@@ -161,6 +174,15 @@ package body Boot.Devicetree is
                Log_Debug ("START STRUCTURE", Devicetree_Logging_Tags);
                Curr_Offset := Curr_Offset + 4;
                Node_Name_Length := 0;
+
+               Push_Cells_Context
+                 (Cells_Context_Stack,
+                  Cells_Context_Stack_Ptr,
+                  Current_Cells_Context,
+                  Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
 
                Read_Name : declare
                   Name_String : String (1 .. Maximum_String_Length)
@@ -188,7 +210,26 @@ package body Boot.Devicetree is
                   Devicetree_Logging_Tags);
 
             elsif Token_Value = FDT_END_NODE then
+               Log_Debug
+                 ("Node cells context: ("
+                  & "Address_Cells: "
+                  & Current_Cells_Context.Address_Cells'Image
+                  & ", Size_Cells: "
+                  & Current_Cells_Context.Size_Cells'Image
+                  & ")",
+                  Devicetree_Logging_Tags);
+
+               Pop_Cells_Context
+                 (Cells_Context_Stack,
+                  Cells_Context_Stack_Ptr,
+                  Current_Cells_Context,
+                  Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
                Log_Debug ("END STRUCTURE" & ASCII.LF, Devicetree_Logging_Tags);
+
                Curr_Offset := Curr_Offset + 4;
             elsif Token_Value = FDT_PROP then
                Curr_Offset := Curr_Offset + 4;
@@ -201,6 +242,8 @@ package body Boot.Devicetree is
                   Property_Length,
                   Property_Address,
                   Curr_Offset);
+
+               Log_Debug ("Property:", Devicetree_Logging_Tags);
 
                Log_Debug
                  ("  Name: '"
@@ -215,8 +258,39 @@ package body Boot.Devicetree is
                      Prop_Value : String (1 .. Integer (Property_Length))
                      with Import, Address => Property_Address, Alignment => 1;
                   begin
-                     Log_Debug ("  Value: '" & Prop_Value & "'");
+                     Log_Debug
+                       ("  Value: '" & Prop_Value & "'",
+                        Devicetree_Logging_Tags);
                   end Read_Property_Value;
+               end if;
+
+               if Compare_Property_Name
+                    (Property_Name, Property_Name_Length, "#size-cells")
+                 or else
+                   Compare_Property_Name
+                     (Property_Name, Property_Name_Length, "#address-cells")
+               then
+                  Read_Cells_Property_Value : declare
+                     Prop_Value : Unsigned_32
+                     with Import, Address => Property_Address, Alignment => 1;
+                  begin
+
+                     Cells_Value : constant Unsigned_32 :=
+                       Convert_BEU32_To_LEU32 (Prop_Value);
+
+                     if Compare_Property_Name
+                          (Property_Name, Property_Name_Length, "#size-cells")
+                     then
+                        Current_Cells_Context.Size_Cells := Cells_Value;
+                     elsif Compare_Property_Name
+                             (Property_Name,
+                              Property_Name_Length,
+                              "#address-cells")
+                     then
+                        Current_Cells_Context.Address_Cells := Cells_Value;
+                     end if;
+
+                  end Read_Cells_Property_Value;
                end if;
 
                while Curr_Offset mod 4 /= 0 loop
@@ -235,9 +309,12 @@ package body Boot.Devicetree is
 
          end Read_Structure;
       end loop;
+
+      Result := Success;
    exception
       when others =>
          Log_Error ("Constraint_Error: Parse_Structure_Block");
+         Result := Constraint_Exception;
    end Parse_Structure_Block;
 
    procedure Read_Property_Name_String
@@ -312,5 +389,78 @@ package body Boot.Devicetree is
    begin
       return Storage_Offset (Header.Totalsize);
    end Get_Devicetree_Size;
+
+   procedure Push_Cells_Context
+     (Context_Stack     : in out FDT_Cells_Context_Stack_T;
+      Context_Stack_Ptr : in out Natural;
+      New_Context       : FDT_Cells_Context_T;
+      Result            : out Function_Result) is
+   begin
+      if Context_Stack_Ptr >= Context_Stack'Last then
+         Log_Error
+           ("Cells context stack overflow: " & Context_Stack_Ptr'Image);
+         Result := Constraint_Exception;
+         return;
+      end if;
+
+      Log_Debug ("Pushing cells context", Devicetree_Logging_Tags);
+
+      Context_Stack (Context_Stack_Ptr) := New_Context;
+      Context_Stack_Ptr := Context_Stack_Ptr + 1;
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Push_Cells_Context");
+         Result := Constraint_Exception;
+   end Push_Cells_Context;
+
+   procedure Pop_Cells_Context
+     (Context_Stack     : FDT_Cells_Context_Stack_T;
+      Context_Stack_Ptr : in out Natural;
+      Popped_Context    : out FDT_Cells_Context_T;
+      Result            : out Function_Result) is
+   begin
+      if Context_Stack_Ptr <= Context_Stack'First then
+         Log_Error ("Cells context stack underflow");
+         Result := Constraint_Exception;
+         return;
+      end if;
+
+      Log_Debug ("Popping cells context", Devicetree_Logging_Tags);
+
+      Context_Stack_Ptr := Context_Stack_Ptr - 1;
+      Popped_Context := Context_Stack (Context_Stack_Ptr);
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Pop_Cells_Context");
+         Result := Constraint_Exception;
+   end Pop_Cells_Context;
+
+   function Compare_Node_Name
+     (Node_Name        : Devicetree_String_T;
+      Node_Name_Length : Natural;
+      Target_Name      : String) return Boolean is
+   begin
+      if Target_Name'Length > Node_Name_Length then
+         return False;
+      end if;
+
+      for I in Target_Name'Range loop
+         if Node_Name (I) /= Target_Name (I) then
+            return False;
+         elsif Node_Name (I) = ASCII.At_Sign then
+            --  If we've reached the '@' character in the node name, without
+            --  finding any mismatches, consider it a match.
+            return True;
+         end if;
+      end loop;
+
+      return True;
+   exception
+      when others =>
+         Log_Error ("Constraint_Error: Compare_Node_Name");
+         return False;
+   end Compare_Node_Name;
 
 end Boot.Devicetree;

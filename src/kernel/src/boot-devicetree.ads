@@ -64,12 +64,14 @@ private
        Size at 8 range 0 .. 63;
      end record;
 
-   Maximum_String_Length : constant Integer := 256;
+   Maximum_String_Length : constant := 256;
 
    subtype Devicetree_String_T is String (1 .. Maximum_String_Length);
 
    procedure Parse_Structure_Block
-     (Structure_Block_Address : Address; String_Table_Address : Address);
+     (Structure_Block_Address : Address;
+      String_Table_Address    : Address;
+      Result                  : out Function_Result);
 
    procedure Parse_Property
      (Structure_Block_Address : Address;
@@ -91,7 +93,38 @@ private
       Property_Name_Length : Natural;
       Target_Name          : String) return Boolean;
 
+   function Compare_Node_Name
+     (Node_Name        : Devicetree_String_T;
+      Node_Name_Length : Natural;
+      Target_Name      : String) return Boolean;
+
    function Is_String_Value
      (Property_Name : Devicetree_String_T; Property_Name_Length : Natural)
       return Boolean;
+
+   --  The current address and size cells context is captured in a stack, so
+   --  that we can properly handle nested nodes that override the
+   --  #address-cells and #size-cells properties.
+   --  Procedures are contained in this package for pushing and popping the
+   --  context as the devicetree is traversed.
+   type FDT_Cells_Context_T is record
+      Address_Cells : Unsigned_32;
+      Size_Cells    : Unsigned_32;
+   end record;
+
+   type FDT_Cells_Context_Stack_T is
+     array (Natural range <>) of FDT_Cells_Context_T;
+
+   procedure Push_Cells_Context
+     (Context_Stack     : in out FDT_Cells_Context_Stack_T;
+      Context_Stack_Ptr : in out Natural;
+      New_Context       : FDT_Cells_Context_T;
+      Result            : out Function_Result);
+
+   procedure Pop_Cells_Context
+     (Context_Stack     : FDT_Cells_Context_Stack_T;
+      Context_Stack_Ptr : in out Natural;
+      Popped_Context    : out FDT_Cells_Context_T;
+      Result            : out Function_Result);
+
 end Boot.Devicetree;
