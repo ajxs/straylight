@@ -94,6 +94,8 @@ libstraylight: ${LIBSTRAYLIGHT_BINARY}
 
 libc: ${LIBC_BINARY}
 
+bios: ${BIOS}
+
 userspace: ${USERSPACE_IMG}
 
 ${KERNEL_BINARY}: ${USERSPACE_IMG}
