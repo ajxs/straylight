@@ -156,6 +156,9 @@ package body Processes is
 
       Get_Process_Kernel_Stack_Virtual_Address
         (New_Process.Process_Id, New_Process.Kernel_Stack_Virt_Addr, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       --  Map the kernel stack into the kernel address space.
       --  It's important that this is mapped into the kernel address space,
@@ -186,25 +189,30 @@ package body Processes is
    end Allocate_And_Map_New_Process_Kernel_Stack;
 
    --  @TODO: Deallocate process id on error.
-   procedure Allocate_Process_Id
+   procedure Allocate_Process_Id_Unlocked
      (New_Id : out Process_Id_T; Result : out Function_Result) is
    begin
-      Acquire_Spinlock (Process_Id_Spinlock);
-
       New_Id := Next_Process_Id;
       Next_Process_Id := Next_Process_Id + 1;
 
       Log_Debug ("Allocated new process id:" & New_Id'Image, Logging_Tags);
 
       Result := Success;
-
-      Release_Spinlock (Process_Id_Spinlock);
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Allocate_Process_Id");
          New_Id := 0;
-         Result := Maximum_Process_Count_Reached;
-         Release_Spinlock (Process_Id_Spinlock);
+         Result := Constraint_Exception;
+   end Allocate_Process_Id_Unlocked;
+
+   procedure Allocate_Process_Id
+     (New_Id : out Process_Id_T; Result : out Function_Result) is
+   begin
+      Acquire_Spinlock (Process_Id_Spinlock);
+
+      Allocate_Process_Id_Unlocked (New_Id, Result);
+
+      Release_Spinlock (Process_Id_Spinlock);
    end Allocate_Process_Id;
 
    procedure Deallocate_Process
