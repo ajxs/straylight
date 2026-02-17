@@ -597,23 +597,18 @@ package body Memory.Physical is
       Result := Invalid_Physical_Memory_Size;
    end Get_Smallest_Possible_Block_Order;
 
-   function Is_List_Empty return Boolean is
-   begin
-      return Phys_Memory_Space.Physical_Memory_Map_List_Head = null;
-   end Is_List_Empty;
-
    function Is_Region_Intersecting
      (Start  : Physical_Address_T;
       Length : Positive;
       Block  : Physical_Memory_Block_T) return Boolean
    is
-      Maximum_Start   : Address := Null_Address;
-      Minimum_End     : Address := Null_Address;
-      Block_End       : Address := Null_Address;
-      Test_Region_End : Address := Null_Address;
+      Maximum_Start : Address := Null_Address;
+      Minimum_End   : Address := Null_Address;
    begin
-      Test_Region_End := Address (Start) + Storage_Offset (Length);
-      Block_End :=
+      Test_Region_End : constant Address :=
+        Address (Start) + Storage_Offset (Length);
+
+      Block_End : constant Address :=
         Address (Block.Address)
         + Storage_Offset (Get_Block_Size_In_Bytes (Block.Order));
 

@@ -145,6 +145,7 @@ private
      (Addr : Physical_Address_T) return Block_Access;
 
    function Is_List_Empty return Boolean
+   is (Phys_Memory_Space.Physical_Memory_Map_List_Head = null)
    with Inline;
 
 end Memory.Physical;
