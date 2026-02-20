@@ -9,45 +9,11 @@ package Straylight is
    Function_Result_Success : constant Function_Result := 0;
    Function_Result_Failure : constant Function_Result := 1;
 
-   subtype File_Handle_Id_T is Unsigned_64;
-   type File_Open_Mode_T is new Integer;
-
-   File_Open_Mode_Read  : constant := 0;
-   File_Open_Mode_Write : constant := 1;
-
-   procedure Allocate_Memory
-     (Size      : Unsigned_64;
-      Addr      : out Address;
-      Result    : out Function_Result;
-      Alignment : Unsigned_64 := 1);
-
    procedure Log_Debug (Str : String);
 
    procedure Log_Error (Str : String);
 
-   procedure Exit_Process (Exit_Code : Unsigned_64);
-
-   procedure Yield_Process;
-
    procedure Print_To_Serial (Str : String);
-
-   procedure Open_File
-     (Path           : Wide_String;
-      Mode           : File_Open_Mode_T;
-      File_Handle_Id : out File_Handle_Id_T;
-      Result         : out Function_Result);
-
-   procedure Read_File
-     (File_Handle_Id : File_Handle_Id_T;
-      Buffer_Address : Address;
-      Size           : Unsigned_64;
-      Bytes_Read     : out Unsigned_64;
-      Result         : out Function_Result);
-
-   procedure Seek_File
-     (File_Handle_Id : File_Handle_Id_T;
-      New_Offset     : Unsigned_64;
-      Result         : out Function_Result);
 
 private
    Syscall_Exit_Process    : constant := 5446_0000;

@@ -1,38 +1,8 @@
 with System.Machine_Code;
 
 with Straylight.Strings;
-with Straylight.Common; use Straylight.Common;
 
 package body Straylight is
-   procedure Allocate_Memory
-     (Size      : Unsigned_64;
-      Addr      : out Address;
-      Result    : out Function_Result;
-      Alignment : Unsigned_64 := 1) is
-   begin
-      Syscall_Result : constant Syscall_Result_T :=
-        Do_Syscall (Syscall_Allocate_Memory, Size, Alignment);
-
-      if Syscall_Result = Syscall_Result_Success then
-         Addr := To_Address (Unsigned_64 (Syscall_Result));
-         Result := Function_Result_Success;
-      else
-         Addr := Null_Address;
-         Result := Function_Result_Failure;
-      end if;
-   end Allocate_Memory;
-
-   procedure Exit_Process (Exit_Code : Unsigned_64) is
-   begin
-      System.Machine_Code.Asm
-        (Template => "mv a0, %0" & ASCII.LF & "mv a1, %1" & ASCII.LF & "ecall",
-         Inputs   =>
-           [Unsigned_64'Asm_Input ("r", Syscall_Exit_Process),
-            Unsigned_64'Asm_Input ("r", Exit_Code)],
-         Clobber  => "a0,a1",
-         Volatile => True);
-   end Exit_Process;
-
    procedure Log_Debug (Str : String) is
    begin
       --  @TODO: There is an issue with exception handlers that cannot
@@ -102,33 +72,6 @@ package body Straylight is
          null;
    end Log_To_Kernel;
 
-   procedure Open_File
-     (Path           : Wide_String;
-      Mode           : File_Open_Mode_T;
-      File_Handle_Id : out File_Handle_Id_T;
-      Result         : out Function_Result) is
-   begin
-      Syscall_Result : constant Syscall_Result_T :=
-        Do_Syscall
-          (Syscall_Open_File,
-           Address_To_Unsigned_64 (Path'Address),
-           Unsigned_64 (Path'Length),
-           Unsigned_64 (Mode));
-
-      if Syscall_Result = Syscall_Result_Success then
-         File_Handle_Id := File_Handle_Id_T (Syscall_Result);
-         Result := Function_Result_Success;
-      else
-         File_Handle_Id := 0;
-         Result := Function_Result_Failure;
-      end if;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: LibStraylight.Open_File");
-         File_Handle_Id := 0;
-         Result := Function_Result_Failure;
-   end Open_File;
-
    procedure Print_To_Serial (Str : String) is
    begin
       pragma Warnings (Off);
@@ -164,50 +107,4 @@ package body Straylight is
          Volatile => True);
    end Print_To_Serial_Internal;
 
-   procedure Read_File
-     (File_Handle_Id : File_Handle_Id_T;
-      Buffer_Address : Address;
-      Size           : Unsigned_64;
-      Bytes_Read     : out Unsigned_64;
-      Result         : out Function_Result) is
-   begin
-      Syscall_Result : constant Syscall_Result_T :=
-        Do_Syscall
-          (Syscall_Read_File,
-           File_Handle_Id,
-           Address_To_Unsigned_64 (Buffer_Address),
-           Size);
-
-      if Syscall_Result = Syscall_Result_Success then
-         Bytes_Read := Unsigned_64 (Syscall_Result);
-         Result := Function_Result_Success;
-      else
-         Bytes_Read := 0;
-         Result := Function_Result_Failure;
-      end if;
-   end Read_File;
-
-   procedure Seek_File
-     (File_Handle_Id : File_Handle_Id_T;
-      New_Offset     : Unsigned_64;
-      Result         : out Function_Result) is
-   begin
-      Syscall_Result : constant Syscall_Result_T :=
-        Do_Syscall (Syscall_Read_File, File_Handle_Id, New_Offset);
-
-      if Syscall_Result = Syscall_Result_Success then
-         Result := Function_Result_Success;
-      else
-         Result := Function_Result_Failure;
-      end if;
-   end Seek_File;
-
-   procedure Yield_Process is
-   begin
-      System.Machine_Code.Asm
-        (Template => "mv a0, %0" & ASCII.LF & "ecall",
-         Inputs   => [Unsigned_64'Asm_Input ("r", Syscall_Yield_Process)],
-         Clobber  => "a0",
-         Volatile => True);
-   end Yield_Process;
 end Straylight;
