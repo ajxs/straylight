@@ -15,14 +15,15 @@
 .global straylight_graphics_fill_framebuffer
 .type straylight_graphics_fill_framebuffer, @function
 straylight_graphics_fill_framebuffer:
-# Total iterations = (width * height * sizeof(u32)) / 2
+# Total iterations = (width * height) / 2
 	mul  t0, a1, a2
 	srli t0, t0, 1
 
 # 64-bit value with two copies of the 32-bit pixel:
-# t1 = (a3 << 32) | a3
-	slli t1, a3, 32
-	or   t1, t1, a3
+# t1 = (a3[31:0] << 32) | a3[31:0]
+	zext.w t2, a3
+	slli   t1, t2, 32
+	or     t1, t1, t2
 
 .fill_loop:
 	sd   t1, 0(a0)
@@ -39,7 +40,7 @@ straylight_graphics_fill_framebuffer:
 # a2: B (Unsigned_8)
 # a3: A (Unsigned_8)
 # Returns:
-# a0: Colour (RGBA format: R[31:24], G[23:16], B[15:8], A[7:0])
+# a0: Colour (RGBA format: A[31:24], B[23:16], G[15:8], R[7:0])
 ###############################################################################
 .global straylight_graphics_make_colour
 .type straylight_graphics_make_colour, @function
@@ -50,5 +51,5 @@ straylight_graphics_make_colour:
 	or t0, t0, t1
 	or t0, t0, t2
 	or t0, t0, a0
-	mv a0, t0
+	sext.w a0, t0
 	ret
