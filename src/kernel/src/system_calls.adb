@@ -543,33 +543,22 @@ package body System_Calls is
          Result := Constraint_Exception;
    end Handle_Print_To_Serial_Syscall;
 
-   procedure Handle_Process_Exit_Syscall
-     (Process : in out Process_Control_Block_T)
-   is
-      Result : Function_Result := Unset;
+   procedure Handle_Process_Exit_Syscall is
    begin
       Log_Debug ("User Mode Syscall: Exit", Logging_Tags);
 
-      Exit_Process (Process, Result);
-      if Is_Error (Result) then
-         Panic;
-      end if;
+      --  Exit the process by calling the scheduler, which will set this
+      --  process's status to 'stopped', and switch to the next ready process.
+      Processes.Scheduler.Run (Process_Stopped);
 
-      Processes.Scheduler.Run;
       Panic ("Exited process still running");
    end Handle_Process_Exit_Syscall;
 
-   procedure Handle_Process_Yield_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result)
-   is
+   procedure Handle_Process_Yield_Syscall is
    begin
       Log_Debug ("User Mode Syscall: Yield", Logging_Tags);
 
-      Process.Status := Process_Ready;
-
-      Processes.Scheduler.Run;
-
-      Result := Success;
+      Processes.Scheduler.Run (Process_Ready);
    end Handle_Process_Yield_Syscall;
 
    procedure Handle_User_Mode_Syscall
@@ -593,10 +582,11 @@ package body System_Calls is
             --  a result value. In the case that control ever returns to this
             --  point, it indicates the process didn't exit, so the kernel
             --  will panic.
-            Handle_Process_Exit_Syscall (Process);
+            Handle_Process_Exit_Syscall;
 
          when Syscall_Yield_Process      =>
-            Handle_Process_Yield_Syscall (Process, Result);
+            Handle_Process_Yield_Syscall;
+            Result := Success;
 
          when Syscall_Log_Debug          =>
             Handle_Logging_Syscall (Process, Log_Level_Debug, Result);

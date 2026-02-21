@@ -6,7 +6,7 @@
 package Processes.Scheduler is
    pragma Preelaborate;
 
-   procedure Run;
+   procedure Run (New_Prev_Process_State : Process_Status_T := Process_Ready);
 
    procedure Lock_Process_Waiting_For_Channel
      (Channel        : Blocking_Channel_T;

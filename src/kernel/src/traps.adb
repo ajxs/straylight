@@ -160,12 +160,6 @@ package body Traps is
 
       case Cause is
          when 5      =>
-            --  Set the process status to ready before handling the timer
-            --  interrupt, as the scheduler will select the next process.
-            if Trapping_Process /= null then
-               Trapping_Process.all.Status := Process_Ready;
-            end if;
-
             Handle_Timer_Interrupt;
 
          when 9      =>
@@ -219,9 +213,11 @@ package body Traps is
    begin
       Setup_Next_Timer_Interrupt;
 
-      Log_Debug ("Scheduling from timer IRQ");
-      Scheduler.Run;
-      Log_Debug ("Returning from timer IRQ");
+      Log_Debug ("Scheduling from timer IRQ", Logging_Tags);
+
+      Scheduler.Run (Process_Ready);
+
+      Log_Debug ("Returning from timer IRQ", Logging_Tags);
    end Handle_Timer_Interrupt;
 
    procedure Handle_User_Mode_Exception
@@ -276,13 +272,11 @@ package body Traps is
      (Trapping_Process : in out Process_Control_Block_T; Cause : Unsigned_64)
    is
    begin
+      pragma Unreferenced (Trapping_Process);
+
       Log_Debug ("User Mode: Interrupt: " & Cause'Image, Logging_Tags);
       case Cause is
          when 5      =>
-            --  Set the process status to ready before handling the timer
-            --  interrupt, as the scheduler will select the next process.
-            Trapping_Process.Status := Process_Ready;
-
             Handle_Timer_Interrupt;
 
          when 9      =>

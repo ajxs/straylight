@@ -4,7 +4,6 @@
 -------------------------------------------------------------------------------
 
 with Hart_State; use Hart_State;
-with RISCV.Interrupts;
 
 package body Processes.Scheduler is
    procedure Get_Next_Scheduled_Process
@@ -78,7 +77,6 @@ package body Processes.Scheduler is
 
       Release_Spinlock (Condition_Lock);
 
-      Process.Status := Process_Blocked_Waiting_For_Response;
       Process.Blocked_By_Channel := Channel;
 
       Log_Debug
@@ -88,7 +86,7 @@ package body Processes.Scheduler is
          & Channel'Image,
          Logging_Tags_Scheduler);
 
-      Run;
+      Run (Process_Blocked_Waiting_For_Response);
 
       --  Control will return to this point once the process is awakened.
       Release_Spinlock (Process.Spinlock);
@@ -99,9 +97,9 @@ package body Processes.Scheduler is
          Panic ("Constraint_Error: Lock_Process_Waiting_For_Channel");
    end Lock_Process_Waiting_For_Channel;
 
-   procedure Run is
-      Prev_Process : Process_Control_Block_Access := null;
-      Next_Process : Process_Control_Block_Access := null;
+   procedure Run (New_Prev_Process_State : Process_Status_T := Process_Ready)
+   is
+      Prev_Process, Next_Process : Process_Control_Block_Access := null;
 
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
 
@@ -131,16 +129,12 @@ package body Processes.Scheduler is
       Result : Function_Result := Unset;
 
    begin
-      --  This procedure needs supervisor interrupts disabled,
-      --  otherwise a timer interrupt could occur in the middle of
-      --  context switching, and complete mayhem ensues.
-      --  Interrupts are *re-enabled* in the following scenarios:
-      --   - The idle routine (in the case that no processes are ready to run)
-      --   - When starting a new process.
-      --   - Before returning to a previously running process.
-      RISCV.Interrupts.Disable_Supervisor_Interrupts;
+      Process_Queue_Spinlock.Acquire_Spinlock;
 
       Prev_Process := Hart_States (Hart_Id).Current_Process;
+      if Prev_Process /= null then
+         Prev_Process.all.Status := New_Prev_Process_State;
+      end if;
 
       Get_Next_Scheduled_Process (Prev_Process, Next_Process, Result);
       if Is_Error (Result) then
@@ -158,6 +152,8 @@ package body Processes.Scheduler is
       Hart_States (Hart_Id).Current_Process := Next_Process;
 
       Next_Process.all.Status := Process_Running;
+
+      Process_Queue_Spinlock.Release_Spinlock;
 
       --  Handle the possibility that there is no current process running on
       --  the current HART. This could be because it's the first time the
@@ -188,20 +184,6 @@ package body Processes.Scheduler is
          --  The next process will resume execution from here, if it
          --  previously yielded control via the scheduler,
          --  or 'return' to the start process routine, if never run.
-
-         --  Ensure that the previous process is not still running.
-         --  @TODO: Figure out a better way to handle setting the current
-         --  process status that doesn't require every path leading to
-         --  here to set the previous process status correctly.
-         --  This design flaw has occurred because there are multiple
-         --  reasons a process can yield control.
-         if Prev_Process.all.Status = Process_Running then
-            Panic
-              ("Scheduler.Run: Hart "
-               & Hart_Id'Image
-               & " current process is still running: PID#"
-               & Prev_Process.all.Process_Id'Image);
-         end if;
 
          Log_Debug
            ("Scheduler.Run: Hart "

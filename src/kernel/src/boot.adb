@@ -697,17 +697,8 @@ package body Boot is
       Wait_For_All_Harts_To_Start;
       Free_Boot_Memory;
 
-      Exit_Process (Init_Process.all, Result);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      --  Because we exit the process *in* kernel-space, we need to explicitly
-      --  run the scheduler here to switch to another process.
-      --  We don't call scheduler from the Exit_process procedure because we
-      --  want to keep the ability to exit userland processes without
-      --  interrupting the normal scheduling.
-      Processes.Scheduler.Run;
+      --  Exit the init process via the scheduler.
+      Processes.Scheduler.Run (Process_Stopped);
       Panic ("Init_Process still running after exit.");
    exception
       when Constraint_Error =>

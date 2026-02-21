@@ -42,11 +42,9 @@ private
       Result    : out Function_Result);
 
    procedure Handle_Process_Exit_Syscall
-     (Process : in out Process_Control_Block_T)
    with No_Return;
 
-   procedure Handle_Process_Yield_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+   procedure Handle_Process_Yield_Syscall;
 
    procedure Handle_Allocate_Memory_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result);

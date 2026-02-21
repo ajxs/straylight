@@ -305,22 +305,6 @@ package body Processes is
       Result := Success;
    end Deallocate_Process_Resources;
 
-   procedure Exit_Process
-     (Process : in out Process_Control_Block_T; Result : out Function_Result)
-   is
-   begin
-      Log_Debug
-        ("Exiting process PID#" & Process.Process_Id'Image, Logging_Tags);
-
-      Process.Status := Process_Stopped;
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Exit_Process");
-         Result := Constraint_Exception;
-   end Exit_Process;
-
    function Find_Running_Process_With_Id
      (Process_Id : Process_Id_T) return Process_Control_Block_Access
    is

@@ -120,9 +120,6 @@ package Processes is
          (Address (Process.Memory_Space.Base_Page_Table_Addr),
           Process.Memory_Space.Address_Space_ID));
 
-   procedure Exit_Process
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
-
    function Find_Running_Process_With_Id
      (Process_Id : Process_Id_T) return Process_Control_Block_Access;
 
