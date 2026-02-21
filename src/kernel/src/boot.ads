@@ -29,7 +29,7 @@ package Boot is
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Boot];
 
-   procedure Initialise_Kernel_Services
+   procedure Initialise_Kernel_Services (Hart_Id : Hart_Index_T)
    with
      Export,
      Convention    => Assembler,
@@ -68,6 +68,8 @@ private
      Convention    => Assembler,
      External_Name => "boot_non_boot_hart_entry";
 
+   procedure Non_Boot_Hart_Start (Hart_Id : Hart_Index_T);
+
    --  This is a one-page 'secondary stack' mapped into kernel space.
    --  This is used so that there's a mapped stack to switch to when enabling
    --  paging and jumping into the kernel's higher-half address space.
@@ -98,7 +100,8 @@ private
    --  return address. This is used to switch into the kernel's address space
    --  from the boot code.
    procedure Switch_To_Kernel_Address_Space
-     (SATP           : Unsigned_64;
+     (Hart_Id        : Hart_Index_T;
+      SATP           : Unsigned_64;
       Stack_Pointer  : Virtual_Address_T;
       Return_Address : Virtual_Address_T)
    with

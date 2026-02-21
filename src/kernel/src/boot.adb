@@ -510,7 +510,8 @@ package body Boot is
       Log_Debug ("Jumping to kernel address space...", Logging_Tags);
 
       Switch_To_Kernel_Address_Space
-        (Get_Kernel_Address_Space_SATP,
+        (Hart_Id,
+         Get_Kernel_Address_Space_SATP,
          Boot_Secondary_Stack_Top,
          Initialise_Kernel_Services'Address);
    exception
@@ -546,13 +547,15 @@ package body Boot is
          Panic ("Constraint_Error: Initialise_Physical_Memory_Manager");
    end Initialise_Physical_Memory_Manager;
 
-   procedure Initialise_Kernel_Services is
+   procedure Initialise_Kernel_Services (Hart_Id : Hart_Index_T) is
    begin
-      Log_Debug ("Initialising kernel services...", Logging_Tags);
+      Log_Debug
+        ("Initialising kernel services. Hart ID: " & Hart_Id'Image,
+         Logging_Tags);
 
       Initialise_Devices;
 
-      Initialise_Hart_Idle_Process (Get_Current_Hart_Id);
+      Initialise_Hart_Idle_Process (Hart_Id);
 
       Initialise_Block_Cache;
 
@@ -568,6 +571,9 @@ package body Boot is
       Log_Debug ("Starting scheduler...", Logging_Tags);
 
       Processes.Scheduler.Run;
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Initialise_Kernel_Services");
    end Initialise_Kernel_Services;
 
    procedure Initialise_Graphics is
@@ -829,15 +835,14 @@ package body Boot is
       Boot_Secondary_Stack_Top : constant Virtual_Address_T :=
         Boot_Secondary_Stack_Virtual_Address + Boot_Secondary_Stack_Size;
 
-      Log_Debug ("Parking non-boot hart: " & Hart_Id'Image, Logging_Tags);
-
       Hart_States (Hart_Id).Hart_Status := Hart_Status_Running;
 
-      --  Enter the kernel address space properly, and park this hart.
+      --  Enter the kernel address space.
       Switch_To_Kernel_Address_Space
-        (Get_Kernel_Address_Space_SATP,
+        (Hart_Id,
+         Get_Kernel_Address_Space_SATP,
          Boot_Secondary_Stack_Top,
-         Park_Non_Boot_Hart'Address);
+         Non_Boot_Hart_Start'Address);
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Non_Boot_Hart_Entry");
@@ -864,4 +869,16 @@ package body Boot is
         + Storage_Offset (Hart_Id * Boot_Secondary_Stack_Size);
    end Get_Boot_Secondary_Stack_Physical_Address;
    pragma Warnings (On);
+
+   procedure Non_Boot_Hart_Start (Hart_Id : Hart_Index_T) is
+   begin
+      Log_Debug ("Started non-boot hart: " & Hart_Id'Image, Logging_Tags);
+
+      Initialise_Hart_Idle_Process (Hart_Id);
+
+      Park_Non_Boot_Hart;
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Non_Boot_Hart_Start");
+   end Non_Boot_Hart_Start;
 end Boot;
