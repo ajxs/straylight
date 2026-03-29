@@ -1,0 +1,15 @@
+name = "straylight_kernel_tests"
+description = "Unit tests for the Utilities package"
+version = "0.1.0-dev"
+
+authors = ["Anthony"]
+maintainers = ["Anthony <ajxs@panoptic.online>"]
+maintainers-logins = ["ajxs"]
+licenses = "MIT OR Apache-2.0 WITH LLVM-exception"
+website = "https://github.com/ajxs"
+tags = []
+
+[[depends-on]]
+gnat_native = "^15"
+aunit = "^22.0.0"
+gnatcov = "^22.0.1"
