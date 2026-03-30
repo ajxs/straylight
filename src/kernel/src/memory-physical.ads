@@ -135,6 +135,26 @@ private
       Required_Order : Block_Order;
       Result         : out Function_Result);
 
+   function Can_Blocks_Be_Consolidated
+     (Block, Next_Block : Physical_Memory_Block_T) return Boolean
+   is (
+       --  Ensure both blocks are free.
+       Block.Free
+       and then Next_Block.Free
+       --  Ensure both block entries are valid.
+       and then Block.Entry_Used
+       and then Next_Block.Entry_Used
+       --  If this block is already the maximum size, it can't be consolidated.
+       and then Block.Order /= Maximum_Block_Order
+       --  For blocks to be consolidated, their orders need to match.
+       --  This also ensures that the next block is not the maximum order.
+       and then Block.Order = Next_Block.Order
+       --  For blocks to be consolidated, they need to be adjacent in memory.
+       and then
+         Block.Address + Storage_Offset (Get_Block_Size_In_Bytes (Block.Order))
+         = Next_Block.Address)
+   with Pure_Function;
+
    procedure Consolidate_Adjacent_Memory_Blocks
      (Block : in out Physical_Memory_Block_T; Result : out Function_Result);
 

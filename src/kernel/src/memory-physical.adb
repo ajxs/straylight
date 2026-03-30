@@ -160,39 +160,11 @@ package body Memory.Physical is
    end Allocate_Physical_Memory_Unlocked;
 
    procedure Consolidate_Adjacent_Memory_Blocks
-     (Block : in out Physical_Memory_Block_T; Result : out Function_Result)
-   is
-      Block_End_Address : Physical_Address_T := Null_Physical_Address;
+     (Block : in out Physical_Memory_Block_T; Result : out Function_Result) is
    begin
-      if Block.Entry_Used = False or else Block.Next_Block = null then
-         Result := Memory_Block_Cannot_Be_Consolidated;
-         return;
-      end if;
-
-      --  If this block is already at the maximum size, it cannot be
-      --  consolidated with another.
-      if Block.Order = Maximum_Block_Order then
-         Result := Memory_Block_Cannot_Be_Consolidated;
-         return;
-      end if;
-
-      --  Check that both adjacent blocks are free.
-      if not Block.Next_Block.all.Free or else not Block.Free then
-         Result := Memory_Block_Cannot_Be_Consolidated;
-         return;
-      end if;
-
-      --  For a block to be consolidated, we need it to match the order
-      --  of the next block.
-      if Block.Next_Block.all.Order /= Block.Order then
-         Result := Memory_Block_Cannot_Be_Consolidated;
-         return;
-      end if;
-
-      Block_End_Address :=
-        Block.Address + Storage_Offset (Get_Block_Size_In_Bytes (Block.Order));
-      --  Test that the two blocks are adjacent in memory.
-      if Block_End_Address /= Block.Next_Block.all.Address then
+      if Block.Next_Block = null
+        or else not Can_Blocks_Be_Consolidated (Block, Block.Next_Block.all)
+      then
          Result := Memory_Block_Cannot_Be_Consolidated;
          return;
       end if;
