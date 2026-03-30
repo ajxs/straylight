@@ -20,6 +20,8 @@ boot_initialise_kernel_memory_addr:
 boot_non_boot_hart_entry_addr:
 	.quad boot_non_boot_hart_entry
 
+boot_adainit_addr:
+	.quad adainit
 
 .section .boot_text
 
@@ -106,6 +108,27 @@ _start:
 	add t0, t0, t1
 
 	mv  sp, t0
+
+# Save the Hart ID and devicetree pointer to the stack.
+	addi sp, sp, -16
+	sd   a0, 8(sp)
+	sd   a1, 0(sp)
+
+# GNAT will generate an 'adainit' procedure that performs Ada-specific 
+# initialisation, such as initialising the runtime, and calling any 
+# package elaboration code (Note that even though most of the packages are 
+# 'preelaborated', some elaboration code is still generated).
+# Since the 'light-rv64imafdc' runtime doesn't provide any startup code for the 
+# platform (which is why this file exists), we need to call 'adainit' manually.
+# Refer to:
+# https://tinyurl.com/mw4abk38 (RISC-V 64-Bit Topics and Tutorial)
+	ld  t0, boot_adainit_addr
+	jalr  t0
+
+# Reload the Hart ID and devicetree pointer from the stack into a0 and a1.
+	ld   a1, 0(sp)
+	ld   a0, 8(sp)
+	addi sp, sp, 16
 
 # Jump to the kernel initialisation function in Ada.
 	ld  t0, boot_initialise_kernel_memory_addr
