@@ -21,10 +21,6 @@ package Memory.Virtual is
 
    Maximum_Virtual_Memory_Mapping_Entries : constant := 128;
 
-   --  Forward declarations, to allow for recursive pointer.
-   type Virtual_Memory_Mapping_T;
-   type Mapping_Access is access all Virtual_Memory_Mapping_T;
-
    subtype Memory_Region_Size is Storage_Offset;
 
    type Memory_Region_Flags_T is record
@@ -34,6 +30,13 @@ package Memory.Virtual is
       User    : Boolean;
    end record;
 
+   type Map_Index_T is range 1 .. Maximum_Virtual_Memory_Mapping_Entries + 1;
+
+   No_Mapping : constant Map_Index_T := Map_Index_T'Last;
+
+   subtype Valid_Map_Index is
+     Map_Index_T range 1 .. Maximum_Virtual_Memory_Mapping_Entries;
+
    ----------------------------------------------------------------------------
    --  Descriptor for an allocated memory block.
    ----------------------------------------------------------------------------
@@ -42,7 +45,7 @@ package Memory.Virtual is
       Physical_Addr : Physical_Address_T := Null_Physical_Address;
       Size          : Memory_Region_Size := 0;
       Flags         : Memory_Region_Flags_T := (False, False, False, False);
-      Next_Region   : Mapping_Access := null;
+      Next_Region   : Map_Index_T := No_Mapping;
       Entry_Used    : Boolean := False;
    end record;
 
@@ -51,8 +54,7 @@ package Memory.Virtual is
    --  This represents a single address space's mapped regions.
    ----------------------------------------------------------------------------
    type Virtual_Memory_Map_T is
-     array (1 .. Maximum_Virtual_Memory_Mapping_Entries)
-     of aliased Virtual_Memory_Mapping_T;
+     array (Valid_Map_Index) of Virtual_Memory_Mapping_T;
 
    ----------------------------------------------------------------------------
    --  Virtual Memory Space Type.
@@ -61,7 +63,7 @@ package Memory.Virtual is
    type Virtual_Memory_Space_T is record
       Base_Page_Table_Addr : Physical_Address_T;
       Memory_Map           : Virtual_Memory_Map_T;
-      Memory_Map_List_Head : Mapping_Access := null;
+      Memory_Map_List_Head : Map_Index_T := No_Mapping;
       Address_Space_ID     : Unsigned_16 := 0;
       Spinlock             : Spinlock_T;
    end record;
@@ -183,7 +185,7 @@ private
 
    function Is_Mapping_List_Empty
      (Addr_Space : Virtual_Memory_Space_T) return Boolean
-   is (Addr_Space.Memory_Map_List_Head = null);
+   is (Addr_Space.Memory_Map_List_Head = No_Mapping);
 
    function Get_Real_Region_Size
      (Size : Memory_Region_Size) return Memory_Region_Size
@@ -191,7 +193,7 @@ private
 
    procedure Find_Unused_List_Entry_Index
      (Addr_Space : Virtual_Memory_Space_T;
-      Free_Index : out Positive;
+      Free_Index : out Map_Index_T;
       Result     : out Function_Result);
 
    function Validate_Memory_Region_Permissions

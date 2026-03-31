@@ -67,6 +67,11 @@ package body Memory.Virtual is
          return;
       end if;
 
+      --  Explicitly initialise the memory map list head, because the
+      --  allocator will zero the allocated process memory, which will leave
+      --  this field with an invalid value.
+      New_Memory_Space.Memory_Map_List_Head := No_Mapping;
+
       Log_Debug ("Created new process memory space.", Logging_Tags);
    end Create_New_Process_Memory_Space;
 
@@ -83,7 +88,9 @@ package body Memory.Virtual is
 
    procedure Deallocate_Memory_Space_Unlocked
      (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Result            : out Function_Result) is
+      Result            : out Function_Result)
+   is
+      VMM_Map renames Virt_Memory_Space.Memory_Map;
    begin
       Log_Debug
         ("Deallocating virtual memory space with base page table address: "
@@ -92,10 +99,10 @@ package body Memory.Virtual is
 
       --  Deallocate all virtual memory mappings.
       --  This will free any allocated physical memory pages as well.
-      while Virt_Memory_Space.Memory_Map_List_Head /= null loop
+      while Virt_Memory_Space.Memory_Map_List_Head /= No_Mapping loop
          Memory.Virtual.Unmap_Unlocked
            (Virt_Memory_Space,
-            Virt_Memory_Space.Memory_Map_List_Head.all.Virtual_Addr,
+            VMM_Map (Virt_Memory_Space.Memory_Map_List_Head).Virtual_Addr,
             Result);
          if Is_Error (Result) then
             return;
@@ -121,12 +128,14 @@ package body Memory.Virtual is
 
    procedure Find_Unused_List_Entry_Index
      (Addr_Space : Virtual_Memory_Space_T;
-      Free_Index : out Positive;
-      Result     : out Function_Result) is
+      Free_Index : out Map_Index_T;
+      Result     : out Function_Result)
+   is
+      VMM_Map renames Addr_Space.Memory_Map;
    begin
       --  Find the first non-allocated mapping entry.
-      for I in 1 .. Maximum_Virtual_Memory_Mapping_Entries loop
-         if not Addr_Space.Memory_Map (I).Entry_Used then
+      for I in Valid_Map_Index loop
+         if not VMM_Map (I).Entry_Used then
             Free_Index := I;
             Result := Success;
             return;
@@ -135,7 +144,7 @@ package body Memory.Virtual is
 
       --  If we reach this statement, we can infer that the mapping
       --  array entries are exhausted.
-      Free_Index := 1;
+      Free_Index := No_Mapping;
       Result := Memory_Map_Array_Exhausted;
       Log_Error ("Memory map exhausted", Logging_Tags);
    end Find_Unused_List_Entry_Index;
@@ -213,10 +222,12 @@ package body Memory.Virtual is
       Result                         : out Function_Result;
       Allow_Mapping_Kernel_Addresses : Boolean := False)
    is
-      Current_Region  : Mapping_Access := null;
-      Previous_Region : Mapping_Access := null;
+      VMM_Map renames Virt_Memory_Space.Memory_Map;
+
+      Current_Region  : Map_Index_T := No_Mapping;
+      Previous_Region : Map_Index_T := No_Mapping;
       Real_Size       : Memory_Region_Size := 1;
-      New_Index       : Positive := 1;
+      New_Index       : Map_Index_T := No_Mapping;
    begin
       if not Allow_Mapping_Kernel_Addresses
         and then
@@ -271,8 +282,9 @@ package body Memory.Virtual is
       --  testing whether the current mapping would intersect with an
       --  existing mapping.
       Current_Region := Virt_Memory_Space.Memory_Map_List_Head;
-      while Current_Region /= null loop
-         if Is_Region_Intersecting (Current_Region.all, Virtual_Address, Size)
+      while Current_Region /= No_Mapping loop
+         if Is_Region_Intersecting
+              (VMM_Map (Current_Region), Virtual_Address, Size)
          then
             Log_Error
               ("Regions Intersect: "
@@ -281,22 +293,14 @@ package body Memory.Virtual is
                & Virtual_Address'Image
                & ASCII.LF
                & "  Intersecting Region VAddr: "
-               & Current_Region.all.Virtual_Addr'Image);
+               & VMM_Map (Current_Region).Virtual_Addr'Image);
             Result := Region_Not_Free;
             return;
          end if;
 
          Previous_Region := Current_Region;
-         Current_Region := Current_Region.all.Next_Region;
+         Current_Region := VMM_Map (Current_Region).Next_Region;
       end loop;
-
-      Virt_Memory_Space.Memory_Map (New_Index) :=
-        (Virtual_Addr  => Virtual_Address,
-         Physical_Addr => Physical_Address,
-         Size          => Real_Size,
-         Flags         => Region_Flags,
-         Next_Region   => null,
-         Entry_Used    => True);
 
       Log_Debug
         ("Creating virtual memory mapping:"
@@ -326,14 +330,20 @@ package body Memory.Virtual is
          return;
       end if;
 
-      if Virt_Memory_Space.Memory_Map_List_Head = null then
-         Virt_Memory_Space.Memory_Map_List_Head :=
-           Virt_Memory_Space.Memory_Map (New_Index)'Unchecked_Access;
-      elsif Previous_Region /= null then
+      VMM_Map (New_Index) :=
+        (Virtual_Addr  => Virtual_Address,
+         Physical_Addr => Physical_Address,
+         Size          => Real_Size,
+         Flags         => Region_Flags,
+         Next_Region   => No_Mapping,
+         Entry_Used    => True);
+
+      if Virt_Memory_Space.Memory_Map_List_Head = No_Mapping then
+         Virt_Memory_Space.Memory_Map_List_Head := New_Index;
+      elsif Previous_Region /= No_Mapping then
          --  Previous_Region will already be pointing to the last allocated
          --  entry in the list from the loop above.
-         Previous_Region.all.Next_Region :=
-           Virt_Memory_Space.Memory_Map (New_Index)'Unchecked_Access;
+         VMM_Map (Previous_Region).Next_Region := New_Index;
       end if;
 
       Log_Debug ("Created virtual memory mapping.", Logging_Tags);
@@ -341,7 +351,8 @@ package body Memory.Virtual is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Map_Unlocked", Logging_Tags);
+         Log_Error
+           ("Constraint_Error: Memory.Virtual.Map_Unlocked", Logging_Tags);
          Result := Constraint_Exception;
    end Map_Unlocked;
 
@@ -362,8 +373,10 @@ package body Memory.Virtual is
       Virt_Addr         : Virtual_Address_T;
       Result            : out Function_Result)
    is
-      Current_Region  : Mapping_Access := null;
-      Previous_Region : Mapping_Access := null;
+      VMM_Map renames Virt_Memory_Space.Memory_Map;
+
+      Current_Region  : Map_Index_T := No_Mapping;
+      Previous_Region : Map_Index_T := No_Mapping;
    begin
       Log_Debug
         ("Unmapping virtual memory address " & Virt_Addr'Image, Logging_Tags);
@@ -372,8 +385,8 @@ package body Memory.Virtual is
 
       --  Iterate through the linked list of memory regions
       --  until we find one matching the specified address.
-      while Current_Region /= null loop
-         if Current_Region.all.Virtual_Addr = Virt_Addr then
+      while Current_Region /= No_Mapping loop
+         if VMM_Map (Current_Region).Virtual_Addr = Virt_Addr then
             Log_Debug
               ("Unmapping virtual memory region:"
                & ASCII.LF
@@ -384,37 +397,37 @@ package body Memory.Virtual is
                & Virt_Addr'Image
                & ASCII.LF
                & "  Physical Address: "
-               & Current_Region.all.Physical_Addr'Image
+               & VMM_Map (Current_Region).Physical_Addr'Image
                & ASCII.LF
                & "  Real Size: "
-               & Current_Region.all.Size'Image,
+               & VMM_Map (Current_Region).Size'Image,
                Logging_Tags);
 
             --  Unmap the page table entries.
             Memory.Virtual.Paging.Unmap
               (Virt_Memory_Space.Base_Page_Table_Addr,
                Virt_Addr,
-               Current_Region.all.Size,
+               VMM_Map (Current_Region).Size,
                Result);
             if Is_Error (Result) then
                return;
             end if;
 
-            if Previous_Region /= null then
-               Previous_Region.all.Next_Region :=
-                 Current_Region.all.Next_Region;
+            if Previous_Region /= No_Mapping then
+               VMM_Map (Previous_Region).Next_Region :=
+                 VMM_Map (Current_Region).Next_Region;
             else
                Virt_Memory_Space.Memory_Map_List_Head :=
-                 Current_Region.all.Next_Region;
+                 VMM_Map (Current_Region).Next_Region;
             end if;
 
-            Current_Region.all.Entry_Used := False;
+            VMM_Map (Current_Region).Entry_Used := False;
             Result := Success;
             return;
          end if;
 
          Previous_Region := Current_Region;
-         Current_Region := Current_Region.all.Next_Region;
+         Current_Region := VMM_Map (Current_Region).Next_Region;
       end loop;
 
       Log_Error ("Memory block not found", Logging_Tags);
