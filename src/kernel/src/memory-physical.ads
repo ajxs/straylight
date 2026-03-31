@@ -45,9 +45,12 @@ private
 
    subtype Block_Order is Natural range 0 .. Maximum_Block_Order;
 
-   --  Forward declarations, to allow for recursive pointer.
-   type Physical_Memory_Block_T;
-   type Block_Access is access all Physical_Memory_Block_T;
+   type Block_Index is range 1 .. Maximum_Physical_Memory_Blocks + 1;
+
+   No_Block : constant Block_Index := Block_Index'Last;
+
+   subtype Valid_Block_Index is
+     Block_Index range 1 .. Maximum_Physical_Memory_Blocks;
 
    ----------------------------------------------------------------------------
    --  Descriptor for a physical memory block managed by the allocator.
@@ -56,17 +59,16 @@ private
       Address    : Physical_Address_T;
       Order      : Block_Order := Maximum_Block_Order;
       Free       : Boolean := False;
-      Next_Block : Block_Access := null;
+      Next_Block : Block_Index := No_Block;
       Entry_Used : Boolean := False;
    end record;
 
    type Physical_Memory_Block_Array is
-     array (1 .. Maximum_Physical_Memory_Blocks)
-     of aliased Physical_Memory_Block_T;
+     array (Valid_Block_Index) of Physical_Memory_Block_T;
 
    type Physical_Memory_Space_T is record
       Physical_Memory_Blocks        : Physical_Memory_Block_Array;
-      Physical_Memory_Map_List_Head : Block_Access := null;
+      Physical_Memory_Map_List_Head : Block_Index := No_Block;
       Spinlock                      : Spinlock_T;
    end record;
 
@@ -114,15 +116,23 @@ private
       Smallest_Possible_Block_Order : out Natural;
       Result                        : out Function_Result);
 
-   function Find_Free_Entry return Block_Access;
+   function Find_Free_Entry return Block_Index;
 
-   function Get_List_Tail return Block_Access;
+   function Get_List_Tail return Block_Index;
 
+   --  Checks if the specified region intersects with the given block.
+   --  This is used to determine if a block can be allocated for a requested
+   --  region of memory.
    function Is_Region_Intersecting
      (Start  : Physical_Address_T;
       Length : Positive;
       Block  : Physical_Memory_Block_T) return Boolean
    with Pure_Function;
+
+   procedure Check_For_Intersecting_Blocks
+     (Region_Start  : Physical_Address_T;
+      Region_Length : Positive;
+      Result        : out Function_Result);
 
    function Get_Block_Size_In_Bytes (Order : Block_Order) return Natural
    with Inline, Pure_Function;
@@ -162,10 +172,10 @@ private
      (Result : out Function_Result);
 
    function Find_Block_With_Address
-     (Addr : Physical_Address_T) return Block_Access;
+     (Addr : Physical_Address_T) return Block_Index;
 
    function Is_List_Empty return Boolean
-   is (Phys_Memory_Space.Physical_Memory_Map_List_Head = null)
+   is (Phys_Memory_Space.Physical_Memory_Map_List_Head = No_Block)
    with Inline;
 
 end Memory.Physical;

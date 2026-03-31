@@ -6,6 +6,8 @@
 with Memory.Virtual;
 
 package body Memory.Physical is
+   PMM_Blocks renames Phys_Memory_Space.Physical_Memory_Blocks;
+
    procedure Allocate_Physical_Memory
      (Required_Size     : Positive;
       Allocated_Address : out Physical_Address_T;
@@ -46,12 +48,12 @@ package body Memory.Physical is
       --  The smallest possible block order which contains the required
       --  amount of physical memory.
       Smallest_Possible_Order : Block_Order := 0;
-      Current_Block           : Block_Access := null;
+      Current_Block           : Block_Index := No_Block;
       --  As all blocks are iterated through, this block points to the
       --  current 'best fit' block. If a block matching the exact required
       --  size cannot be found, this block will be split until it is.
-      Best_Fit_Block          : Block_Access := null;
-      Allocated_Block         : Block_Access := null;
+      Best_Fit_Block          : Block_Index := No_Block;
+      Allocated_Block         : Block_Index := No_Block;
    begin
       Log_Debug
         ("Allocating physical memory block with size " & Required_Size'Image,
@@ -79,22 +81,21 @@ package body Memory.Physical is
       Current_Block := Phys_Memory_Space.Physical_Memory_Map_List_Head;
 
       --  Iterate through the linked list of physical memory blocks.
-      while Current_Block /= null loop
-         if Current_Block.all.Free then
+      while Current_Block /= No_Block loop
+         if PMM_Blocks (Current_Block).Free then
             --  If we've found a block matching the required size.
-            if Current_Block.all.Order = Smallest_Possible_Order then
-               Allocated_Address := Current_Block.all.Address;
-               Current_Block.all.Free := False;
-
+            if PMM_Blocks (Current_Block).Order = Smallest_Possible_Order then
                Log_Debug ("Allocated perfect fit block.", Logging_Tags);
 
                Allocated_Block := Current_Block;
                goto Post_Successful_Allocation;
-            elsif Current_Block.all.Order > Smallest_Possible_Order then
-               --  If we have a current ideal block, check whether the current
-               --  accessed block is a better fit.
-               if Best_Fit_Block /= null then
-                  if Current_Block.all.Order < Best_Fit_Block.all.Order then
+            elsif PMM_Blocks (Current_Block).Order > Smallest_Possible_Order
+            then
+               if Best_Fit_Block /= No_Block then
+                  --  Check whether the current block is a better fit.
+                  if PMM_Blocks (Current_Block).Order
+                    < PMM_Blocks (Best_Fit_Block).Order
+                  then
                      Best_Fit_Block := Current_Block;
                   end if;
                else
@@ -103,29 +104,26 @@ package body Memory.Physical is
             end if;
          end if;
 
-         Current_Block := Current_Block.all.Next_Block;
+         Current_Block := PMM_Blocks (Current_Block).Next_Block;
       end loop;
 
       --  If there's a block suitable for splitting, begin the process
       --  of splitting this block until it's the ideal size.
-      if Best_Fit_Block /= null then
+      if Best_Fit_Block /= No_Block then
          Log_Debug
            ("Dividing best fit block with order: "
-            & Best_Fit_Block.all.Order'Image,
+            & PMM_Blocks (Best_Fit_Block).Order'Image,
             Logging_Tags);
 
          Divide_Block_To_Specified_Order
-           (Best_Fit_Block.all, Smallest_Possible_Order, Result);
+           (PMM_Blocks (Best_Fit_Block), Smallest_Possible_Order, Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Allocated_Address := Best_Fit_Block.all.Address;
-         Best_Fit_Block.all.Free := False;
-
          Log_Debug
            ("Divided best fit block to order: "
-            & Best_Fit_Block.all.Order'Image,
+            & PMM_Blocks (Best_Fit_Block).Order'Image,
             Logging_Tags);
 
          Allocated_Block := Best_Fit_Block;
@@ -138,23 +136,26 @@ package body Memory.Physical is
       return;
 
       <<Post_Successful_Allocation>>
+      Allocated_Address := PMM_Blocks (Allocated_Block).Address;
+      PMM_Blocks (Allocated_Block).Free := False;
+
       Log_Debug
         ("Allocated physical memory block"
          & ASCII.LF
          & "  Address: "
-         & Allocated_Block.all.Address'Image
+         & PMM_Blocks (Allocated_Block).Address'Image
          & ASCII.LF
          & "  Order:   "
-         & Allocated_Block.all.Order'Image
+         & PMM_Blocks (Allocated_Block).Order'Image
          & ASCII.LF
          & "  Size:    "
-         & Get_Block_Size_In_Bytes (Allocated_Block.all.Order)'Image,
+         & Get_Block_Size_In_Bytes (PMM_Blocks (Allocated_Block).Order)'Image,
          Logging_Tags);
 
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Memory.Physical.Allocate");
+         Log_Error ("Constraint_Error: Allocate_Physical_Memory_Unlocked");
          Allocated_Address := Null_Physical_Address;
          Result := Constraint_Exception;
    end Allocate_Physical_Memory_Unlocked;
@@ -162,19 +163,20 @@ package body Memory.Physical is
    procedure Consolidate_Adjacent_Memory_Blocks
      (Block : in out Physical_Memory_Block_T; Result : out Function_Result) is
    begin
-      if Block.Next_Block = null
-        or else not Can_Blocks_Be_Consolidated (Block, Block.Next_Block.all)
+      if Block.Next_Block = No_Block
+        or else
+          not Can_Blocks_Be_Consolidated (Block, PMM_Blocks (Block.Next_Block))
       then
          Result := Memory_Block_Cannot_Be_Consolidated;
          return;
       end if;
 
-      Block.Next_Block.all.Entry_Used := False;
+      PMM_Blocks (Block.Next_Block).Entry_Used := False;
 
       Block.Order := Block.Order + 1;
 
       --  Set this block's next pointer to that of the next block.
-      Block.Next_Block := Block.Next_Block.all.Next_Block;
+      Block.Next_Block := PMM_Blocks (Block.Next_Block).Next_Block;
 
       Result := Success;
    exception
@@ -185,16 +187,17 @@ package body Memory.Physical is
    procedure Consolidate_Free_Physical_Memory_Blocks
      (Result : out Function_Result)
    is
-      Current_Block  : Block_Access := null;
-      Previous_Block : Block_Access := null;
+      Current_Block  : Block_Index := No_Block;
+      Previous_Block : Block_Index := No_Block;
    begin
       Current_Block := Phys_Memory_Space.Physical_Memory_Map_List_Head;
 
       --  Iterate through the linked list of physical memory blocks,
       --  consolidating each block with the next until the list is exhausted.
-      while Current_Block /= null loop
+      while Current_Block /= No_Block loop
          Consolidate_Loop : loop
-            Consolidate_Adjacent_Memory_Blocks (Current_Block.all, Result);
+            Consolidate_Adjacent_Memory_Blocks
+              (PMM_Blocks (Current_Block), Result);
             if Is_Error (Result) then
                return;
             end if;
@@ -202,15 +205,19 @@ package body Memory.Physical is
             exit Consolidate_Loop when
               Result = Memory_Block_Cannot_Be_Consolidated;
 
-            --  If the block has been successfully consolidated, 'rewind'
-            --  one position in the list by setting the current block to
-            --  the previous, to see if the list can be further consolidated
-            --  from this block.
-            Current_Block := Previous_Block;
+            if Previous_Block /= No_Block then
+               --  If the block has been successfully consolidated, 'rewind'
+               --  one position in the list by setting the current block to
+               --  the previous, to see if the list can be further consolidated
+               --  from this block.
+               Current_Block := Previous_Block;
+            else
+               exit Consolidate_Loop;
+            end if;
          end loop Consolidate_Loop;
 
          Previous_Block := Current_Block;
-         Current_Block := Current_Block.all.Next_Block;
+         Current_Block := PMM_Blocks (Current_Block).Next_Block;
       end loop;
 
       Result := Success;
@@ -233,16 +240,51 @@ package body Memory.Physical is
       Release_Spinlock (Phys_Memory_Space.Spinlock);
    end Create_Free_Physical_Memory_Region;
 
+   procedure Check_For_Intersecting_Blocks
+     (Region_Start  : Physical_Address_T;
+      Region_Length : Positive;
+      Result        : out Function_Result)
+   is
+      Current_Block_Index : Block_Index := No_Block;
+   begin
+      if Is_List_Empty then
+         Result := Success;
+         return;
+      end if;
+
+      --  Iterate through the linked list of physical memory blocks
+      --  to check for any intersection.
+      Current_Block_Index := Phys_Memory_Space.Physical_Memory_Map_List_Head;
+
+      while Current_Block_Index /= No_Block loop
+         if Is_Region_Intersecting
+              (Region_Start, Region_Length, PMM_Blocks (Current_Block_Index))
+         then
+            Log_Error ("Region overlaps existing region", Logging_Tags);
+            Result := Region_Is_Overlapping;
+            return;
+         end if;
+
+         Current_Block_Index := PMM_Blocks (Current_Block_Index).Next_Block;
+      end loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Check_For_Intersecting_Blocks");
+         Result := Constraint_Exception;
+   end Check_For_Intersecting_Blocks;
+
    procedure Create_Free_Region_Unlocked
      (Region_Start  : Physical_Address_T;
       Region_Length : Positive;
       Result        : out Function_Result)
    is
-      Current_Block : Block_Access := null;
-      Tail_Block    : Block_Access := null;
+      Current_Block_Index : Block_Index := No_Block;
+      Tail_Block_Index    : Block_Index := No_Block;
 
-      Current_Order      : Natural := Maximum_Block_Order;
-      Current_Block_Addr : Natural := 0;
+      Highest_Possible_Order : Natural := Maximum_Block_Order;
+      Current_Block_Addr     : Natural := 0;
    begin
       --  If the region length is not evenly divisible by the base block
       --  size, then it will end up with wasted space that cannot be
@@ -253,22 +295,19 @@ package body Memory.Physical is
          return;
       end if;
 
-      if not Is_List_Empty then
-         --  Iterate through the linked list of physical memory blocks
-         --  to check for any intersection.
-         Current_Block := Phys_Memory_Space.Physical_Memory_Map_List_Head;
+      Log_Debug
+        ("Creating free PMM Region:"
+         & ASCII.LF
+         & "  Address: "
+         & Region_Start'Image
+         & ASCII.LF
+         & "  Size:    "
+         & Region_Length'Image,
+         Logging_Tags);
 
-         while Current_Block /= null loop
-            if Is_Region_Intersecting
-                 (Region_Start, Region_Length, Current_Block.all)
-            then
-               Log_Error ("Region overlaps existing region", Logging_Tags);
-               Result := Region_Is_Overlapping;
-               return;
-            end if;
-
-            Current_Block := Current_Block.all.Next_Block;
-         end loop;
+      Check_For_Intersecting_Blocks (Region_Start, Region_Length, Result);
+      if Is_Error (Result) then
+         return;
       end if;
 
       Log_Debug
@@ -282,16 +321,18 @@ package body Memory.Physical is
          Logging_Tags);
 
       --  Find the tail of the list, to attach new blocks to.
-      Tail_Block := Get_List_Tail;
+      --  This will be updated in the block allocation loop below. In the case
+      --  that the list is empty, the list head will be set to the new block,
+      --  and the tail index set to this block.
+      Tail_Block_Index := Get_List_Tail;
 
       Allocate_Blocks : loop
          --  If we've evenly arrived at the end of the memory region, exit.
          exit Allocate_Blocks when Current_Block_Addr = Region_Length;
 
-         --  If the memory block array becomes exhausted, this will return
-         --  a status of 'Memory_Map_Array_Exhausted'.
-         Current_Block := Find_Free_Entry;
-         if Current_Block = null then
+         --  If there are no free blocks, return 'Memory_Map_Array_Exhausted'.
+         Current_Block_Index := Find_Free_Entry;
+         if Current_Block_Index = No_Block then
             Log_Error ("Memory map array exhausted", Logging_Tags);
             Result := Memory_Map_Array_Exhausted;
             return;
@@ -300,39 +341,43 @@ package body Memory.Physical is
          --  Calculate the highest possible block order that fits into
          --  the available memory space.
          Get_Highest_Possible_Block_Order
-           (Region_Length - Current_Block_Addr, Current_Order, Result);
+           (Region_Length - Current_Block_Addr,
+            Highest_Possible_Order,
+            Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Current_Block.all :=
+         PMM_Blocks (Current_Block_Index) :=
            (Address    => Region_Start + Storage_Offset (Current_Block_Addr),
-            Order      => Current_Order,
+            Order      => Highest_Possible_Order,
             Free       => True,
-            Next_Block => null,
+            Next_Block => No_Block,
             Entry_Used => True);
 
          Log_Debug
-           ("Initialising block with order " & Current_Order'Image,
+           ("Initialising block with order " & Highest_Possible_Order'Image,
             Logging_Tags);
 
-         if Phys_Memory_Space.Physical_Memory_Map_List_Head = null then
-            Phys_Memory_Space.Physical_Memory_Map_List_Head := Current_Block;
+         if Is_List_Empty then
+            Phys_Memory_Space.Physical_Memory_Map_List_Head :=
+              Current_Block_Index;
          else
-            Tail_Block.all.Next_Block := Current_Block;
+            PMM_Blocks (Tail_Block_Index).Next_Block := Current_Block_Index;
          end if;
 
-         Tail_Block := Current_Block;
+         Tail_Block_Index := Current_Block_Index;
 
          Current_Block_Addr :=
-           Current_Block_Addr + Get_Block_Size_In_Bytes (Current_Order);
+           Current_Block_Addr
+           + Get_Block_Size_In_Bytes (Highest_Possible_Order);
 
       end loop Allocate_Blocks;
 
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_Free_Physical_Memory_Region");
+         Log_Error ("Constraint_Error: Create_Free_Region_Unlocked");
          Result := Constraint_Exception;
    end Create_Free_Region_Unlocked;
 
@@ -358,9 +403,7 @@ package body Memory.Physical is
    end Divide_Block_To_Specified_Order;
 
    procedure Divide_Physical_Memory_Block
-     (Block : in out Physical_Memory_Block_T; Result : out Function_Result)
-   is
-      Next_Block_Address : Address := Null_Address;
+     (Block : in out Physical_Memory_Block_T; Result : out Function_Result) is
    begin
       if Block.Entry_Used = False
         or else Block.Free = False
@@ -385,28 +428,25 @@ package body Memory.Physical is
       --  The divided block's memory address is the same size as the
       --  newly divided original block. This size is added to the
       --  previous block's address.
-      Next_Block_Address :=
+      Next_Block_Address : constant Address :=
         Address (Block.Address)
         + Storage_Offset (Get_Block_Size_In_Bytes (Block.Order));
 
       --  Iterate through all available physical memory blocks in the
       --  reserved array until an unused entry is found. If it is,
       --  this then becomes the new 'divided' block in the linked list.
-      for I in Phys_Memory_Space.Physical_Memory_Blocks'Range loop
-         if Phys_Memory_Space.Physical_Memory_Blocks (I).Entry_Used = False
-         then
+      for I in Valid_Block_Index loop
+         if PMM_Blocks (I).Entry_Used = False then
             --  Initialise new split block.
-            Phys_Memory_Space.Physical_Memory_Blocks (I) :=
+            PMM_Blocks (I) :=
               (Address    => Physical_Address_T (Next_Block_Address),
                Order      => Block.Order,
                Free       => True,
                Next_Block => Block.Next_Block,
                Entry_Used => True);
 
-            --  The first divided block's 'next' link now points to the
-            --  new block.
-            Block.Next_Block :=
-              Phys_Memory_Space.Physical_Memory_Blocks (I)'Unchecked_Access;
+            --  The first divided block's 'next' now points to the new block.
+            Block.Next_Block := I;
 
             Result := Success;
             return;
@@ -414,7 +454,7 @@ package body Memory.Physical is
       end loop;
 
       --  If we've fallen off the end of the loop it means that we've
-      --- exhausted all entries in the memory map array.
+      --  exhausted all entries in the memory map array.
       Log_Error ("Memory map array exhausted", Logging_Tags);
       Result := Memory_Map_Array_Exhausted;
    exception
@@ -425,39 +465,43 @@ package body Memory.Physical is
    end Divide_Physical_Memory_Block;
 
    function Find_Block_With_Address
-     (Addr : Physical_Address_T) return Block_Access is
+     (Addr : Physical_Address_T) return Block_Index is
    begin
-      Current_Block : Block_Access :=
+      --  If the list is empty, the loop below will never be entered.
+      Current_Block_Index : Block_Index :=
         Phys_Memory_Space.Physical_Memory_Map_List_Head;
 
       --  Iterate through the linked list of physical memory blocks
       --  until we find one matching the specified address.
-      while Current_Block /= null loop
-         if Current_Block.all.Address = Addr then
-            return Current_Block;
+      while Current_Block_Index /= No_Block loop
+         if PMM_Blocks (Current_Block_Index).Address = Addr then
+            return Current_Block_Index;
          end if;
 
-         Current_Block := Current_Block.all.Next_Block;
+         Current_Block_Index := PMM_Blocks (Current_Block_Index).Next_Block;
       end loop;
 
-      --  If we reach the end of the list without finding a block with the
-      --  specified address, return null.
-      return null;
+      --  If we reach this point, the block was not found in the list.
+      return No_Block;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Find_Block_With_Address", Logging_Tags);
+         return No_Block;
    end Find_Block_With_Address;
 
-   function Find_Free_Entry return Block_Access is
+   function Find_Free_Entry return Block_Index is
    begin
       --  Iterate through the physical memory block entry array until
       --  we find a free entry.
-      for Test_Block of Phys_Memory_Space.Physical_Memory_Blocks loop
-         if Test_Block.Entry_Used = False then
-            return Test_Block'Unchecked_Access;
+      for I in Valid_Block_Index loop
+         if not PMM_Blocks (I).Entry_Used then
+            return I;
          end if;
       end loop;
 
       --  If we've reached the end of the loop without returning,
       --  it means that we've run out of free entries in the array.
-      return null;
+      return No_Block;
    end Find_Free_Entry;
 
    procedure Free_Physical_Memory
@@ -473,16 +517,16 @@ package body Memory.Physical is
    procedure Free_Physical_Memory_Unlocked
      (Addr : Physical_Address_T; Result : out Function_Result)
    is
-      Current_Block : Block_Access := null;
+      Current_Block_Index : Block_Index := No_Block;
    begin
-      Current_Block := Find_Block_With_Address (Addr);
-      if Current_Block = null then
+      Current_Block_Index := Find_Block_With_Address (Addr);
+      if Current_Block_Index = No_Block then
          Log_Error ("Memory block not found", Logging_Tags);
          Result := Memory_Block_Not_Found;
          return;
       end if;
 
-      Current_Block.all.Free := True;
+      PMM_Blocks (Current_Block_Index).Free := True;
 
       Log_Debug ("Freed block at " & Addr'Image, Logging_Tags);
 
@@ -527,23 +571,23 @@ package body Memory.Physical is
       Result := No_Block_Small_Enough;
    end Get_Highest_Possible_Block_Order;
 
-   function Get_List_Tail return Block_Access is
-      Current_Block : Block_Access := null;
+   function Get_List_Tail return Block_Index is
+      Current_Block_Index : Block_Index := No_Block;
    begin
       if Is_List_Empty then
-         return null;
+         return No_Block;
       end if;
 
-      Current_Block := Phys_Memory_Space.Physical_Memory_Map_List_Head;
-      while Current_Block.all.Next_Block /= null loop
-         Current_Block := Current_Block.all.Next_Block;
+      Current_Block_Index := Phys_Memory_Space.Physical_Memory_Map_List_Head;
+      while PMM_Blocks (Current_Block_Index).Next_Block /= No_Block loop
+         Current_Block_Index := PMM_Blocks (Current_Block_Index).Next_Block;
       end loop;
 
-      return Current_Block;
+      return Current_Block_Index;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Get_List_Tail", Logging_Tags);
-         return null;
+         return No_Block;
    end Get_List_Tail;
 
    procedure Get_Smallest_Possible_Block_Order
@@ -622,9 +666,9 @@ package body Memory.Physical is
    is
       New_Address : Physical_Address_T := Null_Physical_Address;
 
-      Current_Block  : Block_Access := null;
+      Current_Block_Index : Block_Index := No_Block;
       --  The block order required for the new required size.
-      Required_Order : Natural := 0;
+      Required_Order      : Natural := 0;
    begin
       --  Get the smallest possible block order required for the
       --  newly resized block.
@@ -633,26 +677,26 @@ package body Memory.Physical is
          return;
       end if;
 
-      Current_Block := Find_Block_With_Address (Addr);
-      if Current_Block = null then
+      Current_Block_Index := Find_Block_With_Address (Addr);
+      if Current_Block_Index = No_Block then
          Result := Memory_Block_Not_Found;
          return;
       end if;
 
       --  If the required order is equal, do nothing.
-      if Required_Order = Current_Block.all.Order then
+      if Required_Order = PMM_Blocks (Current_Block_Index).Order then
          Result := Success;
          return;
-      elsif Required_Order < Current_Block.all.Order then
+      elsif Required_Order < PMM_Blocks (Current_Block_Index).Order then
          Divide_Block_To_Specified_Order
-           (Current_Block.all, Required_Order, Result);
+           (PMM_Blocks (Current_Block_Index), Required_Order, Result);
          if Is_Error (Result) then
             return;
          end if;
 
          Log_Debug ("Divided block for reallocation.", Logging_Tags);
 
-         Addr := Current_Block.all.Address;
+         Addr := PMM_Blocks (Current_Block_Index).Address;
          Result := Success;
 
          return;
