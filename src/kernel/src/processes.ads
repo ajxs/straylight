@@ -100,7 +100,8 @@ package Processes is
    --  This also allocates the new process' id.
    ----------------------------------------------------------------------------
    procedure Allocate_And_Map_New_Process_Memory
-     (New_Process : out Process_Control_Block_T; Result : out Function_Result);
+     (New_Process : in out Process_Control_Block_T;
+      Result      : out Function_Result);
 
    --  This needs to stay in this package to avoid issues re: strict aliasing.
    --  This automatically suppresses the aliasing optimisations.
@@ -155,15 +156,24 @@ private
    --  4MiB process heap starting size.
    Process_Heap_Starting_Size  : constant := 1024 * 16#1000#;
 
+   procedure Add_Process_Unlocked
+     (New_Process : Process_Control_Block_Access;
+      Result      : out Function_Result);
+
    procedure Allocate_And_Map_New_Process_Stack
-     (New_Process : out Process_Control_Block_T; Result : out Function_Result);
+     (New_Process : in out Process_Control_Block_T;
+      Result      : out Function_Result);
 
    procedure Allocate_And_Map_New_Process_Kernel_Stack
      (New_Process : in out Process_Control_Block_T;
       Result      : out Function_Result);
 
    procedure Allocate_And_Map_New_Process_Heap
-     (New_Process : out Process_Control_Block_T; Result : out Function_Result);
+     (New_Process : in out Process_Control_Block_T;
+      Result      : out Function_Result);
+
+   procedure Deallocate_Process_Unlocked
+     (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
    procedure Deallocate_Process_Resources
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
@@ -177,6 +187,8 @@ private
       Result                 : out Function_Result);
 
    procedure Cleanup_Stopped_Processes (Result : out Function_Result);
+
+   procedure Cleanup_Stopped_Processes_Unlocked (Result : out Function_Result);
 
    --  This is the entry point for a newly-created process.
    --  Newly-created processes have their initial 'return address' set to this

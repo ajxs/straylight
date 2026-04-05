@@ -11,8 +11,8 @@ with RISCV.Interrupts;
 
 package body Processes is
    procedure Allocate_And_Map_New_Process_Memory
-     (New_Process : out Process_Control_Block_T; Result : out Function_Result)
-   is
+     (New_Process : in out Process_Control_Block_T;
+      Result      : out Function_Result) is
    begin
       Log_Debug ("Allocating new process resources...", Logging_Tags);
 
@@ -38,7 +38,8 @@ package body Processes is
    end Allocate_And_Map_New_Process_Memory;
 
    procedure Allocate_And_Map_New_Process_Heap
-     (New_Process : out Process_Control_Block_T; Result : out Function_Result)
+     (New_Process : in out Process_Control_Block_T;
+      Result      : out Function_Result)
    is
       Process_Heap_Physical_Address : Physical_Address_T :=
         Null_Physical_Address;
@@ -89,8 +90,8 @@ package body Processes is
    end Allocate_And_Map_New_Process_Heap;
 
    procedure Allocate_And_Map_New_Process_Stack
-     (New_Process : out Process_Control_Block_T; Result : out Function_Result)
-   is
+     (New_Process : in out Process_Control_Block_T;
+      Result      : out Function_Result) is
    begin
       Log_Debug ("Allocating process stack physical memory...", Logging_Tags);
 
@@ -215,7 +216,7 @@ package body Processes is
       Release_Spinlock (Process_Id_Spinlock);
    end Allocate_Process_Id;
 
-   procedure Deallocate_Process
+   procedure Deallocate_Process_Unlocked
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
    begin
@@ -233,10 +234,20 @@ package body Processes is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Deallocate_Process");
+         Log_Error ("Constraint_Error: Deallocate_Process_Unlocked");
          Result := Constraint_Exception;
+   end Deallocate_Process_Unlocked;
+
+   procedure Deallocate_Process
+     (Process : in out Process_Control_Block_T; Result : out Function_Result)
+   is
+   begin
+      Acquire_Spinlock (Process_Id_Spinlock);
+      Deallocate_Process_Unlocked (Process, Result);
+      Release_Spinlock (Process_Id_Spinlock);
    end Deallocate_Process;
 
+   --  This procedure assumes that the process' spinlock is held.
    procedure Deallocate_Process_Heap
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
@@ -267,11 +278,11 @@ package body Processes is
          Result := Constraint_Exception;
    end Deallocate_Process_Heap;
 
+   --  This procedure assumes that the process' spinlock is held.
    procedure Deallocate_Process_Resources
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
    begin
-      Acquire_Spinlock (Process.Spinlock);
       Log_Debug ("Freeing process stack physical memory...", Logging_Tags);
       Free_Physical_Memory (Process.Stack_Phys_Addr, Result);
       if Is_Error (Result) then
@@ -298,7 +309,6 @@ package body Processes is
       if Is_Error (Result) then
          return;
       end if;
-      Release_Spinlock (Process.Spinlock);
 
       Log_Debug ("Deallocated process address space.", Logging_Tags);
 
@@ -346,27 +356,26 @@ package body Processes is
    pragma
      Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
 
-   procedure Add_Process
+   procedure Add_Process_Unlocked
      (New_Process : Process_Control_Block_Access; Result : out Function_Result)
    is
-      Curr_Process : Process_Control_Block_Access := null;
-      Prev_Process : Process_Control_Block_Access := null;
+      Curr_Process, Prev_Process : Process_Control_Block_Access := null;
    begin
-      Acquire_Spinlock (Process_Queue_Spinlock);
-
       Log_Debug
-        ("Adding process id "
+        ("Adding process: "
+         & ASCII.LF
+         & "  PID# "
          & New_Process.all.Process_Id'Image
-         & ", address "
+         & ASCII.LF
+         & "  Addr: "
          & New_Process.all'Address'Image,
          Logging_Tags);
+
       if Process_Queue = null then
          Log_Debug
            ("No processes in list, setting new process as head", Logging_Tags);
          Process_Queue := New_Process;
          Result := Success;
-
-         Release_Spinlock (Process_Queue_Spinlock);
          return;
       end if;
 
@@ -378,14 +387,21 @@ package body Processes is
 
       Prev_Process.all.Next_Process := New_Process;
 
-      Release_Spinlock (Process_Queue_Spinlock);
-
       Log_Debug ("Added process to end of list", Logging_Tags);
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Add_Process");
+         Log_Error ("Constraint_Error: Add_Process_Unlocked");
          Result := Constraint_Exception;
+   end Add_Process_Unlocked;
+
+   procedure Add_Process
+     (New_Process : Process_Control_Block_Access; Result : out Function_Result)
+   is
+   begin
+      Acquire_Spinlock (Process_Queue_Spinlock);
+      Add_Process_Unlocked (New_Process, Result);
+      Release_Spinlock (Process_Queue_Spinlock);
    end Add_Process;
 
    procedure Create_New_Process
@@ -458,14 +474,13 @@ package body Processes is
          Result := Constraint_Exception;
    end Create_New_Process;
 
-   procedure Cleanup_Stopped_Processes (Result : out Function_Result) is
+   procedure Cleanup_Stopped_Processes_Unlocked (Result : out Function_Result)
+   is
       Curr_Process : Process_Control_Block_Access := null;
       Prev_Process : Process_Control_Block_Access := null;
 
       Logging_Tags : constant Log_Tags := [Log_Tag_Idle];
    begin
-      Acquire_Spinlock (Process_Queue_Spinlock);
-
       Log_Debug ("Cleaning up stopped processes...", Logging_Tags);
 
       Curr_Process := Process_Queue;
@@ -500,9 +515,14 @@ package body Processes is
          Curr_Process := Curr_Process.all.Next_Process;
       end loop;
 
-      Release_Spinlock (Process_Queue_Spinlock);
-
       Result := Success;
+   end Cleanup_Stopped_Processes_Unlocked;
+
+   procedure Cleanup_Stopped_Processes (Result : out Function_Result) is
+   begin
+      Acquire_Spinlock (Process_Queue_Spinlock);
+      Cleanup_Stopped_Processes_Unlocked (Result);
+      Release_Spinlock (Process_Queue_Spinlock);
    end Cleanup_Stopped_Processes;
 
    procedure Idle is
