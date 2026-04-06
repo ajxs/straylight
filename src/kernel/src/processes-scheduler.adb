@@ -4,6 +4,7 @@
 -------------------------------------------------------------------------------
 
 with Hart_State; use Hart_State;
+with Utilities;  use Utilities;
 
 package body Processes.Scheduler is
    procedure Get_Next_Scheduled_Process
@@ -97,6 +98,49 @@ package body Processes.Scheduler is
          Panic ("Constraint_Error: Lock_Process_Waiting_For_Channel");
    end Lock_Process_Waiting_For_Channel;
 
+   procedure Print_Process_Switch_Info
+     (Prev_Process, Next_Process : Process_Control_Block_Access)
+   is
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
+
+      Old_Process_Name, New_Process_Name : String (1 .. 24) :=
+        "None                    ";
+   begin
+      if Next_Process = Hart_Idle_Processes (Hart_Id) then
+         Set_Fixed_Length_String
+           ("Idle (PID#" & Next_Process.all.Process_Id'Image & ")",
+            New_Process_Name);
+      else
+         Set_Fixed_Length_String
+           ("PID#" & Next_Process.all.Process_Id'Image, New_Process_Name);
+      end if;
+
+      if Prev_Process = Hart_Idle_Processes (Hart_Id) then
+         Set_Fixed_Length_String
+           ("Idle (PID#" & Prev_Process.all.Process_Id'Image & ")",
+            Old_Process_Name);
+      elsif Prev_Process /= null then
+         Set_Fixed_Length_String
+           ("PID#" & Prev_Process.all.Process_Id'Image, Old_Process_Name);
+      end if;
+
+      Log_Debug
+        ("Scheduler.Run:"
+         & ASCII.LF
+         & "  Hart#"
+         & Hart_Id'Image
+         & ASCII.LF
+         & "  Old Process: "
+         & Old_Process_Name
+         & ASCII.LF
+         & "  New Process: "
+         & New_Process_Name,
+         Logging_Tags_Scheduler);
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Print_Process_Switch_Info");
+   end Print_Process_Switch_Info;
+
    procedure Run (New_Prev_Process_State : Process_Status_T := Process_Ready)
    is
       Prev_Process, Next_Process : Process_Control_Block_Access := null;
@@ -153,47 +197,23 @@ package body Processes.Scheduler is
 
       Next_Process.all.Status := Process_Running;
 
+      Print_Process_Switch_Info (Prev_Process, Next_Process);
+
       Process_Queue_Spinlock.Release_Spinlock;
 
       --  Handle the possibility that there is no current process running on
       --  the current HART. This could be because it's the first time the
       --  scheduler is running.
       if Prev_Process = null then
-         Log_Debug
-           ("Scheduler.Run: Hart "
-            & Hart_Id'Image
-            & " switching from none to next process with PID#"
-            & Next_Process.all.Process_Id'Image,
-            Logging_Tags_Scheduler);
-
          Load_Kernel_Context
            (Get_Process_SATP (Next_Process.all),
             Next_Process.all.Memory_Space.Address_Space_ID,
             Next_Process.all);
-      elsif Prev_Process = Next_Process then
-         --  If the next process to run is the same as the previous
-         --  process, simply return.
-         Log_Debug
-           ("Scheduler.Run: Hart "
-            & Hart_Id'Image
-            & " continuing to run current process with PID#"
-            & Next_Process.all.Process_Id'Image,
-            Logging_Tags_Scheduler);
-      else
+      elsif Prev_Process /= Next_Process then
          --  Otherwise, switch to the next process' kernel context.
          --  The next process will resume execution from here, if it
          --  previously yielded control via the scheduler,
          --  or 'return' to the start process routine, if never run.
-
-         Log_Debug
-           ("Scheduler.Run: Hart "
-            & Hart_Id'Image
-            & " switching from PID#: "
-            & Prev_Process.all.Process_Id'Image
-            & " to PID#: "
-            & Next_Process.all.Process_Id'Image,
-            Logging_Tags_Scheduler);
-
          Switch_Kernel_Context
            (Get_Process_SATP (Next_Process.all),
             Next_Process.all.Memory_Space.Address_Space_ID,
@@ -203,7 +223,9 @@ package body Processes.Scheduler is
 
       --  A previously pre-empted process will resume execution here when
       --  control returns to it, after being scheduled again.
-      Log_Debug ("Scheduler.Run: Returning to caller", Logging_Tags_Scheduler);
+      Log_Debug
+        ("Scheduler.Run: Hart#" & Hart_Id'Image & " exiting scheduler",
+         Logging_Tags_Scheduler);
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Scheduler.Run");

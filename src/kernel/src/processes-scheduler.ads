@@ -24,4 +24,7 @@ private
       Next_Process    : out Process_Control_Block_Access;
       Result          : out Function_Result);
 
+   procedure Print_Process_Switch_Info
+     (Prev_Process, Next_Process : Process_Control_Block_Access);
+
 end Processes.Scheduler;

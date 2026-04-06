@@ -37,4 +37,6 @@ package Utilities is
       Output_Buffer             : out UTF8_Converted_Char_Buffer_T;
       Output_Buffer_Byte_Length : out Natural);
 
+   procedure Set_Fixed_Length_String (Input : String; Dest_Str : out String);
+
 end Utilities;

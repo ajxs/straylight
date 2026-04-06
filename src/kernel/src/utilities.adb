@@ -90,4 +90,16 @@ package body Utilities is
          Output_Buffer_Byte_Length := 3;
    end Encode_UCS2_Wide_Char_As_UTF8_Buffer;
 
+   procedure Set_Fixed_Length_String (Input : String; Dest_Str : out String) is
+   begin
+      if Input'Length >= Dest_Str'Length then
+         Dest_Str := Input (Input'First .. Input'First + Dest_Str'Length - 1);
+      else
+         Dest_Str := Input & [1 .. Dest_Str'Length - Input'Length => ' '];
+      end if;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Set_Fixed_Length_String");
+   end Set_Fixed_Length_String;
+
 end Utilities;
