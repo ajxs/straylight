@@ -33,4 +33,13 @@ private
    procedure Switch_Process_Context
      (Prev_Process, Next_Process : Process_Control_Block_Access);
 
+   --  This procedure is used to run the scheduler while holding a lock.
+   --  This is to avoid a 'lost wakeup' issue where a process is inadvertently
+   --  woken up before it is put to sleep, which can lead to a deadlock.
+   --  One scenario where this guard is required is putting a process to sleep
+   --  pending a response from a channel.
+   procedure Run_Guarded
+     (New_Prev_Process_State : Process_Status_T := Process_Ready;
+      Condition_Lock         : in out Spinlock_T);
+
 end Processes.Scheduler;

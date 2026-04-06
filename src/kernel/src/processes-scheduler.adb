@@ -92,8 +92,6 @@ package body Processes.Scheduler is
       Process.Blocked_By_Channel := Channel;
       Release_Spinlock (Process.Spinlock);
 
-      Release_Spinlock (Condition_Lock);
-
       Log_Debug
         ("Process "
          & Process.Process_Id'Image
@@ -101,7 +99,7 @@ package body Processes.Scheduler is
          & Channel'Image,
          Logging_Tags_Scheduler);
 
-      Run (Process_Blocked_Waiting_For_Response);
+      Run_Guarded (Process_Blocked_Waiting_For_Response, Condition_Lock);
 
       --  Control will return to this point once the process is awakened.
       Acquire_Spinlock (Condition_Lock);
@@ -179,6 +177,8 @@ package body Processes.Scheduler is
         Convention    => Assembler,
         External_Name => "scheduler_load_kernel_context";
    begin
+      Print_Process_Switch_Info (Prev_Process, Next_Process);
+
       --  Handle the possibility that there is no current process running on
       --  the current HART. This could be because it's the first time the
       --  scheduler is running.
@@ -216,8 +216,6 @@ package body Processes.Scheduler is
 
       Hart_States (Hart_Id).Current_Process := Next_Process;
 
-      Print_Process_Switch_Info (Prev_Process, Next_Process);
-
       Switch_Process_Context (Prev_Process, Next_Process);
 
       --  A previously pre-empted process will resume execution here when
@@ -230,6 +228,35 @@ package body Processes.Scheduler is
          Panic ("Constraint_Error: Scheduler.Run");
    end Run;
 
+   procedure Run_Guarded
+     (New_Prev_Process_State : Process_Status_T := Process_Ready;
+      Condition_Lock         : in out Spinlock_T)
+   is
+      Prev_Process, Next_Process : Process_Control_Block_Access := null;
+
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
+   begin
+      Prev_Process := Hart_States (Hart_Id).Current_Process;
+
+      Schedule_Next_Process
+        (Prev_Process, Next_Process, New_Prev_Process_State);
+
+      Hart_States (Hart_Id).Current_Process := Next_Process;
+
+      Release_Spinlock (Condition_Lock);
+
+      Switch_Process_Context (Prev_Process, Next_Process);
+
+      --  A previously pre-empted process will resume execution here when
+      --  control returns to it, after being scheduled again.
+      Log_Debug
+        ("Scheduler.Run_Guarded: Hart#" & Hart_Id'Image & " exiting scheduler",
+         Logging_Tags_Scheduler);
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Scheduler.Run_Guarded");
+   end Run_Guarded;
+
    procedure Wake_Processes_Waiting_For_Channel_Unlocked
      (Channel : Blocking_Channel_T; Result : out Function_Result)
    is
@@ -241,6 +268,8 @@ package body Processes.Scheduler is
 
       Curr_Process := Process_Queue;
       while Curr_Process /= null loop
+         Acquire_Spinlock (Curr_Process.all.Spinlock);
+
          if Curr_Process.all.Status = Process_Blocked_Waiting_For_Response
            and then Curr_Process.all.Blocked_By_Channel = Channel
          then
@@ -248,11 +277,11 @@ package body Processes.Scheduler is
               ("Waking process with PID# " & Curr_Process.all.Process_Id'Image,
                Logging_Tags_Scheduler);
 
-            Acquire_Spinlock (Curr_Process.all.Spinlock);
             Curr_Process.all.Status := Process_Ready;
             Curr_Process.all.Blocked_By_Channel := 0;
-            Release_Spinlock (Curr_Process.all.Spinlock);
          end if;
+
+         Release_Spinlock (Curr_Process.all.Spinlock);
 
          Curr_Process := Curr_Process.all.Next_Process;
       end loop;
