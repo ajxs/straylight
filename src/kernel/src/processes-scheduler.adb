@@ -7,13 +7,21 @@ with Hart_State; use Hart_State;
 with Utilities;  use Utilities;
 
 package body Processes.Scheduler is
-   procedure Get_Next_Scheduled_Process
-     (Current_Process : Process_Control_Block_Access;
-      Next_Process    : out Process_Control_Block_Access;
-      Result          : out Function_Result)
+   procedure Schedule_Next_Process
+     (Current_Process        : Process_Control_Block_Access;
+      Next_Process           : out Process_Control_Block_Access;
+      New_Prev_Process_State : Process_Status_T)
    is
       First_Process_To_Check : Process_Control_Block_Access := null;
    begin
+      if Current_Process /= null then
+         Acquire_Spinlock (Current_Process.all.Spinlock);
+         Current_Process.all.Status := New_Prev_Process_State;
+         Release_Spinlock (Current_Process.all.Spinlock);
+      end if;
+
+      Acquire_Spinlock (Process_Queue_Spinlock);
+
       --  If there are no processes in the queue, exit.
       if Process_Queue = null then
          goto No_Ready_Processes;
@@ -39,10 +47,15 @@ package body Processes.Scheduler is
 
       --  Iterate through the process queue, looking for a ready process.
       loop
+         Acquire_Spinlock (Next_Process.all.Spinlock);
+
          if Next_Process.all.Status = Process_Ready then
-            Result := Success;
-            return;
+            Next_Process.all.Status := Process_Running;
+            Release_Spinlock (Next_Process.all.Spinlock);
+            goto Release_Spinlock_and_Exit;
          end if;
+
+         Release_Spinlock (Next_Process.all.Spinlock);
 
          Next_Process := Next_Process.all.Next_Process;
          if Next_Process = null then
@@ -52,22 +65,23 @@ package body Processes.Scheduler is
          end if;
 
          if Next_Process = First_Process_To_Check then
-            --  If we have looped through the entire  process queue and not
+            --  If we have looped through the entire process queue and not
             --  found a ready process, exit.
             goto No_Ready_Processes;
          end if;
       end loop;
 
-      --  At this point 'Process' will be null, as no processes are ready.
+      --  At this point 'Next_Process' will be null, as no processes are ready.
       <<No_Ready_Processes>>
-      Next_Process := null;
-      Result := Success;
+      --  If there are no processes ready to run, switch to the idle process.
+      Next_Process := Hart_Idle_Processes (Get_Current_Hart_Id);
+
+      <<Release_Spinlock_and_Exit>>
+      Release_Spinlock (Process_Queue_Spinlock);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Next_Scheduled_Process");
-         Result := Constraint_Exception;
-         Next_Process := null;
-   end Get_Next_Scheduled_Process;
+         Panic ("Constraint_Error: Schedule_Next_Process");
+   end Schedule_Next_Process;
 
    procedure Lock_Process_Waiting_For_Channel
      (Channel        : Blocking_Channel_T;
@@ -75,10 +89,10 @@ package body Processes.Scheduler is
       Process        : in out Process_Control_Block_T) is
    begin
       Acquire_Spinlock (Process.Spinlock);
+      Process.Blocked_By_Channel := Channel;
+      Release_Spinlock (Process.Spinlock);
 
       Release_Spinlock (Condition_Lock);
-
-      Process.Blocked_By_Channel := Channel;
 
       Log_Debug
         ("Process "
@@ -90,8 +104,6 @@ package body Processes.Scheduler is
       Run (Process_Blocked_Waiting_For_Response);
 
       --  Control will return to this point once the process is awakened.
-      Release_Spinlock (Process.Spinlock);
-
       Acquire_Spinlock (Condition_Lock);
    exception
       when Constraint_Error =>
@@ -141,12 +153,9 @@ package body Processes.Scheduler is
          Panic ("Constraint_Error: Print_Process_Switch_Info");
    end Print_Process_Switch_Info;
 
-   procedure Run (New_Prev_Process_State : Process_Status_T := Process_Ready)
+   procedure Switch_Process_Context
+     (Prev_Process, Next_Process : Process_Control_Block_Access)
    is
-      Prev_Process, Next_Process : Process_Control_Block_Access := null;
-
-      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
-
       --  Save the current kernel context, and load a new one.
       --  Interrupts are re-enabled in this procedure.
       procedure Switch_Kernel_Context
@@ -169,38 +178,7 @@ package body Processes.Scheduler is
         Import,
         Convention    => Assembler,
         External_Name => "scheduler_load_kernel_context";
-
-      Result : Function_Result := Unset;
-
    begin
-      Process_Queue_Spinlock.Acquire_Spinlock;
-
-      Prev_Process := Hart_States (Hart_Id).Current_Process;
-      if Prev_Process /= null then
-         Prev_Process.all.Status := New_Prev_Process_State;
-      end if;
-
-      Get_Next_Scheduled_Process (Prev_Process, Next_Process, Result);
-      if Is_Error (Result) then
-         Panic ("Get_Next_Scheduled_Process failed: " & Result'Image);
-      end if;
-
-      --  If there are no processes ready to run, switch to the idle process.
-      if Next_Process = null then
-         Next_Process := Hart_Idle_Processes (Hart_Id);
-      end if;
-
-      --  If there is no ready processes found, the current process will be
-      --  set as null, to trigger the scheduler to start searching for the
-      --  next process from the beginning of the process queue next time.
-      Hart_States (Hart_Id).Current_Process := Next_Process;
-
-      Next_Process.all.Status := Process_Running;
-
-      Print_Process_Switch_Info (Prev_Process, Next_Process);
-
-      Process_Queue_Spinlock.Release_Spinlock;
-
       --  Handle the possibility that there is no current process running on
       --  the current HART. This could be because it's the first time the
       --  scheduler is running.
@@ -220,6 +198,27 @@ package body Processes.Scheduler is
             Next_Process.all,
             Prev_Process.all.Kernel_Context);
       end if;
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Switch_Process_Context");
+   end Switch_Process_Context;
+
+   procedure Run (New_Prev_Process_State : Process_Status_T := Process_Ready)
+   is
+      Prev_Process, Next_Process : Process_Control_Block_Access := null;
+
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
+   begin
+      Prev_Process := Hart_States (Hart_Id).Current_Process;
+
+      Schedule_Next_Process
+        (Prev_Process, Next_Process, New_Prev_Process_State);
+
+      Hart_States (Hart_Id).Current_Process := Next_Process;
+
+      Print_Process_Switch_Info (Prev_Process, Next_Process);
+
+      Switch_Process_Context (Prev_Process, Next_Process);
 
       --  A previously pre-empted process will resume execution here when
       --  control returns to it, after being scheduled again.
@@ -231,7 +230,7 @@ package body Processes.Scheduler is
          Panic ("Constraint_Error: Scheduler.Run");
    end Run;
 
-   procedure Wake_Processes_Waiting_For_Channel
+   procedure Wake_Processes_Waiting_For_Channel_Unlocked
      (Channel : Blocking_Channel_T; Result : out Function_Result)
    is
       Curr_Process : Process_Control_Block_Access := null;
@@ -248,8 +247,11 @@ package body Processes.Scheduler is
             Log_Debug
               ("Waking process with PID# " & Curr_Process.all.Process_Id'Image,
                Logging_Tags_Scheduler);
+
+            Acquire_Spinlock (Curr_Process.all.Spinlock);
             Curr_Process.all.Status := Process_Ready;
             Curr_Process.all.Blocked_By_Channel := 0;
+            Release_Spinlock (Curr_Process.all.Spinlock);
          end if;
 
          Curr_Process := Curr_Process.all.Next_Process;
@@ -258,8 +260,17 @@ package body Processes.Scheduler is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Wake_Processes_Waiting_For_Channel");
+         Log_Error
+           ("Constraint_Error: Wake_Processes_Waiting_For_Channel_Unlocked");
          Result := Constraint_Exception;
+   end Wake_Processes_Waiting_For_Channel_Unlocked;
+
+   procedure Wake_Processes_Waiting_For_Channel
+     (Channel : Blocking_Channel_T; Result : out Function_Result) is
+   begin
+      Acquire_Spinlock (Process_Queue_Spinlock);
+      Wake_Processes_Waiting_For_Channel_Unlocked (Channel, Result);
+      Release_Spinlock (Process_Queue_Spinlock);
    end Wake_Processes_Waiting_For_Channel;
 
 end Processes.Scheduler;

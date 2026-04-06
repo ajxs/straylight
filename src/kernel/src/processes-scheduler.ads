@@ -19,12 +19,18 @@ package Processes.Scheduler is
 private
    Logging_Tags_Scheduler : constant Log_Tags := [Log_Tag_Scheduler];
 
-   procedure Get_Next_Scheduled_Process
-     (Current_Process : Process_Control_Block_Access;
-      Next_Process    : out Process_Control_Block_Access;
-      Result          : out Function_Result);
+   procedure Schedule_Next_Process
+     (Current_Process        : Process_Control_Block_Access;
+      Next_Process           : out Process_Control_Block_Access;
+      New_Prev_Process_State : Process_Status_T);
 
    procedure Print_Process_Switch_Info
+     (Prev_Process, Next_Process : Process_Control_Block_Access);
+
+   procedure Wake_Processes_Waiting_For_Channel_Unlocked
+     (Channel : Blocking_Channel_T; Result : out Function_Result);
+
+   procedure Switch_Process_Context
      (Prev_Process, Next_Process : Process_Control_Block_Access);
 
 end Processes.Scheduler;
