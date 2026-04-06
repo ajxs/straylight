@@ -550,8 +550,7 @@ package body Boot is
    procedure Initialise_Kernel_Services (Hart_Id : Hart_Index_T) is
    begin
       Log_Debug
-        ("Initialising kernel services. Hart ID: " & Hart_Id'Image,
-         Logging_Tags);
+        ("Initialising kernel services. Hart#" & Hart_Id'Image, Logging_Tags);
 
       Initialise_Devices;
 
@@ -566,9 +565,9 @@ package body Boot is
       Start_Non_Boot_Harts;
 
       Traps.Setup_Next_Timer_Interrupt;
-      Log_Debug ("Set initial system tick.", Logging_Tags);
 
-      Log_Debug ("Starting scheduler...", Logging_Tags);
+      Log_Debug
+        ("Set initial system tick for Hart#" & Hart_Id'Image, Logging_Tags);
 
       Processes.Scheduler.Run;
    exception
@@ -812,7 +811,7 @@ package body Boot is
       --  determine the current hart id.
       Initialise_Hart (Hart_Id);
 
-      Log_Debug ("Starting non-boot hart: " & Hart_Id'Image, Logging_Tags);
+      Log_Debug ("Starting non-boot Hart#" & Hart_Id'Image, Logging_Tags);
 
       --  Map the boot secondary stack for this hart.
       Boot_Secondary_Stack_Phys_Address : constant Physical_Address_T :=

@@ -25,6 +25,8 @@ package body Devices.VirtIO is
          return;
       end if;
 
+      Acquire_Spinlock (Device.Spinlock);
+
       Interrupt_Status := Device_Registers.Interrupt_Status;
 
       --  Acknowledge the interrupt and process any completed requests.
@@ -109,6 +111,8 @@ package body Devices.VirtIO is
         (Interrupt_Status and Interrupt_Ack_Mask);
 
       Log_Debug ("Acknowledged VirtIO Device Interrupt", Logging_Tags_VirtIO);
+
+      Release_Spinlock (Device.Spinlock);
 
       Result := Success;
    exception

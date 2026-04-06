@@ -163,6 +163,11 @@ non_boot_hart_entry:
 	li   t0, SSTATUS_SUM
 	csrs sstatus, t0
 
+# Enable supervisor-mode timer and external interrupts, but leave interrupts 
+# disabled until we're ready to jump into userspace.
+	li   t0, SIE_SEIE | SIE_STIE
+	csrs sie, t0
+
 # Set up the supervisor-mode trap vector.
 	la   t0, traps_entry
 	csrw stvec, t0
