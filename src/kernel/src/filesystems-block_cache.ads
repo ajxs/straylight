@@ -3,7 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Locks;            use Locks;
 with Locks.Sleeplocks; use Locks.Sleeplocks;
 
 private package Filesystems.Block_Cache is

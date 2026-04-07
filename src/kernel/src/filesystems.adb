@@ -13,7 +13,7 @@ with RISCV;
 with Hart_State;        use Hart_State;
 
 package body Filesystems is
-   procedure Add_Filesystem_Node_To_Cache
+   procedure Add_Filesystem_Node_To_Cache_Unlocked
      (Node : Filesystem_Node_Access; Result : out Function_Result)
    is
       Cache renames Filesystem_Node_Cache;
@@ -48,9 +48,16 @@ package body Filesystems is
       Result := Cache_Exhausted;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Add_Filesystem_Node_To_Cache", Logging_Tags);
+         Log_Error ("Constraint_Error: Add_Filesystem_Node_To_Cache_Unlocked");
          Result := Constraint_Exception;
+   end Add_Filesystem_Node_To_Cache_Unlocked;
+
+   procedure Add_Filesystem_Node_To_Cache
+     (Node : Filesystem_Node_Access; Result : out Function_Result) is
+   begin
+      Acquire_Spinlock (Filesystem_Node_Cache.Spinlock);
+      Add_Filesystem_Node_To_Cache_Unlocked (Node, Result);
+      Release_Spinlock (Filesystem_Node_Cache.Spinlock);
    end Add_Filesystem_Node_To_Cache;
 
    function Can_Filesystem_Cache_Entry_Be_Overwritten
@@ -83,17 +90,17 @@ package body Filesystems is
          return False;
    end Compare_Node_Name_With_Wide_String;
 
-   procedure Create_Filesystem_Node_Cache_Entry
+   procedure Create_Filesystem_Node_Cache_Entry_Unlocked
      (Parent_Filesystem : Filesystem_Access;
       Filename          : Filesystem_Path_T;
       New_Node          : out Filesystem_Node_Access;
       Result            : out Function_Result;
-      Index             : Filesystem_Node_Index_T := 0;
-      Parent_Index      : Filesystem_Node_Index_T := 0;
-      Data_Location     : Unsigned_64 := 0;
-      Size              : Unsigned_64 := 0;
-      Node_Type         : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
-      Filesystem        : Filesystem_Access := null)
+      Index             : Filesystem_Node_Index_T;
+      Parent_Index      : Filesystem_Node_Index_T;
+      Data_Location     : Unsigned_64;
+      Size              : Unsigned_64;
+      Node_Type         : Filesystem_Node_Type_T;
+      Filesystem        : Filesystem_Access)
    is
       Cache renames Filesystem_Node_Cache;
       Cache_Index : Natural := 0;
@@ -138,10 +145,39 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_Filesystem_Node_Cache_Entry");
+         Log_Error
+           ("Constraint_Error: Create_Filesystem_Node_Cache_Entry_Unlocked");
          Result := Constraint_Exception;
+   end Create_Filesystem_Node_Cache_Entry_Unlocked;
+
+   procedure Create_Filesystem_Node_Cache_Entry
+     (Parent_Filesystem : Filesystem_Access;
+      Filename          : Filesystem_Path_T;
+      New_Node          : out Filesystem_Node_Access;
+      Result            : out Function_Result;
+      Index             : Filesystem_Node_Index_T := 0;
+      Parent_Index      : Filesystem_Node_Index_T := 0;
+      Data_Location     : Unsigned_64 := 0;
+      Size              : Unsigned_64 := 0;
+      Node_Type         : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+      Filesystem        : Filesystem_Access := null) is
+   begin
+      Acquire_Spinlock (Filesystem_Node_Cache.Spinlock);
+      Create_Filesystem_Node_Cache_Entry_Unlocked
+        (Parent_Filesystem,
+         Filename,
+         New_Node,
+         Result,
+         Index,
+         Parent_Index,
+         Data_Location,
+         Size,
+         Node_Type,
+         Filesystem);
+      Release_Spinlock (Filesystem_Node_Cache.Spinlock);
    end Create_Filesystem_Node_Cache_Entry;
 
+   --  Assumes that the caller already holds the cache spinlock.
    procedure Find_Free_Cache_Entry
      (Cache_Index : out Natural; Result : out Function_Result) is
    begin
@@ -159,7 +195,7 @@ package body Filesystems is
       Result := Cache_Exhausted;
    end Find_Free_Cache_Entry;
 
-   procedure Find_Filesystem_Node_In_Cache
+   procedure Find_Filesystem_Node_In_Cache_Unlocked
      (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;
       Filename     : Filesystem_Path_T;
@@ -183,8 +219,21 @@ package body Filesystems is
    exception
       when Constraint_Error =>
          Log_Error
-           ("Constraint_Error: Find_Filesystem_Node_In_Cache", Logging_Tags);
+           ("Constraint_Error: Find_Filesystem_Node_In_Cache_Unlocked");
          Result := Constraint_Exception;
+   end Find_Filesystem_Node_In_Cache_Unlocked;
+
+   procedure Find_Filesystem_Node_In_Cache
+     (Filesystem   : Filesystem_Access;
+      Parent_Index : Unsigned_64;
+      Filename     : Filesystem_Path_T;
+      Node         : out Filesystem_Node_Access;
+      Result       : out Function_Result) is
+   begin
+      Acquire_Spinlock (Filesystem_Node_Cache.Spinlock);
+      Find_Filesystem_Node_In_Cache_Unlocked
+        (Filesystem, Parent_Index, Filename, Node, Result);
+      Release_Spinlock (Filesystem_Node_Cache.Spinlock);
    end Find_Filesystem_Node_In_Cache;
 
    procedure Find_Unused_File_Handle_Entry

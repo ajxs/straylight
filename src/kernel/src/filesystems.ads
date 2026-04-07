@@ -5,6 +5,7 @@
 
 with Ada.Unchecked_Conversion;
 with Interfaces;              use Interfaces;
+with Locks;                   use Locks;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
@@ -181,11 +182,15 @@ private
    type Filesystem_Node_Cache_T is record
       Entries          : Filesystem_Node_Cache_Entry_Array_T;
       Next_Entry_Index : Positive := 1;
+      Spinlock         : Spinlock_T;
    end record;
 
    Filesystem_Node_Cache : Filesystem_Node_Cache_T;
 
    Maximum_File_Read_Size : constant := 16#60_000#;
+
+   procedure Add_Filesystem_Node_To_Cache_Unlocked
+     (Node : Filesystem_Node_Access; Result : out Function_Result);
 
    function Compare_Node_Name_With_Wide_String
      (Name1 : Wide_String; Name1_Length : Integer; Name2 : Wide_String)
@@ -249,6 +254,18 @@ private
       Node_Type         : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
       Filesystem        : Filesystem_Access := null);
 
+   procedure Create_Filesystem_Node_Cache_Entry_Unlocked
+     (Parent_Filesystem : Filesystem_Access;
+      Filename          : Filesystem_Path_T;
+      New_Node          : out Filesystem_Node_Access;
+      Result            : out Function_Result;
+      Index             : Filesystem_Node_Index_T;
+      Parent_Index      : Filesystem_Node_Index_T;
+      Data_Location     : Unsigned_64;
+      Size              : Unsigned_64;
+      Node_Type         : Filesystem_Node_Type_T;
+      Filesystem        : Filesystem_Access);
+
    function Sector_To_Block
      (Sector_Number : Unsigned_64; Sector_Size : Natural) return Unsigned_64;
 
@@ -265,5 +282,12 @@ private
 
    procedure Allocate_Filesystem_Node
      (New_Node : out Filesystem_Node_Access; Result : out Function_Result);
+
+   procedure Find_Filesystem_Node_In_Cache_Unlocked
+     (Filesystem   : Filesystem_Access;
+      Parent_Index : Unsigned_64;
+      Filename     : Filesystem_Path_T;
+      Node         : out Filesystem_Node_Access;
+      Result       : out Function_Result);
 
 end Filesystems;
