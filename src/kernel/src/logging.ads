@@ -83,8 +83,6 @@ private
 
    System_Logging_Level : Log_Level_T := Log_Level_Debug;
 
-   Logging_Spinlock : Spinlock_T;
-
    procedure Log_Message
      (Message : String; Tags : Log_Tags; Level : Log_Level_T);
 
@@ -92,9 +90,6 @@ private
      (Wide_Message : Wide_String; Tags : Log_Tags; Level : Log_Level_T);
 
    procedure Log_To_Debug_Console (Message : String; Level : Log_Level_T);
-
-   procedure Log_To_Debug_Console_Unlocked
-     (Message : String; Level : Log_Level_T);
 
    ----------------------------------------------------------------------------
    --  Printing a string to the SBI Debug Console requires knowing the
@@ -115,9 +110,13 @@ private
    ----------------------------------------------------------------------------
    SBI_Logging_Buffer : String (1 .. SBI_Log_Buffer_Length);
 
+   SBI_Logging_Buffer_Spinlock : Spinlock_T;
+
    function Should_Log_To_Debug_Console
      (Tags : Log_Tags; Level : Log_Level_T) return Boolean;
 
    procedure Print_String_To_SBI_Console (Message : String);
+
+   procedure Print_String_To_SBI_Console_Unlocked (Message : String);
 
 end Logging;
