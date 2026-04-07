@@ -17,7 +17,7 @@ package Locks.Sleeplocks is
 
    Null_Sleeplock : constant Sleeplock_T :=
      (Locked     => 0,
-      Spinlock   => (Locked => 0, Time_Acquired => 0, Hart_Id => 0),
+      Spinlock   => (Locked => 0, Time_Acquired => 0, Hart_Id => No_Hart_Id),
       Process_Id => 0);
 
    procedure Acquire_Sleeplock

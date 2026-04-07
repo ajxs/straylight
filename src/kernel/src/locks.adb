@@ -61,6 +61,9 @@ package body Locks is
       --  references happen strictly after the lock is acquired.
       Fence;
 
+      Lock.Time_Acquired := 0;
+      Lock.Hart_Id := No_Hart_Id;
+
       --  Because the Ada compiler could perform the assignment to the lock
       --  variable with multiple instructions, we use an atomic swap operation
       --  to clear the lock.

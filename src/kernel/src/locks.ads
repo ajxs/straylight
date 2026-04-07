@@ -8,6 +8,8 @@ with Interfaces; use Interfaces;
 package Locks is
    pragma Preelaborate;
 
+   No_Hart_Id : constant Natural := Natural'Last;
+
    type Spinlock_T is record
       --  An unsigned 32-bit integer used to indicate whether the lock is held
       --  because the interface with the GCC __sync_lock_test_and_set builtin
@@ -15,11 +17,11 @@ package Locks is
       --  @TODO: This may change in future.
       Locked        : aliased Unsigned_32 := 0;
       Time_Acquired : Unsigned_64 := 0;
-      Hart_Id       : Natural := 0;
+      Hart_Id       : Natural := No_Hart_Id;
    end record;
 
    Null_Spinlock : constant Spinlock_T :=
-     (Locked => 0, Time_Acquired => 0, Hart_Id => 0);
+     (Locked => 0, Time_Acquired => 0, Hart_Id => No_Hart_Id);
 
    procedure Acquire_Spinlock (Lock : in out Spinlock_T);
 
@@ -30,6 +32,7 @@ private
 
    function Is_Current_Hart_Holding_Spinlock
      (Lock : Spinlock_T; Hart_Id : Natural) return Boolean
-   is (Lock.Locked = Lock_Magic_Number and then Lock.Hart_Id = Hart_Id);
+   is (Lock.Locked = Lock_Magic_Number and then Lock.Hart_Id = Hart_Id)
+   with Inline;
 
 end Locks;
