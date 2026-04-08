@@ -7,7 +7,7 @@ with Hart_State; use Hart_State;
 with Utilities;  use Utilities;
 
 package body Processes.Scheduler is
-   procedure Schedule_Next_Process
+   procedure Schedule_Next_Process_Unlocked
      (Current_Process        : Process_Control_Block_Access;
       Next_Process           : out Process_Control_Block_Access;
       New_Prev_Process_State : Process_Status_T)
@@ -19,8 +19,6 @@ package body Processes.Scheduler is
          Current_Process.all.Status := New_Prev_Process_State;
          Release_Spinlock (Current_Process.all.Spinlock);
       end if;
-
-      Acquire_Spinlock (Process_Queue_Spinlock);
 
       --  If there are no processes in the queue, exit.
       if Process_Queue = null then
@@ -52,7 +50,7 @@ package body Processes.Scheduler is
          if Next_Process.all.Status = Process_Ready then
             Next_Process.all.Status := Process_Running;
             Release_Spinlock (Next_Process.all.Spinlock);
-            goto Release_Spinlock_and_Exit;
+            return;
          end if;
 
          Release_Spinlock (Next_Process.all.Spinlock);
@@ -75,12 +73,20 @@ package body Processes.Scheduler is
       <<No_Ready_Processes>>
       --  If there are no processes ready to run, switch to the idle process.
       Next_Process := Hart_Idle_Processes (Get_Current_Hart_Id);
-
-      <<Release_Spinlock_and_Exit>>
-      Release_Spinlock (Process_Queue_Spinlock);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Schedule_Next_Process");
+         Panic ("Constraint_Error: Schedule_Next_Process_Unlocked");
+   end Schedule_Next_Process_Unlocked;
+
+   procedure Schedule_Next_Process
+     (Current_Process        : Process_Control_Block_Access;
+      Next_Process           : out Process_Control_Block_Access;
+      New_Prev_Process_State : Process_Status_T) is
+   begin
+      Acquire_Spinlock (Process_Queue_Spinlock);
+      Schedule_Next_Process_Unlocked
+        (Current_Process, Next_Process, New_Prev_Process_State);
+      Release_Spinlock (Process_Queue_Spinlock);
    end Schedule_Next_Process;
 
    procedure Lock_Process_Waiting_For_Channel

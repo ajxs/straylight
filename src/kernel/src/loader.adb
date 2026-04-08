@@ -214,7 +214,7 @@ package body Loader is
         ("Finished loading new process. Adding to process queue.",
          Logging_Tags);
 
-      Add_Process (New_Process, Result);
+      Add_Process_To_Process_Queue (New_Process, Result);
       if Is_Error (Result) then
          Panic ("Error adding new process");
       end if;

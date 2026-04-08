@@ -356,7 +356,7 @@ package body Processes is
    pragma
      Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
 
-   procedure Add_Process_Unlocked
+   procedure Add_Process_To_Process_Queue_Unlocked
      (New_Process : Process_Control_Block_Access; Result : out Function_Result)
    is
       Curr_Process, Prev_Process : Process_Control_Block_Access := null;
@@ -391,18 +391,18 @@ package body Processes is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Add_Process_Unlocked");
+         Log_Error ("Constraint_Error: Add_Process_To_Process_Queue_Unlocked");
          Result := Constraint_Exception;
-   end Add_Process_Unlocked;
+   end Add_Process_To_Process_Queue_Unlocked;
 
-   procedure Add_Process
+   procedure Add_Process_To_Process_Queue
      (New_Process : Process_Control_Block_Access; Result : out Function_Result)
    is
    begin
       Acquire_Spinlock (Process_Queue_Spinlock);
-      Add_Process_Unlocked (New_Process, Result);
+      Add_Process_To_Process_Queue_Unlocked (New_Process, Result);
       Release_Spinlock (Process_Queue_Spinlock);
-   end Add_Process;
+   end Add_Process_To_Process_Queue;
 
    procedure Create_New_Process
      (New_Process : out Process_Control_Block_Access;

@@ -130,7 +130,7 @@ package Processes is
    procedure Allocate_Process_Id_Unlocked
      (New_Id : out Process_Id_T; Result : out Function_Result);
 
-   procedure Add_Process
+   procedure Add_Process_To_Process_Queue
      (New_Process : Process_Control_Block_Access;
       Result      : out Function_Result);
 
@@ -156,7 +156,7 @@ private
    --  4MiB process heap starting size.
    Process_Heap_Starting_Size  : constant := 1024 * 16#1000#;
 
-   procedure Add_Process_Unlocked
+   procedure Add_Process_To_Process_Queue_Unlocked
      (New_Process : Process_Control_Block_Access;
       Result      : out Function_Result);
 

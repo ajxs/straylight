@@ -422,7 +422,7 @@ package body Boot is
       Init_Process.all.Kernel_Context (ra) :=
         Address_To_Unsigned_64 (Start_Init_Process'Address);
 
-      Add_Process (Init_Process, Result);
+      Add_Process_To_Process_Queue (Init_Process, Result);
       if Is_Error (Result) then
          Panic ("Error adding init process");
       end if;
