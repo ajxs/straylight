@@ -106,9 +106,6 @@ package Filesystems is
       Position       : Unsigned_64 := 0;
    end record;
 
-   type Process_File_Handle_Array is
-     array (1 .. 64) of aliased Process_File_Handle_T;
-
    type Process_File_Handle_Access is access all Process_File_Handle_T;
 
    procedure Open_File
@@ -157,8 +154,6 @@ package Filesystems is
    System_Root_Filesystem : Filesystem_Access := null;
    Mounted_Filesystems    : Mounted_Filesystem_Array;
 
-   Open_Files : Process_File_Handle_Array;
-
    procedure Find_File_Handle
      (Process_Id     : Process_Id_T;
       File_Handle_Id : Unsigned_64;
@@ -167,6 +162,13 @@ package Filesystems is
 
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Filesystems];
+
+   type Process_File_Handle_Array is
+     array (1 .. 64) of aliased Process_File_Handle_T;
+
+   Open_Files : Process_File_Handle_Array;
+
+   Open_Files_Spinlock : Spinlock_T;
 
    type Filesystem_Node_Cache_Entry_T is record
       Node        : Filesystem_Node_Access := null;
@@ -188,6 +190,16 @@ private
    Filesystem_Node_Cache : Filesystem_Node_Cache_T;
 
    Maximum_File_Read_Size : constant := 16#60_000#;
+
+   procedure Open_File_Unlocked
+     (Process     : in out Process_Control_Block_T;
+      Path        : Filesystem_Path_T;
+      Mode        : File_Open_Mode_T;
+      File_Handle : out Process_File_Handle_Access;
+      Result      : out Function_Result);
+
+   procedure Close_File_Unlocked
+     (File_Handle : Process_File_Handle_Access; Result : out Function_Result);
 
    procedure Add_Filesystem_Node_To_Cache_Unlocked
      (Node : Filesystem_Node_Access; Result : out Function_Result);

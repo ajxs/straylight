@@ -446,7 +446,7 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Find_File;
 
-   procedure Open_File
+   procedure Open_File_Unlocked
      (Process     : in out Process_Control_Block_T;
       Path        : Filesystem_Path_T;
       Mode        : File_Open_Mode_T;
@@ -490,6 +490,18 @@ package body Filesystems is
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Open_File");
          Result := Constraint_Exception;
+   end Open_File_Unlocked;
+
+   procedure Open_File
+     (Process     : in out Process_Control_Block_T;
+      Path        : Filesystem_Path_T;
+      Mode        : File_Open_Mode_T;
+      File_Handle : out Process_File_Handle_Access;
+      Result      : out Function_Result) is
+   begin
+      Acquire_Spinlock (Open_Files_Spinlock);
+      Open_File_Unlocked (Process, Path, Mode, File_Handle, Result);
+      Release_Spinlock (Open_Files_Spinlock);
    end Open_File;
 
    procedure Read_File
@@ -794,19 +806,28 @@ package body Filesystems is
          return False;
    end Does_Node_Name_Match_Path_Name;
 
-   procedure Close_File
+   procedure Close_File_Unlocked
      (File_Handle : Process_File_Handle_Access; Result : out Function_Result)
    is
    begin
-      Log_Debug ("Filesystems.Close_File", Logging_Tags);
+      Log_Debug ("Filesystems.Close_File_Unlocked", Logging_Tags);
 
       File_Handle.all.Entry_Used := False;
 
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Close_File", Logging_Tags);
+         Log_Error ("Constraint_Error: Close_File_Unlocked", Logging_Tags);
          Result := Constraint_Exception;
+   end Close_File_Unlocked;
+
+   procedure Close_File
+     (File_Handle : Process_File_Handle_Access; Result : out Function_Result)
+   is
+   begin
+      Acquire_Spinlock (Open_Files_Spinlock);
+      Close_File_Unlocked (File_Handle, Result);
+      Release_Spinlock (Open_Files_Spinlock);
    end Close_File;
 
 end Filesystems;
