@@ -14,7 +14,6 @@ with Function_Results; use Function_Results;
 with Processes.Scheduler;
 with RISCV;
 with RISCV.SBI;        use RISCV.SBI;
-with RISCV.Interrupts;
 with System_Calls;
 with Hart_State;       use Hart_State;
 
@@ -203,7 +202,6 @@ package body Traps is
          & Get_Cause (Scause)'Image,
          Logging_Tags);
 
-      RISCV.Interrupts.Enable_Supervisor_Interrupts;
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Handle_Supervisor_Mode_Trap");
@@ -245,7 +243,7 @@ package body Traps is
             --  Since Sepc points to the address at the time of the trap,
             --  this points to the instruction that raised the system call.
             --  Increment Sepc to the next instruction to advance past it.
-            --  This is safe to do because there's no compressed version off
+            --  This is safe to do because there's no compressed version of
             --  the ecall instruction. It's always 4 bytes long.
             Trap_Context.Sepc := Sepc + 4;
 
@@ -317,13 +315,6 @@ package body Traps is
          & "  Cause: "
          & Get_Cause (Scause)'Image,
          Logging_Tags);
-
-      --  Re-enable supervisor interrupts before returning to user mode,
-      --  so that any pending interrupts can be handled.
-      --  A likely scenario for a pending IRQ would be a syscall triggering
-      --  an interrupt from a device.
-      --  This is more performant than waiting for the current trap to return.
-      RISCV.Interrupts.Enable_Supervisor_Interrupts;
 
    exception
       when Constraint_Error =>
