@@ -64,6 +64,10 @@ private
    is ((Cause and 16#8000_0000_0000_0000#) = 0)
    with Inline, Pure_Function;
 
+   function Is_Interrupt (Cause : Unsigned_64) return Boolean
+   is ((Cause and 16#8000_0000_0000_0000#) /= 0)
+   with Inline, Pure_Function;
+
    function Get_Cause (Cause : Unsigned_64) return Unsigned_64
    is (Cause and 16#7FFF_FFFF_FFFF_FFFF#)
    with Inline, Pure_Function;

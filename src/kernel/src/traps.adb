@@ -16,6 +16,7 @@ with RISCV;
 with RISCV.SBI;        use RISCV.SBI;
 with System_Calls;
 with Hart_State;       use Hart_State;
+with Utilities;        use Utilities;
 
 package body Traps is
    procedure Handle_Supervisor_Mode_Exception
@@ -50,17 +51,7 @@ package body Traps is
             & "  Stack Base: "
             & Trapping_Process.Kernel_Stack_Virt_Addr'Image);
       else
-         Panic
-           ("Supervisor Mode: Exception: "
-            & ASCII.LF
-            & "  Cause: "
-            & Cause'Image
-            & ASCII.LF
-            & "  Sepc: "
-            & Sepc'Image
-            & ASCII.LF
-            & "  Stval: "
-            & Stval'Image);
+         Panic ("Supervisor Mode: Exception");
       end if;
 
    exception
@@ -129,33 +120,9 @@ package body Traps is
    end Handle_External_Interrupt;
 
    procedure Handle_Supervisor_Mode_Interrupt
-     (Cause : Unsigned_64; Sepc : Virtual_Address_T; Stval : Unsigned_64)
-   is
-      Trapping_Process : Process_Control_Block_Access := null;
+     (Cause : Unsigned_64; Sepc : Virtual_Address_T; Stval : Unsigned_64) is
    begin
       pragma Unreferenced (Sepc, Stval);
-
-      Trapping_Process := Get_Process_Running_On_Current_Hart;
-      if Trapping_Process /= null then
-         Log_Debug
-           ("Supervisor Mode: Interrupt: "
-            & ASCII.LF
-            & "  PID#   "
-            & Trapping_Process.all.Process_Id'Image
-            & ASCII.LF
-            & "  Cause: "
-            & Cause'Image,
-            Logging_Tags);
-      else
-         Log_Debug
-           ("Supervisor Mode: Interrupt: "
-            & ASCII.LF
-            & "  PID#   None"
-            & ASCII.LF
-            & "  Cause: "
-            & Cause'Image,
-            Logging_Tags);
-      end if;
 
       case Cause is
          when 5      =>
@@ -180,23 +147,59 @@ package body Traps is
       Sepc         : Virtual_Address_T;
       Stval        : Unsigned_64)
    is
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
+
       Cause : constant Unsigned_64 := Get_Cause (Scause);
+
+      Trap_Is_Interrupt : constant Boolean := Is_Interrupt (Scause);
 
       Trapping_Process : Process_Control_Block_T
       with Import, Alignment => 1, Address => Process_Addr;
+
+      Process_Id_String : String (1 .. 24) := "None                    ";
    begin
-      if Is_Exception (Scause) then
-         Handle_Supervisor_Mode_Exception
-           (Trapping_Process, Cause, Sepc, Stval);
-      else
-         Handle_Supervisor_Mode_Interrupt (Cause, Sepc, Stval);
+      if Process_Addr /= Null_Address then
+         Set_Fixed_Length_String
+           (Trapping_Process.Process_Id'Image, Process_Id_String);
       end if;
 
       Log_Debug
-        ("Returning from supervisor trap:"
+        ("Traps.Handle_Supervisor_Mode_Trap:"
+         & ASCII.LF
+         & "  Hart#      "
+         & Hart_Id'Image
+         & ASCII.LF
+         & "  PID#       "
+         & Process_Id_String
+         & ASCII.LF
+         & "  Interrupt: "
+         & Trap_Is_Interrupt'Image
+         & ASCII.LF
+         & "  Cause:     "
+         & Cause'Image
+         & ASCII.LF
+         & "  Sepc:      "
+         & Sepc'Image
+         & ASCII.LF
+         & "  Stval:     "
+         & Stval'Image,
+         Logging_Tags);
+
+      if Trap_Is_Interrupt then
+         Handle_Supervisor_Mode_Interrupt (Cause, Sepc, Stval);
+      else
+         Handle_Supervisor_Mode_Exception
+           (Trapping_Process, Cause, Sepc, Stval);
+      end if;
+
+      Log_Debug
+        ("Traps.Handle_Supervisor_Mode_Trap: Returning from trap:"
+         & ASCII.LF
+         & "  Hart#  "
+         & Hart_Id'Image
          & ASCII.LF
          & "  PID#   "
-         & Trapping_Process.Process_Id'Image
+         & Process_Id_String
          & ASCII.LF
          & "  Cause: "
          & Get_Cause (Scause)'Image,
@@ -208,14 +211,18 @@ package body Traps is
    end Handle_Supervisor_Mode_Trap;
 
    procedure Handle_Timer_Interrupt is
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
    begin
       Setup_Next_Timer_Interrupt;
 
-      Log_Debug ("Scheduling from timer IRQ", Logging_Tags);
+      Log_Debug
+        ("Hart#" & Hart_Id'Image & ": Scheduling from timer IRQ",
+         Logging_Tags);
 
       Scheduler.Run (Process_Ready);
 
-      Log_Debug ("Returning from timer IRQ", Logging_Tags);
+      Log_Debug
+        ("Hart#" & Hart_Id'Image & ": Returning from timer IRQ", Logging_Tags);
    end Handle_Timer_Interrupt;
 
    procedure Handle_User_Mode_Exception
@@ -272,7 +279,6 @@ package body Traps is
    begin
       pragma Unreferenced (Trapping_Process);
 
-      Log_Debug ("User Mode: Interrupt: " & Cause'Image, Logging_Tags);
       case Cause is
          when 5      =>
             Handle_Timer_Interrupt;
@@ -295,30 +301,63 @@ package body Traps is
       Sepc         : Virtual_Address_T;
       Stval        : Unsigned_64)
    is
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
+
       Cause : constant Unsigned_64 := Get_Cause (Scause);
+
+      Trap_Is_Interrupt : constant Boolean := Is_Interrupt (Scause);
 
       Trapping_Process : Process_Control_Block_T
       with Import, Alignment => 1, Address => Process_Addr;
+
+      Process_Id_String : String (1 .. 24) := "None                    ";
    begin
-      if Is_Exception (Scause) then
-         Handle_User_Mode_Exception (Trapping_Process, Cause, Sepc, Stval);
-      else
-         Handle_User_Mode_Interrupt (Trapping_Process, Cause);
+      if Process_Addr /= Null_Address then
+         Set_Fixed_Length_String
+           (Trapping_Process.Process_Id'Image, Process_Id_String);
       end if;
 
       Log_Debug
-        ("Returning from user trap:"
+        ("Traps.Handle_User_Mode_Trap:"
+         & ASCII.LF
+         & "  Hart#      "
+         & Hart_Id'Image
+         & ASCII.LF
+         & "  Interrupt: "
+         & Trap_Is_Interrupt'Image
+         & ASCII.LF
+         & "  Cause:     "
+         & Cause'Image
+         & ASCII.LF
+         & "  PID#       "
+         & Process_Id_String
+         & ASCII.LF
+         & "  Sepc:      "
+         & Sepc'Image
+         & ASCII.LF
+         & "  Stval:     "
+         & Stval'Image,
+         Logging_Tags);
+
+      if Trap_Is_Interrupt then
+         Handle_User_Mode_Interrupt (Trapping_Process, Cause);
+      else
+         Handle_User_Mode_Exception (Trapping_Process, Cause, Sepc, Stval);
+      end if;
+
+      Log_Debug
+        ("Traps.Handle_User_Mode_Trap: Returning from trap"
+         & ASCII.LF
+         & "  Hart#  "
+         & Hart_Id'Image
          & ASCII.LF
          & "  PID#   "
-         & Trapping_Process.Process_Id'Image
-         & ASCII.LF
-         & "  Cause: "
-         & Get_Cause (Scause)'Image,
+         & Process_Id_String,
          Logging_Tags);
 
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Handle_Supervisor_Mode_Trap");
+         Panic ("Constraint_Error: Handle_User_Mode_Trap");
    end Handle_User_Mode_Trap;
 
    procedure Setup_Next_Timer_Interrupt is
