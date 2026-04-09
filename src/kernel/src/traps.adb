@@ -20,43 +20,46 @@ with Utilities;        use Utilities;
 
 package body Traps is
    procedure Handle_Supervisor_Mode_Exception
-     (Trapping_Process : in out Process_Control_Block_T;
-      Cause            : Unsigned_64;
-      Sepc             : Virtual_Address_T;
-      Stval            : Unsigned_64)
-   is
-      function Is_Stack_Overflow return Boolean
-      is ((Cause = 13 or else Cause = 15)
-          and then
-            Stval
-            < Address_To_Unsigned_64
-                (Trapping_Process.Kernel_Stack_Virt_Addr));
+     (Trapping_Process_Addr : Virtual_Address_T;
+      Cause                 : Unsigned_64;
+      Stval                 : Unsigned_64) is
    begin
-      if Is_Stack_Overflow then
+      if Trapping_Process_Addr = Null_Address then
          Panic
-           ("Stack Overflow: "
-            & ASCII.LF
-            & "  PID#        "
-            & Trapping_Process.Process_Id'Image
-            & ASCII.LF
-            & "  Cause:      "
-            & Cause'Image
-            & ASCII.LF
-            & "  Sepc:       "
-            & Sepc'Image
-            & ASCII.LF
-            & "  Stval:      "
-            & Stval'Image
-            & ASCII.LF
-            & "  Stack Base: "
-            & Trapping_Process.Kernel_Stack_Virt_Addr'Image);
-      else
-         Panic ("Supervisor Mode: Exception");
+           ("Traps.Handle_Supervisor_Mode_Exception: "
+            & "Null trapping process address");
       end if;
+
+      Read_Process_Info : declare
+         Trapping_Process : Process_Control_Block_T
+         with Import, Alignment => 1, Address => Trapping_Process_Addr;
+
+         function Is_Stack_Overflow return Boolean
+         is ((Cause = 13 or else Cause = 15)
+             and then
+               Stval
+               < Address_To_Unsigned_64
+                   (Trapping_Process.Kernel_Stack_Virt_Addr));
+      begin
+         if Is_Stack_Overflow then
+            Panic
+              ("Traps.Handle_Supervisor_Mode_Exception: Stack Overflow: "
+               & ASCII.LF
+               & "  Stval:      "
+               & Stval'Image
+               & ASCII.LF
+               & "  Stack Base: "
+               & Trapping_Process.Kernel_Stack_Virt_Addr'Image);
+         end if;
+      end Read_Process_Info;
+
+      Panic
+        ("Traps.Handle_Supervisor_Mode_Exception: "
+         & "Supervisor Mode: Exception");
 
    exception
       when Constraint_Error =>
-         null;
+         Panic ("Constraint_Error: Handle_Supervisor_Mode_Exception");
    end Handle_Supervisor_Mode_Exception;
 
    procedure Handle_External_Interrupt is
@@ -142,10 +145,10 @@ package body Traps is
    end Handle_Supervisor_Mode_Interrupt;
 
    procedure Handle_Supervisor_Mode_Trap
-     (Process_Addr : Virtual_Address_T;
-      Scause       : Unsigned_64;
-      Sepc         : Virtual_Address_T;
-      Stval        : Unsigned_64)
+     (Trapping_Process_Addr : Virtual_Address_T;
+      Scause                : Unsigned_64;
+      Sepc                  : Virtual_Address_T;
+      Stval                 : Unsigned_64)
    is
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
 
@@ -153,14 +156,16 @@ package body Traps is
 
       Trap_Is_Interrupt : constant Boolean := Is_Interrupt (Scause);
 
-      Trapping_Process : Process_Control_Block_T
-      with Import, Alignment => 1, Address => Process_Addr;
-
       Process_Id_String : String (1 .. 24) := "None                    ";
    begin
-      if Process_Addr /= Null_Address then
-         Set_Fixed_Length_String
-           (Trapping_Process.Process_Id'Image, Process_Id_String);
+      if Trapping_Process_Addr /= Null_Address then
+         Get_Process_Id : declare
+            Trapping_Process : Process_Control_Block_T
+            with Import, Alignment => 1, Address => Trapping_Process_Addr;
+         begin
+            Set_Fixed_Length_String
+              (Trapping_Process.Process_Id'Image, Process_Id_String);
+         end Get_Process_Id;
       end if;
 
       Log_Debug
@@ -189,7 +194,7 @@ package body Traps is
          Handle_Supervisor_Mode_Interrupt (Cause, Sepc, Stval);
       else
          Handle_Supervisor_Mode_Exception
-           (Trapping_Process, Cause, Sepc, Stval);
+           (Trapping_Process_Addr, Cause, Stval);
       end if;
 
       Log_Debug
@@ -223,6 +228,9 @@ package body Traps is
 
       Log_Debug
         ("Hart#" & Hart_Id'Image & ": Returning from timer IRQ", Logging_Tags);
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Handle_Timer_Interrupt");
    end Handle_Timer_Interrupt;
 
    procedure Handle_User_Mode_Exception
@@ -267,18 +275,13 @@ package body Traps is
                & "  Stval: "
                & Stval'Image);
       end case;
-
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Handle_User_Mode_Exception");
    end Handle_User_Mode_Exception;
 
-   procedure Handle_User_Mode_Interrupt
-     (Trapping_Process : in out Process_Control_Block_T; Cause : Unsigned_64)
-   is
+   procedure Handle_User_Mode_Interrupt (Cause : Unsigned_64) is
    begin
-      pragma Unreferenced (Trapping_Process);
-
       case Cause is
          when 5      =>
             Handle_Timer_Interrupt;
@@ -296,65 +299,65 @@ package body Traps is
    end Handle_User_Mode_Interrupt;
 
    procedure Handle_User_Mode_Trap
-     (Process_Addr : Virtual_Address_T;
-      Scause       : Unsigned_64;
-      Sepc         : Virtual_Address_T;
-      Stval        : Unsigned_64)
+     (Trapping_Process_Addr : Virtual_Address_T;
+      Scause                : Unsigned_64;
+      Sepc                  : Virtual_Address_T;
+      Stval                 : Unsigned_64)
    is
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
 
       Cause : constant Unsigned_64 := Get_Cause (Scause);
 
       Trap_Is_Interrupt : constant Boolean := Is_Interrupt (Scause);
-
-      Trapping_Process : Process_Control_Block_T
-      with Import, Alignment => 1, Address => Process_Addr;
-
-      Process_Id_String : String (1 .. 24) := "None                    ";
    begin
-      if Process_Addr /= Null_Address then
-         Set_Fixed_Length_String
-           (Trapping_Process.Process_Id'Image, Process_Id_String);
+      --  If we're in user mode, and there's no actual process running, this
+      --  indicates some serious problem has occurred. In this case, panic.
+      if Trapping_Process_Addr = Null_Address then
+         Panic ("Traps.Handle_User_Mode_Trap: Null trapping process address");
       end if;
 
-      Log_Debug
-        ("Traps.Handle_User_Mode_Trap:"
-         & ASCII.LF
-         & "  Hart#      "
-         & Hart_Id'Image
-         & ASCII.LF
-         & "  Interrupt: "
-         & Trap_Is_Interrupt'Image
-         & ASCII.LF
-         & "  Cause:     "
-         & Cause'Image
-         & ASCII.LF
-         & "  PID#       "
-         & Process_Id_String
-         & ASCII.LF
-         & "  Sepc:      "
-         & Sepc'Image
-         & ASCII.LF
-         & "  Stval:     "
-         & Stval'Image,
-         Logging_Tags);
+      Read_Process_Info : declare
+         Trapping_Process : Process_Control_Block_T
+         with Import, Alignment => 1, Address => Trapping_Process_Addr;
+      begin
+         Log_Debug
+           ("Traps.Handle_User_Mode_Trap:"
+            & ASCII.LF
+            & "  Hart#      "
+            & Hart_Id'Image
+            & ASCII.LF
+            & "  Interrupt: "
+            & Trap_Is_Interrupt'Image
+            & ASCII.LF
+            & "  Cause:     "
+            & Cause'Image
+            & ASCII.LF
+            & "  PID#       "
+            & Trapping_Process.Process_Id'Image
+            & ASCII.LF
+            & "  Sepc:      "
+            & Sepc'Image
+            & ASCII.LF
+            & "  Stval:     "
+            & Stval'Image,
+            Logging_Tags);
 
-      if Trap_Is_Interrupt then
-         Handle_User_Mode_Interrupt (Trapping_Process, Cause);
-      else
-         Handle_User_Mode_Exception (Trapping_Process, Cause, Sepc, Stval);
-      end if;
+         if Trap_Is_Interrupt then
+            Handle_User_Mode_Interrupt (Cause);
+         else
+            Handle_User_Mode_Exception (Trapping_Process, Cause, Sepc, Stval);
+         end if;
 
-      Log_Debug
-        ("Traps.Handle_User_Mode_Trap: Returning from trap"
-         & ASCII.LF
-         & "  Hart#  "
-         & Hart_Id'Image
-         & ASCII.LF
-         & "  PID#   "
-         & Process_Id_String,
-         Logging_Tags);
-
+         Log_Debug
+           ("Traps.Handle_User_Mode_Trap: Returning from trap"
+            & ASCII.LF
+            & "  Hart#  "
+            & Hart_Id'Image
+            & ASCII.LF
+            & "  PID#   "
+            & Trapping_Process.Process_Id'Image,
+            Logging_Tags);
+      end Read_Process_Info;
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Handle_User_Mode_Trap");

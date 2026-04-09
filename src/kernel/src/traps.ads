@@ -17,20 +17,20 @@ package Traps is
    pragma Preelaborate;
 
    procedure Handle_Supervisor_Mode_Trap
-     (Process_Addr : Virtual_Address_T;
-      Scause       : Unsigned_64;
-      Sepc         : Virtual_Address_T;
-      Stval        : Unsigned_64)
+     (Trapping_Process_Addr : Virtual_Address_T;
+      Scause                : Unsigned_64;
+      Sepc                  : Virtual_Address_T;
+      Stval                 : Unsigned_64)
    with
      Export,
      Convention    => Assembler,
      External_Name => "trap_handler_supervisor_mode";
 
    procedure Handle_User_Mode_Trap
-     (Process_Addr : Virtual_Address_T;
-      Scause       : Unsigned_64;
-      Sepc         : Virtual_Address_T;
-      Stval        : Unsigned_64)
+     (Trapping_Process_Addr : Virtual_Address_T;
+      Scause                : Unsigned_64;
+      Sepc                  : Virtual_Address_T;
+      Stval                 : Unsigned_64)
    with
      Export,
      Convention    => Assembler,
@@ -53,10 +53,9 @@ private
      (Cause : Unsigned_64; Sepc : Virtual_Address_T; Stval : Unsigned_64);
 
    procedure Handle_Supervisor_Mode_Exception
-     (Trapping_Process : in out Process_Control_Block_T;
-      Cause            : Unsigned_64;
-      Sepc             : Virtual_Address_T;
-      Stval            : Unsigned_64);
+     (Trapping_Process_Addr : Virtual_Address_T;
+      Cause                 : Unsigned_64;
+      Stval                 : Unsigned_64);
 
    procedure Handle_External_Interrupt;
 
@@ -78,8 +77,7 @@ private
      Convention    => Assembler,
      External_Name => "traps_clear_pending_supervisor_software_interrupt";
 
-   procedure Handle_User_Mode_Interrupt
-     (Trapping_Process : in out Process_Control_Block_T; Cause : Unsigned_64);
+   procedure Handle_User_Mode_Interrupt (Cause : Unsigned_64);
 
    procedure Handle_User_Mode_Exception
      (Trapping_Process : in out Process_Control_Block_T;
