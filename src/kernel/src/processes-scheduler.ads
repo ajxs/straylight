@@ -47,4 +47,6 @@ private
      (New_Prev_Process_State : Process_Status_T := Process_Ready;
       Condition_Lock         : in out Spinlock_T);
 
+   procedure Ensure_No_Locks_Held_Before_Context_Switch;
+
 end Processes.Scheduler;

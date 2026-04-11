@@ -183,6 +183,8 @@ package body Processes.Scheduler is
         Convention    => Assembler,
         External_Name => "scheduler_load_kernel_context";
    begin
+      Ensure_No_Locks_Held_Before_Context_Switch;
+
       Print_Process_Switch_Info (Prev_Process, Next_Process);
 
       --  Handle the possibility that there is no current process running on
@@ -307,5 +309,21 @@ package body Processes.Scheduler is
       Wake_Processes_Waiting_For_Channel_Unlocked (Channel, Result);
       Release_Spinlock (Process_Queue_Spinlock);
    end Wake_Processes_Waiting_For_Channel;
+
+   procedure Ensure_No_Locks_Held_Before_Context_Switch is
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
+   begin
+      if Hart_States (Hart_Id).Interrupts_Off_Counter /= 0 then
+         Panic
+           ("Hart# "
+            & Hart_Id'Image
+            & " still has active locks prior to context switch: "
+            & Hart_States (Hart_Id).Interrupts_Off_Counter'Image);
+      end if;
+   exception
+      when Constraint_Error =>
+         Panic
+           ("Constraint_Error: Ensure_No_Locks_Held_Before_Context_Switch");
+   end Ensure_No_Locks_Held_Before_Context_Switch;
 
 end Processes.Scheduler;
