@@ -203,12 +203,12 @@ private
 
    Maximum_File_Read_Size : constant := 16#60_000#;
 
-   procedure Open_File_Unlocked
-     (Process     : in out Process_Control_Block_T;
-      Path        : Filesystem_Path_T;
-      Mode        : File_Open_Mode_T;
-      File_Handle : out Process_File_Handle_Access;
-      Result      : out Function_Result);
+   procedure Create_File_Handle_For_Filesystem_Node
+     (Process         : in out Process_Control_Block_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      Mode            : File_Open_Mode_T;
+      File_Handle     : out Process_File_Handle_Access;
+      Result          : out Function_Result);
 
    procedure Close_File_Unlocked
      (File_Handle : Process_File_Handle_Access; Result : out Function_Result);
