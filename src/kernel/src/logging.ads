@@ -110,7 +110,11 @@ private
    ----------------------------------------------------------------------------
    SBI_Logging_Buffer : String (1 .. SBI_Log_Buffer_Length);
 
-   SBI_Logging_Buffer_Spinlock : Spinlock_T;
+   SBI_Logging_Buffer_Spinlock : Spinlock_T :=
+     (Locked        => 0,
+      Time_Acquired => 0,
+      Hart_Id       => No_Hart_Id,
+      Lock_Id       => Lock_Id_SBI_Log_Buffer);
 
    function Should_Log_To_Debug_Console
      (Tags : Log_Tags; Level : Log_Level_T) return Boolean;

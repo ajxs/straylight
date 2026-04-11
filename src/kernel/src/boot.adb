@@ -16,7 +16,7 @@ with Filesystems.Root;  use Filesystems.Root;
 with Function_Results;  use Function_Results;
 with Graphics;          use Graphics;
 with Loader;
-with Locks;
+with Locks;             use Locks;
 with Memory.Allocators; use Memory.Allocators;
 with Memory.Kernel;     use Memory.Kernel;
 with Memory.Physical;   use Memory.Physical;
@@ -85,6 +85,12 @@ package body Boot is
       Result : Function_Result := Unset;
    begin
       Log_Debug ("Initialising devices...", Logging_Tags);
+
+      --  Assign a unique Lock ID to the device spinlocks.
+      for I in System_Devices'Range loop
+         System_Devices (I).Spinlock.Lock_Id :=
+           Lock_Id_Devices_Prefix + Lock_Id_T (I);
+      end loop;
 
       APIC_Device :=
         (Device_Class       => Device_Class_Interrupt_Controller,

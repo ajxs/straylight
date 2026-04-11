@@ -731,6 +731,14 @@ package body Filesystems is
    begin
       Log_Debug ("Initialising block cache...", Logging_Tags);
 
+      System_Block_Cache.Spinlock.Lock_Id := Lock_Id_Block_Cache;
+
+      --  Assign unique Lock IDs to the block cache spinlocks.
+      for I in System_Block_Cache.Entries'Range loop
+         System_Block_Cache.Entries (I).Sleeplock.Spinlock.Lock_Id :=
+           Lock_Id_Block_Cache_Entry_Prefix + Lock_Id_T (I);
+      end loop;
+
       --  Allocate memory for the block cache entries.
       --  Each block is conveniently the same size as a page.
       Allocate_Pages

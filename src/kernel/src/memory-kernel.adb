@@ -1,6 +1,7 @@
 with Memory.Physical; use Memory.Physical;
 with Memory.Virtual;  use Memory.Virtual;
 with Hart_State;      use Hart_State;
+with Locks;           use Locks;
 
 package body Memory.Kernel is
    procedure Allocate_Kernel_Memory
@@ -56,6 +57,10 @@ package body Memory.Kernel is
 
       Result : Function_Result := Unset;
    begin
+      Log_Debug ("Initialising kernel heap...", Logging_Tags);
+
+      Kernel_Heap.Spinlock.Lock_Id := Lock_Id_Kernel_Heap;
+
       Allocate_Physical_Memory
         (Kernel_Heap_Initial_Size, Allocated_Physical_Address, Result);
       if Is_Error (Result) then
@@ -111,6 +116,8 @@ package body Memory.Kernel is
       Result : Function_Result := Unset;
    begin
       Log_Debug ("Initialising kernel page pool...", Logging_Tags);
+
+      Kernel_Page_Pool.Spinlock.Lock_Id := Lock_Id_Kernel_Page_Pool;
 
       Allocate_Physical_Memory
         (Kernel_Page_Pool_Initial_Size, Allocated_Physical_Address, Result);

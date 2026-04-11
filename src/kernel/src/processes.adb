@@ -427,6 +427,9 @@ package body Processes is
          return;
       end if;
 
+      New_Process.all.Spinlock.Lock_Id :=
+        Lock_Id_Process_Prefix + Lock_Id_T (New_Process.all.Process_Id);
+
       Log_Debug
         ("Allocated new process: "
          & ASCII.LF

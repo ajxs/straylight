@@ -144,10 +144,18 @@ private
    Logging_Tags : constant Log_Tags := [Log_Tag_Processes];
 
    Next_Process_Id     : Process_Id_T := 1;
-   Process_Id_Spinlock : Spinlock_T;
+   Process_Id_Spinlock : Spinlock_T :=
+     (Locked        => 0,
+      Time_Acquired => 0,
+      Hart_Id       => No_Hart_Id,
+      Lock_Id       => Lock_Id_Process_Id);
 
    Process_Queue          : Process_Control_Block_Access := null;
-   Process_Queue_Spinlock : Spinlock_T;
+   Process_Queue_Spinlock : Spinlock_T :=
+     (Locked        => 0,
+      Time_Acquired => 0,
+      Hart_Id       => No_Hart_Id,
+      Lock_Id       => Lock_Id_Process_Queue);
 
    --  16KiB process kernel stack starting size.
    Process_Kernel_Stack_Size   : constant := 4 * 16#1000#;

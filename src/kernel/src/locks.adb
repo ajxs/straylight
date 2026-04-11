@@ -19,7 +19,12 @@ package body Locks is
          --  We panic here because there's no way of resolving this situation
          --  safely without halting the system.
          Panic
-           ("Lock already held by this hart at: " & Lock.Time_Acquired'Image);
+           ("Hart#"
+            & Hart_Id'Image
+            & " already holds lock#"
+            & Lock.Lock_Id'Image
+            & ", held at: "
+            & Lock.Time_Acquired'Image);
       end if;
 
       --  Loop until we successfully acquire the lock.
@@ -49,7 +54,11 @@ package body Locks is
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
    begin
       if not Is_Current_Hart_Holding_Spinlock (Lock, Hart_Id) then
-         Panic ("Lock not held");
+         Panic
+           ("Hart#"
+            & Hart_Id'Image
+            & " does not hold lock#"
+            & Lock.Lock_Id'Image);
       end if;
 
       --  There's no need to clear the Hart Id, as it will be overwritten
@@ -70,5 +79,8 @@ package body Locks is
       Atomic_Clear_Unsigned_32 (Lock.Locked'Access);
 
       Pop_Interrupts_Off;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Release_Spinlock");
    end Release_Spinlock;
 end Locks;
