@@ -266,7 +266,7 @@ package body Processes.Scheduler is
    end Run_Guarded;
 
    procedure Wake_Processes_Waiting_For_Channel_Unlocked
-     (Channel : Blocking_Channel_T; Result : out Function_Result)
+     (Channel : Blocking_Channel_T)
    is
       Curr_Process : Process_Control_Block_Access := null;
    begin
@@ -293,20 +293,20 @@ package body Processes.Scheduler is
 
          Curr_Process := Curr_Process.all.Next_Process;
       end loop;
-
-      Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
+         --  If a constraint error occurs while waking processes, it's likely
+         --  that the system is in an invalid state. In this case it's better
+         --  to panic and halt the system rather than continue.
+         Panic
            ("Constraint_Error: Wake_Processes_Waiting_For_Channel_Unlocked");
-         Result := Constraint_Exception;
    end Wake_Processes_Waiting_For_Channel_Unlocked;
 
-   procedure Wake_Processes_Waiting_For_Channel
-     (Channel : Blocking_Channel_T; Result : out Function_Result) is
+   procedure Wake_Processes_Waiting_For_Channel (Channel : Blocking_Channel_T)
+   is
    begin
       Acquire_Spinlock (Process_Queue_Spinlock);
-      Wake_Processes_Waiting_For_Channel_Unlocked (Channel, Result);
+      Wake_Processes_Waiting_For_Channel_Unlocked (Channel);
       Release_Spinlock (Process_Queue_Spinlock);
    end Wake_Processes_Waiting_For_Channel;
 

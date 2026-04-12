@@ -62,8 +62,9 @@ package body Locks.Sleeplocks is
       Lock.Locked := 0;
       Lock.Process_Id := 0;
       Wake_Processes_Waiting_For_Channel
-        (Address_To_Unsigned_64 (Lock'Address), Result);
+        (Address_To_Unsigned_64 (Lock'Address));
 
+      Result := Success;
       Release_Spinlock (Lock.Spinlock);
    end Release_Sleeplock;
 

@@ -92,10 +92,7 @@ package body Devices.VirtIO is
                & Device.Bus_Info_VirtIO.Request_Serviced_Index'Image,
                Logging_Tags_VirtIO);
 
-            Wake_Processes_Waiting_For_Channel (Channel, Result);
-            if Is_Error (Result) then
-               return;
-            end if;
+            Wake_Processes_Waiting_For_Channel (Channel);
 
             --  Tell the processor to not move loads or stores past this point.
             Fence;
