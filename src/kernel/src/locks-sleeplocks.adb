@@ -3,21 +3,22 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Hart_State;          use Hart_State;
 with Memory;              use Memory;
 with Processes.Scheduler; use Processes.Scheduler;
 
 package body Locks.Sleeplocks is
    procedure Acquire_Sleeplock
-     (Lock       : in out Sleeplock_T;
-      Process_Id : Process_Id_T;
-      Result     : out Function_Result) is
+     (Lock : in out Sleeplock_T; Process_Id : Process_Id_T) is
    begin
       Acquiring_Process : constant Process_Control_Block_Access :=
         Find_Running_Process_With_Id (Process_Id);
       --  The case the process isn't found is an error condition.
       if Acquiring_Process = null then
-         Result := Process_Not_Found;
-         return;
+         Panic
+           ("Process with ID#"
+            & Process_Id'Image
+            & " not found when trying to acquire sleeplock.");
       end if;
 
       Acquire_Spinlock (Lock.Spinlock);
@@ -29,15 +30,13 @@ package body Locks.Sleeplocks is
             Process        => Acquiring_Process.all);
       end loop;
 
-      Lock.Locked := 1;
+      Lock.Locked := Sleeplock_Magic_Number;
       Lock.Process_Id := Process_Id;
-
-      Result := Success;
 
       Release_Spinlock (Lock.Spinlock);
    exception
       when Constraint_Error =>
-         Result := Constraint_Exception;
+         Panic ("Constraint_Error: Acquire_Sleeplock");
    end Acquire_Sleeplock;
 
    function Is_Current_Process_Holding_Sleeplock
@@ -47,24 +46,24 @@ package body Locks.Sleeplocks is
    begin
       Acquire_Spinlock (Lock.Spinlock);
 
-      Hold_Status := Lock.Locked = 1 and then Lock.Process_Id = Process_Id;
+      Hold_Status :=
+        Lock.Locked = Sleeplock_Magic_Number
+        and then Lock.Process_Id = Process_Id;
 
       Release_Spinlock (Lock.Spinlock);
 
       return Hold_Status;
    end Is_Current_Process_Holding_Sleeplock;
 
-   procedure Release_Sleeplock
-     (Lock : in out Sleeplock_T; Result : out Function_Result) is
+   procedure Release_Sleeplock (Lock : in out Sleeplock_T) is
    begin
       Acquire_Spinlock (Lock.Spinlock);
 
       Lock.Locked := 0;
-      Lock.Process_Id := 0;
+      Lock.Process_Id := No_Process_Id;
       Wake_Processes_Waiting_For_Channel
         (Address_To_Unsigned_64 (Lock'Address));
 
-      Result := Success;
       Release_Spinlock (Lock.Spinlock);
    end Release_Sleeplock;
 

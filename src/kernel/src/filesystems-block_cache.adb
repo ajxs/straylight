@@ -175,11 +175,7 @@ package body Filesystems.Block_Cache is
          --  If free, the current process will acquire the lock and continue.
          Acquire_Sleeplock
            (System_Block_Cache.Entries (Cache_Index).Sleeplock,
-            Reading_Process.Process_Id,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
+            Reading_Process.Process_Id);
       elsif Result = Cache_Entry_Not_Found then
          Log_Debug
            ("Block not found in cache; Reading from filesystem...",
@@ -198,11 +194,7 @@ package body Filesystems.Block_Cache is
          --  use by another process.
          Acquire_Sleeplock
            (System_Block_Cache.Entries (Cache_Index).Sleeplock,
-            Reading_Process.Process_Id,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
+            Reading_Process.Process_Id);
 
          Acquire_Spinlock (System_Block_Cache.Spinlock);
 
@@ -366,10 +358,7 @@ package body Filesystems.Block_Cache is
            ("Found block to release in cache.", Logging_Tags_Block_Cache);
 
          Release_Sleeplock
-           (System_Block_Cache.Entries (Cache_Index).Sleeplock, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
+           (System_Block_Cache.Entries (Cache_Index).Sleeplock);
       elsif Result = Cache_Entry_Not_Found then
          Log_Error ("Block to release not found in cache.");
          Result := Invalid_Argument;
