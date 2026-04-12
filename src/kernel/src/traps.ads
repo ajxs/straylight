@@ -55,6 +55,7 @@ private
    procedure Handle_Supervisor_Mode_Exception
      (Trapping_Process_Addr : Virtual_Address_T;
       Cause                 : Unsigned_64;
+      Sepc                  : Virtual_Address_T;
       Stval                 : Unsigned_64);
 
    procedure Handle_External_Interrupt;
@@ -86,5 +87,7 @@ private
       Stval            : Unsigned_64);
 
    procedure Handle_Timer_Interrupt;
+
+   procedure Ensure_No_Locks_Held_In_Trap;
 
 end Traps;

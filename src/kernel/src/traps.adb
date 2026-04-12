@@ -22,7 +22,10 @@ package body Traps is
    procedure Handle_Supervisor_Mode_Exception
      (Trapping_Process_Addr : Virtual_Address_T;
       Cause                 : Unsigned_64;
-      Stval                 : Unsigned_64) is
+      Sepc                  : Virtual_Address_T;
+      Stval                 : Unsigned_64)
+   is
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
    begin
       if Trapping_Process_Addr = Null_Address then
          Panic
@@ -39,11 +42,19 @@ package body Traps is
              and then
                Stval
                < Address_To_Unsigned_64
-                   (Trapping_Process.Kernel_Stack_Virt_Addr));
+                   (Trapping_Process.Kernel_Stack_Virt_Addr)
+             and then
+               Stval
+               > Address_To_Unsigned_64
+                   (Trapping_Process.Kernel_Stack_Virt_Addr - 16#1000#));
       begin
+         Is_Idle_Process : constant Boolean :=
+           Trapping_Process.Process_Id
+           = Hart_Idle_Processes (Hart_Id).all.Process_Id;
+
          if Is_Stack_Overflow then
             Panic
-              ("Traps.Handle_Supervisor_Mode_Exception: Stack Overflow: "
+              ("Traps.Handle_Supervisor_Mode_Exception: Stack Overflow:"
                & ASCII.LF
                & "  Stval:      "
                & Stval'Image
@@ -51,11 +62,29 @@ package body Traps is
                & "  Stack Base: "
                & Trapping_Process.Kernel_Stack_Virt_Addr'Image);
          end if;
-      end Read_Process_Info;
 
-      Panic
-        ("Traps.Handle_Supervisor_Mode_Exception: "
-         & "Supervisor Mode: Exception");
+         Panic
+           ("Unhandled supervisor mode exception"
+            & ASCII.LF
+            & "  Hart#      "
+            & Hart_Id'Image
+            & ASCII.LF
+            & "  PID#       "
+            & Trapping_Process.Process_Id'Image
+            & ASCII.LF
+            & "  Idle Proc: "
+            & Is_Idle_Process'Image
+            & ASCII.LF
+            & "  Cause:     "
+            & Cause'Image
+            & ASCII.LF
+            & "  Sepc:      "
+            & Sepc'Image
+            & ASCII.LF
+            & "  Stval:     "
+            & Stval'Image);
+
+      end Read_Process_Info;
 
    exception
       when Constraint_Error =>
@@ -194,7 +223,7 @@ package body Traps is
          Handle_Supervisor_Mode_Interrupt (Cause, Sepc, Stval);
       else
          Handle_Supervisor_Mode_Exception
-           (Trapping_Process_Addr, Cause, Stval);
+           (Trapping_Process_Addr, Cause, Sepc, Stval);
       end if;
 
       Log_Debug
@@ -266,10 +295,16 @@ package body Traps is
             Panic
               ("Unhandled user mode exception: "
                & ASCII.LF
+               & "  Hart#  "
+               & Get_Current_Hart_Id'Image
+               & ASCII.LF
+               & "  PID#   "
+               & Trapping_Process.Process_Id'Image
+               & ASCII.LF
                & "  Cause: "
                & Cause'Image
                & ASCII.LF
-               & "  Sepc: "
+               & "  Sepc:  "
                & Sepc'Image
                & ASCII.LF
                & "  Stval: "
@@ -376,5 +411,20 @@ package body Traps is
       when Constraint_Error =>
          Panic ("Constraint_Error: Setup_Next_Timer_Interrupt");
    end Setup_Next_Timer_Interrupt;
+
+   procedure Ensure_No_Locks_Held_In_Trap is
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
+   begin
+      if Hart_States (Hart_Id).Interrupts_Off_Counter /= 0 then
+         Panic
+           ("Hart# "
+            & Hart_Id'Image
+            & " still has active locks prior to trap: "
+            & Hart_States (Hart_Id).Interrupts_Off_Counter'Image);
+      end if;
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Ensure_No_Locks_Held_In_Trap");
+   end Ensure_No_Locks_Held_In_Trap;
 
 end Traps;
