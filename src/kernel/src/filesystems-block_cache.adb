@@ -26,20 +26,16 @@ package body Filesystems.Block_Cache is
          return False;
    end Can_Block_Cache_Entry_Be_Invalidated;
 
-   procedure Find_Available_Block_Cache_Entry
-     (Cache  : Block_Cache_T;
-      Index  : out Positive;
-      Result : out Function_Result) is
+   procedure Find_And_Claim_Available_Block_Cache_Entry_Unlocked
+     (Cache       : in out Block_Cache_T;
+      Cache_Index : out Positive;
+      Result      : out Function_Result) is
    begin
-      --  This procedure assumes that the caller has already acquired the
-      --  block cache spinlock.
-
       --  Search for an unused entry.
       for I in Cache.Entries'Range loop
          if not Cache.Entries (I).Entry_Used then
-            Index := I;
-            Result := Success;
-            return;
+            Cache_Index := I;
+            goto Claim_Entry;
          end if;
       end loop;
 
@@ -48,25 +44,50 @@ package body Filesystems.Block_Cache is
          if Can_Block_Cache_Entry_Be_Invalidated
               (Cache, I, RISCV.Get_System_Time)
          then
-            Index := I;
-            Result := Success;
-            return;
+            Cache_Index := I;
+            goto Claim_Entry;
          end if;
       end loop;
 
-      --  If no entries need to be invalidated, just overwrite the first entry.
-      --  @TODO: Implement a better cache replacement policy.
-      Index := 1;
+      Result := Cache_Exhausted;
+      return;
+
+      <<Claim_Entry>>
+      Cache.Entries (Cache_Index).Entry_Used := True;
+      Cache.Entries (Cache_Index).Filesystem := null;
+      Cache.Entries (Cache_Index).Block_Number := 0;
       Result := Success;
-   end Find_Available_Block_Cache_Entry;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: "
+            & "Find_And_Claim_Available_Block_Cache_Entry_Unlocked");
+         Result := Constraint_Exception;
+   end Find_And_Claim_Available_Block_Cache_Entry_Unlocked;
+
+   procedure Find_And_Claim_Available_Block_Cache_Entry
+     (Cache       : in out Block_Cache_T;
+      Cache_Index : out Positive;
+      Result      : out Function_Result) is
+   begin
+      Acquire_Spinlock (Cache.Spinlock);
+      Find_And_Claim_Available_Block_Cache_Entry_Unlocked
+        (Cache, Cache_Index, Result);
+      Release_Spinlock (Cache.Spinlock);
+   end Find_And_Claim_Available_Block_Cache_Entry;
 
    procedure Find_Existing_Block_In_Cache
-     (Cache        : Block_Cache_T;
+     (Cache        : in out Block_Cache_T;
       Filesystem   : Filesystem_Access;
       Block_Number : Unsigned_64;
       Cache_Index  : out Positive;
       Result       : out Function_Result) is
    begin
+      --  Acquire the block cache spinlock prior to searching the cache.
+      --  We need to ensure the block we're looking for isn't being modified
+      --  by another process while we're searching.
+      Acquire_Spinlock (Cache.Spinlock);
+
       for I in Cache.Entries'Range loop
          if Cache.Entries (I).Entry_Used
            and then Cache.Entries (I).Filesystem = Filesystem
@@ -74,9 +95,12 @@ package body Filesystems.Block_Cache is
          then
             Cache_Index := I;
             Result := Success;
+            Release_Spinlock (Cache.Spinlock);
             return;
          end if;
       end loop;
+
+      Release_Spinlock (Cache.Spinlock);
 
       Result := Cache_Entry_Not_Found;
    end Find_Existing_Block_In_Cache;
@@ -121,9 +145,6 @@ package body Filesystems.Block_Cache is
       Result               : out Function_Result)
    is
       Cache_Index : Positive := 1;
-      --  A separate result variable for the lock release, to avoid
-      --  overwriting the main result of the function.
-      --  Lock_Release_Result : Function_Result := Unset;
 
       Cache_Entry_Address_Virtual  : Virtual_Address_T := Null_Address;
       Cache_Entry_Address_Physical : Physical_Address_T :=
@@ -139,27 +160,19 @@ package body Filesystems.Block_Cache is
         ("Read_Block_From_Filesystem: " & Block_Number'Image,
          Logging_Tags_Block_Cache);
 
-      --  Acquire the block cache spinlock prior to searching the cache.
-      --  We need to ensure the block we're looking for isn't being modified
-      --  by another process while we're searching.
-      Acquire_Spinlock (System_Block_Cache.Spinlock);
-
       Find_Existing_Block_In_Cache
         (System_Block_Cache, Filesystem, Block_Number, Cache_Index, Result);
-      --  There are only two possible results here: Success or
-      --  Cache_Entry_Not_Found.
+
+      --  Two possible results: Success / Cache_Entry_Not_Found.
       if Result = Success then
          Log_Debug
            ("Found existing block in cache.", Logging_Tags_Block_Cache);
 
-         Release_Spinlock (System_Block_Cache.Spinlock);
-
-         --  After releasing the spinlock, acquire the cache entry's sleeplock.
-         --  What this means is that if this block is currently being used by
-         --  another process, the current process will 'sleep' here until the
-         --  other process is done with it.
-         --  If it's free, the current process will acquire the lock and
-         --  continue.
+         --  Acquire the cache entry's sleeplock.
+         --  This means that if this block is currently being used by another
+         --  process, the current process will 'sleep' here until the other
+         --  process is done with it.
+         --  If free, the current process will acquire the lock and continue.
          Acquire_Sleeplock
            (System_Block_Cache.Entries (Cache_Index).Sleeplock,
             Reading_Process.Process_Id,
@@ -174,10 +187,9 @@ package body Filesystems.Block_Cache is
 
          --  If the block isn't already in the cache, allocate a new cache
          --  entry, then read the data from the filesystem into that entry.
-         Find_Available_Block_Cache_Entry
+         Find_And_Claim_Available_Block_Cache_Entry
            (System_Block_Cache, Cache_Index, Result);
          if Is_Error (Result) then
-            Release_Spinlock (System_Block_Cache.Spinlock);
             return;
          end if;
 
@@ -189,14 +201,15 @@ package body Filesystems.Block_Cache is
             Reading_Process.Process_Id,
             Result);
          if Is_Error (Result) then
-            Release_Spinlock (System_Block_Cache.Spinlock);
             return;
          end if;
 
-         System_Block_Cache.Entries (Cache_Index).Entry_Used := True;
+         Acquire_Spinlock (System_Block_Cache.Spinlock);
+
          System_Block_Cache.Entries (Cache_Index).Filesystem := Filesystem;
          System_Block_Cache.Entries (Cache_Index).Block_Number := Block_Number;
-         System_Block_Cache.Entries (Cache_Index).Last_Access := 0;
+         System_Block_Cache.Entries (Cache_Index).Last_Access :=
+           RISCV.Get_System_Time;
 
          Release_Spinlock (System_Block_Cache.Spinlock);
 
@@ -331,7 +344,9 @@ package body Filesystems.Block_Cache is
    procedure Release_Block
      (Filesystem   : Filesystem_Access;
       Block_Number : Unsigned_64;
-      Result       : out Function_Result) is
+      Result       : out Function_Result)
+   is
+      Cache_Index : Positive := 1;
    begin
       if not Is_Valid_Filesystem_Pointer (Filesystem) then
          Log_Error ("Release_Block: Unsupported filesystem");
@@ -339,20 +354,6 @@ package body Filesystems.Block_Cache is
          return;
       end if;
 
-      Acquire_Spinlock (System_Block_Cache.Spinlock);
-
-      Release_Block_Unlocked (Filesystem, Block_Number, Result);
-
-      Release_Spinlock (System_Block_Cache.Spinlock);
-   end Release_Block;
-
-   procedure Release_Block_Unlocked
-     (Filesystem   : Filesystem_Access;
-      Block_Number : Unsigned_64;
-      Result       : out Function_Result)
-   is
-      Cache_Index : Positive := 1;
-   begin
       Log_Debug
         ("Releasing block: " & Block_Number'Image, Logging_Tags_Block_Cache);
 
@@ -380,7 +381,7 @@ package body Filesystems.Block_Cache is
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Release_Block_Unlocked");
          Result := Constraint_Exception;
-   end Release_Block_Unlocked;
+   end Release_Block;
 
    procedure Release_Sector
      (Filesystem    : Filesystem_Access;

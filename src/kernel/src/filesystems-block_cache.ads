@@ -73,10 +73,15 @@ private
 
    Cache_Entry_Age_Threshold : constant Unsigned_64 := 1000000;
 
-   procedure Find_Available_Block_Cache_Entry
-     (Cache  : Block_Cache_T;
-      Index  : out Positive;
-      Result : out Function_Result);
+   procedure Find_And_Claim_Available_Block_Cache_Entry
+     (Cache       : in out Block_Cache_T;
+      Cache_Index : out Positive;
+      Result      : out Function_Result);
+
+   procedure Find_And_Claim_Available_Block_Cache_Entry_Unlocked
+     (Cache       : in out Block_Cache_T;
+      Cache_Index : out Positive;
+      Result      : out Function_Result);
 
    procedure Get_Block_Cache_Entry_Data_Address
      (Cache                 : Block_Cache_T;
@@ -91,7 +96,7 @@ private
       Current_Time : Unsigned_64) return Boolean;
 
    procedure Find_Existing_Block_In_Cache
-     (Cache        : Block_Cache_T;
+     (Cache        : in out Block_Cache_T;
       Filesystem   : Filesystem_Access;
       Block_Number : Unsigned_64;
       Cache_Index  : out Positive;
@@ -104,18 +109,5 @@ private
       Block_Number    : Unsigned_64;
       Cache_Index     : Positive;
       Result          : out Function_Result);
-
-   ----------------------------------------------------------------------------
-   --  The following methods are the 'unlocked' versions of the above methods
-   --  which are called once the spinlock has been acquired.
-   --  These functions are only called from the 'locked' versions above.
-   --  They are structured this way so that all happy/unhappy paths all lead to
-   --  the same exit point, making it easier to ensure the spinlock is always
-   --  released.
-   ----------------------------------------------------------------------------
-   procedure Release_Block_Unlocked
-     (Filesystem   : Filesystem_Access;
-      Block_Number : Unsigned_64;
-      Result       : out Function_Result);
 
 end Filesystems.Block_Cache;
