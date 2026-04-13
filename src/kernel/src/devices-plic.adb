@@ -7,20 +7,27 @@ with MMIO;
 
 package body Devices.PLIC is
    function Claim_Supervisor_Interrupt
-     (Device : Device_T; Context : Natural) return Unsigned_32 is
+     (Device : in out Device_T; Context : Natural) return Unsigned_32 is
    begin
-      return
+      Acquire_Spinlock (Device.Spinlock);
+      Result : constant Unsigned_32 :=
         MMIO.Read_Unsigned_32 (Get_Interrupt_Claim_Address (Device, Context));
+      Release_Spinlock (Device.Spinlock);
+
+      return Result;
    end Claim_Supervisor_Interrupt;
 
    procedure Complete_Supervisor_Interrupt
-     (Device : Device_T; Context : Natural; Interrupt_ID : Unsigned_32) is
+     (Device : in out Device_T; Context : Natural; Interrupt_ID : Unsigned_32)
+   is
    begin
+      Acquire_Spinlock (Device.Spinlock);
       MMIO.Write_Unsigned_32
         (Get_Interrupt_Claim_Address (Device, Context), Interrupt_ID);
+      Release_Spinlock (Device.Spinlock);
    end Complete_Supervisor_Interrupt;
 
-   procedure Set_Interrupt_Priority
+   procedure Set_Interrupt_Priority_Unlocked
      (Device       : Device_T;
       IRQ          : Natural;
       IRQ_Priority : Natural;
@@ -43,14 +50,25 @@ package body Devices.PLIC is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Set_Interrupt_Priority");
+         Log_Error ("Constraint_Error: Set_Interrupt_Priority_Unlocked");
          Result := Constraint_Exception;
+   end Set_Interrupt_Priority_Unlocked;
+
+   procedure Set_Interrupt_Priority
+     (Device       : in out Device_T;
+      IRQ          : Natural;
+      IRQ_Priority : Natural;
+      Result       : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+      Set_Interrupt_Priority_Unlocked (Device, IRQ, IRQ_Priority, Result);
+      Release_Spinlock (Device.Spinlock);
    end Set_Interrupt_Priority;
 
    pragma
      Warnings
        (Off, "pragma Restrictions (No_Exception_Propagation) in effect");
-   procedure Set_IRQ_Enable_State
+   procedure Set_IRQ_Enable_State_Unlocked
      (Device         : Device_T;
       Context        : Natural;
       Interrupt_Line : Natural;
@@ -94,22 +112,38 @@ package body Devices.PLIC is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Set_IRQ_Enable_State");
+         Log_Error ("Constraint_Error: Set_IRQ_Enable_State_Unlocked");
          Result := Constraint_Exception;
-   end Set_IRQ_Enable_State;
+   end Set_IRQ_Enable_State_Unlocked;
    pragma
      Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
 
+   procedure Set_IRQ_Enable_State
+     (Device         : in out Device_T;
+      Context        : Natural;
+      Interrupt_Line : Natural;
+      State          : Boolean;
+      Result         : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+      Set_IRQ_Enable_State_Unlocked
+        (Device, Context, Interrupt_Line, State, Result);
+      Release_Spinlock (Device.Spinlock);
+   end Set_IRQ_Enable_State;
+
    procedure Set_IRQ_Priority_Threshold
-     (Device : Device_T; Context : Natural; Threshold : Natural)
+     (Device : in out Device_T; Context : Natural; Threshold : Natural)
    is
       Priority_Threshold_Address : constant System.Address :=
         Device.Virtual_Address + 16#20_0000#;
-   begin
+
       Context_Offset : constant Storage_Offset :=
         Storage_Offset (Context) * 16#1000#;
+   begin
+      Acquire_Spinlock (Device.Spinlock);
 
       MMIO.Write_Unsigned_32
         (Priority_Threshold_Address + Context_Offset, Unsigned_32 (Threshold));
+      Release_Spinlock (Device.Spinlock);
    end Set_IRQ_Priority_Threshold;
 end Devices.PLIC;

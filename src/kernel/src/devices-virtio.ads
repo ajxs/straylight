@@ -83,12 +83,12 @@ private
    with Size => 32;
    for VirtIO_Device_Status_T use
      record
-       Acknowledge at 0 range 0 .. 0;
-       Driver at 0 range 1 .. 1;
-       Driver_OK at 0 range 2 .. 2;
-       Features_OK at 0 range 3 .. 3;
+       Acknowledge        at 0 range 0 .. 0;
+       Driver             at 0 range 1 .. 1;
+       Driver_OK          at 0 range 2 .. 2;
+       Features_OK        at 0 range 3 .. 3;
        Device_Needs_Reset at 0 range 6 .. 6;
-       Failed at 0 range 7 .. 7;
+       Failed             at 0 range 7 .. 7;
      end record;
 
    type VirtIO_Device_Features_Block_T is record
@@ -112,22 +112,22 @@ private
    with Size => 32;
    for VirtIO_Device_Features_Block_T use
      record
-       VIRTIO_BLK_F_SIZE_MAX at 0 range 1 .. 1;
-       VIRTIO_BLK_F_SEG_MAX at 0 range 2 .. 2;
-       VIRTIO_BLK_F_GEOMETRY at 0 range 4 .. 4;
-       VIRTIO_BLK_F_RO at 0 range 5 .. 5;
-       VIRTIO_BLK_F_BLK_SIZE at 0 range 6 .. 6;
-       VIRTIO_BLK_F_SCSI at 0 range 7 .. 7;
-       VIRTIO_BLK_F_FLUSH at 0 range 9 .. 9;
-       VIRTIO_BLK_F_TOPOLOGY at 0 range 10 .. 10;
-       VIRTIO_BLK_F_CONFIG_WCE at 0 range 11 .. 11;
-       VIRTIO_BLK_F_MQ at 0 range 12 .. 12;
-       VIRTIO_BLK_F_DISCARD at 0 range 13 .. 13;
-       VIRTIO_BLK_F_WRITE_ZEROES at 0 range 14 .. 14;
-       UNUSED_1 at 0 range 15 .. 26;
-       VIRTIO_F_ANY_LAYOUT at 0 range 27 .. 27;
+       VIRTIO_BLK_F_SIZE_MAX       at 0 range 1 .. 1;
+       VIRTIO_BLK_F_SEG_MAX        at 0 range 2 .. 2;
+       VIRTIO_BLK_F_GEOMETRY       at 0 range 4 .. 4;
+       VIRTIO_BLK_F_RO             at 0 range 5 .. 5;
+       VIRTIO_BLK_F_BLK_SIZE       at 0 range 6 .. 6;
+       VIRTIO_BLK_F_SCSI           at 0 range 7 .. 7;
+       VIRTIO_BLK_F_FLUSH          at 0 range 9 .. 9;
+       VIRTIO_BLK_F_TOPOLOGY       at 0 range 10 .. 10;
+       VIRTIO_BLK_F_CONFIG_WCE     at 0 range 11 .. 11;
+       VIRTIO_BLK_F_MQ             at 0 range 12 .. 12;
+       VIRTIO_BLK_F_DISCARD        at 0 range 13 .. 13;
+       VIRTIO_BLK_F_WRITE_ZEROES   at 0 range 14 .. 14;
+       UNUSED_1                    at 0 range 15 .. 26;
+       VIRTIO_F_ANY_LAYOUT         at 0 range 27 .. 27;
        VIRTIO_RING_F_INDIRECT_DESC at 0 range 28 .. 28;
-       VIRTIO_RING_F_EVENT_IDX at 0 range 29 .. 29;
+       VIRTIO_RING_F_EVENT_IDX     at 0 range 29 .. 29;
      end record;
 
    type VirtIO_MMIO_Device_Registers_T is record
@@ -161,28 +161,28 @@ private
      Scalar_Storage_Order => System.Low_Order_First;
    for VirtIO_MMIO_Device_Registers_T use
      record
-       Magic_Value at 16#000# range 0 .. 31;
-       Version at 16#004# range 0 .. 31;
-       Device_ID at 16#008# range 0 .. 31;
-       Vendor_ID at 16#00c# range 0 .. 31;
-       Device_Features at 16#010# range 0 .. 31;
+       Magic_Value            at 16#000# range 0 .. 31;
+       Version                at 16#004# range 0 .. 31;
+       Device_ID              at 16#008# range 0 .. 31;
+       Vendor_ID              at 16#00c# range 0 .. 31;
+       Device_Features        at 16#010# range 0 .. 31;
        Device_Features_Select at 16#014# range 0 .. 31;
-       Driver_Features at 16#020# range 0 .. 31;
+       Driver_Features        at 16#020# range 0 .. 31;
        Driver_Features_Select at 16#024# range 0 .. 31;
-       Queue_Select at 16#030# range 0 .. 31;
-       Queue_Size_Maximum at 16#034# range 0 .. 31;
-       Queue_Size at 16#038# range 0 .. 31;
-       Queue_Ready at 16#044# range 0 .. 31;
-       Queue_Notify at 16#050# range 0 .. 31;
-       Interrupt_Status at 16#060# range 0 .. 31;
-       Interrupt_Acknowledge at 16#064# range 0 .. 31;
-       Status at 16#070# range 0 .. 31;
-       Queue_Descriptor_Low at 16#080# range 0 .. 31;
-       Queue_Descriptor_High at 16#084# range 0 .. 31;
-       Queue_Driver_Low at 16#090# range 0 .. 31;
-       Queue_Driver_High at 16#094# range 0 .. 31;
-       Queue_Device_Low at 16#0a0# range 0 .. 31;
-       Queue_Device_High at 16#0a4# range 0 .. 31;
+       Queue_Select           at 16#030# range 0 .. 31;
+       Queue_Size_Maximum     at 16#034# range 0 .. 31;
+       Queue_Size             at 16#038# range 0 .. 31;
+       Queue_Ready            at 16#044# range 0 .. 31;
+       Queue_Notify           at 16#050# range 0 .. 31;
+       Interrupt_Status       at 16#060# range 0 .. 31;
+       Interrupt_Acknowledge  at 16#064# range 0 .. 31;
+       Status                 at 16#070# range 0 .. 31;
+       Queue_Descriptor_Low   at 16#080# range 0 .. 31;
+       Queue_Descriptor_High  at 16#084# range 0 .. 31;
+       Queue_Driver_Low       at 16#090# range 0 .. 31;
+       Queue_Driver_High      at 16#094# range 0 .. 31;
+       Queue_Device_Low       at 16#0a0# range 0 .. 31;
+       Queue_Device_High      at 16#0a4# range 0 .. 31;
      end record;
 
    function Is_MMIO_Device_Valid
@@ -217,5 +217,8 @@ private
       Result : out Function_Result);
 
    function Increment_Index (Index : Unsigned_16) return Unsigned_16;
+
+   procedure Acknowledge_Interrupt_Unlocked
+     (Device : in out Device_T; Result : out Function_Result);
 
 end Devices.VirtIO;

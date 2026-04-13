@@ -10,7 +10,7 @@ with RISCV.Atomics;        use RISCV.Atomics;
 with Processes.Scheduler;  use Processes.Scheduler;
 
 package body Devices.VirtIO is
-   procedure Acknowledge_Interrupt
+   procedure Acknowledge_Interrupt_Unlocked
      (Device : in out Device_T; Result : out Function_Result)
    is
       Device_Registers : VirtIO_MMIO_Device_Registers_T
@@ -19,14 +19,6 @@ package body Devices.VirtIO is
       Interrupt_Status   : Unsigned_32 := 0;
       Interrupt_Ack_Mask : constant := 3;
    begin
-      if Device.Device_Bus /= Device_Bus_VirtIO_MMIO then
-         Log_Error ("Invalid device bus for VirtIO device");
-         Result := Invalid_Argument;
-         return;
-      end if;
-
-      Acquire_Spinlock (Device.Spinlock);
-
       Interrupt_Status := Device_Registers.Interrupt_Status;
 
       --  Acknowledge the interrupt and process any completed requests.
@@ -109,13 +101,25 @@ package body Devices.VirtIO is
 
       Log_Debug ("Acknowledged VirtIO Device Interrupt", Logging_Tags_VirtIO);
 
-      Release_Spinlock (Device.Spinlock);
-
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Acknowledge_Interrupt");
+         Log_Error ("Constraint_Error: Acknowledge_Interrupt_Unlocked");
          Result := Constraint_Exception;
+   end Acknowledge_Interrupt_Unlocked;
+
+   procedure Acknowledge_Interrupt
+     (Device : in out Device_T; Result : out Function_Result) is
+   begin
+      if Device.Device_Bus /= Device_Bus_VirtIO_MMIO then
+         Log_Error ("Invalid device bus for VirtIO device");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Acquire_Spinlock (Device.Spinlock);
+      Acknowledge_Interrupt_Unlocked (Device, Result);
+      Release_Spinlock (Device.Spinlock);
    end Acknowledge_Interrupt;
 
    procedure Allocate_Descriptor
