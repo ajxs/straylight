@@ -118,7 +118,7 @@ skip_fp_save:
 # method is more robust in case the stack pointer is modified in the trap
 # handler.
 	ld t6, PCB_OFFSET_TRAP_CONTEXT(t5)
-	sd t6, TRAP_CONTEXT_OFFSET_TP(sp)
+	sd t6, TRAP_CONTEXT_OFFSET_PREV_TP(sp)
 
 # Now the trap context is saved on the stack, store a pointer in the 
 # process control block, so that we can access the trap context in the handler
@@ -144,25 +144,22 @@ call_supervisor_trap_handler:
 restore_trap_frame:
 # Restore the trap context pointer.
 	ld t5, HART_STATE_PCB_POINTER_OFFSET(tp)
-	ld t6, TRAP_CONTEXT_OFFSET_TP(sp)
+	ld t6, TRAP_CONTEXT_OFFSET_PREV_TP(sp)
 	sd t6, PCB_OFFSET_TRAP_CONTEXT(t5)
 
-# Restore scause.
-	ld t6, TRAP_CONTEXT_OFFSET_SCAUSE(sp)
-	csrw scause, t6
-
 # Restore sstatus.
-	ld t6, TRAP_CONTEXT_OFFSET_SSTATUS(sp)
-	csrw sstatus, t6
+# t5 is used to hold the restored sstatus value to avoid re-reading the CSR
+# below when checking FS and SPP.
+	ld t5, TRAP_CONTEXT_OFFSET_SSTATUS(sp)
+	csrw sstatus, t5
 
 # Restore sepc.
 	ld t6, TRAP_CONTEXT_OFFSET_SEPC(sp)
 	csrw sepc, t6
 
-# Read the FS field from sstatus to determine whether we need to restore 
+# Read the FS field from sstatus to determine whether we need to restore
 # the floating point registers.
-	csrr t6, sstatus
-	srli t6, t6, 13
+	srli t6, t5, 13
 	andi t6, t6, 3       # extract FS field (bits 14:13)
 	beqz t6, skip_fp_restore
 
@@ -178,8 +175,7 @@ skip_fp_restore:
 
 # Test whether we're returning to supervisor mode.
 # This determines whether we reload the user stack pointer from the PCB.
-	csrr  t6, sstatus
-	andi  t6, t6, SSTATUS_SPP
+	andi  t6, t5, SSTATUS_SPP
 
 # If SPP == 1, the trap has come from supervisor mode, and we don't need to
 # reload the stack pointer.
@@ -219,15 +215,7 @@ restore_gp_pointers_and_return_to_supervisor_mode:
 		.set i, i+1
 	.endr
 
-# temporarily save t6 in sscratch, then use it to load the PCB pointer.
-	csrw sscratch, t6
-	ld t6, HART_STATE_PCB_POINTER_OFFSET(tp)
-
 	addi sp, sp, TRAP_CONTEXT_SIZE
-	sd sp, KERNEL_CONTEXT_OFFSET_SP(t6)
-
-# Restore t6 from sscratch before returning to supervisor mode.
-	csrr t6, sscratch
 
 return_to_supervisor_mode:
 	sret

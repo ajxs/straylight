@@ -26,6 +26,5 @@ riscv_interrupts_disable_supervisor_interrupts:
 riscv_interrupts_are_supervisor_interrupts_enabled:
 	csrr t0, sstatus
 	andi t0, t0, SSTATUS_SIE
-	seqz a0, t0
-	xori a0, a0, 1
+	snez a0, t0
 	ret
