@@ -17,6 +17,7 @@ typedef struct
 	void *buffer_address;
 	size_t buffer_size;
 	size_t buffer_offset;
+	size_t buffer_valid_bytes;
 	bool eof;
 } FILE;
 

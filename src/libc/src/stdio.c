@@ -45,6 +45,7 @@ FILE *fopen(const char *restrict file_path, const char *restrict mode)
 	file->buffer_address = 0;
 	file->buffer_size = 0;
 	file->buffer_offset = 0;
+	file->buffer_valid_bytes = 0;
 	file->eof = false;
 
 	return file;
@@ -60,7 +61,6 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 
 	size_t total_bytes_to_read = size * count;
 	size_t total_bytes_read = 0;
-	size_t bytes_in_buffer = stream->buffer_size;
 	size_t remaining_bytes_to_read = 0;
 	size_t current_bytes_to_copy_to_userspace = 0;
 
@@ -77,14 +77,12 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 			{
 				// Allocate the stream buffer.
 				stream->buffer_size = FREAD_BUFFER_SIZE;
-				int64_t buffer_allocation_result = (int64_t)malloc(stream->buffer_size);
-				if (buffer_allocation_result < 0)
+				stream->buffer_address = malloc(stream->buffer_size);
+				if (stream->buffer_address == NULL)
 				{
-					errno = buffer_allocation_result;
+					// errno already set to ENOMEM by malloc
 					return 0;
 				}
-
-				stream->buffer_address = (void *)buffer_allocation_result;
 			}
 
 			int64_t read_result = straylight_libc_do_syscall(
@@ -107,11 +105,12 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 			// returned from the kernel.
 			// This variable becomes useful when the end of the file is reached, and
 			// less data is read than the full buffer size.
-			bytes_in_buffer = read_result;
+			stream->buffer_valid_bytes = read_result;
 		}
 
 		// Is all the remaining data to read already inside the buffer?
-		if (remaining_bytes_to_read <= bytes_in_buffer - stream->buffer_offset)
+		if (remaining_bytes_to_read <=
+		    stream->buffer_valid_bytes - stream->buffer_offset)
 		{
 			current_bytes_to_copy_to_userspace = remaining_bytes_to_read;
 		}
@@ -120,7 +119,7 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 			// Copy all the remaining data in the buffer, and loop back around to
 			// keep reading the rest of the data.
 			current_bytes_to_copy_to_userspace =
-			    bytes_in_buffer - stream->buffer_offset;
+			    stream->buffer_valid_bytes - stream->buffer_offset;
 		}
 
 		// Copy the data from the stream buffer to the userspace buffer.
@@ -133,7 +132,7 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 
 		// If we've read all the data in the buffer, reset the current buffer
 		// offset to 0 to indicate that the buffer needs refilling.
-		if (stream->buffer_offset >= bytes_in_buffer)
+		if (stream->buffer_offset >= stream->buffer_valid_bytes)
 		{
 			stream->buffer_offset = 0;
 		}
