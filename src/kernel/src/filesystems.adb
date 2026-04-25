@@ -974,4 +974,81 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Write_File;
 
+   procedure Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read
+     (Filesystem_Node      : Filesystem_Node_Access;
+      Start_Offset         : Unsigned_64;
+      Bytes_To_Read        : Natural;
+      Actual_Bytes_To_Read : out Natural;
+      Result               : out Function_Result) is
+   begin
+      --  Validate that the read doesn't exceed the file size.
+      if Start_Offset >= Filesystem_Node.all.Size then
+         Log_Error
+           ("Read offset exceeds file size: "
+            & Start_Offset'Image
+            & " >= "
+            & Filesystem_Node.all.Size'Image,
+            Logging_Tags);
+
+         Actual_Bytes_To_Read := 0;
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      --  Truncate the read if it would exceed the file size.
+      if Start_Offset + Unsigned_64 (Bytes_To_Read) > Filesystem_Node.all.Size
+      then
+         Actual_Bytes_To_Read :=
+           Natural (Filesystem_Node.all.Size - Start_Offset);
+
+         Log_Debug
+           ("Truncating read from "
+            & Bytes_To_Read'Image
+            & " to "
+            & Actual_Bytes_To_Read'Image
+            & " bytes to stay within file size",
+            Logging_Tags);
+      else
+         Actual_Bytes_To_Read := Bytes_To_Read;
+      end if;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: "
+            & "Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read",
+            Logging_Tags);
+         Actual_Bytes_To_Read := 0;
+         Result := Constraint_Exception;
+   end Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read;
+
+   procedure Validate_Filesystem_And_Node
+     (Filesystem      : Filesystem_Access;
+      Filesystem_Node : Filesystem_Node_Access;
+      Filesystem_Type : Filesystem_Type_T;
+      Result          : out Function_Result) is
+   begin
+      if not Is_Valid_Filesystem_Pointer (Filesystem)
+        or else Filesystem.all.Filesystem_Type /= Filesystem_Type
+      then
+         Log_Error ("Invalid filesystem type", Logging_Tags);
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if Filesystem_Node = null then
+         Log_Error ("Filesystem node is null", Logging_Tags);
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Validate_Filesystem_And_Node", Logging_Tags);
+         Result := Constraint_Exception;
+   end Validate_Filesystem_And_Node;
+
 end Filesystems;

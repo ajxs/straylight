@@ -11,7 +11,7 @@ package Filesystems.UStar is
       Reading_Process : in out Process_Control_Block_T;
       Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
+      Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result);
 
    procedure Read_File

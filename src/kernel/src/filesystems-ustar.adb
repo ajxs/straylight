@@ -11,7 +11,7 @@ package body Filesystems.UStar is
       Reading_Process : in out Process_Control_Block_T;
       Filename        : Filesystem_Path_T;
       Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
+      Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result)
    is
       Current_Sector : Unsigned_64 := 0;
@@ -19,18 +19,22 @@ package body Filesystems.UStar is
       Sector_Address   : Virtual_Address_T := Null_Address;
       File_Sector_Size : Unsigned_64 := 0;
    begin
+      --  Note that the parent node isn't meaningful for a UStar filesystem,
+      --  since it doesn't have a hierarchical structure, but it's still
+      --  validated it to ensure that the caller isn't passing in an invalid
+      --  node pointer.
+      --  This should also never be null, because the USTAR filesystem should
+      --  always be mounted, and have a parent in the root filesystem.
+      Validate_Filesystem_And_Node
+        (Filesystem, Parent_Node, Filesystem_Type_UStar, Result);
+      if Is_Error (Result) then
+         Found_Node := null;
+         return;
+      end if;
+
       Log_Debug
         ("Filesystems.UStar.Find_File: Searching for file",
          Logging_Tags_UStar);
-
-      if not Is_Valid_Filesystem_Pointer (Filesystem)
-        or else Filesystem.all.Filesystem_Type /= Filesystem_Type_UStar
-      then
-         Log_Error ("Invalid UStar filesystem", Logging_Tags_UStar);
-         Filesystem_Node := null;
-         Result := Invalid_Argument;
-         return;
-      end if;
 
       loop
          Read_Sector_From_Filesystem
@@ -61,9 +65,11 @@ package body Filesystems.UStar is
                exit;
             end if;
 
+            File_Size : constant Unsigned_64 :=
+              Octal_To_Unsigned_64 (Header.Size);
+
             --  The number of sectors occupied by the file's data.
-            File_Sector_Size :=
-              (Octal_To_Unsigned_64 (Header.Size) + 511) / 512;
+            File_Sector_Size := (File_Size + 511) / 512;
 
             Log_Debug
               ("Filesystems.UStar.Find_File: Checking file: '"
@@ -76,21 +82,21 @@ package body Filesystems.UStar is
                Create_Filesystem_Node_Cache_Entry
                  (Filesystem,
                   Filename,
-                  Filesystem_Node,
+                  Found_Node,
                   Result,
                   Index         => Current_Sector,
                   Data_Location => Current_Sector + 1,
-                  Size          => Octal_To_Unsigned_64 (Header.Size),
+                  Size          => File_Size,
                   Parent_Index  => Parent_Node.all.Index);
                if Is_Error (Result) then
-                  Filesystem_Node := null;
+                  Found_Node := null;
 
                   Release_Sector (Filesystem, Current_Sector, 512, Result);
 
                   return;
                end if;
 
-               Filesystem_Node.all.Node_Type :=
+               Found_Node.all.Node_Type :=
                  Get_Filesystem_Node_Type_From_UStar_Typeflag
                    (Header.Typeflag);
 
@@ -107,12 +113,12 @@ package body Filesystems.UStar is
          Current_Sector := Current_Sector + File_Sector_Size + 1;
       end loop;
 
-      Filesystem_Node := null;
+      Found_Node := null;
       Result := File_Not_Found;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Filesystems.UStar.Find_File");
-         Filesystem_Node := null;
+         Found_Node := null;
          Result := Constraint_Exception;
    end Find_File;
 
@@ -134,7 +140,7 @@ package body Filesystems.UStar is
    function Get_UStar_String_Length (Str : USTAR_Header_Name) return Integer is
       Length : Integer := 0;
    begin
-      for I in 1 .. 100 loop
+      for I in Str'Range loop
          exit when Str (I) = ASCII.NUL;
 
          Length := Length + 1;
@@ -242,26 +248,34 @@ package body Filesystems.UStar is
       Bytes_To_Copy_From_Sector : Natural := 0;
       Bytes_Left_To_Read        : Natural := 0;
 
-      Sector_Size : constant Natural := 512;
+      Actual_Bytes_To_Read : Natural := Bytes_To_Read;
+      Sector_Size          : constant Natural := 512;
    begin
-      if not Is_Valid_Filesystem_Pointer (Filesystem)
-        or else Filesystem.all.Filesystem_Type /= Filesystem_Type_UStar
-      then
-         Log_Error ("Invalid UStar filesystem", Logging_Tags_UStar);
-         Bytes_Read := 0;
-         Result := Invalid_Argument;
+      Bytes_Read := 0;
+
+      Validate_Filesystem_And_Node
+        (Filesystem, Filesystem_Node, Filesystem_Type_UStar, Result);
+      if Is_Error (Result) then
          return;
       end if;
 
       Log_Debug ("Filesystems.UStar.Read_File", Logging_Tags_UStar);
 
-      Bytes_Read := 0;
+      Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read
+        (Filesystem_Node,
+         Start_Offset,
+         Bytes_To_Read,
+         Actual_Bytes_To_Read,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Current_Read_Sector : Unsigned_64 :=
         Filesystem_Node.all.Data_Location
         + Current_Offset / Unsigned_64 (Sector_Size);
 
-      Bytes_Left_To_Read := Bytes_To_Read;
+      Bytes_Left_To_Read := Actual_Bytes_To_Read;
 
       loop
          exit when Bytes_Left_To_Read = 0;

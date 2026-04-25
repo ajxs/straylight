@@ -345,4 +345,17 @@ private
       Node         : out Filesystem_Node_Access;
       Result       : out Function_Result);
 
+   procedure Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read
+     (Filesystem_Node      : Filesystem_Node_Access;
+      Start_Offset         : Unsigned_64;
+      Bytes_To_Read        : Natural;
+      Actual_Bytes_To_Read : out Natural;
+      Result               : out Function_Result);
+
+   procedure Validate_Filesystem_And_Node
+     (Filesystem      : Filesystem_Access;
+      Filesystem_Node : Filesystem_Node_Access;
+      Filesystem_Type : Filesystem_Type_T;
+      Result          : out Function_Result);
+
 end Filesystems;
