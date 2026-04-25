@@ -53,6 +53,9 @@ QEMU_DEBUG_FLAGS := cpu_reset,int,guest_errors,in_asm
 
 QEMU_DEBUG_SERIAL_OUTPUT := file:${SERIAL_FILENAME}
 QEMU_SERIAL_OUTPUT       := stdio
+# Empty by default (QEMU auto-selects the best display for the platform).
+# Set to `-display vnc=:0` when running inside a Dev Container.
+QEMU_DISPLAY_FLAGS       ?=
 # https://kashyapc.wordpress.com/2016/02/11/qemu-command-line-behavior-of-serial-stdio-vs-serial-monstdio/
 # QEMU_SERIAL_OUTPUT       := mon:stdio
 QEMU_LOG_FILE            := qemu.log
@@ -71,6 +74,7 @@ clean:
 debug: kernel ${BIOS}
 	qemu-system-riscv64      \
 		${QEMU_FLAGS}          \
+		${QEMU_DISPLAY_FLAGS}  \
 		-d ${QEMU_DEBUG_FLAGS} \
 		-D ${QEMU_LOG_FILE}    \
 		-S                     \
@@ -81,11 +85,13 @@ debug: kernel ${BIOS}
 emu: kernel ${BIOS}
 	qemu-system-riscv64     \
 		${QEMU_FLAGS}         \
+		${QEMU_DISPLAY_FLAGS} \
 		-serial ${QEMU_SERIAL_OUTPUT}
 
 emu-log: kernel ${BIOS}
 	qemu-system-riscv64     \
 		${QEMU_FLAGS}         \
+		${QEMU_DISPLAY_FLAGS} \
 		-serial ${QEMU_DEBUG_SERIAL_OUTPUT}
 
 kernel: ${KERNEL_BINARY}
