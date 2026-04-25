@@ -32,10 +32,11 @@ package Filesystems.FAT is
 private
    Logging_Tags_FAT : constant Log_Tags := [Log_Tag_Filesystems_FAT];
 
-   type FAT_Type_T is (FAT12, FAT16, FAT32, ExFAT);
+   type FAT_Type_T is
+     (Fat_Type_FAT12, Fat_Type_FAT16, Fat_Type_FAT32, Fat_Type_ExFAT);
 
    type FAT_Filesystem_Info_T is record
-      FAT_Type                    : FAT_Type_T := FAT12;
+      FAT_Type                    : FAT_Type_T := Fat_Type_FAT12;
       Root_Directory_Sector       : Unsigned_64 := 0;
       Root_Directory_Sector_Count : Natural := 0;
       Root_Directory_Buffer_Size  : Natural := 0;
@@ -395,25 +396,7 @@ private
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result);
 
-   procedure Find_File_In_FAT16_Root_Directory
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
-      Result          : out Function_Result);
-
    procedure Find_File_In_Directory
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
-      Result          : out Function_Result);
-
-   procedure Find_File_In_FAT16_Directory
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
@@ -461,13 +444,6 @@ private
       Cluster         : Unsigned_32;
       FAT_Entry       : out Unsigned_32;
       Result          : out Function_Result);
-
-   procedure Read_FAT16_Root_Directory_Into_Buffer
-     (Filesystem             : Filesystem_Access;
-      Reading_Process        : in out Process_Control_Block_T;
-      Filesystem_Info        : FAT_Filesystem_Info_T;
-      Buffer_Virtual_Address : Virtual_Address_T;
-      Result                 : out Function_Result);
 
    procedure Read_Cluster_Into_Buffer
      (Filesystem             : Filesystem_Access;
