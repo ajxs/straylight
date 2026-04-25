@@ -72,7 +72,7 @@ package Filesystems is
       --  path length for every node in memory.
       Filename             : Filesystem_Node_Name_T :=
         [others => Character'Val (0)];
-      Filename_Byte_Length : Integer := 0;
+      Filename_Byte_Length : Natural := 0;
 
       --  The index uniquely identifies this node within its filesystem.
       Index             : Filesystem_Node_Index_T := 0;

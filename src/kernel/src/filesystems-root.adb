@@ -45,6 +45,7 @@ package body Filesystems.Root is
          Find_Free_Root_Filesystem_Node_Index
            (Root_Filesystem, New_Entry_Index, Result);
          if Is_Error (Result) then
+            New_Node_Index := 0;
             return;
          end if;
 
@@ -58,8 +59,9 @@ package body Filesystems.Root is
             Mounted_Device       => Mounted_Device,
             Mounted_Filesystem   => Mounted_Filesystem);
 
-         Root_Filesystem.Nodes (New_Entry_Index).Filename (Filename'Range) :=
-           Filename (Filename'Range);
+         Root_Filesystem.Nodes (New_Entry_Index).Filename
+           (1 .. Filename'Length) :=
+           Filename;
          Root_Filesystem.Nodes (New_Entry_Index).Filename_Byte_Length :=
            Filename'Length;
 
