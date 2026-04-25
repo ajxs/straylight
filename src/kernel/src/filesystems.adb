@@ -514,7 +514,7 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Open_File;
 
-   procedure Read_File
+   procedure Read_File_Node_Type_File
      (Process        : in out Process_Control_Block_T;
       File_Handle    : Process_File_Handle_Access;
       Buffer_Address : Virtual_Address_T;
@@ -525,25 +525,6 @@ package body Filesystems is
       Real_Bytes_To_Read      : Natural := 0;
       Remaining_Bytes_In_File : Natural := 0;
    begin
-      Log_Debug
-        ("Filesystems.Read_File: "
-         & ASCII.LF
-         & "  Bytes_To_Read: "
-         & Bytes_To_Read'Image
-         & ASCII.LF
-         & "  File_Position: "
-         & File_Handle.all.Position'Image,
-         Logging_Tags);
-
-      if Bytes_To_Read > Maximum_File_Read_Size or else Bytes_To_Read = 0 then
-         Log_Error
-           ("Filesystems.Read_File: Invalid Bytes_To_Read: "
-            & Bytes_To_Read'Image);
-         Bytes_Read := 0;
-         Result := Invalid_Argument;
-         return;
-      end if;
-
       Remaining_Bytes_In_File :=
         Natural (File_Handle.all.File.all.Size - File_Handle.all.Position);
 
@@ -588,7 +569,7 @@ package body Filesystems is
               ("Unsupported filesystem type: "
                & File_Handle.all.File.all.Parent_Filesystem.all
                    .Filesystem_Type'Image);
-            Result := Invalid_Argument;
+            Result := Not_Supported;
       end case;
 
       if Is_Error (Result) then
@@ -602,7 +583,58 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
+         Log_Error ("Constraint_Error: Read_File_Node_Type_File");
+         Result := Constraint_Exception;
+   end Read_File_Node_Type_File;
+
+   procedure Read_File
+     (Process        : in out Process_Control_Block_T;
+      File_Handle    : Process_File_Handle_Access;
+      Buffer_Address : Virtual_Address_T;
+      Bytes_To_Read  : Natural;
+      Bytes_Read     : out Natural;
+      Result         : out Function_Result) is
+   begin
+      Log_Debug
+        ("Filesystems.Read_File: "
+         & ASCII.LF
+         & "  Bytes_To_Read: "
+         & Bytes_To_Read'Image
+         & ASCII.LF
+         & "  File_Position: "
+         & File_Handle.all.Position'Image,
+         Logging_Tags);
+
+      if Bytes_To_Read > Maximum_File_Read_Size or else Bytes_To_Read = 0 then
+         Log_Error
+           ("Filesystems.Read_File: Invalid Bytes_To_Read: "
+            & Bytes_To_Read'Image);
+         Bytes_Read := 0;
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      case File_Handle.all.File.all.Node_Type is
+         when Filesystem_Node_Type_File =>
+            Read_File_Node_Type_File
+              (Process,
+               File_Handle,
+               Buffer_Address,
+               Bytes_To_Read,
+               Bytes_Read,
+               Result);
+
+         when others                    =>
+            Log_Error
+              ("Unsupported node type for reading: "
+               & File_Handle.all.File.all.Node_Type'Image);
+            Bytes_Read := 0;
+            Result := Function_Results.Not_Supported;
+      end case;
+   exception
+      when Constraint_Error =>
          Log_Error ("Constraint_Error: Read_File");
+         Bytes_Read := 0;
          Result := Constraint_Exception;
    end Read_File;
 
@@ -848,6 +880,43 @@ package body Filesystems is
       Release_Spinlock (Open_Files_Spinlock);
    end Close_File;
 
+   procedure Write_File_Node_Type_File
+     (Process        : in out Process_Control_Block_T;
+      File_Handle    : Process_File_Handle_Access;
+      Buffer_Address : Virtual_Address_T;
+      Bytes_To_Write : Natural;
+      Bytes_Written  : out Natural;
+      Result         : out Function_Result) is
+   begin
+      pragma Unreferenced (Process, Buffer_Address, Bytes_To_Write);
+      Bytes_Written := 0;
+
+      case File_Handle.all.File.all.Parent_Filesystem.all.Filesystem_Type is
+         when others =>
+            Log_Error
+              ("Unsupported filesystem type: "
+               & File_Handle.all.File.all.Parent_Filesystem.all
+                   .Filesystem_Type'Image);
+            Result := Not_Supported;
+      end case;
+
+      if Is_Error (Result) then
+         Bytes_Written := 0;
+         return;
+      end if;
+
+      File_Handle.all.Position :=
+        File_Handle.all.Position + Unsigned_64 (Bytes_Written);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Write_File_Node_Type_File", Logging_Tags);
+         Bytes_Written := 0;
+         Result := Constraint_Exception;
+   end Write_File_Node_Type_File;
+
    procedure Write_File
      (Process        : in out Process_Control_Block_T;
       File_Handle    : Process_File_Handle_Access;
@@ -876,35 +945,28 @@ package body Filesystems is
          return;
       end if;
 
-      pragma Unreferenced (Process, Buffer_Address);
+      case File_Handle.all.File.all.Node_Type is
+         when Filesystem_Node_Type_File =>
+            Write_File_Node_Type_File
+              (Process,
+               File_Handle,
+               Buffer_Address,
+               Bytes_To_Write,
+               Bytes_Written,
+               Result);
 
-      case File_Handle.all.File.all.Parent_Filesystem.all.Filesystem_Type is
-         when Filesystem_Type_UStar =>
-            Result := Not_Supported;
-
-         when Filesystem_Type_FAT   =>
-            Result := Not_Supported;
-
-         when others                =>
+         when others                    =>
             Log_Error
-              ("Unsupported filesystem type: "
-               & File_Handle.all.File.all.Parent_Filesystem.all
-                   .Filesystem_Type'Image);
-            Result := Invalid_Argument;
+              ("Unsupported node type for writing: "
+               & File_Handle.all.File.all.Node_Type'Image);
+            Bytes_Written := 0;
+            Result := Not_Supported;
       end case;
 
-      if Is_Error (Result) then
-         Bytes_Written := 0;
-         return;
-      end if;
-
-      File_Handle.all.Position :=
-        File_Handle.all.Position + Unsigned_64 (Bytes_Written);
-
-      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Write_File", Logging_Tags);
+         Bytes_Written := 0;
          Result := Constraint_Exception;
    end Write_File;
 
