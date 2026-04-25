@@ -55,6 +55,9 @@ package body Filesystems.UStar is
                Log_Debug
                  ("Filesystems.UStar.Find_File: Invalid record reached",
                   Logging_Tags_UStar);
+
+               Release_Sector (Filesystem, Current_Sector, 512, Result);
+
                exit;
             end if;
 
@@ -81,6 +84,9 @@ package body Filesystems.UStar is
                   Parent_Index  => Parent_Node.all.Index);
                if Is_Error (Result) then
                   Filesystem_Node := null;
+
+                  Release_Sector (Filesystem, Current_Sector, 512, Result);
+
                   return;
                end if;
 
@@ -125,7 +131,7 @@ package body Filesystems.UStar is
       end case;
    end Get_Filesystem_Node_Type_From_UStar_Typeflag;
 
-   function Get_UStar_String_Length (Str : String) return Integer is
+   function Get_UStar_String_Length (Str : USTAR_Header_Name) return Integer is
       Length : Integer := 0;
    begin
       for I in 1 .. 100 loop
@@ -142,12 +148,23 @@ package body Filesystems.UStar is
 
    function Octal_To_Unsigned_64 (Octal_String : String) return Unsigned_64 is
       Result : Unsigned_64 := 0;
+      Digit  : Unsigned_64;
    begin
       for I in Octal_String'Range loop
+         --  USTAR numeric fields are NUL- or space-terminated.
          exit when Octal_String (I) = ASCII.NUL or else Octal_String (I) = ' ';
 
-         Result :=
-           Result * 8 + Character'Pos (Octal_String (I)) - Character'Pos ('0');
+         --  Any non-octal character indicates a corrupt header field.
+         if Octal_String (I) not in '0' .. '7' then
+            return 0;
+         end if;
+
+         Digit := Character'Pos (Octal_String (I)) - Character'Pos ('0');
+
+         --  Note that a USTAR Octal string is at most 12 characters long,
+         --  so we know that the result of the conversion will not overflow
+         --  the Unsigned_64 type.
+         Result := Result * 8 + Digit;
       end loop;
 
       return Result;
@@ -238,6 +255,8 @@ package body Filesystems.UStar is
 
       Log_Debug ("Filesystems.UStar.Read_File", Logging_Tags_UStar);
 
+      Bytes_Read := 0;
+
       Current_Read_Sector : Unsigned_64 :=
         Filesystem_Node.all.Data_Location
         + Current_Offset / Unsigned_64 (Sector_Size);
@@ -274,12 +293,13 @@ package body Filesystems.UStar is
             Sector_Address + Storage_Offset (Offset_Within_Sector),
             Bytes_To_Copy_From_Sector);
 
+         Bytes_Read := Bytes_Read + Bytes_To_Copy_From_Sector;
+
          Release_Sector (Filesystem, Current_Read_Sector, Sector_Size, Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Bytes_Read := Bytes_Read + Bytes_To_Copy_From_Sector;
          Current_Offset :=
            Current_Offset + Unsigned_64 (Bytes_To_Copy_From_Sector);
          Bytes_Left_To_Read := Bytes_Left_To_Read - Bytes_To_Copy_From_Sector;

@@ -27,8 +27,10 @@ package Filesystems.UStar is
 private
    Logging_Tags_UStar : constant Log_Tags := [Log_Tag_Filesystems_UStar];
 
+   subtype USTAR_Header_Name is String (1 .. 100);
+
    type Tar_File_Header is record
-      Name     : String (1 .. 100);
+      Name     : USTAR_Header_Name;
       Mode     : String (1 .. 8);
       Uid      : String (1 .. 8);
       Gid      : String (1 .. 8);
@@ -36,7 +38,7 @@ private
       Mtime    : String (1 .. 12);
       Checksum : String (1 .. 8);
       Typeflag : Character;
-      Linkname : String (1 .. 100);
+      Linkname : USTAR_Header_Name;
       Magic    : String (1 .. 6);
       Version  : String (1 .. 2);
       Uname    : String (1 .. 32);
@@ -52,7 +54,7 @@ private
 
    procedure Print_File_Header (Header : Tar_File_Header);
 
-   function Get_UStar_String_Length (Str : String) return Integer;
+   function Get_UStar_String_Length (Str : USTAR_Header_Name) return Integer;
 
    function Is_Valid_Record (Header : Tar_File_Header) return Boolean
    is (Header.Magic (1 .. 5) = "ustar");
