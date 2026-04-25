@@ -848,4 +848,64 @@ package body Filesystems is
       Release_Spinlock (Open_Files_Spinlock);
    end Close_File;
 
+   procedure Write_File
+     (Process        : in out Process_Control_Block_T;
+      File_Handle    : Process_File_Handle_Access;
+      Buffer_Address : Virtual_Address_T;
+      Bytes_To_Write : Natural;
+      Bytes_Written  : out Natural;
+      Result         : out Function_Result) is
+   begin
+      Log_Debug
+        ("Filesystems.Write_File: "
+         & ASCII.LF
+         & "  Bytes_To_Write: "
+         & Bytes_To_Write'Image
+         & ASCII.LF
+         & "  File_Position: "
+         & File_Handle.all.Position'Image,
+         Logging_Tags);
+
+      if Bytes_To_Write > Maximum_File_Write_Size or else Bytes_To_Write = 0
+      then
+         Log_Error
+           ("Filesystems.Write_File: Invalid Bytes_To_Write: "
+            & Bytes_To_Write'Image);
+         Bytes_Written := 0;
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      pragma Unreferenced (Process, Buffer_Address);
+
+      case File_Handle.all.File.all.Parent_Filesystem.all.Filesystem_Type is
+         when Filesystem_Type_UStar =>
+            Result := Not_Supported;
+
+         when Filesystem_Type_FAT   =>
+            Result := Not_Supported;
+
+         when others                =>
+            Log_Error
+              ("Unsupported filesystem type: "
+               & File_Handle.all.File.all.Parent_Filesystem.all
+                   .Filesystem_Type'Image);
+            Result := Invalid_Argument;
+      end case;
+
+      if Is_Error (Result) then
+         Bytes_Written := 0;
+         return;
+      end if;
+
+      File_Handle.all.Position :=
+        File_Handle.all.Position + Unsigned_64 (Bytes_Written);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Write_File", Logging_Tags);
+         Result := Constraint_Exception;
+   end Write_File;
+
 end Filesystems;

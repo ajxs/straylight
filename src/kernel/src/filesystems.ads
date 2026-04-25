@@ -123,6 +123,14 @@ package Filesystems is
       Bytes_Read     : out Natural;
       Result         : out Function_Result);
 
+   procedure Write_File
+     (Process        : in out Process_Control_Block_T;
+      File_Handle    : Process_File_Handle_Access;
+      Buffer_Address : Virtual_Address_T;
+      Bytes_To_Write : Natural;
+      Bytes_Written  : out Natural;
+      Result         : out Function_Result);
+
    procedure Close_File
      (File_Handle : Process_File_Handle_Access; Result : out Function_Result);
 
@@ -201,7 +209,8 @@ private
          Hart_Id       => No_Hart_Id,
          Lock_Id       => Lock_Id_FS_Node_Cache));
 
-   Maximum_File_Read_Size : constant := 16#60_000#;
+   Maximum_File_Read_Size  : constant := 16#60_000#;
+   Maximum_File_Write_Size : constant := 16#60_000#;
 
    procedure Create_File_Handle_For_Filesystem_Node
      (Process         : in out Process_Control_Block_T;
