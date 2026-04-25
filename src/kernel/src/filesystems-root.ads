@@ -13,13 +13,14 @@ package Filesystems.Root is
    pragma Preelaborate;
 
    procedure Add_Filesystem_Node_To_Root_Filesystem
-     (Filesystem      : Filesystem_Access;
-      Filename        : Filesystem_Path_T;
-      Parent_Index    : Filesystem_Node_Index_T;
-      New_Node_Index  : out Filesystem_Node_Index_T;
-      Result          : out Function_Result;
-      Node_Type       : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
-      Node_Filesystem : Filesystem_Access := null);
+     (Filesystem         : Filesystem_Access;
+      Filename           : Filesystem_Path_T;
+      Parent_Index       : Filesystem_Node_Index_T;
+      New_Node_Index     : out Filesystem_Node_Index_T;
+      Result             : out Function_Result;
+      Node_Type          : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+      Mounted_Device     : Device_Access := null;
+      Mounted_Filesystem : Filesystem_Access := null);
 
    procedure Find_File
      (Filesystem        : Filesystem_Access;
@@ -48,7 +49,8 @@ private
       Filename_Byte_Length : Natural := 0;
       Index                : Filesystem_Node_Index_T := 0;
       Parent_Index         : Filesystem_Node_Index_T := 0;
-      Filesystem           : Filesystem_Access := null;
+      Mounted_Device       : Device_Access := null;
+      Mounted_Filesystem   : Filesystem_Access := null;
       Node_Type            : Filesystem_Node_Type_T :=
         Filesystem_Node_Type_File;
       Entry_Used           : Boolean := False;

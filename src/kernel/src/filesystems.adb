@@ -91,16 +91,17 @@ package body Filesystems is
    end Compare_Node_Name_With_Wide_String;
 
    procedure Create_Filesystem_Node_Cache_Entry_Unlocked
-     (Parent_Filesystem : Filesystem_Access;
-      Filename          : Filesystem_Path_T;
-      New_Node          : out Filesystem_Node_Access;
-      Result            : out Function_Result;
-      Index             : Filesystem_Node_Index_T;
-      Parent_Index      : Filesystem_Node_Index_T;
-      Data_Location     : Unsigned_64;
-      Size              : Unsigned_64;
-      Node_Type         : Filesystem_Node_Type_T;
-      Filesystem        : Filesystem_Access)
+     (Parent_Filesystem  : Filesystem_Access;
+      Filename           : Filesystem_Path_T;
+      New_Node           : out Filesystem_Node_Access;
+      Result             : out Function_Result;
+      Index              : Filesystem_Node_Index_T;
+      Parent_Index       : Filesystem_Node_Index_T;
+      Data_Location      : Unsigned_64;
+      Size               : Unsigned_64;
+      Node_Type          : Filesystem_Node_Type_T;
+      Mounted_Device     : Device_Access;
+      Mounted_Filesystem : Filesystem_Access)
    is
       Cache renames Filesystem_Node_Cache;
       Cache_Index : Natural := 0;
@@ -126,7 +127,8 @@ package body Filesystems is
          Size                 => Size,
          Node_Type            => Node_Type,
          Parent_Filesystem    => Parent_Filesystem,
-         Filesystem           => Filesystem);
+         Mounted_Device       => Mounted_Device,
+         Mounted_Filesystem   => Mounted_Filesystem);
 
       Set_Filesystem_Node_Name (New_Node.all, Filename, Result);
       if Is_Error (Result) then
@@ -151,16 +153,17 @@ package body Filesystems is
    end Create_Filesystem_Node_Cache_Entry_Unlocked;
 
    procedure Create_Filesystem_Node_Cache_Entry
-     (Parent_Filesystem : Filesystem_Access;
-      Filename          : Filesystem_Path_T;
-      New_Node          : out Filesystem_Node_Access;
-      Result            : out Function_Result;
-      Index             : Filesystem_Node_Index_T := 0;
-      Parent_Index      : Filesystem_Node_Index_T := 0;
-      Data_Location     : Unsigned_64 := 0;
-      Size              : Unsigned_64 := 0;
-      Node_Type         : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
-      Filesystem        : Filesystem_Access := null) is
+     (Parent_Filesystem  : Filesystem_Access;
+      Filename           : Filesystem_Path_T;
+      New_Node           : out Filesystem_Node_Access;
+      Result             : out Function_Result;
+      Index              : Filesystem_Node_Index_T := 0;
+      Parent_Index       : Filesystem_Node_Index_T := 0;
+      Data_Location      : Unsigned_64 := 0;
+      Size               : Unsigned_64 := 0;
+      Node_Type          : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+      Mounted_Device     : Device_Access := null;
+      Mounted_Filesystem : Filesystem_Access := null) is
    begin
       Acquire_Spinlock (Filesystem_Node_Cache.Spinlock);
       Create_Filesystem_Node_Cache_Entry_Unlocked
@@ -173,7 +176,8 @@ package body Filesystems is
          Data_Location,
          Size,
          Node_Type,
-         Filesystem);
+         Mounted_Device,
+         Mounted_Filesystem);
       Release_Spinlock (Filesystem_Node_Cache.Spinlock);
    end Create_Filesystem_Node_Cache_Entry;
 
@@ -421,7 +425,7 @@ package body Filesystems is
            = Filesystem_Node_Type_Mounted_Filesystem
          then
             Log_Debug ("Filesystem node found.", Logging_Tags);
-            Current_Filesystem := Filesystem_Node.all.Filesystem;
+            Current_Filesystem := Filesystem_Node.all.Mounted_Filesystem;
             if Current_Filesystem = null then
                Log_Error ("Mounted filesystem has null filesystem pointer");
                Filesystem_Node := null;

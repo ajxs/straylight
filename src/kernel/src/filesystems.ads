@@ -78,8 +78,11 @@ package Filesystems is
       Index             : Filesystem_Node_Index_T := 0;
       Parent_Index      : Filesystem_Node_Index_T := 0;
       Parent_Filesystem : Filesystem_Access := null;
-      Filesystem        : Filesystem_Access := null;
-      Node_Type         : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+
+      Node_Type : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+
+      Mounted_Filesystem : Filesystem_Access := null;
+      Mounted_Device     : Device_Access := null;
 
       --  This is a generic location identifier, which is only meaningful
       --  within the context of the filesystem it belongs to.
@@ -293,28 +296,30 @@ private
       Result    : out Function_Result);
 
    procedure Create_Filesystem_Node_Cache_Entry
-     (Parent_Filesystem : Filesystem_Access;
-      Filename          : Filesystem_Path_T;
-      New_Node          : out Filesystem_Node_Access;
-      Result            : out Function_Result;
-      Index             : Filesystem_Node_Index_T := 0;
-      Parent_Index      : Filesystem_Node_Index_T := 0;
-      Data_Location     : Unsigned_64 := 0;
-      Size              : Unsigned_64 := 0;
-      Node_Type         : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
-      Filesystem        : Filesystem_Access := null);
+     (Parent_Filesystem  : Filesystem_Access;
+      Filename           : Filesystem_Path_T;
+      New_Node           : out Filesystem_Node_Access;
+      Result             : out Function_Result;
+      Index              : Filesystem_Node_Index_T := 0;
+      Parent_Index       : Filesystem_Node_Index_T := 0;
+      Data_Location      : Unsigned_64 := 0;
+      Size               : Unsigned_64 := 0;
+      Node_Type          : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+      Mounted_Device     : Device_Access := null;
+      Mounted_Filesystem : Filesystem_Access := null);
 
    procedure Create_Filesystem_Node_Cache_Entry_Unlocked
-     (Parent_Filesystem : Filesystem_Access;
-      Filename          : Filesystem_Path_T;
-      New_Node          : out Filesystem_Node_Access;
-      Result            : out Function_Result;
-      Index             : Filesystem_Node_Index_T;
-      Parent_Index      : Filesystem_Node_Index_T;
-      Data_Location     : Unsigned_64;
-      Size              : Unsigned_64;
-      Node_Type         : Filesystem_Node_Type_T;
-      Filesystem        : Filesystem_Access);
+     (Parent_Filesystem  : Filesystem_Access;
+      Filename           : Filesystem_Path_T;
+      New_Node           : out Filesystem_Node_Access;
+      Result             : out Function_Result;
+      Index              : Filesystem_Node_Index_T;
+      Parent_Index       : Filesystem_Node_Index_T;
+      Data_Location      : Unsigned_64;
+      Size               : Unsigned_64;
+      Node_Type          : Filesystem_Node_Type_T;
+      Mounted_Device     : Device_Access;
+      Mounted_Filesystem : Filesystem_Access);
 
    function Sector_To_Block
      (Sector_Number : Unsigned_64; Sector_Size : Natural) return Unsigned_64;

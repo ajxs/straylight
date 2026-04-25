@@ -373,7 +373,7 @@ package body Boot is
          Disk_Filesystem_Node_Index,
          Result,
          Filesystem_Node_Type_Mounted_Filesystem,
-         Filesystems.Mounted_Filesystems (2)'Access);
+         Mounted_Filesystem => Filesystems.Mounted_Filesystems (2)'Access);
       if Is_Error (Result) then
          Panic;
       end if;
@@ -385,7 +385,7 @@ package body Boot is
          Disk_Filesystem_Node_Index,
          Result,
          Filesystem_Node_Type_Mounted_Filesystem,
-         Filesystems.Mounted_Filesystems (3)'Access);
+         Mounted_Filesystem => Filesystems.Mounted_Filesystems (3)'Access);
       if Is_Error (Result) then
          Panic;
       end if;

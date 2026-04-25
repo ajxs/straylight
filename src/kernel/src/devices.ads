@@ -106,6 +106,8 @@ package Devices is
       end case;
    end record;
 
+   type Device_Access is access all Device_T;
+
    --  type System_Device_Array is array (1 .. 16) of aliased Device_T;
 
    System_Devices : array (1 .. 16) of aliased Device_T;

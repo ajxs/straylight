@@ -5,13 +5,14 @@
 
 package body Filesystems.Root is
    procedure Add_Filesystem_Node_To_Root_Filesystem
-     (Filesystem      : Filesystem_Access;
-      Filename        : Filesystem_Path_T;
-      Parent_Index    : Filesystem_Node_Index_T;
-      New_Node_Index  : out Filesystem_Node_Index_T;
-      Result          : out Function_Result;
-      Node_Type       : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
-      Node_Filesystem : Filesystem_Access := null)
+     (Filesystem         : Filesystem_Access;
+      Filename           : Filesystem_Path_T;
+      Parent_Index       : Filesystem_Node_Index_T;
+      New_Node_Index     : out Filesystem_Node_Index_T;
+      Result             : out Function_Result;
+      Node_Type          : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+      Mounted_Device     : Device_Access := null;
+      Mounted_Filesystem : Filesystem_Access := null)
    is
       New_Entry_Index : Positive := 1;
    begin
@@ -54,7 +55,8 @@ package body Filesystems.Root is
             Filename             => [others => Character'Val (0)],
             Filename_Byte_Length => 0,
             Node_Type            => Node_Type,
-            Filesystem           => Node_Filesystem);
+            Mounted_Device       => Mounted_Device,
+            Mounted_Filesystem   => Mounted_Filesystem);
 
          Root_Filesystem.Nodes (New_Entry_Index).Filename (Filename'Range) :=
            Filename (Filename'Range);
@@ -134,7 +136,8 @@ package body Filesystems.Root is
                      0,
                      0,
                      Current_Node.Node_Type,
-                     Current_Node.Filesystem);
+                     Current_Node.Mounted_Device,
+                     Current_Node.Mounted_Filesystem);
                   if Is_Error (Result) then
                      Filesystem_Node := null;
                      return;
