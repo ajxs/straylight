@@ -100,9 +100,9 @@ package body Filesystems.FAT is
             Filesystem_Node,
             Result);
       else
-         Log_Error ("Only FAT16 supported.", Logging_Tags_FAT);
+         Log_Error ("FAT type not supported", Logging_Tags_FAT);
          Filesystem_Node := null;
-         Result := Invalid_Argument;
+         Result := Not_Supported;
       end if;
    end Find_File_In_Directory;
 
@@ -125,16 +125,18 @@ package body Filesystems.FAT is
             Filesystem_Node,
             Result);
          if Is_Error (Result) then
-            Log_Error ("Error reading root dir: " & Result'Image);
+            Log_Error
+              ("Error reading root dir: " & Result'Image, Logging_Tags_FAT);
          end if;
       else
-         Log_Error ("Only FAT16 supported.", Logging_Tags_FAT);
+         Log_Error ("FAT type not supported", Logging_Tags_FAT);
          Filesystem_Node := null;
-         Result := Invalid_Filesystem;
+         Result := Not_Supported;
       end if;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_File_In_Root_Directory");
+         Log_Error
+           ("Constraint_Error: Find_File_In_Root_Directory", Logging_Tags_FAT);
          Filesystem_Node := null;
          Result := Constraint_Exception;
    end Find_File_In_Root_Directory;
@@ -589,53 +591,23 @@ package body Filesystems.FAT is
       Filesystem_Info : FAT_Filesystem_Info_T;
       Cluster         : Unsigned_32;
       FAT_Entry       : out Unsigned_32;
-      Result          : out Function_Result)
-   is
-      Sector_Address : Virtual_Address_T := Null_Address;
+      Result          : out Function_Result) is
    begin
-      Sector_Number : constant Unsigned_64 :=
-        Filesystem_Info.First_FAT_Sector
-        + Unsigned_64
-            ((Cluster * 2) / Unsigned_32 (Filesystem_Info.Bytes_Per_Sector));
+      case Filesystem_Info.FAT_Type is
+         when FAT_Type_FAT16 =>
+            Read_FAT16_Table_Entry
+              (Filesystem,
+               Reading_Process,
+               Filesystem_Info,
+               Cluster,
+               FAT_Entry,
+               Result);
 
-      Read_Sector_From_Filesystem
-        (Filesystem,
-         Reading_Process,
-         Sector_Number,
-         Filesystem_Info.Bytes_Per_Sector,
-         Sector_Address,
-         Result);
-      if Is_Error (Result) then
-         FAT_Entry := 0;
-         return;
-      end if;
-
-      if Filesystem_Info.FAT_Type = FAT_Type_FAT16 then
-         declare
-            Index : Natural := 0;
-
-            FAT16_Table :
-              FAT16_Table_T (0 .. (Filesystem_Info.Bytes_Per_Sector / 2) - 1)
-            with Import, Alignment => 1, Address => Sector_Address;
-         begin
-            Index :=
-              Natural
-                ((Cluster * 2)
-                 mod Unsigned_32 (Filesystem_Info.Bytes_Per_Sector))
-              / 2;
-
-            FAT_Entry := Unsigned_32 (FAT16_Table (Index));
-         end;
-      else
-         Log_Error ("Only FAT16 supported.");
-         FAT_Entry := 0;
-         Result := Invalid_Argument;
-         return;
-      end if;
-
-      --  Result set by this call.
-      Release_Sector
-        (Filesystem, Sector_Number, Filesystem_Info.Bytes_Per_Sector, Result);
+         when others         =>
+            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            FAT_Entry := 0;
+            Result := Not_Supported;
+      end case;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Read_FAT_Entry");

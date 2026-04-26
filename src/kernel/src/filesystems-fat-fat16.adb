@@ -72,7 +72,6 @@ package body Filesystems.FAT.FAT16 is
                goto Free_Buffer;
             elsif Result = Success then
                Log_Debug ("Found matching file entry.", Logging_Tags_FAT);
-               Result := Success;
                goto Free_Buffer;
             end if;
          end Parse_Directory_Buffer;
@@ -172,7 +171,6 @@ package body Filesystems.FAT.FAT16 is
             goto Free_Buffer;
          elsif Result = Success then
             Log_Debug ("Found matching file entry.", Logging_Tags_FAT);
-            Result := Success;
             goto Free_Buffer;
          end if;
       end Parse_Directory_Buffer;
@@ -228,6 +226,9 @@ package body Filesystems.FAT.FAT16 is
             Current_Read_Sector,
             Filesystem_Info.Bytes_Per_Sector,
             Result);
+         if Is_Error (Result) then
+            return;
+         end if;
 
          --  Increment the device read offset.
          Current_Read_Sector := Current_Read_Sector + 1;
@@ -245,5 +246,98 @@ package body Filesystems.FAT.FAT16 is
          Log_Error ("Constraint_Error: Read_FAT16_Root_Directory_Into_Buffer");
          Result := Constraint_Exception;
    end Read_FAT16_Root_Directory_Into_Buffer;
+
+   procedure Get_FAT16_Table_Entry_Sector_Number
+     (Filesystem_Info : FAT_Filesystem_Info_T;
+      Cluster         : Unsigned_32;
+      Sector_Number   : out Unsigned_64;
+      Result          : out Function_Result) is
+   begin
+      Sector_Number :=
+        Filesystem_Info.First_FAT_Sector
+        + Unsigned_64
+            ((Cluster * 2) / Unsigned_32 (Filesystem_Info.Bytes_Per_Sector));
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Get_FAT16_Table_Entry_Sector_Number");
+         Sector_Number := 0;
+         Result := Constraint_Exception;
+   end Get_FAT16_Table_Entry_Sector_Number;
+
+   procedure Get_FAT16_Table_Cluster_Index
+     (Filesystem_Info : FAT_Filesystem_Info_T;
+      Cluster         : Unsigned_32;
+      Cluster_Index   : out Natural;
+      Result          : out Function_Result) is
+   begin
+      Cluster_Index :=
+        Natural
+          (Cluster mod Unsigned_32 (Filesystem_Info.Bytes_Per_Sector / 2));
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Get_FAT16_Table_Cluster_Index");
+         Cluster_Index := 0;
+         Result := Constraint_Exception;
+   end Get_FAT16_Table_Cluster_Index;
+
+   procedure Read_FAT16_Table_Entry
+     (Filesystem      : Filesystem_Access;
+      Reading_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Cluster         : Unsigned_32;
+      FAT_Entry       : out Unsigned_32;
+      Result          : out Function_Result)
+   is
+      Sector_Address : Virtual_Address_T := Null_Address;
+      Sector_Number  : Unsigned_64 := 0;
+      Cluster_Index  : Natural := 0;
+   begin
+      Get_FAT16_Table_Entry_Sector_Number
+        (Filesystem_Info, Cluster, Sector_Number, Result);
+      if Is_Error (Result) then
+         FAT_Entry := 0;
+         return;
+      end if;
+
+      Get_FAT16_Table_Cluster_Index
+        (Filesystem_Info, Cluster, Cluster_Index, Result);
+      if Is_Error (Result) then
+         FAT_Entry := 0;
+         return;
+      end if;
+
+      Read_Sector_From_Filesystem
+        (Filesystem,
+         Reading_Process,
+         Sector_Number,
+         Filesystem_Info.Bytes_Per_Sector,
+         Sector_Address,
+         Result);
+      if Is_Error (Result) then
+         FAT_Entry := 0;
+         return;
+      end if;
+
+      declare
+         FAT16_Table :
+           FAT16_Table_T (0 .. (Filesystem_Info.Bytes_Per_Sector / 2) - 1)
+         with Import, Alignment => 1, Address => Sector_Address;
+      begin
+         FAT_Entry := Unsigned_32 (FAT16_Table (Cluster_Index));
+      end;
+
+      --  Result set by this call.
+      Release_Sector
+        (Filesystem, Sector_Number, Filesystem_Info.Bytes_Per_Sector, Result);
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Read_FAT16_Table_Entry");
+         FAT_Entry := 0;
+         Result := Constraint_Exception;
+   end Read_FAT16_Table_Entry;
 
 end Filesystems.FAT.FAT16;
