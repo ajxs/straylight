@@ -90,7 +90,7 @@ package body Filesystems.FAT is
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result) is
    begin
-      if Filesystem_Info.FAT_Type = Fat_Type_FAT16 then
+      if Filesystem_Info.FAT_Type = FAT_Type_FAT16 then
          Find_File_In_FAT16_Directory
            (Filesystem,
             Reading_Process,
@@ -115,7 +115,7 @@ package body Filesystems.FAT is
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result) is
    begin
-      if Filesystem_Info.FAT_Type = Fat_Type_FAT16 then
+      if Filesystem_Info.FAT_Type = FAT_Type_FAT16 then
          Find_File_In_FAT16_Root_Directory
            (Filesystem,
             Reading_Process,
@@ -221,11 +221,11 @@ package body Filesystems.FAT is
    function Is_Cluster_End_Of_Chain
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean is
    begin
-      if FAT_Type = Fat_Type_FAT16 then
+      if FAT_Type = FAT_Type_FAT16 then
          return Cluster >= 16#FFF8#;
-      elsif FAT_Type = Fat_Type_FAT12 then
+      elsif FAT_Type = FAT_Type_FAT12 then
          return Cluster >= 16#0FF8#;
-      elsif FAT_Type = Fat_Type_FAT32 then
+      elsif FAT_Type = FAT_Type_FAT32 then
          return Cluster >= 16#0FFFFFF8#;
       end if;
 
@@ -314,14 +314,14 @@ package body Filesystems.FAT is
    function Get_Filesystem_Type (Total_Clusters : Natural) return FAT_Type_T is
    begin
       if Total_Clusters < 4085 then
-         return Fat_Type_FAT12;
+         return FAT_Type_FAT12;
       elsif Total_Clusters < 65525 then
-         return Fat_Type_FAT16;
+         return FAT_Type_FAT16;
       elsif Total_Clusters < 268_435_445 then
-         return Fat_Type_FAT32;
+         return FAT_Type_FAT32;
       end if;
 
-      return Fat_Type_ExFAT;
+      return FAT_Type_ExFAT;
    end Get_Filesystem_Type;
 
    function Get_Root_Directory_Sector_Count
@@ -339,18 +339,26 @@ package body Filesystems.FAT is
          return 0;
    end Get_Root_Directory_Sector_Count;
 
-   function Get_Total_Clusters (Boot_Sector : Boot_Sector_T) return Natural is
-      Total_Sectors : Unsigned_32 := 0;
+   function Get_Total_Sectors (Boot_Sector : Boot_Sector_T) return Unsigned_32
+   is
+   begin
+      if Boot_Sector.BPB.Total_Sector_Count = 0 then
+         return Boot_Sector.BPB.Large_Sector_Count;
+      end if;
+
+      return Unsigned_32 (Boot_Sector.BPB.Total_Sector_Count);
+   end Get_Total_Sectors;
+
+   procedure Get_Total_Clusters
+     (Boot_Sector    : Boot_Sector_T;
+      Total_Clusters : out Natural;
+      Result         : out Function_Result) is
    begin
       --  The number of sectors in each File Allocation Table.
       Sectors_Per_FAT : constant Unsigned_32 :=
         Unsigned_32 (Get_FAT_Sector_Count (Boot_Sector));
 
-      if Boot_Sector.BPB.Total_Sector_Count = 0 then
-         Total_Sectors := Boot_Sector.BPB.Large_Sector_Count;
-      else
-         Total_Sectors := Unsigned_32 (Boot_Sector.BPB.Total_Sector_Count);
-      end if;
+      Total_Sectors : constant Unsigned_32 := Get_Total_Sectors (Boot_Sector);
 
       FAT_Sector_Count : constant Unsigned_32 :=
         Unsigned_32 (Boot_Sector.BPB.Table_Count) * Sectors_Per_FAT;
@@ -361,17 +369,27 @@ package body Filesystems.FAT is
       --  Guard against the possibility of an underflow when calculating the
       --  number of data sectors caused by a corrupt BPB.
       if Total_Sectors < Overhead_Sectors then
-         return 0;
+         Log_Error
+           ("Invalid BPB: Total sectors less than reserved + FAT sectors.",
+            Logging_Tags_FAT);
+
+         Total_Clusters := 0;
+         Result := Unhandled_Exception;
+         return;
       end if;
 
       Data_Sectors : constant Unsigned_32 := Total_Sectors - Overhead_Sectors;
 
-      return
+      Total_Clusters :=
         Natural
           (Data_Sectors / Unsigned_32 (Boot_Sector.BPB.Sectors_Per_Cluster));
+
+      Result := Success;
    exception
       when Constraint_Error =>
-         return 0;
+         Log_Error ("Constraint_Error: Get_Total_Clusters", Logging_Tags_FAT);
+         Total_Clusters := 0;
+         Result := Unhandled_Exception;
    end Get_Total_Clusters;
 
    procedure Print_FAT_Filesystem_Info
@@ -442,10 +460,12 @@ package body Filesystems.FAT is
            Alignment => 1,
            Address   => Boot_Sector.EBPB_Reserved_Space'Address;
 
-         Total_Clusters    : Natural := 0;
-         Total_Tables_Size : Natural := 0;
+         Total_Clusters : Natural := 0;
       begin
-         Total_Clusters := Get_Total_Clusters (Boot_Sector);
+         Get_Total_Clusters (Boot_Sector, Total_Clusters, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
 
          Filesystem_Info.FAT_Type := Get_Filesystem_Type (Total_Clusters);
 
@@ -471,7 +491,7 @@ package body Filesystems.FAT is
          Filesystem_Info.Sectors_Per_Cluster :=
            Natural (Boot_Sector.BPB.Sectors_Per_Cluster);
 
-         Total_Tables_Size :=
+         Total_Tables_Size : constant Natural :=
            Natural (Boot_Sector.BPB.Table_Count)
            * Natural (Boot_Sector.BPB.Table_Size);
 
@@ -480,7 +500,7 @@ package body Filesystems.FAT is
            + Unsigned_64 (Filesystem_Info.Root_Directory_Sector_Count)
            + Unsigned_64 (Total_Tables_Size);
 
-         if Filesystem_Info.FAT_Type = Fat_Type_FAT32 then
+         if Filesystem_Info.FAT_Type = FAT_Type_FAT32 then
             Filesystem_Info.Root_Directory_Sector :=
               Unsigned_64 (FAT32_EBPB.Root_Cluster);
          else
@@ -571,10 +591,9 @@ package body Filesystems.FAT is
       FAT_Entry       : out Unsigned_32;
       Result          : out Function_Result)
    is
-      Sector_Number  : Unsigned_64 := 0;
       Sector_Address : Virtual_Address_T := Null_Address;
    begin
-      Sector_Number :=
+      Sector_Number : constant Unsigned_64 :=
         Filesystem_Info.First_FAT_Sector
         + Unsigned_64
             ((Cluster * 2) / Unsigned_32 (Filesystem_Info.Bytes_Per_Sector));
@@ -591,7 +610,7 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      if Filesystem_Info.FAT_Type = Fat_Type_FAT16 then
+      if Filesystem_Info.FAT_Type = FAT_Type_FAT16 then
          declare
             Index : Natural := 0;
 
@@ -636,7 +655,7 @@ package body Filesystems.FAT is
       --  The current offset into reading the name.
       Name_offset : Natural := 1;
    begin
-      if not Is_LFN_Entry (Dir_Entry) then
+      if not Is_LFN_Directory_Entry (Dir_Entry) then
          Result := Invalid_Argument;
          return;
       end if;
@@ -738,10 +757,10 @@ package body Filesystems.FAT is
             exit;
          end if;
 
-         if not Is_Unused_Entry (Directory (Dir_Idx)) then
+         if not Is_Unused_Directory_Entry (Directory (Dir_Idx)) then
             --  If the entry attributes indicate that this is a long
             --  file name entry, then parse it differently.
-            if Is_LFN_Entry (Directory (Dir_Idx)) then
+            if Is_LFN_Directory_Entry (Directory (Dir_Idx)) then
                Entry_Has_Long_Filename := True;
 
                --  Read this section of the name from the LFN entry.

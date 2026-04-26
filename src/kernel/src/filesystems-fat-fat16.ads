@@ -26,4 +26,9 @@ private package Filesystems.FAT.FAT16 is
       Buffer_Virtual_Address : Virtual_Address_T;
       Result                 : out Function_Result);
 
+   type FAT16_Table_Entry_T is new Unsigned_16;
+
+   type FAT16_Table_T is array (Natural range <>) of FAT16_Table_Entry_T
+   with Pack;
+
 end Filesystems.FAT.FAT16;

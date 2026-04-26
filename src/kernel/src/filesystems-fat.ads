@@ -33,10 +33,10 @@ private
    Logging_Tags_FAT : constant Log_Tags := [Log_Tag_Filesystems_FAT];
 
    type FAT_Type_T is
-     (Fat_Type_FAT12, Fat_Type_FAT16, Fat_Type_FAT32, Fat_Type_ExFAT);
+     (FAT_Type_FAT12, FAT_Type_FAT16, FAT_Type_FAT32, FAT_Type_ExFAT);
 
    type FAT_Filesystem_Info_T is record
-      FAT_Type                    : FAT_Type_T := Fat_Type_FAT12;
+      FAT_Type                    : FAT_Type_T := FAT_Type_FAT12;
       Root_Directory_Sector       : Unsigned_64 := 0;
       Root_Directory_Sector_Count : Natural := 0;
       Root_Directory_Buffer_Size  : Natural := 0;
@@ -268,17 +268,6 @@ private
    with Pack;
 
    ----------------------------------------------------------------------------
-   --  An entry into a FAT16 formatted table.
-   ----------------------------------------------------------------------------
-   type FAT16_Table_Entry_T is new Unsigned_16;
-
-   ----------------------------------------------------------------------------
-   --  The file allocation table in a FAT16 formatted device.
-   ----------------------------------------------------------------------------
-   type FAT16_Table_T is array (Natural range <>) of FAT16_Table_Entry_T
-   with Pack;
-
-   ----------------------------------------------------------------------------
    --  An entry into a FAT32 formatted table.
    ----------------------------------------------------------------------------
    type FAT32_Table_Entry_T is new Unsigned_32;
@@ -344,11 +333,13 @@ private
    is (Dir_Entry.File_Name (1) = ASCII.NUL)
    with Pure_Function, Inline;
 
-   function Is_Unused_Entry (Dir_Entry : FAT_Directory_Entry_T) return Boolean
+   function Is_Unused_Directory_Entry
+     (Dir_Entry : FAT_Directory_Entry_T) return Boolean
    is (Character'Pos (Dir_Entry.File_Name (1)) = 16#E5#)
    with Pure_Function, Inline;
 
-   function Is_LFN_Entry (Dir_Entry : FAT_Directory_Entry_T) return Boolean
+   function Is_LFN_Directory_Entry
+     (Dir_Entry : FAT_Directory_Entry_T) return Boolean
    is (Dir_Entry.Attributes.Read_Only
        and then Dir_Entry.Attributes.Hidden
        and then Dir_Entry.Attributes.System_Entry
@@ -357,7 +348,13 @@ private
 
    function Get_Filesystem_Type (Total_Clusters : Natural) return FAT_Type_T;
 
-   function Get_Total_Clusters (Boot_Sector : Boot_Sector_T) return Natural;
+   function Get_Total_Sectors (Boot_Sector : Boot_Sector_T) return Unsigned_32
+   with Inline;
+
+   procedure Get_Total_Clusters
+     (Boot_Sector    : Boot_Sector_T;
+      Total_Clusters : out Natural;
+      Result         : out Function_Result);
 
    function Get_FAT_Sector_Count (Boot_Sector : Boot_Sector_T) return Natural
    with Inline;
