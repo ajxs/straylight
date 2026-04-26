@@ -373,10 +373,6 @@ private
        * Unsigned_64 (Filesystem_Info.Sectors_Per_Cluster)
        + Filesystem_Info.First_Data_Sector);
 
-   function Get_Directory_Entry_First_Sector
-     (Filesystem_Info : FAT_Filesystem_Info_T;
-      Dir_Entry       : FAT_Directory_Entry_T) return Unsigned_64;
-
    function Get_Root_Directory_Sector_Count
      (Boot_Sector : Boot_Sector_T) return Natural
    with Inline;

@@ -17,12 +17,12 @@ package body Filesystems.FAT is
       Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result) is
    begin
-      if not Is_Valid_Filesystem_Pointer (Filesystem)
-        or else Filesystem.all.Filesystem_Type /= Filesystem_Type_FAT
-      then
-         Log_Error ("Invalid FAT filesystem", Logging_Tags_FAT);
+      --  The parent node should never be null, because the filesystem should
+      --  always be mounted, and have a parent in the root filesystem.
+      Validate_Filesystem_And_Node
+        (Filesystem, Parent_Node, Filesystem_Type_FAT, Result);
+      if Is_Error (Result) then
          Found_Node := null;
-         Result := Invalid_Argument;
          return;
       end if;
 
@@ -77,6 +77,7 @@ package body Filesystems.FAT is
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Find_File", Logging_Tags_FAT);
+         Found_Node := null;
          Result := Constraint_Exception;
    end Find_File;
 
@@ -134,6 +135,7 @@ package body Filesystems.FAT is
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Find_File_In_Root_Directory");
+         Filesystem_Node := null;
          Result := Constraint_Exception;
    end Find_File_In_Root_Directory;
 
@@ -151,18 +153,6 @@ package body Filesystems.FAT is
    end Get_Buffer_Max_Directory_Entry_Count;
    pragma
      Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
-
-   function Get_Directory_Entry_First_Sector
-     (Filesystem_Info : FAT_Filesystem_Info_T;
-      Dir_Entry       : FAT_Directory_Entry_T) return Unsigned_64
-   is
-      First_Cluster : Unsigned_32 := 0;
-   begin
-      --  Combine the two 16-bit halves of the cluster.
-      First_Cluster := Get_First_Cluster_Of_Dir_Entry (Dir_Entry);
-
-      return Get_First_Sector_Of_Cluster (Filesystem_Info, First_Cluster);
-   end Get_Directory_Entry_First_Sector;
 
    procedure Get_Filesystem_Meta_Info
      (Filesystem      : Filesystem_Access;
@@ -192,6 +182,8 @@ package body Filesystems.FAT is
          if Is_Error (Result) then
             return;
          end if;
+
+         Print_FAT_Filesystem_Info (FAT_Filesystem_Info);
 
          Validate_FAT_Filesystem (FAT_Filesystem_Info, Result);
          if Is_Error (Result) then
@@ -286,7 +278,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint error reading LFN");
+         Log_Error ("Constraint_Error: Read_DOS_Filename", Logging_Tags_FAT);
          Result := Unhandled_Exception;
    end Read_DOS_Filename;
 
@@ -333,13 +325,12 @@ package body Filesystems.FAT is
    end Get_Filesystem_Type;
 
    function Get_Root_Directory_Sector_Count
-     (Boot_Sector : Boot_Sector_T) return Natural
-   is
-      Root_Entry_Size : Natural := 0;
-      Total_Size      : Natural := 0;
+     (Boot_Sector : Boot_Sector_T) return Natural is
    begin
-      Root_Entry_Size := Natural (Boot_Sector.BPB.Root_Entry_Count * 32);
-      Total_Size :=
+      Root_Entry_Size : constant Natural :=
+        Natural (Boot_Sector.BPB.Root_Entry_Count) * 32;
+
+      Total_Size : constant Natural :=
         Root_Entry_Size + Natural (Boot_Sector.BPB.Bytes_Per_Sector) - 1;
 
       return Total_Size / Natural (Boot_Sector.BPB.Bytes_Per_Sector);
@@ -349,13 +340,11 @@ package body Filesystems.FAT is
    end Get_Root_Directory_Sector_Count;
 
    function Get_Total_Clusters (Boot_Sector : Boot_Sector_T) return Natural is
-      --  The number of sectors in each File Allocation Table.
-      Sectors_Per_FAT  : Unsigned_32 := 0;
-      FAT_Sector_Count : Unsigned_32 := 0;
-      Total_Sectors    : Unsigned_32 := 0;
-      Data_Sectors     : Unsigned_32 := 0;
+      Total_Sectors : Unsigned_32 := 0;
    begin
-      Sectors_Per_FAT := Unsigned_32 (Get_FAT_Sector_Count (Boot_Sector));
+      --  The number of sectors in each File Allocation Table.
+      Sectors_Per_FAT : constant Unsigned_32 :=
+        Unsigned_32 (Get_FAT_Sector_Count (Boot_Sector));
 
       if Boot_Sector.BPB.Total_Sector_Count = 0 then
          Total_Sectors := Boot_Sector.BPB.Large_Sector_Count;
@@ -363,13 +352,19 @@ package body Filesystems.FAT is
          Total_Sectors := Unsigned_32 (Boot_Sector.BPB.Total_Sector_Count);
       end if;
 
-      FAT_Sector_Count :=
+      FAT_Sector_Count : constant Unsigned_32 :=
         Unsigned_32 (Boot_Sector.BPB.Table_Count) * Sectors_Per_FAT;
 
-      Data_Sectors :=
-        Total_Sectors
-        - (FAT_Sector_Count
-           + Unsigned_32 (Boot_Sector.BPB.Reserved_Sector_Count));
+      Overhead_Sectors : constant Unsigned_32 :=
+        FAT_Sector_Count + Unsigned_32 (Boot_Sector.BPB.Reserved_Sector_Count);
+
+      --  Guard against the possibility of an underflow when calculating the
+      --  number of data sectors caused by a corrupt BPB.
+      if Total_Sectors < Overhead_Sectors then
+         return 0;
+      end if;
+
+      Data_Sectors : constant Unsigned_32 := Total_Sectors - Overhead_Sectors;
 
       return
         Natural
@@ -496,8 +491,6 @@ package body Filesystems.FAT is
 
       end Parse_Boot_Sector;
 
-      Print_FAT_Filesystem_Info (Filesystem_Info);
-
       Release_Sector (Filesystem, 0, 512, Result);
 
    exception
@@ -521,6 +514,13 @@ package body Filesystems.FAT is
         Buffer_Virtual_Address;
    begin
       Log_Debug ("Reading cluster: " & Cluster'Image, Logging_Tags_FAT);
+
+      if Cluster < 2 then
+         Log_Error
+           ("Invalid cluster number: " & Cluster'Image, Logging_Tags_FAT);
+         Result := Invalid_Argument;
+         return;
+      end if;
 
       Current_Read_Sector :=
         Get_First_Sector_Of_Cluster (Filesystem_Info, Cluster);
@@ -595,7 +595,8 @@ package body Filesystems.FAT is
          declare
             Index : Natural := 0;
 
-            FAT16_Table : FAT16_Table_T (0 .. 255)
+            FAT16_Table :
+              FAT16_Table_T (0 .. (Filesystem_Info.Bytes_Per_Sector / 2) - 1)
             with Import, Alignment => 1, Address => Sector_Address;
          begin
             Index :=
@@ -613,10 +614,9 @@ package body Filesystems.FAT is
          return;
       end if;
 
+      --  Result set by this call.
       Release_Sector
         (Filesystem, Sector_Number, Filesystem_Info.Bytes_Per_Sector, Result);
-
-      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Read_FAT_Entry");
@@ -641,12 +641,8 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      --  Since each LFN entry contains 13 UCS-2 characters, ensure that
-      --  adding another 13 characters to the name won't exceed the maximum
-      --  length of a file name that we can support.
-      if Name_offset + 13 > Filename'Length then
-         Log_Error ("LFN entry filename exceeds maximum supported length.");
-         Result := Invalid_Filename;
+      if LFN_Entry.Sequence.Number = 0 then
+         Result := Invalid_Argument;
          return;
       end if;
 
@@ -654,6 +650,17 @@ package body Filesystems.FAT is
       --  multiplied by the maximum string length that each
       --  entry holds, which is 13.
       Name_offset := (Natural (LFN_Entry.Sequence.Number) - 1) * 13;
+
+      --  Since each LFN entry contains 13 UCS-2 characters, ensure that
+      --  adding another 13 characters to the name won't exceed the maximum
+      --  length of a file name that we can support.
+      if Name_offset + 13 > Filename'Length then
+         Log_Error
+           ("LFN entry filename exceeds maximum supported length.",
+            Logging_Tags_FAT);
+         Result := Invalid_Filename;
+         return;
+      end if;
 
       --  Copy each of the string sections contained in this
       --  file name entry into the current directory entry.
@@ -692,7 +699,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint error reading LFN");
+         Log_Error ("Constraint error reading LFN", Logging_Tags_FAT);
          Result := Constraint_Exception;
    end Read_LFN_Entry_Filename;
 
@@ -749,7 +756,7 @@ package body Filesystems.FAT is
             else
                --  If we're not in the process of reading a long file name
                --  then read the DOS filename from the 8.3 entry.
-               if Entry_Has_Long_Filename = False then
+               if not Entry_Has_Long_Filename then
                   Read_DOS_Filename
                     (Directory (Dir_Idx),
                      Entry_Filename,
@@ -842,11 +849,9 @@ package body Filesystems.FAT is
    begin
       Bytes_Read := 0;
 
-      if not Is_Valid_Filesystem_Pointer (Filesystem)
-        or else Filesystem.all.Filesystem_Type /= Filesystem_Type_FAT
-      then
-         Log_Error ("Invalid FAT filesystem", Logging_Tags_FAT);
-         Result := Invalid_Argument;
+      Validate_Filesystem_And_Node
+        (Filesystem, Filesystem_Node, Filesystem_Type_FAT, Result);
+      if Is_Error (Result) then
          return;
       end if;
 
@@ -918,31 +923,14 @@ package body Filesystems.FAT is
    begin
       Bytes_Read := 0;
 
-      --  Validate that the read doesn't exceed the file size.
-      if Start_Offset >= Filesystem_Node.all.Size then
-         Log_Error
-           ("Read offset exceeds file size: "
-            & Start_Offset'Image
-            & " >= "
-            & Filesystem_Node.all.Size'Image,
-            Logging_Tags_FAT);
-         Result := Invalid_Argument;
+      Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read
+        (Filesystem_Node,
+         Start_Offset,
+         Bytes_To_Read,
+         Actual_Bytes_To_Read,
+         Result);
+      if Is_Error (Result) then
          return;
-      end if;
-
-      --  Truncate the read if it would exceed the file size.
-      if Start_Offset + Unsigned_64 (Bytes_To_Read) > Filesystem_Node.all.Size
-      then
-         Actual_Bytes_To_Read :=
-           Natural (Filesystem_Node.all.Size - Start_Offset);
-
-         Log_Debug
-           ("Truncating read from "
-            & Bytes_To_Read'Image
-            & " to "
-            & Actual_Bytes_To_Read'Image
-            & " bytes to stay within file size",
-            Logging_Tags_FAT);
       end if;
 
       --  Allocate a buffer to hold each cluster we need to read.
@@ -1073,6 +1061,25 @@ package body Filesystems.FAT is
       if not Sector_Size_Valid then
          Log_Error
            ("Filesystem Invalid: Invalid sector size.", Logging_Tags_FAT);
+         Result := Invalid_Filesystem;
+         return;
+      end if;
+
+      if Filesystem_Info.Sectors_Per_Cluster = 0 then
+         Log_Error
+           ("Filesystem Invalid: Sectors per cluster cannot be zero.",
+            Logging_Tags_FAT);
+         Result := Invalid_Filesystem;
+         return;
+      end if;
+
+      if Unsigned_64 (Filesystem_Info.Root_Directory_Sector_Count)
+        > Filesystem_Info.First_Data_Sector
+      then
+         Log_Error
+           ("Filesystem Invalid: "
+            & "Root directory cannot be located within data region.",
+            Logging_Tags_FAT);
          Result := Invalid_Filesystem;
          return;
       end if;
