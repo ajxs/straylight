@@ -24,33 +24,33 @@ package Devices is
       Device_Class_Serial,
       Device_Class_Storage);
 
-   type Device_Bus_T is (Device_Bus_Memory_Mapped, Device_Bus_VirtIO_MMIO);
+   type Device_Bus_T is (Device_Bus_Memory_Mapped, Device_Bus_Virtio_MMIO);
 
-   type VirtIO_Device_Type_T is
-     (VirtIO_Device_Type_Block,
-      VirtIO_Device_Type_Graphics,
-      VirtIO_Device_Type_Unknown);
+   type Virtio_Device_Type_T is
+     (Virtio_Device_Type_Block,
+      Virtio_Device_Type_Graphics,
+      Virtio_Device_Type_Unknown);
 
-   Maximum_VirtIO_Queue_Length : constant := 256;
+   Maximum_Virtio_Queue_Length : constant := 256;
 
-   subtype VirtIO_Descriptor_Array_Index_T is Unsigned_16;
+   subtype Virtio_Descriptor_Array_Index_T is Unsigned_16;
 
-   type VirtIO_Descriptor_Status_Array_T is
-     array (VirtIO_Descriptor_Array_Index_T) of Boolean;
+   type Virtio_Descriptor_Status_Array_T is
+     array (Virtio_Descriptor_Array_Index_T) of Boolean;
 
    --  The kernel is mapped into the higher-half, and needs to operate on
    --  virtual addresses. However, devices operate on physical addresses, so
    --  the kernel needs to maintain both virtual and physical addresses for
-   --  VirtIO devices resources.
-   subtype VirtIO_Resource_Allocated_Addresses_T is
+   --  Virtio devices resources.
+   subtype Virtio_Resource_Allocated_Addresses_T is
      Memory.Allocators.Memory_Allocation_Result;
 
-   type VirtIO_Device_Request_Info_T is record
+   type Virtio_Device_Request_Info_T is record
       Channel : Blocking_Channel_T := 0;
    end record;
 
    type Request_Info_Array_T is
-     array (VirtIO_Descriptor_Array_Index_T) of VirtIO_Device_Request_Info_T;
+     array (Virtio_Descriptor_Array_Index_T) of Virtio_Device_Request_Info_T;
 
    --  Feature bits for Virtio devices are split into multiple 'pages' of
    --  32-bit feature bitmaps. The first page (Page 0) is accessed by writing
@@ -60,8 +60,8 @@ package Devices is
    --  Refer to section 4.2.2 of the Virtio specification for more details.
    type Virtio_Device_Features_Pages_T is array (0 .. 1) of Unsigned_32;
 
-   type Device_Bus_Info_VirtIO_T
-     (Device_Type : VirtIO_Device_Type_T := VirtIO_Device_Type_Unknown)
+   type Device_Bus_Info_Virtio_T
+     (Device_Type : Virtio_Device_Type_T := Virtio_Device_Type_Unknown)
    is record
       --  Defines which features the driver supports.
       --  During feature negotiation, this field will be combined with the
@@ -70,24 +70,24 @@ package Devices is
       Driver_Features        : Virtio_Device_Features_Pages_T := [others => 0];
       Request_Info           : Request_Info_Array_T :=
         [others => (Channel => 0)];
-      Request_Status_Array   : VirtIO_Resource_Allocated_Addresses_T;
-      Request_Serviced_Index : VirtIO_Descriptor_Array_Index_T := 0;
-      Q_Used                 : VirtIO_Resource_Allocated_Addresses_T;
-      Q_Available            : VirtIO_Resource_Allocated_Addresses_T;
-      Q_Descriptor           : VirtIO_Resource_Allocated_Addresses_T;
-      Descriptor_Status      : VirtIO_Descriptor_Status_Array_T;
+      Request_Status_Array   : Virtio_Resource_Allocated_Addresses_T;
+      Request_Serviced_Index : Virtio_Descriptor_Array_Index_T := 0;
+      Q_Used                 : Virtio_Resource_Allocated_Addresses_T;
+      Q_Available            : Virtio_Resource_Allocated_Addresses_T;
+      Q_Descriptor           : Virtio_Resource_Allocated_Addresses_T;
+      Descriptor_Status      : Virtio_Descriptor_Status_Array_T;
 
       case Device_Type is
-         when VirtIO_Device_Type_Block =>
-            --  This array holds the VirtIO block device request structures.
+         when Virtio_Device_Type_Block =>
+            --  This array holds the Virtio block device request structures.
             --  This needs to be allocated by the kernel at runtime, because
             --  it needs to have a physical address for the device to access.
             Block_Request_Array_Addresses :
-              VirtIO_Resource_Allocated_Addresses_T;
+              Virtio_Resource_Allocated_Addresses_T;
 
-         when VirtIO_Device_Type_Graphics =>
+         when Virtio_Device_Type_Graphics =>
             Resource_Id           : Unsigned_32 := 0;
-            Framebuffer_Addresses : VirtIO_Resource_Allocated_Addresses_T;
+            Framebuffer_Addresses : Virtio_Resource_Allocated_Addresses_T;
             Framebuffer_Width     : Unsigned_32 := 0;
             Framebuffer_Height    : Unsigned_32 := 0;
 
@@ -108,8 +108,8 @@ package Devices is
       Spinlock           : Spinlock_T;
 
       case Device_Bus is
-         when Device_Bus_VirtIO_MMIO =>
-            Bus_Info_VirtIO : Device_Bus_Info_VirtIO_T;
+         when Device_Bus_Virtio_MMIO =>
+            Bus_Info_Virtio : Device_Bus_Info_Virtio_T;
 
          when others =>
             null;

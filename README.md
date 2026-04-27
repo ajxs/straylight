@@ -11,8 +11,8 @@ The name *Straylight* comes from William Gibson's groundbreaking cyberpunk novel
 |Feature|Status|Description|
 |--|--|--|
 |Multitasking|✅|Pre-emptive multitasking.
-|Graphics Devices|✅|VirtIO GPU support.
-|Block Devices|✅|VirtIO Block Device support.
+|Graphics Devices|✅|Virtio GPU support.
+|Block Devices|✅|Virtio Block Device support.
 |Filesystem|✅|Supports mounting FAT16 and USTAR images.
 |Userspace|✅|Supports loading ELF binaries written in C and Ada.
 |SMP|❌|Currently no SMP support. This will be added in a future update.

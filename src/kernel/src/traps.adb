@@ -7,7 +7,7 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Devices;          use Devices;
-with Devices.VirtIO;
+with Devices.Virtio;
 with Devices.PLIC;
 with Devices.UART;
 with Function_Results; use Function_Results;
@@ -129,8 +129,8 @@ package body Traps is
                & System_Device.Virtual_Address'Image,
                Logging_Tags);
 
-            if System_Device.Device_Bus = Device_Bus_VirtIO_MMIO then
-               Devices.VirtIO.Acknowledge_Interrupt (System_Device, Result);
+            if System_Device.Device_Bus = Device_Bus_Virtio_MMIO then
+               Devices.Virtio.Acknowledge_Interrupt (System_Device, Result);
             elsif System_Device.Device_Class = Device_Class_Serial then
                Devices.UART.Acknowledge_Interrupt (System_Device, Result);
             else

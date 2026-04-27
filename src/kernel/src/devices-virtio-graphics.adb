@@ -3,7 +3,7 @@ with Memory.Kernel;       use Memory.Kernel;
 with RISCV.Atomics;       use RISCV.Atomics;
 with Processes.Scheduler; use Processes.Scheduler;
 
-package body Devices.VirtIO.Graphics is
+package body Devices.Virtio.Graphics is
    procedure Attach_Framebuffer_To_Resource
      (Reading_Process              : in out Process_Control_Block_T;
       Device                       : in out Device_T;
@@ -30,7 +30,7 @@ package body Devices.VirtIO.Graphics is
       Framebuffer_Physical_Address : Physical_Address_T;
       Result                       : out Function_Result)
    is
-      Device_Registers : VirtIO_MMIO_Device_Registers_T
+      Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
@@ -44,8 +44,8 @@ package body Devices.VirtIO.Graphics is
       Response_Size : constant Natural := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
       Log_Debug
-        ("Attaching framebuffer to VirtIO Graphics Resource",
-         Logging_Tags_VirtIO_Graphics);
+        ("Attaching framebuffer to Virtio Graphics Resource",
+         Logging_Tags_Virtio_Graphics);
 
       Allocate_Descriptors (Device, 3, Descriptor_Indexes, Result);
       if Is_Error (Result) then
@@ -60,8 +60,7 @@ package body Devices.VirtIO.Graphics is
          return;
       end if;
 
-      Setup_Request :
-      declare
+      Setup_Request : declare
          Request_Data : Request_Resource_Attach_Backing
          with
            Import,
@@ -90,24 +89,23 @@ package body Devices.VirtIO.Graphics is
            (Addr    =>
               Address_To_Unsigned_64 (Address (Framebuffer_Physical_Address)),
             Length  =>
-              Device.Bus_Info_VirtIO.Framebuffer_Width
-              * Device.Bus_Info_VirtIO.Framebuffer_Height
+              Device.Bus_Info_Virtio.Framebuffer_Width
+              * Device.Bus_Info_Virtio.Framebuffer_Height
               * 4,
             Padding => 0);
       end Setup_Request;
 
-      Setup_Queues :
-      declare
+      Setup_Queues : declare
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -135,7 +133,7 @@ package body Devices.VirtIO.Graphics is
             Next    => 0);
 
          Q_Available.Ring
-           (Q_Available.Index mod Maximum_VirtIO_Queue_Length) :=
+           (Q_Available.Index mod Maximum_Virtio_Queue_Length) :=
            Descriptor_Indexes (0);
 
          --  Tell the processor to not move loads or stores past this point.
@@ -151,14 +149,13 @@ package body Devices.VirtIO.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_VirtIO.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
 
-      Test_Result :
-      declare
+      Test_Result : declare
          Response_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
@@ -212,7 +209,7 @@ package body Devices.VirtIO.Graphics is
       Device          : in out Device_T;
       Result          : out Function_Result)
    is
-      Device_Registers : VirtIO_MMIO_Device_Registers_T
+      Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
@@ -224,8 +221,8 @@ package body Devices.VirtIO.Graphics is
         Virtio_Gpu_Resp_Display_Info'Size / 8;
 
       Log_Debug
-        ("Getting display info from VirtIO Graphics Device",
-         Logging_Tags_VirtIO_Graphics);
+        ("Getting display info from Virtio Graphics Device",
+         Logging_Tags_Virtio_Graphics);
 
       Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
@@ -238,8 +235,7 @@ package body Devices.VirtIO.Graphics is
          return;
       end if;
 
-      Setup_Request :
-      declare
+      Setup_Request : declare
          Request_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
@@ -254,18 +250,17 @@ package body Devices.VirtIO.Graphics is
             Padding   => 0);
       end Setup_Request;
 
-      Setup_Queues :
-      declare
+      Setup_Queues : declare
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -284,7 +279,7 @@ package body Devices.VirtIO.Graphics is
             Next    => 0);
 
          Q_Available.Ring
-           (Q_Available.Index mod Maximum_VirtIO_Queue_Length) :=
+           (Q_Available.Index mod Maximum_Virtio_Queue_Length) :=
            Descriptor_Indexes (0);
 
          --  Tell the processor to not move loads or stores past this point.
@@ -300,14 +295,13 @@ package body Devices.VirtIO.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_VirtIO.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
 
-      Read_Response :
-      declare
+      Read_Response : declare
          Response_Data : Virtio_Gpu_Resp_Display_Info
          with
            Import,
@@ -328,7 +322,7 @@ package body Devices.VirtIO.Graphics is
                   & Response_Data.Pmodes (I).R.Width'Image
                   & ", Height="
                   & Response_Data.Pmodes (I).R.Height'Image,
-                  Logging_Tags_VirtIO_Graphics);
+                  Logging_Tags_Virtio_Graphics);
             end if;
          end loop;
       end Read_Response;
@@ -370,7 +364,7 @@ package body Devices.VirtIO.Graphics is
       Resource_Id     : Unsigned_32;
       Result          : out Function_Result)
    is
-      Device_Registers : VirtIO_MMIO_Device_Registers_T
+      Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
@@ -391,8 +385,7 @@ package body Devices.VirtIO.Graphics is
          return;
       end if;
 
-      Setup_Request :
-      declare
+      Setup_Request : declare
          Request_Data : Request_Resource_Create_2D
          with
            Import,
@@ -408,22 +401,21 @@ package body Devices.VirtIO.Graphics is
                Padding   => 0),
             Resource_Id => Resource_Id,
             Format      => VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM,
-            Width       => Device.Bus_Info_VirtIO.Framebuffer_Width,
-            Height      => Device.Bus_Info_VirtIO.Framebuffer_Height);
+            Width       => Device.Bus_Info_Virtio.Framebuffer_Width,
+            Height      => Device.Bus_Info_Virtio.Framebuffer_Height);
       end Setup_Request;
 
-      Setup_Queues :
-      declare
+      Setup_Queues : declare
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -442,7 +434,7 @@ package body Devices.VirtIO.Graphics is
             Next    => 0);
 
          Q_Available.Ring
-           (Q_Available.Index mod Maximum_VirtIO_Queue_Length) :=
+           (Q_Available.Index mod Maximum_Virtio_Queue_Length) :=
            Descriptor_Indexes (0);
 
          --  Tell the processor to not move loads or stores past this point.
@@ -458,14 +450,13 @@ package body Devices.VirtIO.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_VirtIO.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
 
-      Test_Result :
-      declare
+      Test_Result : declare
          Response_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
@@ -532,7 +523,7 @@ package body Devices.VirtIO.Graphics is
       Height          : Unsigned_32;
       Result          : out Function_Result)
    is
-      Device_Registers : VirtIO_MMIO_Device_Registers_T
+      Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
@@ -553,8 +544,7 @@ package body Devices.VirtIO.Graphics is
          return;
       end if;
 
-      Setup_Request :
-      declare
+      Setup_Request : declare
          Request_Data : Request_Set_Scanout
          with
            Import,
@@ -573,18 +563,17 @@ package body Devices.VirtIO.Graphics is
             R           => (X => 0, Y => 0, Width => Width, Height => Height));
       end Setup_Request;
 
-      Setup_Queues :
-      declare
+      Setup_Queues : declare
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -603,7 +592,7 @@ package body Devices.VirtIO.Graphics is
             Next    => 0);
 
          Q_Available.Ring
-           (Q_Available.Index mod Maximum_VirtIO_Queue_Length) :=
+           (Q_Available.Index mod Maximum_Virtio_Queue_Length) :=
            Descriptor_Indexes (0);
 
          --  Tell the processor to not move loads or stores past this point.
@@ -619,14 +608,13 @@ package body Devices.VirtIO.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_VirtIO.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
 
-      Test_Result :
-      declare
+      Test_Result : declare
          Response_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
@@ -689,7 +677,7 @@ package body Devices.VirtIO.Graphics is
       Height          : Unsigned_32;
       Result          : out Function_Result)
    is
-      Device_Registers : VirtIO_MMIO_Device_Registers_T
+      Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
@@ -710,8 +698,7 @@ package body Devices.VirtIO.Graphics is
          return;
       end if;
 
-      Setup_Request :
-      declare
+      Setup_Request : declare
          Request_Data : Request_Transfer_To_Host_2D
          with
            Import,
@@ -731,18 +718,17 @@ package body Devices.VirtIO.Graphics is
             Padding     => 0);
       end Setup_Request;
 
-      Setup_Queues :
-      declare
+      Setup_Queues : declare
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -761,7 +747,7 @@ package body Devices.VirtIO.Graphics is
             Next    => 0);
 
          Q_Available.Ring
-           (Q_Available.Index mod Maximum_VirtIO_Queue_Length) :=
+           (Q_Available.Index mod Maximum_Virtio_Queue_Length) :=
            Descriptor_Indexes (0);
 
          --  Tell the processor to not move loads or stores past this point.
@@ -777,14 +763,13 @@ package body Devices.VirtIO.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_VirtIO.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
 
-      Test_Result :
-      declare
+      Test_Result : declare
          Response_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
@@ -847,7 +832,7 @@ package body Devices.VirtIO.Graphics is
       Height          : Unsigned_32;
       Result          : out Function_Result)
    is
-      Device_Registers : VirtIO_MMIO_Device_Registers_T
+      Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
@@ -868,8 +853,7 @@ package body Devices.VirtIO.Graphics is
          return;
       end if;
 
-      Setup_Request :
-      declare
+      Setup_Request : declare
          Request_Data : Request_Resource_Flush
          with
            Import,
@@ -888,18 +872,17 @@ package body Devices.VirtIO.Graphics is
             Padding     => 0);
       end Setup_Request;
 
-      Setup_Queues :
-      declare
+      Setup_Queues : declare
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -918,7 +901,7 @@ package body Devices.VirtIO.Graphics is
             Next    => 0);
 
          Q_Available.Ring
-           (Q_Available.Index mod Maximum_VirtIO_Queue_Length) :=
+           (Q_Available.Index mod Maximum_Virtio_Queue_Length) :=
            Descriptor_Indexes (0);
 
          --  Tell the processor to not move loads or stores past this point.
@@ -934,14 +917,13 @@ package body Devices.VirtIO.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_VirtIO.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
 
-      Test_Result :
-      declare
+      Test_Result : declare
          Response_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
@@ -976,4 +958,4 @@ package body Devices.VirtIO.Graphics is
          Result := Constraint_Exception;
    end Resource_Flush_Unlocked;
 
-end Devices.VirtIO.Graphics;
+end Devices.Virtio.Graphics;

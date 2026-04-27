@@ -5,7 +5,7 @@
 
 with Function_Results; use Function_Results;
 
-package Devices.VirtIO is
+package Devices.Virtio is
    pragma Preelaborate;
 
    procedure Initialise_MMIO_Device
@@ -16,7 +16,7 @@ package Devices.VirtIO is
 
    --  @TODO: Investigate whether this should be moved inside the
    --  Initialise_MMIO_Device procedure.
-   procedure Allocate_VirtIO_Device_Resources
+   procedure Allocate_Virtio_Device_Resources
      (Device : in out Device_T; Result : out Function_Result);
 
    --  Reserved feature bits.
@@ -38,15 +38,15 @@ package Devices.VirtIO is
    VIRTIO_F_SUSPEND_RESUME    : constant := 2 ** 10;
 
 private
-   Logging_Tags_VirtIO : constant Log_Tags := [Log_Tag_Devices_VirtIO];
+   Logging_Tags_Virtio : constant Log_Tags := [Log_Tag_Devices_Virtio];
 
    VIRTQ_DESC_F_NEXT  : constant := 1; --  Chained with another descriptor.
    VIRTQ_DESC_F_WRITE : constant := 2; --  Device writes, as opposed to read.
 
    BLOCK_SIZE : constant := 512;
 
-   type VirtIO_Status_Byte_Array_T is
-     array (VirtIO_Descriptor_Array_Index_T) of Unsigned_8
+   type Virtio_Status_Byte_Array_T is
+     array (Virtio_Descriptor_Array_Index_T) of Unsigned_8
    with Convention => C;
 
    subtype Descriptor_Index_T is Unsigned_16;
@@ -59,11 +59,11 @@ private
    end record;
 
    type Virtqueue_Descriptor_Array is
-     array (VirtIO_Descriptor_Array_Index_T) of Virtqueue_Descriptor_T
+     array (Virtio_Descriptor_Array_Index_T) of Virtqueue_Descriptor_T
    with Convention => C;
 
    type Virtqueue_Available_Descriptor_Array is
-     array (VirtIO_Descriptor_Array_Index_T) of Descriptor_Index_T
+     array (Virtio_Descriptor_Array_Index_T) of Descriptor_Index_T
    with Convention => C;
 
    type Virtqueue_Available_T is record
@@ -73,7 +73,7 @@ private
       Unused : Unsigned_16;
    end record;
 
-   --  Section 2.7.8 of VirtIO Spec 1.3.
+   --  Section 2.7.8 of Virtio Spec 1.3.
    type Virtqueue_Used_Element is record
       --  Index of start of used descriptor chain.
       Id     : Unsigned_32;
@@ -81,7 +81,7 @@ private
    end record;
 
    type Virtqueue_Used_Descriptor_Array is
-     array (VirtIO_Descriptor_Array_Index_T) of Virtqueue_Used_Element
+     array (Virtio_Descriptor_Array_Index_T) of Virtqueue_Used_Element
    with Convention => C;
 
    type Virtqueue_Used_T is record
@@ -90,7 +90,7 @@ private
       Ring  : Virtqueue_Used_Descriptor_Array;
    end record;
 
-   type VirtIO_Device_Status_T is record
+   type Virtio_Device_Status_T is record
       Acknowledge        : Boolean;
       Driver             : Boolean;
       Driver_OK          : Boolean;
@@ -99,7 +99,7 @@ private
       Failed             : Boolean;
    end record
    with Size => 32;
-   for VirtIO_Device_Status_T use
+   for Virtio_Device_Status_T use
      record
        Acknowledge        at 0 range 0 .. 0;
        Driver             at 0 range 1 .. 1;
@@ -109,7 +109,7 @@ private
        Failed             at 0 range 7 .. 7;
      end record;
 
-   type VirtIO_MMIO_Device_Registers_T is record
+   type Virtio_MMIO_Device_Registers_T is record
       Magic_Value            : Unsigned_32;
       Version                : Unsigned_32;
       Device_ID              : Unsigned_32;
@@ -125,7 +125,7 @@ private
       Queue_Notify           : Unsigned_32;
       Interrupt_Status       : Unsigned_32;
       Interrupt_Acknowledge  : Unsigned_32;
-      Status                 : VirtIO_Device_Status_T;
+      Status                 : Virtio_Device_Status_T;
       Queue_Descriptor_Low   : Unsigned_32;
       Queue_Descriptor_High  : Unsigned_32;
       Queue_Driver_Low       : Unsigned_32;
@@ -138,7 +138,7 @@ private
      Volatile,
      Size                 => (168 * 8),
      Scalar_Storage_Order => System.Low_Order_First;
-   for VirtIO_MMIO_Device_Registers_T use
+   for Virtio_MMIO_Device_Registers_T use
      record
        Magic_Value            at 16#000# range 0 .. 31;
        Version                at 16#004# range 0 .. 31;
@@ -165,7 +165,7 @@ private
      end record;
 
    function Is_MMIO_Device_Valid
-     (Device_Registers : VirtIO_MMIO_Device_Registers_T) return Boolean
+     (Device_Registers : Virtio_MMIO_Device_Registers_T) return Boolean
    is (Device_Registers.Magic_Value = 16#7472_6976#
        and then Device_Registers.Version = 2
        and then Device_Registers.Device_ID /= 0
@@ -200,4 +200,4 @@ private
    procedure Acknowledge_Interrupt_Unlocked
      (Device : in out Device_T; Result : out Function_Result);
 
-end Devices.VirtIO;
+end Devices.Virtio;

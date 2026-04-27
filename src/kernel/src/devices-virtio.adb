@@ -3,17 +3,17 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Devices.VirtIO.Block; use Devices.VirtIO.Block;
+with Devices.Virtio.Block; use Devices.Virtio.Block;
 with Memory.Allocators;    use Memory.Allocators;
 with Memory.Kernel;        use Memory.Kernel;
 with RISCV.Atomics;        use RISCV.Atomics;
 with Processes.Scheduler;  use Processes.Scheduler;
 
-package body Devices.VirtIO is
+package body Devices.Virtio is
    procedure Acknowledge_Interrupt_Unlocked
      (Device : in out Device_T; Result : out Function_Result)
    is
-      Device_Registers : VirtIO_MMIO_Device_Registers_T
+      Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
       Interrupt_Status   : Unsigned_32 := 0;
@@ -27,7 +27,7 @@ package body Devices.VirtIO is
          Q_Used : constant Virtqueue_Used_T
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Used.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Used.Virtual_Address,
            Alignment => 1;
 
          Descriptor_Index : Unsigned_32 := 0;
@@ -35,25 +35,25 @@ package body Devices.VirtIO is
          Queue_Index : Unsigned_16 := 0;
       begin
          Log_Debug
-           ("Q_Used.Index: " & Q_Used.Index'Image, Logging_Tags_VirtIO);
+           ("Q_Used.Index: " & Q_Used.Index'Image, Logging_Tags_Virtio);
 
-         while Device.Bus_Info_VirtIO.Request_Serviced_Index /= Q_Used.Index
+         while Device.Bus_Info_Virtio.Request_Serviced_Index /= Q_Used.Index
          loop
 
             Queue_Index :=
-              Device.Bus_Info_VirtIO.Request_Serviced_Index
-              mod Maximum_VirtIO_Queue_Length;
+              Device.Bus_Info_Virtio.Request_Serviced_Index
+              mod Maximum_Virtio_Queue_Length;
 
             --  Verify that the status byte has been cleared by the device,
             --  indicating that the request was successful.
             --  This block has not been moved to its own function because the
             --  import can raise a Constraint_Error.
             Check_Request_Status : declare
-               Request_Status_Array : VirtIO_Status_Byte_Array_T
+               Request_Status_Array : Virtio_Status_Byte_Array_T
                with
                  Import,
                  Address   =>
-                   Device.Bus_Info_VirtIO.Request_Status_Array.Virtual_Address,
+                   Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address,
                  Alignment => 1;
             begin
                Status_Byte : constant Unsigned_8 :=
@@ -72,25 +72,25 @@ package body Devices.VirtIO is
 
             Log_Debug
               ("Used descriptor index: " & Descriptor_Index'Image,
-               Logging_Tags_VirtIO);
+               Logging_Tags_Virtio);
 
             Channel : constant Unsigned_64 :=
-              Device.Bus_Info_VirtIO.Request_Info
-                (VirtIO_Descriptor_Array_Index_T (Descriptor_Index))
+              Device.Bus_Info_Virtio.Request_Info
+                (Virtio_Descriptor_Array_Index_T (Descriptor_Index))
                 .Channel;
 
             Log_Debug
               ("Successfully acknowledged driver Q entry: "
-               & Device.Bus_Info_VirtIO.Request_Serviced_Index'Image,
-               Logging_Tags_VirtIO);
+               & Device.Bus_Info_Virtio.Request_Serviced_Index'Image,
+               Logging_Tags_Virtio);
 
             Wake_Processes_Waiting_For_Channel (Channel);
 
             --  Tell the processor to not move loads or stores past this point.
             Fence;
 
-            Device.Bus_Info_VirtIO.Request_Serviced_Index :=
-              Device.Bus_Info_VirtIO.Request_Serviced_Index + 1;
+            Device.Bus_Info_Virtio.Request_Serviced_Index :=
+              Device.Bus_Info_Virtio.Request_Serviced_Index + 1;
          end loop;
       end Acknowledge_Interrupt_Channel;
 
@@ -99,7 +99,7 @@ package body Devices.VirtIO is
       Device_Registers.Interrupt_Acknowledge :=
         (Interrupt_Status and Interrupt_Ack_Mask);
 
-      Log_Debug ("Acknowledged VirtIO Device Interrupt", Logging_Tags_VirtIO);
+      Log_Debug ("Acknowledged Virtio Device Interrupt", Logging_Tags_Virtio);
 
       Result := Success;
    exception
@@ -111,8 +111,8 @@ package body Devices.VirtIO is
    procedure Acknowledge_Interrupt
      (Device : in out Device_T; Result : out Function_Result) is
    begin
-      if Device.Device_Bus /= Device_Bus_VirtIO_MMIO then
-         Log_Error ("Invalid device bus for VirtIO device");
+      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
+         Log_Error ("Invalid device bus for Virtio device");
          Result := Invalid_Argument;
          return;
       end if;
@@ -127,28 +127,28 @@ package body Devices.VirtIO is
       Index  : out Descriptor_Index_T;
       Result : out Function_Result) is
    begin
-      if Device.Device_Bus /= Device_Bus_VirtIO_MMIO then
-         Log_Error ("Device not VirtIO");
+      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
+         Log_Error ("Device not Virtio");
          Index := 0;
          Result := Invalid_Argument;
          return;
       end if;
 
-      for I in VirtIO_Descriptor_Array_Index_T loop
-         if Device.Bus_Info_VirtIO.Descriptor_Status (I) then
+      for I in Virtio_Descriptor_Array_Index_T loop
+         if Device.Bus_Info_Virtio.Descriptor_Status (I) then
             Index := I;
-            Device.Bus_Info_VirtIO.Descriptor_Status (I) := False;
+            Device.Bus_Info_Virtio.Descriptor_Status (I) := False;
 
             Log_Debug
-              ("Allocated descriptor: " & Index'Image, Logging_Tags_VirtIO);
+              ("Allocated descriptor: " & Index'Image, Logging_Tags_Virtio);
 
             Result := Success;
             return;
          end if;
       end loop;
 
-      Log_Error ("No remaining VirtIO Descriptors");
-      Result := No_Remaining_VirtIO_Descriptors;
+      Log_Error ("No remaining Virtio Descriptors");
+      Result := No_Remaining_Virtio_Descriptors;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint Error allocating descriptor");
@@ -201,25 +201,25 @@ package body Devices.VirtIO is
          Result := Constraint_Exception;
    end Allocate_Descriptors;
 
-   procedure Allocate_VirtIO_Device_Resources
+   procedure Allocate_Virtio_Device_Resources
      (Device : in out Device_T; Result : out Function_Result)
    is
       Allocation_Result : Memory_Allocation_Result;
    begin
       --  @TODO: Revisit error handling.
       --  This is a remnant of a very early implementation.
-      if Device.Device_Bus /= Device_Bus_VirtIO_MMIO then
+      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
          Result := Invalid_Argument;
          return;
       end if;
 
       Log_Debug
-        ("Initialising VirtIO Device Resources...", Logging_Tags_VirtIO);
-      Log_Debug ("Allocating Request Status Array...", Logging_Tags_VirtIO);
+        ("Initialising Virtio Device Resources...", Logging_Tags_Virtio);
+      Log_Debug ("Allocating Request Status Array...", Logging_Tags_Virtio);
 
       Allocate_Kernel_Physical_Memory
-        (Maximum_VirtIO_Queue_Length,
-         Device.Bus_Info_VirtIO.Request_Status_Array,
+        (Maximum_Virtio_Queue_Length,
+         Device.Bus_Info_Virtio.Request_Status_Array,
          Result);
       if Is_Error (Result) then
          Log_Error ("Error allocating status array memory");
@@ -228,65 +228,65 @@ package body Devices.VirtIO is
 
       Log_Debug
         ("Allocated Request Status Array: "
-         & Device.Bus_Info_VirtIO.Request_Status_Array.Virtual_Address'Image,
-         Logging_Tags_VirtIO);
+         & Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address'Image,
+         Logging_Tags_Virtio);
 
       Initialise_Request_Status_Array : declare
-         Request_Status_Array : VirtIO_Status_Byte_Array_T
+         Request_Status_Array : Virtio_Status_Byte_Array_T
          with
            Import,
            Address   =>
-             Device.Bus_Info_VirtIO.Request_Status_Array.Virtual_Address,
+             Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
       begin
-         for I in VirtIO_Descriptor_Array_Index_T loop
+         for I in Virtio_Descriptor_Array_Index_T loop
             Request_Status_Array (I) := 0;
          end loop;
       end Initialise_Request_Status_Array;
 
-      Log_Debug ("Allocated Request Status Array.", Logging_Tags_VirtIO);
-      Log_Debug ("Allocating descriptors queues...", Logging_Tags_VirtIO);
+      Log_Debug ("Allocated Request Status Array.", Logging_Tags_Virtio);
+      Log_Debug ("Allocating descriptors queues...", Logging_Tags_Virtio);
 
       Allocate_Pages (3, Allocation_Result, Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Device.Bus_Info_VirtIO.Q_Descriptor.Physical_Address :=
+      Device.Bus_Info_Virtio.Q_Descriptor.Physical_Address :=
         Allocation_Result.Physical_Address;
-      Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address :=
+      Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address :=
         Allocation_Result.Virtual_Address;
 
-      Device.Bus_Info_VirtIO.Q_Used.Physical_Address :=
+      Device.Bus_Info_Virtio.Q_Used.Physical_Address :=
         Allocation_Result.Physical_Address + 16#1000#;
-      Device.Bus_Info_VirtIO.Q_Used.Virtual_Address :=
+      Device.Bus_Info_Virtio.Q_Used.Virtual_Address :=
         Allocation_Result.Virtual_Address + 16#1000#;
 
-      Device.Bus_Info_VirtIO.Q_Available.Physical_Address :=
+      Device.Bus_Info_Virtio.Q_Available.Physical_Address :=
         Allocation_Result.Physical_Address + 16#2000#;
-      Device.Bus_Info_VirtIO.Q_Available.Virtual_Address :=
+      Device.Bus_Info_Virtio.Q_Available.Virtual_Address :=
         Allocation_Result.Virtual_Address + 16#2000#;
 
       Log_Debug
         ("Initialised Device Queues:"
          & ASCII.LF
          & "  Descriptor Q:         "
-         & Device.Bus_Info_VirtIO.Q_Descriptor.Physical_Address'Image
+         & Device.Bus_Info_Virtio.Q_Descriptor.Physical_Address'Image
          & " / "
-         & Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address'Image
+         & Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address'Image
          & ASCII.LF
          & "  Initialised Device Q: "
-         & Device.Bus_Info_VirtIO.Q_Used.Physical_Address'Image
+         & Device.Bus_Info_Virtio.Q_Used.Physical_Address'Image
          & " / "
-         & Device.Bus_Info_VirtIO.Q_Used.Virtual_Address'Image
+         & Device.Bus_Info_Virtio.Q_Used.Virtual_Address'Image
          & ASCII.LF
          & "  Initialised Driver Q: "
-         & Device.Bus_Info_VirtIO.Q_Available.Physical_Address'Image
+         & Device.Bus_Info_Virtio.Q_Available.Physical_Address'Image
          & " / "
-         & Device.Bus_Info_VirtIO.Q_Available.Virtual_Address'Image,
-         Logging_Tags_VirtIO);
+         & Device.Bus_Info_Virtio.Q_Available.Virtual_Address'Image,
+         Logging_Tags_Virtio);
 
-      if Device.Bus_Info_VirtIO.Device_Type = VirtIO_Device_Type_Block then
+      if Device.Bus_Info_Virtio.Device_Type = Virtio_Device_Type_Block then
          Initialise_Block_Device (Device, Result);
          if Is_Error (Result) then
             return;
@@ -296,13 +296,13 @@ package body Devices.VirtIO is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_VirtIO_Device_Resources");
+         Log_Error ("Constraint_Error: Allocate_Virtio_Device_Resources");
          Result := Constraint_Exception;
-   end Allocate_VirtIO_Device_Resources;
+   end Allocate_Virtio_Device_Resources;
 
    function Increment_Index (Index : Unsigned_16) return Unsigned_16 is
    begin
-      if Index < (Maximum_VirtIO_Queue_Length - 1) then
+      if Index < (Maximum_Virtio_Queue_Length - 1) then
          return Index + 1;
       end if;
 
@@ -314,23 +314,23 @@ package body Devices.VirtIO is
       Index  : Descriptor_Index_T;
       Result : out Function_Result) is
    begin
-      if Device.Device_Bus /= Device_Bus_VirtIO_MMIO then
-         Log_Error ("Device not VirtIO MMIO");
+      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
+         Log_Error ("Device not Virtio MMIO");
          Result := Invalid_Argument;
          return;
       end if;
 
-      if Index > Maximum_VirtIO_Queue_Length
-        or else Device.Bus_Info_VirtIO.Descriptor_Status (Index)
+      if Index > Maximum_Virtio_Queue_Length
+        or else Device.Bus_Info_Virtio.Descriptor_Status (Index)
       then
          Log_Error ("Invalid descriptor index to free: " & Index'Image);
          Result := Invalid_Argument;
          return;
       end if;
 
-      Device.Bus_Info_VirtIO.Descriptor_Status (Index) := True;
+      Device.Bus_Info_Virtio.Descriptor_Status (Index) := True;
 
-      Log_Debug ("Freed descriptor: " & Index'Image, Logging_Tags_VirtIO);
+      Log_Debug ("Freed descriptor: " & Index'Image, Logging_Tags_Virtio);
 
       Result := Success;
    exception
@@ -352,7 +352,7 @@ package body Devices.VirtIO is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
       begin
          loop
@@ -380,12 +380,12 @@ package body Devices.VirtIO is
    procedure Initialise_MMIO_Device
      (Device : in out Device_T; Result : out Function_Result)
    is
-      Device_Registers : VirtIO_MMIO_Device_Registers_T
+      Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
       Queue_Size_Maximum : Unsigned_32 := 0;
 
-      Status : VirtIO_Device_Status_T :=
+      Status : Virtio_Device_Status_T :=
         (Acknowledge        => False,
          Driver             => False,
          Driver_OK          => False,
@@ -397,20 +397,20 @@ package body Devices.VirtIO is
    begin
       --  @TODO: Revisit error handling.
       --  This is a remnant of a very early implementation.
-      if Device.Device_Bus /= Device_Bus_VirtIO_MMIO then
+      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
          Result := Invalid_Argument;
          return;
       end if;
 
       Log_Debug
-        ("Initialising VirtIO MMIO Device:"
+        ("Initialising Virtio MMIO Device:"
          & ASCII.LF
          & "  Virtual Addr:  "
          & Device.Virtual_Address'Image
          & ASCII.LF
          & "  Physical Addr: "
          & Device.Physical_Address'Image,
-         Logging_Tags_VirtIO);
+         Logging_Tags_Virtio);
 
       --  4.2.3.1.1 Driver Requirements: Device Initialization states:
       --  The driver MUST start the device initialization by reading and
@@ -419,13 +419,13 @@ package body Devices.VirtIO is
       --  is zero (0x0) MUST abort initialization and MUST NOT access
       --  any other register.
       if not Is_MMIO_Device_Valid (Device_Registers) then
-         Log_Error ("Device Invalid!", Logging_Tags_VirtIO);
+         Log_Error ("Device Invalid!", Logging_Tags_Virtio);
          Result := Invalid_Argument;
          return;
       end if;
 
       Log_Debug
-        ("Found valid VirtIO MMIO device: "
+        ("Found valid Virtio MMIO device: "
          & ASCII.LF
          & "  Vendor ID:      "
          & Device_Registers.Vendor_ID'Image
@@ -435,7 +435,7 @@ package body Devices.VirtIO is
          & ASCII.LF
          & "  Device ID:      "
          & Device_Registers.Device_ID'Image,
-         Logging_Tags_VirtIO);
+         Logging_Tags_Virtio);
 
       --  Initialise the device.
       --  Refer to section 3.1: Device Initialization.
@@ -453,7 +453,7 @@ package body Devices.VirtIO is
       --  Iterate through each page of device features, load the supported
       --  features from the device, mask out any features not supported by
       --  the driver, then write the negotiated features back to the device.
-      for I in Device.Bus_Info_VirtIO.Driver_Features'Range loop
+      for I in Device.Bus_Info_Virtio.Driver_Features'Range loop
          --  Section 4.2.2.2 Driver Requirements states that:
          --  Before reading from DeviceFeatures, the driver MUST write a
          --  value to DeviceFeaturesSel.
@@ -463,7 +463,7 @@ package body Devices.VirtIO is
          --  any features not supported by the driver.
          Device_Features (I) := Device_Registers.Device_Features;
          Device_Features (I) :=
-           Device_Features (I) and Device.Bus_Info_VirtIO.Driver_Features (I);
+           Device_Features (I) and Device.Bus_Info_Virtio.Driver_Features (I);
 
          --  Section 4.2.2.2 Driver Requirements states that:
          --  Before writing to the DriverFeatures register, the driver MUST
@@ -478,67 +478,67 @@ package body Devices.VirtIO is
       Status := Device_Registers.Status;
       if not Status.Features_OK then
          Log_Error
-           ("Device feature negotiation unsuccessful.", Logging_Tags_VirtIO);
+           ("Device feature negotiation unsuccessful.", Logging_Tags_Virtio);
          Result := Unhandled_Exception;
          return;
       end if;
 
       Log_Debug
-        ("Device feature negotiation successful.", Logging_Tags_VirtIO);
+        ("Device feature negotiation successful.", Logging_Tags_Virtio);
 
       Queue_Size_Maximum := Device_Registers.Queue_Size_Maximum;
       if Queue_Size_Maximum = 0 then
-         Log_Error ("No queues available.", Logging_Tags_VirtIO);
+         Log_Error ("No queues available.", Logging_Tags_Virtio);
          Result := Unhandled_Exception;
          return;
-      elsif Queue_Size_Maximum < Maximum_VirtIO_Queue_Length then
-         Log_Error ("Not enough queues available.", Logging_Tags_VirtIO);
+      elsif Queue_Size_Maximum < Maximum_Virtio_Queue_Length then
+         Log_Error ("Not enough queues available.", Logging_Tags_Virtio);
          Result := Unhandled_Exception;
          return;
       end if;
 
-      Device_Registers.Queue_Size := Maximum_VirtIO_Queue_Length;
+      Device_Registers.Queue_Size := Maximum_Virtio_Queue_Length;
 
       Device_Registers.Queue_Select := 0;
 
       Device_Registers.Queue_Descriptor_Low :=
         Get_Address_Word_Low
-          (Address (Device.Bus_Info_VirtIO.Q_Descriptor.Physical_Address));
+          (Address (Device.Bus_Info_Virtio.Q_Descriptor.Physical_Address));
       Device_Registers.Queue_Descriptor_High :=
         Get_Address_Word_High
-          (Address (Device.Bus_Info_VirtIO.Q_Descriptor.Physical_Address));
+          (Address (Device.Bus_Info_Virtio.Q_Descriptor.Physical_Address));
 
       Device_Registers.Queue_Device_Low :=
         Get_Address_Word_Low
-          (Address (Device.Bus_Info_VirtIO.Q_Used.Physical_Address));
+          (Address (Device.Bus_Info_Virtio.Q_Used.Physical_Address));
       Device_Registers.Queue_Device_High :=
         Get_Address_Word_High
-          (Address (Device.Bus_Info_VirtIO.Q_Used.Physical_Address));
+          (Address (Device.Bus_Info_Virtio.Q_Used.Physical_Address));
 
       Device_Registers.Queue_Driver_Low :=
         Get_Address_Word_Low
-          (Address (Device.Bus_Info_VirtIO.Q_Available.Physical_Address));
+          (Address (Device.Bus_Info_Virtio.Q_Available.Physical_Address));
       Device_Registers.Queue_Driver_High :=
         Get_Address_Word_High
-          (Address (Device.Bus_Info_VirtIO.Q_Available.Physical_Address));
+          (Address (Device.Bus_Info_Virtio.Q_Available.Physical_Address));
 
       Device_Registers.Queue_Ready := 1;
 
       Status.Driver_OK := True;
       Device_Registers.Status := Status;
 
-      for I in VirtIO_Descriptor_Array_Index_T loop
-         Device.Bus_Info_VirtIO.Descriptor_Status (I) := True;
+      for I in Virtio_Descriptor_Array_Index_T loop
+         Device.Bus_Info_Virtio.Descriptor_Status (I) := True;
       end loop;
 
-      Log_Debug ("Initialised VirtIO MMIO Device.", Logging_Tags_VirtIO);
+      Log_Debug ("Initialised Virtio MMIO Device.", Logging_Tags_Virtio);
 
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Error
-           ("Constraint_Error: Initialise_MMIO_Device", Logging_Tags_VirtIO);
+           ("Constraint_Error: Initialise_MMIO_Device", Logging_Tags_Virtio);
          Result := Constraint_Exception;
    end Initialise_MMIO_Device;
 
-end Devices.VirtIO;
+end Devices.Virtio;

@@ -7,9 +7,9 @@ with System.Storage_Elements; use System.Storage_Elements;
 
 with Boot.Devicetree;
 with Devices;              use Devices;
-with Devices.VirtIO;       use Devices.VirtIO;
-with Devices.VirtIO.Block; use Devices.VirtIO.Block;
-with Devices.VirtIO.Graphics;
+with Devices.Virtio;       use Devices.Virtio;
+with Devices.Virtio.Block; use Devices.Virtio.Block;
+with Devices.Virtio.Graphics;
 with Devices.UART;
 with Devices.PLIC;
 with Filesystems;          use Filesystems;
@@ -77,7 +77,7 @@ package body Boot is
       Graphics_Device renames System_Devices (6);
 
       Default_Unallocated_Addresses :
-        constant VirtIO_Resource_Allocated_Addresses_T :=
+        constant Virtio_Resource_Allocated_Addresses_T :=
           (Virtual_Address  => Null_Address,
            Physical_Address => Null_Physical_Address);
 
@@ -143,7 +143,7 @@ package body Boot is
 
       Disk_Device :=
         (Device_Class       => Device_Class_Storage,
-         Device_Bus         => Device_Bus_VirtIO_MMIO,
+         Device_Bus         => Device_Bus_Virtio_MMIO,
          Memory_Size        => 16#1000#,
          Virtual_Address    => Device_Virtual_Address,
          Physical_Address   => Physical_Address_T (To_Address (16#1000_1000#)),
@@ -151,9 +151,9 @@ package body Boot is
          Interrupt_Priority => 7,
          Spinlock           => Locks.Null_Spinlock,
          Record_Used        => True,
-         Bus_Info_VirtIO    =>
+         Bus_Info_Virtio    =>
            (Driver_Features               => Disk_Device_Driver_Features,
-            Device_Type                   => VirtIO_Device_Type_Block,
+            Device_Type                   => Virtio_Device_Type_Block,
             Request_Info                  => [others => (Channel => 0)],
             Request_Serviced_Index        => 0,
             Request_Status_Array          => Default_Unallocated_Addresses,
@@ -188,7 +188,7 @@ package body Boot is
 
       Disk_B_Device :=
         (Device_Class       => Device_Class_Storage,
-         Device_Bus         => Device_Bus_VirtIO_MMIO,
+         Device_Bus         => Device_Bus_Virtio_MMIO,
          Memory_Size        => 16#1000#,
          Virtual_Address    => Device_Virtual_Address,
          Physical_Address   => Physical_Address_T (To_Address (16#1000_2000#)),
@@ -196,9 +196,9 @@ package body Boot is
          Interrupt_Priority => 7,
          Spinlock           => Locks.Null_Spinlock,
          Record_Used        => True,
-         Bus_Info_VirtIO    =>
+         Bus_Info_Virtio    =>
            (Driver_Features               => Disk_Device_Driver_Features,
-            Device_Type                   => VirtIO_Device_Type_Block,
+            Device_Type                   => Virtio_Device_Type_Block,
             Request_Info                  => [others => (Channel => 0)],
             Request_Serviced_Index        => 0,
             Request_Status_Array          => Default_Unallocated_Addresses,
@@ -213,7 +213,7 @@ package body Boot is
 
       Graphics_Device :=
         (Device_Class       => Device_Class_Graphics,
-         Device_Bus         => Device_Bus_VirtIO_MMIO,
+         Device_Bus         => Device_Bus_Virtio_MMIO,
          Memory_Size        => 16#1000#,
          Virtual_Address    => Device_Virtual_Address,
          Physical_Address   => Physical_Address_T (To_Address (16#1000_3000#)),
@@ -221,9 +221,9 @@ package body Boot is
          Interrupt_Priority => 7,
          Spinlock           => Locks.Null_Spinlock,
          Record_Used        => True,
-         Bus_Info_VirtIO    =>
+         Bus_Info_Virtio    =>
            (Driver_Features        => Graphics_Device_Driver_Features,
-            Device_Type            => VirtIO_Device_Type_Graphics,
+            Device_Type            => Virtio_Device_Type_Graphics,
             Request_Info           => [others => (Channel => 0)],
             Request_Serviced_Index => 0,
             Request_Status_Array   => Default_Unallocated_Addresses,
@@ -269,14 +269,14 @@ package body Boot is
             end if;
 
             --  Initialise devices.
-            if System_Devices (I).Device_Bus = Device_Bus_VirtIO_MMIO then
-               Devices.VirtIO.Allocate_VirtIO_Device_Resources
+            if System_Devices (I).Device_Bus = Device_Bus_Virtio_MMIO then
+               Devices.Virtio.Allocate_Virtio_Device_Resources
                  (System_Devices (I), Result);
                if Is_Error (Result) then
-                  Panic ("Error allocating VirtIO device resources");
+                  Panic ("Error allocating Virtio device resources");
                end if;
 
-               Devices.VirtIO.Initialise_MMIO_Device
+               Devices.Virtio.Initialise_MMIO_Device
                  (System_Devices (I), Result);
                if Is_Error (Result) then
                   Panic;
@@ -618,7 +618,7 @@ package body Boot is
 
       Graphics_Device renames Devices.System_Devices (6);
    begin
-      Devices.VirtIO.Graphics.Get_Display_Info
+      Devices.Virtio.Graphics.Get_Display_Info
         (Init_Process.all, Graphics_Device, Result);
       if Is_Error (Result) then
          Panic;
@@ -637,19 +637,19 @@ package body Boot is
          & Framebuffer_Allocation.Physical_Address'Image,
          Logging_Tags);
 
-      Graphics_Device.Bus_Info_VirtIO.Resource_Id := Resource_Id;
-      Graphics_Device.Bus_Info_VirtIO.Framebuffer_Addresses :=
+      Graphics_Device.Bus_Info_Virtio.Resource_Id := Resource_Id;
+      Graphics_Device.Bus_Info_Virtio.Framebuffer_Addresses :=
         Framebuffer_Allocation;
-      Graphics_Device.Bus_Info_VirtIO.Framebuffer_Width := Framebuffer_Width;
-      Graphics_Device.Bus_Info_VirtIO.Framebuffer_Height := Framebuffer_Height;
+      Graphics_Device.Bus_Info_Virtio.Framebuffer_Width := Framebuffer_Width;
+      Graphics_Device.Bus_Info_Virtio.Framebuffer_Height := Framebuffer_Height;
 
-      Devices.VirtIO.Graphics.Created_2d_Resource
+      Devices.Virtio.Graphics.Created_2d_Resource
         (Init_Process.all, Graphics_Device, Resource_Id, Result);
       if Is_Error (Result) then
          Panic;
       end if;
 
-      Devices.VirtIO.Graphics.Attach_Framebuffer_To_Resource
+      Devices.Virtio.Graphics.Attach_Framebuffer_To_Resource
         (Init_Process.all,
          Graphics_Device,
          Resource_Id,
@@ -659,7 +659,7 @@ package body Boot is
          Panic;
       end if;
 
-      Devices.VirtIO.Graphics.Set_Scanout
+      Devices.Virtio.Graphics.Set_Scanout
         (Init_Process.all,
          Graphics_Device,
          Resource_Id,
@@ -677,7 +677,7 @@ package body Boot is
          Framebuffer_Height,
          Make_Colour (Red => 0, Green => 0, Blue => 0, Alpha => 255));
 
-      Devices.VirtIO.Graphics.Transfer_To_Host_2d
+      Devices.Virtio.Graphics.Transfer_To_Host_2d
         (Init_Process.all,
          Graphics_Device,
          Resource_Id,
@@ -690,7 +690,7 @@ package body Boot is
          Panic;
       end if;
 
-      Devices.VirtIO.Graphics.Resource_Flush
+      Devices.Virtio.Graphics.Resource_Flush
         (Init_Process.all,
          Graphics_Device,
          Resource_Id,
@@ -712,7 +712,7 @@ package body Boot is
    begin
       Log_Debug ("Starting init process...", Logging_Tags);
 
-      --  The graphics system is initialised here because the VirtIO driver
+      --  The graphics system is initialised here because the Virtio driver
       --  requires a process context to operate in.
       Initialise_Graphics;
 

@@ -4,7 +4,7 @@
 -------------------------------------------------------------------------------
 
 with Devices.Ramdisk;
-with Devices.VirtIO.Block;
+with Devices.Virtio.Block;
 with RISCV;
 
 package body Filesystems.Block_Cache is
@@ -296,8 +296,8 @@ package body Filesystems.Block_Cache is
            ("Reading sector into block cache: " & Current_Sector'Image,
             Logging_Tags_Block_Cache);
          case Filesystem.all.Device.all.Device_Bus is
-            when Device_Bus_VirtIO_MMIO   =>
-               Devices.VirtIO.Block.Read_Sector
+            when Device_Bus_Virtio_MMIO   =>
+               Devices.Virtio.Block.Read_Sector
                  (Reading_Process,
                   Filesystem.all.Device.all,
                   Current_Read_Addr_Physical,

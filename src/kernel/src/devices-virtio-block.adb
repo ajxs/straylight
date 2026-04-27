@@ -8,14 +8,14 @@ with Memory.Kernel;       use Memory.Kernel;
 with Processes.Scheduler; use Processes.Scheduler;
 with RISCV.Atomics;       use RISCV.Atomics;
 
-package body Devices.VirtIO.Block is
+package body Devices.Virtio.Block is
    function Get_Block_Request_Physical_Address
      (Device : Device_T; Index : Unsigned_16) return Physical_Address_T is
    begin
       Block_Request_Size : constant Unsigned_64 := Block_Request_T'Size / 8;
 
       return
-        Device.Bus_Info_VirtIO.Block_Request_Array_Addresses.Physical_Address
+        Device.Bus_Info_Virtio.Block_Request_Array_Addresses.Physical_Address
         + Physical_Address_T
             (Unsigned_64_To_Address
                (Unsigned_64 (Index) * Block_Request_Size));
@@ -72,14 +72,14 @@ package body Devices.VirtIO.Block is
    is
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
-      Device_Registers : VirtIO_MMIO_Device_Registers_T
+      Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
    begin
       --  If this is a write operation, ensure the device is not read-only.
       if Write
         and then (Device_Registers.Device_Features and VIRTIO_BLK_F_RO) /= 0
       then
-         Log_Error ("Attempt to write to read-only VirtIO Block Device");
+         Log_Error ("Attempt to write to read-only Virtio Block Device");
          Result := Operation_Unsupported;
          return;
       end if;
@@ -92,15 +92,15 @@ package body Devices.VirtIO.Block is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Data_Physical_Address));
 
-      Device.Bus_Info_VirtIO.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Initialise_Status : declare
-         Request_Status_Array : VirtIO_Status_Byte_Array_T
+         Request_Status_Array : Virtio_Status_Byte_Array_T
          with
            Import,
            Address   =>
-             Device.Bus_Info_VirtIO.Request_Status_Array.Virtual_Address,
+             Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
       begin
          Request_Status_Array (Descriptor_Indexes (0)) := 255;
@@ -110,13 +110,13 @@ package body Devices.VirtIO.Block is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_VirtIO.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
          Block_Device_Request_Array : Block_Request_Array_T
@@ -124,7 +124,7 @@ package body Devices.VirtIO.Block is
            Import,
            Address   =>
              Device
-               .Bus_Info_VirtIO
+               .Bus_Info_Virtio
                .Block_Request_Array_Addresses
                .Virtual_Address,
            Alignment => 1;
@@ -171,7 +171,7 @@ package body Devices.VirtIO.Block is
          Descriptors (Descriptor_Indexes (2)) :=
            (Address =>
               --  Get the address of the status byte for this request.
-              Device.Bus_Info_VirtIO.Request_Status_Array.Physical_Address
+              Device.Bus_Info_Virtio.Request_Status_Array.Physical_Address
               + Physical_Address_T
                   (Unsigned_64_To_Address
                      (Unsigned_64 (Descriptor_Indexes (0)))),
@@ -180,7 +180,7 @@ package body Devices.VirtIO.Block is
             Next    => 0);
 
          Q_Available.Ring
-           (Q_Available.Index mod Maximum_VirtIO_Queue_Length) :=
+           (Q_Available.Index mod Maximum_Virtio_Queue_Length) :=
            Descriptor_Indexes (0);
 
          --  Tell the processor to not move loads or stores past this point.
@@ -205,11 +205,11 @@ package body Devices.VirtIO.Block is
       end if;
 
       Read_Request_Status : declare
-         Request_Status_Array : VirtIO_Status_Byte_Array_T
+         Request_Status_Array : Virtio_Status_Byte_Array_T
          with
            Import,
            Address   =>
-             Device.Bus_Info_VirtIO.Request_Status_Array.Virtual_Address,
+             Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
 
          VIRTIO_BLK_S_OK     : constant := 0;
@@ -221,15 +221,15 @@ package body Devices.VirtIO.Block is
                Result := Success;
 
             when VIRTIO_BLK_S_IOERR  =>
-               Log_Error ("I/O Error on VirtIO Block Device");
+               Log_Error ("I/O Error on Virtio Block Device");
                Result := Device_IO_Error;
 
             when VIRTIO_BLK_S_UNSUPP =>
-               Log_Error ("Unsupported Operation on VirtIO Block Device");
+               Log_Error ("Unsupported Operation on Virtio Block Device");
                Result := Operation_Unsupported;
 
             when others              =>
-               Log_Error ("Unknown Status on VirtIO Block Device");
+               Log_Error ("Unknown Status on Virtio Block Device");
                Result := Unhandled_Exception;
          end case;
       end Read_Request_Status;
@@ -245,10 +245,10 @@ package body Devices.VirtIO.Block is
       Allocation_Result : Memory_Allocation_Result;
    begin
       Log_Debug
-        ("Allocating Block Device Request Array...", Logging_Tags_VirtIO);
+        ("Allocating Block Device Request Array...", Logging_Tags_Virtio);
 
       Allocate_Kernel_Physical_Memory
-        ((Block_Request_T'Size / 8) * Maximum_VirtIO_Queue_Length,
+        ((Block_Request_T'Size / 8) * Maximum_Virtio_Queue_Length,
          Allocation_Result,
          Result);
       if Is_Error (Result) then
@@ -256,10 +256,10 @@ package body Devices.VirtIO.Block is
          return;
       end if;
 
-      Device.Bus_Info_VirtIO.Block_Request_Array_Addresses :=
+      Device.Bus_Info_Virtio.Block_Request_Array_Addresses :=
         Allocation_Result;
 
-      Log_Debug ("Allocated Block Device Request Array.", Logging_Tags_VirtIO);
+      Log_Debug ("Allocated Block Device Request Array.", Logging_Tags_Virtio);
 
       Result := Success;
    exception
@@ -268,4 +268,4 @@ package body Devices.VirtIO.Block is
          Result := Constraint_Exception;
    end Initialise_Block_Device;
 
-end Devices.VirtIO.Block;
+end Devices.Virtio.Block;

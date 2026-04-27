@@ -3,7 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package Devices.VirtIO.Block is
+package Devices.Virtio.Block is
    pragma Preelaborate;
 
    procedure Initialise_Block_Device
@@ -84,7 +84,7 @@ private
        Sector       at 8 range 0 .. 63;
      end record;
    type Block_Request_Array_T is
-     array (VirtIO_Descriptor_Array_Index_T) of Block_Request_T
+     array (Virtio_Descriptor_Array_Index_T) of Block_Request_T
    with Convention => C;
 
    function Convert_Request_Block_Number_To_Sector
@@ -94,4 +94,4 @@ private
 
    function Get_Block_Request_Physical_Address
      (Device : Device_T; Index : Unsigned_16) return Physical_Address_T;
-end Devices.VirtIO.Block;
+end Devices.Virtio.Block;

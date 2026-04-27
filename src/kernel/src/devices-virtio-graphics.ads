@@ -3,7 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package Devices.VirtIO.Graphics is
+package Devices.Virtio.Graphics is
    pragma Preelaborate;
 
    procedure Created_2d_Resource
@@ -104,10 +104,10 @@ private
    Device_Control_Queue_Index : constant := 0;
    Device_Cursor_Queue_Index  : constant := 1;
 
-   Logging_Tags_VirtIO_Graphics : constant Log_Tags :=
+   Logging_Tags_Virtio_Graphics : constant Log_Tags :=
      [Log_Tag_Devices,
-      Log_Tag_Devices_VirtIO,
-      Log_Tag_Devices_VirtIO_Graphics];
+      Log_Tag_Devices_Virtio,
+      Log_Tag_Devices_Virtio_Graphics];
 
    type Virtio_Gpu_Format is
      (VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM,
@@ -129,7 +129,7 @@ private
       VIRTIO_GPU_FORMAT_A8B8G8R8_UNORM => 121,
       VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM => 134);
 
-   --  These match section 5.7 of the VirtIO spec.
+   --  These match section 5.7 of the Virtio spec.
    type Gpu_Ctrl_Type is
      (Cmd_Get_Display_Info,
       Cmd_Resource_Create_2D,
@@ -280,4 +280,4 @@ private
    end record
    with Convention => C;
 
-end Devices.VirtIO.Graphics;
+end Devices.Virtio.Graphics;
