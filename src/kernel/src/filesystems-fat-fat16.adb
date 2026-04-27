@@ -241,10 +241,6 @@ package body Filesystems.FAT.FAT16 is
       Log_Debug ("Finished Reading FAT16 Root Directory", Logging_Tags_FAT);
 
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_FAT16_Root_Directory_Into_Buffer");
-         Result := Constraint_Exception;
    end Read_FAT16_Root_Directory_Into_Buffer;
 
    procedure Get_FAT16_Table_Entry_Sector_Number

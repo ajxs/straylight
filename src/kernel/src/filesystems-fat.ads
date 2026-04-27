@@ -38,12 +38,12 @@ private
    type FAT_Filesystem_Info_T is record
       FAT_Type                    : FAT_Type_T := FAT_Type_FAT12;
       Root_Directory_Sector       : Unsigned_64 := 0;
-      Root_Directory_Sector_Count : Natural := 0;
+      Root_Directory_Sector_Count : Unsigned_32 := 0;
       Root_Directory_Buffer_Size  : Natural := 0;
       Bytes_Per_Sector            : Natural := 0;
       First_FAT_Sector            : Unsigned_64 := 0;
       First_Data_Sector           : Unsigned_64 := 0;
-      FAT_Sector_Count            : Natural := 0;
+      FAT_Sector_Count            : Unsigned_32 := 0;
       FAT_Buffer_Size             : Natural := 0;
       Sectors_Per_Cluster         : Natural := 0;
    end record;
@@ -92,7 +92,7 @@ private
    --  Extended BIOS parameter block.
    --  Used in FAT12/FAT16 filesystems.
    ----------------------------------------------------------------------------
-   type Extended_BIOS_Parameter_Block is record
+   type EBPB_T is record
       Physical_Drive_Number   : Unsigned_8;
       Reserved                : Unsigned_8;
       Extended_Boot_Signature : Unsigned_8;
@@ -101,7 +101,7 @@ private
       File_System_Type        : String (1 .. 8);
    end record
    with Size => 208, Scalar_Storage_Order => System.Low_Order_First;
-   for Extended_BIOS_Parameter_Block use
+   for EBPB_T use
      record
        Physical_Drive_Number   at 0 range 00 .. 07;
        Reserved                at 0 range 08 .. 15;
@@ -112,21 +112,16 @@ private
      end record;
 
    ----------------------------------------------------------------------------
-   --  Reserved area in the FAT32 BPB.
-   ----------------------------------------------------------------------------
-   type FAT32_Reserved_Buffer is array (1 .. 12) of Character;
-
-   ----------------------------------------------------------------------------
    --  FAT32 Extended BIOS Parameter Block type.
    ----------------------------------------------------------------------------
-   type FAT32_Extended_BIOS_Parameter_Block is record
+   type EBPB_FAT32_T is record
       Table_Size       : Unsigned_32;
       Drive_Desc       : Unsigned_16;
       Version          : Unsigned_16;
       Root_Cluster     : Unsigned_32;
       Info_Sector      : Unsigned_16;
       Backup_BS_Sector : Unsigned_16;
-      Reserved         : FAT32_Reserved_Buffer;
+      Reserved         : String (1 .. 12);
       Drive_Number     : Unsigned_8;
       Reserved_1       : Unsigned_8;
       Boot_Signature   : Unsigned_8;
@@ -135,7 +130,7 @@ private
       File_System_Type : String (1 .. 8);
    end record
    with Size => 432, Scalar_Storage_Order => System.Low_Order_First;
-   for FAT32_Extended_BIOS_Parameter_Block use
+   for EBPB_FAT32_T use
      record
        Table_Size       at 0 range 0 .. 31;
        Drive_Desc       at 0 range 32 .. 47;
@@ -257,17 +252,6 @@ private
    with Convention => C, Pack;
 
    ----------------------------------------------------------------------------
-   --  An entry in a FAT12 formatted table.
-   ----------------------------------------------------------------------------
-   type FAT12_Table_Entry_T is mod 2 ** 12 with Size => 12;
-
-   ----------------------------------------------------------------------------
-   --  The file allocation table in a FAT12 formatted device.
-   ----------------------------------------------------------------------------
-   type FAT12_Table_T is array (Natural range <>) of FAT12_Table_Entry_T
-   with Pack;
-
-   ----------------------------------------------------------------------------
    --  An entry into a FAT32 formatted table.
    ----------------------------------------------------------------------------
    type FAT32_Table_Entry_T is new Unsigned_32;
@@ -356,23 +340,34 @@ private
       Total_Clusters : out Natural;
       Result         : out Function_Result);
 
-   function Get_FAT_Sector_Count (Boot_Sector : Boot_Sector_T) return Natural
-   with Inline;
+   function Get_FAT_Table_Size
+     (Boot_Sector : Boot_Sector_T) return Unsigned_32;
 
    function Is_Cluster_End_Of_Chain
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean
    with Pure_Function, Inline;
 
    function Get_First_Sector_Of_Cluster
-     (Filesystem_Info : FAT_Filesystem_Info_T; Cluster : Unsigned_32)
-      return Unsigned_64
+     (Cluster             : Unsigned_32;
+      Sectors_Per_Cluster : Natural;
+      First_Data_Sector   : Unsigned_64) return Unsigned_64
    is (Unsigned_64 (Cluster - 2)
-       * Unsigned_64 (Filesystem_Info.Sectors_Per_Cluster)
-       + Filesystem_Info.First_Data_Sector);
+       * Unsigned_64 (Sectors_Per_Cluster)
+       + First_Data_Sector)
+   with Inline, Pure_Function;
 
    function Get_Root_Directory_Sector_Count
-     (Boot_Sector : Boot_Sector_T) return Natural
+     (Boot_Sector : Boot_Sector_T) return Unsigned_32
    with Inline;
+
+   procedure Get_Root_Directory_Sector
+     (EBPB_Address                : Virtual_Address_T;
+      FAT_Type                    : FAT_Type_T;
+      Sectors_Per_Cluster         : Natural;
+      First_Data_Sector           : Unsigned_64;
+      Root_Directory_Sector_Count : Unsigned_32;
+      Root_Directory_Sector       : out Unsigned_64;
+      Result                      : out Function_Result);
 
    procedure Read_Boot_Sector
      (Filesystem      : Filesystem_Access;

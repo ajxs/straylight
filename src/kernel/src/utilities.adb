@@ -102,4 +102,10 @@ package body Utilities is
          Log_Error ("Constraint_Error: Set_Fixed_Length_String");
    end Set_Fixed_Length_String;
 
+   function ASCII_To_Wide_Char (ASCII_Char : Character) return Wide_Character
+   is
+   begin
+      return Wide_Character'Val (Character'Pos (ASCII_Char));
+   end ASCII_To_Wide_Char;
+
 end Utilities;

@@ -30,6 +30,9 @@ package Utilities is
      (Wide_Char : Wide_Character) return Character
    with Pure_Function;
 
+   function ASCII_To_Wide_Char (ASCII_Char : Character) return Wide_Character
+   with Pure_Function;
+
    type UTF8_Converted_Char_Buffer_T is array (1 .. 4) of Character;
 
    procedure Encode_UCS2_Wide_Char_As_UTF8_Buffer

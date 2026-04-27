@@ -246,16 +246,13 @@ package body Filesystems.FAT is
          --  of the file name.
          exit Copy_Name when Dir_Entry.File_Name (I) = ' ';
 
-         Filename (I) :=
-           Wide_Character'Val (Character'Pos (Dir_Entry.File_Name (I)));
+         Filename (I) := ASCII_To_Wide_Char (Dir_Entry.File_Name (I));
 
-         --  Increment the name length.
          Filename_Length := Filename_Length + 1;
       end loop Copy_Name;
 
-      --  If this DOS file entry has an extension
-      --  then it is appended after a trailing '.'
-      --  character at the end of the file name.
+      --  If this DOS file entry has an extension, append it after a
+      --  trailing '.' character at the end of the file name.
       if Dir_Entry.File_Ext (1) /= ' ' then
          Filename_Length := Filename_Length + 1;
 
@@ -271,9 +268,8 @@ package body Filesystems.FAT is
 
             Filename_Length := Filename_Length + 1;
 
-            --  Convert each DOS file extension character to a wide character.
             Filename (Filename_Length) :=
-              Wide_Character'Val (Character'Pos (Dir_Entry.File_Ext (I)));
+              ASCII_To_Wide_Char (Dir_Entry.File_Ext (I));
          end loop Copy_Extension;
       end if;
 
@@ -294,24 +290,21 @@ package body Filesystems.FAT is
       return Filesystem_Node_Type_File;
    end Get_Node_Type_From_Directory_Entry;
 
-   function Get_FAT_Sector_Count (Boot_Sector : Boot_Sector_T) return Natural
+   function Get_FAT_Table_Size (Boot_Sector : Boot_Sector_T) return Unsigned_32
    is
       --  The extended BIOS parameter block, if the filesystem is FAT32.
-      FAT32_EBPB : FAT32_Extended_BIOS_Parameter_Block
+      FAT32_EBPB : EBPB_FAT32_T
       with
         Import,
         Alignment => 1,
         Address   => Boot_Sector.EBPB_Reserved_Space'Address;
    begin
       if Boot_Sector.BPB.Table_Size > 0 then
-         return Natural (Boot_Sector.BPB.Table_Size);
+         return Unsigned_32 (Boot_Sector.BPB.Table_Size);
       end if;
 
-      return Natural (FAT32_EBPB.Table_Size);
-   exception
-      when Constraint_Error =>
-         return 0;
-   end Get_FAT_Sector_Count;
+      return FAT32_EBPB.Table_Size;
+   end Get_FAT_Table_Size;
 
    function Get_Filesystem_Type (Total_Clusters : Natural) return FAT_Type_T is
    begin
@@ -327,17 +320,20 @@ package body Filesystems.FAT is
    end Get_Filesystem_Type;
 
    function Get_Root_Directory_Sector_Count
-     (Boot_Sector : Boot_Sector_T) return Natural is
+     (Boot_Sector : Boot_Sector_T) return Unsigned_32 is
    begin
-      Root_Entry_Size : constant Natural :=
-        Natural (Boot_Sector.BPB.Root_Entry_Count) * 32;
+      Root_Entry_Size : constant Unsigned_32 :=
+        Unsigned_32 (Boot_Sector.BPB.Root_Entry_Count) * 32;
 
-      Total_Size : constant Natural :=
-        Root_Entry_Size + Natural (Boot_Sector.BPB.Bytes_Per_Sector) - 1;
+      Total_Size : constant Unsigned_32 :=
+        Root_Entry_Size + Unsigned_32 (Boot_Sector.BPB.Bytes_Per_Sector) - 1;
 
-      return Total_Size / Natural (Boot_Sector.BPB.Bytes_Per_Sector);
+      return Total_Size / Unsigned_32 (Boot_Sector.BPB.Bytes_Per_Sector);
    exception
       when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Get_Root_Directory_Sector_Count",
+            Logging_Tags_FAT);
          return 0;
    end Get_Root_Directory_Sector_Count;
 
@@ -356,17 +352,20 @@ package body Filesystems.FAT is
       Total_Clusters : out Natural;
       Result         : out Function_Result) is
    begin
-      --  The number of sectors in each File Allocation Table.
-      Sectors_Per_FAT : constant Unsigned_32 :=
-        Unsigned_32 (Get_FAT_Sector_Count (Boot_Sector));
-
       Total_Sectors : constant Unsigned_32 := Get_Total_Sectors (Boot_Sector);
+      Root_Directory_Sector_Count : constant Unsigned_32 :=
+        Get_Root_Directory_Sector_Count (Boot_Sector);
+
+      FAT_Table_Size : constant Unsigned_32 :=
+        Get_FAT_Table_Size (Boot_Sector);
 
       FAT_Sector_Count : constant Unsigned_32 :=
-        Unsigned_32 (Boot_Sector.BPB.Table_Count) * Sectors_Per_FAT;
+        Unsigned_32 (Boot_Sector.BPB.Table_Count) * FAT_Table_Size;
 
       Overhead_Sectors : constant Unsigned_32 :=
-        FAT_Sector_Count + Unsigned_32 (Boot_Sector.BPB.Reserved_Sector_Count);
+        FAT_Sector_Count
+        + Unsigned_32 (Boot_Sector.BPB.Reserved_Sector_Count)
+        + Root_Directory_Sector_Count;
 
       --  Guard against the possibility of an underflow when calculating the
       --  number of data sectors caused by a corrupt BPB.
@@ -391,7 +390,7 @@ package body Filesystems.FAT is
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Get_Total_Clusters", Logging_Tags_FAT);
          Total_Clusters := 0;
-         Result := Unhandled_Exception;
+         Result := Constraint_Exception;
    end Get_Total_Clusters;
 
    procedure Print_FAT_Filesystem_Info
@@ -432,6 +431,41 @@ package body Filesystems.FAT is
          Log_Error ("Constraint_Error: Print_FAT_Filesystem_Info");
    end Print_FAT_Filesystem_Info;
 
+   procedure Get_Root_Directory_Sector
+     (EBPB_Address                : Virtual_Address_T;
+      FAT_Type                    : FAT_Type_T;
+      Sectors_Per_Cluster         : Natural;
+      First_Data_Sector           : Unsigned_64;
+      Root_Directory_Sector_Count : Unsigned_32;
+      Root_Directory_Sector       : out Unsigned_64;
+      Result                      : out Function_Result)
+   is
+      --  The extended FAT32 BIOS parameter block,
+      FAT32_EBPB : EBPB_FAT32_T
+      with Import, Alignment => 1, Address => EBPB_Address;
+   begin
+      case FAT_Type is
+         when FAT_Type_FAT32 .. FAT_Type_ExFAT =>
+            Root_Directory_Sector :=
+              Get_First_Sector_Of_Cluster
+                (FAT32_EBPB.Root_Cluster,
+                 Sectors_Per_Cluster,
+                 First_Data_Sector);
+
+         when others                           =>
+            Root_Directory_Sector :=
+              First_Data_Sector - Unsigned_64 (Root_Directory_Sector_Count);
+      end case;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Get_Root_Directory_Sector", Logging_Tags_FAT);
+         Root_Directory_Sector := 0;
+         Result := Constraint_Exception;
+   end Get_Root_Directory_Sector;
+
    procedure Read_Boot_Sector
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -455,13 +489,6 @@ package body Filesystems.FAT is
          Boot_Sector : aliased Boot_Sector_T
          with Import, Alignment => 1, Address => Sector_Address;
 
-         --  The extended FAT32 BIOS parameter block,
-         FAT32_EBPB : FAT32_Extended_BIOS_Parameter_Block
-         with
-           Import,
-           Alignment => 1,
-           Address   => Boot_Sector.EBPB_Reserved_Space'Address;
-
          Total_Clusters : Natural := 0;
       begin
          Get_Total_Clusters (Boot_Sector, Total_Clusters, Result);
@@ -479,36 +506,39 @@ package body Filesystems.FAT is
 
          Filesystem_Info.Root_Directory_Buffer_Size :=
            Filesystem_Info.Bytes_Per_Sector
-           * Filesystem_Info.Root_Directory_Sector_Count;
+           * Natural (Filesystem_Info.Root_Directory_Sector_Count);
 
-         Filesystem_Info.FAT_Sector_Count :=
-           Get_FAT_Sector_Count (Boot_Sector);
+         Filesystem_Info.FAT_Sector_Count := Get_FAT_Table_Size (Boot_Sector);
 
          Filesystem_Info.First_FAT_Sector :=
            Unsigned_64 (Boot_Sector.BPB.Reserved_Sector_Count);
 
          Filesystem_Info.FAT_Buffer_Size :=
-           Filesystem_Info.FAT_Sector_Count * Filesystem_Info.Bytes_Per_Sector;
+           Natural (Filesystem_Info.FAT_Sector_Count)
+           * Filesystem_Info.Bytes_Per_Sector;
 
          Filesystem_Info.Sectors_Per_Cluster :=
            Natural (Boot_Sector.BPB.Sectors_Per_Cluster);
 
-         Total_Tables_Size : constant Natural :=
-           Natural (Boot_Sector.BPB.Table_Count)
-           * Natural (Boot_Sector.BPB.Table_Size);
+         Total_Tables_Size : constant Unsigned_64 :=
+           Unsigned_64 (Boot_Sector.BPB.Table_Count)
+           * Unsigned_64 (Filesystem_Info.FAT_Sector_Count);
 
          Filesystem_Info.First_Data_Sector :=
            Unsigned_64 (Boot_Sector.BPB.Reserved_Sector_Count)
            + Unsigned_64 (Filesystem_Info.Root_Directory_Sector_Count)
-           + Unsigned_64 (Total_Tables_Size);
+           + Total_Tables_Size;
 
-         if Filesystem_Info.FAT_Type = FAT_Type_FAT32 then
-            Filesystem_Info.Root_Directory_Sector :=
-              Unsigned_64 (FAT32_EBPB.Root_Cluster);
-         else
-            Filesystem_Info.Root_Directory_Sector :=
-              Filesystem_Info.First_Data_Sector
-              - Unsigned_64 (Filesystem_Info.Root_Directory_Sector_Count);
+         Get_Root_Directory_Sector
+           (Boot_Sector.EBPB_Reserved_Space'Address,
+            Filesystem_Info.FAT_Type,
+            Filesystem_Info.Sectors_Per_Cluster,
+            Filesystem_Info.First_Data_Sector,
+            Filesystem_Info.Root_Directory_Sector_Count,
+            Filesystem_Info.Root_Directory_Sector,
+            Result);
+         if Is_Error (Result) then
+            return;
          end if;
 
       end Parse_Boot_Sector;
@@ -545,7 +575,10 @@ package body Filesystems.FAT is
       end if;
 
       Current_Read_Sector :=
-        Get_First_Sector_Of_Cluster (Filesystem_Info, Cluster);
+        Get_First_Sector_Of_Cluster
+          (Cluster,
+           Filesystem_Info.Sectors_Per_Cluster,
+           Filesystem_Info.First_Data_Sector);
 
       for I in 0 .. Filesystem_Info.Sectors_Per_Cluster - 1 loop
          Read_Sector_From_Filesystem
