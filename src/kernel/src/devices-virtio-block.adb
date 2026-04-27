@@ -76,7 +76,9 @@ package body Devices.VirtIO.Block is
       with Import, Alignment => 1, Address => Device.Virtual_Address;
    begin
       --  If this is a write operation, ensure the device is not read-only.
-      if Write and then Device_Registers.Device_Features.VIRTIO_BLK_F_RO then
+      if Write
+        and then (Device_Registers.Device_Features and VIRTIO_BLK_F_RO) /= 0
+      then
          Log_Error ("Attempt to write to read-only VirtIO Block Device");
          Result := Operation_Unsupported;
          return;

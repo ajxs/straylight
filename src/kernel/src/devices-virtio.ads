@@ -19,6 +19,24 @@ package Devices.VirtIO is
    procedure Allocate_VirtIO_Device_Resources
      (Device : in out Device_T; Result : out Function_Result);
 
+   --  Reserved feature bits.
+   VIRTIO_F_ANY_LAYOUT    : constant := 2 ** 27;
+   VIRTIO_F_INDIRECT_DESC : constant := 2 ** 28;
+   VIRTIO_F_EVENT_IDX     : constant := 2 ** 29;
+
+   --  Page-1 feature bits (Second feature word).
+   VIRTIO_F_VERSION_1         : constant := 2 ** 0;
+   VIRTIO_F_ACCESS_PLATFORM   : constant := 2 ** 1;
+   VIRTIO_F_RING_PACKED       : constant := 2 ** 2;
+   VIRTIO_F_IN_ORDER          : constant := 2 ** 3;
+   VIRTIO_F_ORDER_PLATFORM    : constant := 2 ** 4;
+   VIRTIO_F_SR_IOV            : constant := 2 ** 5;
+   VIRTIO_F_NOTIFICATION_DATA : constant := 2 ** 6;
+   VIRTIO_F_NOTIF_CONFIG_DATA : constant := 2 ** 7;
+   VIRTIO_F_RING_RESET        : constant := 2 ** 8;
+   VIRTIO_F_ADMIN_VQ          : constant := 2 ** 9;
+   VIRTIO_F_SUSPEND_RESUME    : constant := 2 ** 10;
+
 private
    Logging_Tags_VirtIO : constant Log_Tags := [Log_Tag_Devices_VirtIO];
 
@@ -91,53 +109,14 @@ private
        Failed             at 0 range 7 .. 7;
      end record;
 
-   type VirtIO_Device_Features_Block_T is record
-      VIRTIO_BLK_F_SIZE_MAX       : Boolean;
-      VIRTIO_BLK_F_SEG_MAX        : Boolean;
-      VIRTIO_BLK_F_GEOMETRY       : Boolean;
-      VIRTIO_BLK_F_RO             : Boolean;
-      VIRTIO_BLK_F_BLK_SIZE       : Boolean;
-      VIRTIO_BLK_F_SCSI           : Boolean;
-      VIRTIO_BLK_F_FLUSH          : Boolean;
-      VIRTIO_BLK_F_TOPOLOGY       : Boolean;
-      VIRTIO_BLK_F_CONFIG_WCE     : Boolean;
-      VIRTIO_BLK_F_MQ             : Boolean;
-      VIRTIO_BLK_F_DISCARD        : Boolean;
-      VIRTIO_BLK_F_WRITE_ZEROES   : Boolean;
-      UNUSED_1                    : Boolean;
-      VIRTIO_F_ANY_LAYOUT         : Boolean;
-      VIRTIO_RING_F_INDIRECT_DESC : Boolean;
-      VIRTIO_RING_F_EVENT_IDX     : Boolean;
-   end record
-   with Size => 32;
-   for VirtIO_Device_Features_Block_T use
-     record
-       VIRTIO_BLK_F_SIZE_MAX       at 0 range 1 .. 1;
-       VIRTIO_BLK_F_SEG_MAX        at 0 range 2 .. 2;
-       VIRTIO_BLK_F_GEOMETRY       at 0 range 4 .. 4;
-       VIRTIO_BLK_F_RO             at 0 range 5 .. 5;
-       VIRTIO_BLK_F_BLK_SIZE       at 0 range 6 .. 6;
-       VIRTIO_BLK_F_SCSI           at 0 range 7 .. 7;
-       VIRTIO_BLK_F_FLUSH          at 0 range 9 .. 9;
-       VIRTIO_BLK_F_TOPOLOGY       at 0 range 10 .. 10;
-       VIRTIO_BLK_F_CONFIG_WCE     at 0 range 11 .. 11;
-       VIRTIO_BLK_F_MQ             at 0 range 12 .. 12;
-       VIRTIO_BLK_F_DISCARD        at 0 range 13 .. 13;
-       VIRTIO_BLK_F_WRITE_ZEROES   at 0 range 14 .. 14;
-       UNUSED_1                    at 0 range 15 .. 26;
-       VIRTIO_F_ANY_LAYOUT         at 0 range 27 .. 27;
-       VIRTIO_RING_F_INDIRECT_DESC at 0 range 28 .. 28;
-       VIRTIO_RING_F_EVENT_IDX     at 0 range 29 .. 29;
-     end record;
-
    type VirtIO_MMIO_Device_Registers_T is record
       Magic_Value            : Unsigned_32;
       Version                : Unsigned_32;
       Device_ID              : Unsigned_32;
       Vendor_ID              : Unsigned_32;
-      Device_Features        : VirtIO_Device_Features_Block_T;
+      Device_Features        : Unsigned_32;
       Device_Features_Select : Unsigned_32;
-      Driver_Features        : VirtIO_Device_Features_Block_T;
+      Driver_Features        : Unsigned_32;
       Driver_Features_Select : Unsigned_32;
       Queue_Select           : Unsigned_32;
       Queue_Size_Maximum     : Unsigned_32;

@@ -38,6 +38,10 @@ package Devices is
    type VirtIO_Descriptor_Status_Array_T is
      array (VirtIO_Descriptor_Array_Index_T) of Boolean;
 
+   --  The kernel is mapped into the higher-half, and needs to operate on
+   --  virtual addresses. However, devices operate on physical addresses, so
+   --  the kernel needs to maintain both virtual and physical addresses for
+   --  VirtIO devices resources.
    subtype VirtIO_Resource_Allocated_Addresses_T is
      Memory.Allocators.Memory_Allocation_Result;
 
@@ -48,16 +52,22 @@ package Devices is
    type Request_Info_Array_T is
      array (VirtIO_Descriptor_Array_Index_T) of VirtIO_Device_Request_Info_T;
 
-   --  Block device requests require both the virtual and physical addresses
-   --  of the request descriptor to properly set up the descriptor table.
-   --  This structure holds both addresses for each request.
-   type Device_Request_Array_Addresses_T is
-     array (VirtIO_Descriptor_Array_Index_T)
-     of VirtIO_Resource_Allocated_Addresses_T;
+   --  Feature bits for Virtio devices are split into multiple 'pages' of
+   --  32-bit feature bitmaps. The first page (Page 0) is accessed by writing
+   --  0 to the DeviceFeaturesSel register, the second page (Page 1) is
+   --  accessed by writing 1, and so on.
+   --  Currently only two pages are defined in the Virtio specification.
+   --  Refer to section 4.2.2 of the Virtio specification for more details.
+   type Virtio_Device_Features_Pages_T is array (0 .. 1) of Unsigned_32;
 
    type Device_Bus_Info_VirtIO_T
      (Device_Type : VirtIO_Device_Type_T := VirtIO_Device_Type_Unknown)
    is record
+      --  Defines which features the driver supports.
+      --  During feature negotiation, this field will be combined with the
+      --  device's supported features to determine the final set of active
+      --  features.
+      Driver_Features        : Virtio_Device_Features_Pages_T := [others => 0];
       Request_Info           : Request_Info_Array_T :=
         [others => (Channel => 0)];
       Request_Status_Array   : VirtIO_Resource_Allocated_Addresses_T;
@@ -107,8 +117,6 @@ package Devices is
    end record;
 
    type Device_Access is access all Device_T;
-
-   --  type System_Device_Array is array (1 .. 16) of aliased Device_T;
 
    System_Devices : array (1 .. 16) of aliased Device_T;
 

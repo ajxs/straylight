@@ -393,7 +393,7 @@ package body Devices.VirtIO is
          Device_Needs_Reset => False,
          Failed             => False);
 
-      Device_Features : VirtIO_Device_Features_Block_T;
+      Device_Features : Virtio_Device_Features_Pages_T := [others => 0];
    begin
       --  @TODO: Revisit error handling.
       --  This is a remnant of a very early implementation.
@@ -450,25 +450,27 @@ package body Devices.VirtIO is
       Device_Registers.Status := Status;
 
       --  Negotiate Device Features.
-      --  Section 4.2.2.2 Driver Requirements states that:
-      --  Before reading from DeviceFeatures, the driver MUST write a
-      --  value to DeviceFeaturesSel.
-      Device_Registers.Device_Features_Select := 0;
-      Device_Features := Device_Registers.Device_Features;
+      --  Iterate through each page of device features, load the supported
+      --  features from the device, mask out any features not supported by
+      --  the driver, then write the negotiated features back to the device.
+      for I in Device.Bus_Info_VirtIO.Driver_Features'Range loop
+         --  Section 4.2.2.2 Driver Requirements states that:
+         --  Before reading from DeviceFeatures, the driver MUST write a
+         --  value to DeviceFeaturesSel.
+         Device_Registers.Device_Features_Select := Unsigned_32 (I);
 
-      Device_Features.VIRTIO_BLK_F_RO := False;
-      Device_Features.VIRTIO_BLK_F_SCSI := False;
-      Device_Features.VIRTIO_BLK_F_CONFIG_WCE := False;
-      Device_Features.VIRTIO_BLK_F_MQ := False;
-      Device_Features.VIRTIO_F_ANY_LAYOUT := False;
-      Device_Features.VIRTIO_RING_F_INDIRECT_DESC := False;
-      Device_Features.VIRTIO_RING_F_EVENT_IDX := False;
+         --  Load the device features supported by the device, then mask out
+         --  any features not supported by the driver.
+         Device_Features (I) := Device_Registers.Device_Features;
+         Device_Features (I) :=
+           Device_Features (I) and Device.Bus_Info_VirtIO.Driver_Features (I);
 
-      --  Section 4.2.2.2 Driver Requirements states that:
-      --  Before writing to the DriverFeatures register, the driver MUST
-      --  write a value to the DriverFeaturesSel register.
-      Device_Registers.Driver_Features_Select := 0;
-      Device_Registers.Driver_Features := Device_Features;
+         --  Section 4.2.2.2 Driver Requirements states that:
+         --  Before writing to the DriverFeatures register, the driver MUST
+         --  write a value to the DriverFeaturesSel register.
+         Device_Registers.Driver_Features_Select := Unsigned_32 (I);
+         Device_Registers.Driver_Features := Device_Features (I);
+      end loop;
 
       Status.Features_OK := True;
       Device_Registers.Status := Status;

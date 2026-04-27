@@ -16,6 +16,23 @@ package Devices.VirtIO.Block is
       Sector                : Unsigned_64;
       Result                : out Function_Result);
 
+   --  Block device feature bits.
+   VIRTIO_BLK_F_SIZE_MAX     : constant := 2 ** 1;
+   VIRTIO_BLK_F_SEG_MAX      : constant := 2 ** 2;
+   VIRTIO_BLK_F_GEOMETRY     : constant := 2 ** 4;
+   VIRTIO_BLK_F_RO           : constant := 2 ** 5;
+   VIRTIO_BLK_F_BLK_SIZE     : constant := 2 ** 6;
+   VIRTIO_BLK_F_SCSI         : constant := 2 ** 7;
+   VIRTIO_BLK_F_FLUSH        : constant := 2 ** 9;
+   VIRTIO_BLK_F_TOPOLOGY     : constant := 2 ** 10;
+   VIRTIO_BLK_F_CONFIG_WCE   : constant := 2 ** 11;
+   VIRTIO_BLK_F_MQ           : constant := 2 ** 12;
+   VIRTIO_BLK_F_DISCARD      : constant := 2 ** 13;
+   VIRTIO_BLK_F_WRITE_ZEROES : constant := 2 ** 14;
+   VIRTIO_BLK_F_LIFETIME     : constant := 2 ** 15;
+   VIRTIO_BLK_F_SECURE_ERASE : constant := 2 ** 16;
+   VIRTIO_BLK_F_ZONED        : constant := 2 ** 17;
+
 private
    procedure Read_Write
      (Reading_Process       : in out Process_Control_Block_T;

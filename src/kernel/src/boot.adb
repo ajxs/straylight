@@ -6,24 +6,26 @@
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Boot.Devicetree;
-with Devices;           use Devices;
-with Devices.VirtIO;
+with Devices;              use Devices;
+with Devices.VirtIO;       use Devices.VirtIO;
+with Devices.VirtIO.Block; use Devices.VirtIO.Block;
 with Devices.VirtIO.Graphics;
 with Devices.UART;
 with Devices.PLIC;
-with Filesystems;       use Filesystems;
-with Filesystems.Root;  use Filesystems.Root;
-with Function_Results;  use Function_Results;
-with Graphics;          use Graphics;
+with Filesystems;          use Filesystems;
+with Filesystems.Root;     use Filesystems.Root;
+with Function_Results;     use Function_Results;
+with Graphics;             use Graphics;
 with Loader;
-with Locks;             use Locks;
-with Memory.Allocators; use Memory.Allocators;
-with Memory.Kernel;     use Memory.Kernel;
-with Memory.Physical;   use Memory.Physical;
-with Memory.Virtual;    use Memory.Virtual;
+with Locks;                use Locks;
+with Memory.Allocators;    use Memory.Allocators;
+with Memory.Kernel;        use Memory.Kernel;
+with Memory.Physical;      use Memory.Physical;
+with Memory.Virtual;       use Memory.Virtual;
 with RISCV.SBI;
 with Processes.Scheduler;
 with Traps;
+with Utilities;            use Utilities;
 
 package body Boot is
    procedure Free_Boot_Memory is
@@ -120,6 +122,25 @@ package body Boot is
       Device_Virtual_Address :=
         Device_Virtual_Address + UART_Device.Memory_Size;
 
+      Disk_Device_Driver_Features : constant Virtio_Device_Features_Pages_T :=
+        [not Create_U32_Bitmask_From_Flags
+               ([VIRTIO_BLK_F_RO,
+                 VIRTIO_BLK_F_SCSI,
+                 VIRTIO_BLK_F_CONFIG_WCE,
+                 VIRTIO_BLK_F_MQ,
+                 VIRTIO_F_ANY_LAYOUT,
+                 VIRTIO_F_INDIRECT_DESC,
+                 VIRTIO_F_EVENT_IDX]),
+         Create_U32_Bitmask_From_Flags ([VIRTIO_F_VERSION_1])];
+
+      Graphics_Device_Driver_Features :
+        constant Virtio_Device_Features_Pages_T :=
+          [not Create_U32_Bitmask_From_Flags
+                 ([VIRTIO_F_ANY_LAYOUT,
+                   VIRTIO_F_INDIRECT_DESC,
+                   VIRTIO_F_EVENT_IDX]),
+           Create_U32_Bitmask_From_Flags ([VIRTIO_F_VERSION_1])];
+
       Disk_Device :=
         (Device_Class       => Device_Class_Storage,
          Device_Bus         => Device_Bus_VirtIO_MMIO,
@@ -131,7 +152,8 @@ package body Boot is
          Spinlock           => Locks.Null_Spinlock,
          Record_Used        => True,
          Bus_Info_VirtIO    =>
-           (Device_Type                   => VirtIO_Device_Type_Block,
+           (Driver_Features               => Disk_Device_Driver_Features,
+            Device_Type                   => VirtIO_Device_Type_Block,
             Request_Info                  => [others => (Channel => 0)],
             Request_Serviced_Index        => 0,
             Request_Status_Array          => Default_Unallocated_Addresses,
@@ -175,7 +197,8 @@ package body Boot is
          Spinlock           => Locks.Null_Spinlock,
          Record_Used        => True,
          Bus_Info_VirtIO    =>
-           (Device_Type                   => VirtIO_Device_Type_Block,
+           (Driver_Features               => Disk_Device_Driver_Features,
+            Device_Type                   => VirtIO_Device_Type_Block,
             Request_Info                  => [others => (Channel => 0)],
             Request_Serviced_Index        => 0,
             Request_Status_Array          => Default_Unallocated_Addresses,
@@ -199,7 +222,8 @@ package body Boot is
          Spinlock           => Locks.Null_Spinlock,
          Record_Used        => True,
          Bus_Info_VirtIO    =>
-           (Device_Type            => VirtIO_Device_Type_Graphics,
+           (Driver_Features        => Graphics_Device_Driver_Features,
+            Device_Type            => VirtIO_Device_Type_Graphics,
             Request_Info           => [others => (Channel => 0)],
             Request_Serviced_Index => 0,
             Request_Status_Array   => Default_Unallocated_Addresses,

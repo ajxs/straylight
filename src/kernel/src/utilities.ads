@@ -42,4 +42,10 @@ package Utilities is
 
    procedure Set_Fixed_Length_String (Input : String; Dest_Str : out String);
 
+   type Bit_Flag_Array_T is array (Natural range <>) of Unsigned_32;
+
+   function Create_U32_Bitmask_From_Flags
+     (Flags : Bit_Flag_Array_T) return Unsigned_32
+   with Pure_Function, Inline;
+
 end Utilities;

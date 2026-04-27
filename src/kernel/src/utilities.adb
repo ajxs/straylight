@@ -108,4 +108,16 @@ package body Utilities is
       return Wide_Character'Val (Character'Pos (ASCII_Char));
    end ASCII_To_Wide_Char;
 
+   function Create_U32_Bitmask_From_Flags
+     (Flags : Bit_Flag_Array_T) return Unsigned_32
+   is
+      Bitmask : Unsigned_32 := 0;
+   begin
+      for Flag of Flags loop
+         Bitmask := Bitmask or Flag;
+      end loop;
+
+      return Bitmask;
+   end Create_U32_Bitmask_From_Flags;
+
 end Utilities;
