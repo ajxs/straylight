@@ -167,16 +167,15 @@ package body Filesystems.FAT.FAT16 is
             Parent_Node,
             Filesystem_Node,
             Result);
-         if Is_Error (Result) then
-            goto Free_Buffer;
-         elsif Result = Success then
+
+         --  All results fall-through to free the allocated buffer.
+         if Result = Success then
             Log_Debug ("Found matching file entry.", Logging_Tags_FAT);
-            goto Free_Buffer;
+         elsif Result = File_Not_Found then
+            Log_Debug
+              ("File not found in root FAT directory.", Logging_Tags_FAT);
          end if;
       end Parse_Directory_Buffer;
-
-      Log_Debug ("File not found in root FAT directory.", Logging_Tags_FAT);
-      Result := File_Not_Found;
 
       <<Free_Buffer>>
       Free_Kernel_Memory (Directory_Buffer_Address, Free_Buffer_Result);
