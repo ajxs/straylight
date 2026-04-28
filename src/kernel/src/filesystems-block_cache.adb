@@ -13,20 +13,13 @@ package body Filesystems.Block_Cache is
       Cache_Index  : Positive;
       Current_Time : Unsigned_64) return Boolean is
    begin
-      if Cache_Index > Cache.Entries'Last then
-         return False;
-      end if;
-
-      return
-        (Current_Time - Cache.Entries (Cache_Index).Last_Access)
-        > Cache_Entry_Age_Threshold;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Can_Block_Cache_Entry_Be_Invalidated");
-         return False;
+      --  Stub implementation.
+      --  Cache entry invalidation isn't currently supported.
+      pragma Unreferenced (Cache, Cache_Index, Current_Time);
+      return False;
    end Can_Block_Cache_Entry_Be_Invalidated;
 
-   procedure Find_And_Claim_Available_Block_Cache_Entry_Unlocked
+   procedure Find_And_Claim_Available_Block_Cache_Entry
      (Cache       : in out Block_Cache_T;
       Cache_Index : out Positive;
       Result      : out Function_Result) is
@@ -60,21 +53,25 @@ package body Filesystems.Block_Cache is
    exception
       when Constraint_Error =>
          Log_Error
-           ("Constraint_Error: "
-            & "Find_And_Claim_Available_Block_Cache_Entry_Unlocked");
+           ("Constraint_Error: Find_And_Claim_Available_Block_Cache_Entry");
          Result := Constraint_Exception;
-   end Find_And_Claim_Available_Block_Cache_Entry_Unlocked;
-
-   procedure Find_And_Claim_Available_Block_Cache_Entry
-     (Cache       : in out Block_Cache_T;
-      Cache_Index : out Positive;
-      Result      : out Function_Result) is
-   begin
-      Acquire_Spinlock (Cache.Spinlock);
-      Find_And_Claim_Available_Block_Cache_Entry_Unlocked
-        (Cache, Cache_Index, Result);
-      Release_Spinlock (Cache.Spinlock);
    end Find_And_Claim_Available_Block_Cache_Entry;
+
+   function Is_Matching_Used_Cache_Entry
+     (Cache        : Block_Cache_T;
+      Cache_Index  : Positive;
+      Filesystem   : Filesystem_Access;
+      Block_Number : Unsigned_64) return Boolean is
+   begin
+      return
+        (Cache.Entries (Cache_Index).Entry_Used
+         and then Cache.Entries (Cache_Index).Filesystem = Filesystem
+         and then Cache.Entries (Cache_Index).Block_Number = Block_Number);
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Is_Matching_Used_Cache_Entry");
+         return False;
+   end Is_Matching_Used_Cache_Entry;
 
    procedure Find_Existing_Block_In_Cache
      (Cache        : in out Block_Cache_T;
@@ -83,24 +80,14 @@ package body Filesystems.Block_Cache is
       Cache_Index  : out Positive;
       Result       : out Function_Result) is
    begin
-      --  Acquire the block cache spinlock prior to searching the cache.
-      --  We need to ensure the block we're looking for isn't being modified
-      --  by another process while we're searching.
-      Acquire_Spinlock (Cache.Spinlock);
-
       for I in Cache.Entries'Range loop
-         if Cache.Entries (I).Entry_Used
-           and then Cache.Entries (I).Filesystem = Filesystem
-           and then Cache.Entries (I).Block_Number = Block_Number
+         if Is_Matching_Used_Cache_Entry (Cache, I, Filesystem, Block_Number)
          then
             Cache_Index := I;
             Result := Success;
-            Release_Spinlock (Cache.Spinlock);
             return;
          end if;
       end loop;
-
-      Release_Spinlock (Cache.Spinlock);
 
       Result := Cache_Entry_Not_Found;
    end Find_Existing_Block_In_Cache;
@@ -144,7 +131,9 @@ package body Filesystems.Block_Cache is
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result)
    is
-      Cache_Index : Positive := 1;
+      Cache_Index     : Positive := 1;
+      Retry_Count     : Natural := 0;
+      Retry_Threshold : constant Natural := 3;
 
       Cache_Entry_Address_Virtual  : Virtual_Address_T := Null_Address;
       Cache_Entry_Address_Physical : Physical_Address_T :=
@@ -160,66 +149,125 @@ package body Filesystems.Block_Cache is
         ("Read_Block_From_Filesystem: " & Block_Number'Image,
          Logging_Tags_Block_Cache);
 
-      Find_Existing_Block_In_Cache
-        (System_Block_Cache, Filesystem, Block_Number, Cache_Index, Result);
-
-      --  Two possible results: Success / Cache_Entry_Not_Found.
-      if Result = Success then
-         Log_Debug
-           ("Found existing block in cache.", Logging_Tags_Block_Cache);
-
-         --  Acquire the cache entry's sleeplock.
-         --  This means that if this block is currently being used by another
-         --  process, the current process will 'sleep' here until the other
-         --  process is done with it.
-         --  If free, the current process will acquire the lock and continue.
-         Acquire_Sleeplock
-           (System_Block_Cache.Entries (Cache_Index).Sleeplock,
-            Reading_Process.Process_Id);
-      elsif Result = Cache_Entry_Not_Found then
-         Log_Debug
-           ("Block not found in cache; Reading from filesystem...",
-            Logging_Tags_Block_Cache);
-
-         --  If the block isn't already in the cache, allocate a new cache
-         --  entry, then read the data from the filesystem into that entry.
-         Find_And_Claim_Available_Block_Cache_Entry
-           (System_Block_Cache, Cache_Index, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         --  Acquire the cache entry's sleeplock.
-         --  In this case, it's unlikely the newly allocated block will be in
-         --  use by another process.
-         Acquire_Sleeplock
-           (System_Block_Cache.Entries (Cache_Index).Sleeplock,
-            Reading_Process.Process_Id);
-
+      --  We read from/into the cache in a loop, so that if reading into a
+      --  cache entry fails, we can release the cache lock, and immediately
+      --  loop back to retry with another cache entry.
+      Read_From_Cache_Loop : loop
+         --  Acquire the block cache spinlock prior to searching the cache.
+         --  We need to ensure the block we're looking for isn't being modified
+         --  by another process while we're searching.
          Acquire_Spinlock (System_Block_Cache.Spinlock);
 
-         System_Block_Cache.Entries (Cache_Index).Filesystem := Filesystem;
-         System_Block_Cache.Entries (Cache_Index).Block_Number := Block_Number;
-         System_Block_Cache.Entries (Cache_Index).Last_Access :=
-           RISCV.Get_System_Time;
+         Find_Existing_Block_In_Cache
+           (System_Block_Cache, Filesystem, Block_Number, Cache_Index, Result);
 
-         Release_Spinlock (System_Block_Cache.Spinlock);
+         --  Two possible results: Success / Cache_Entry_Not_Found.
+         if Result = Success then
+            Log_Debug
+              ("Found existing block in cache.", Logging_Tags_Block_Cache);
 
-         Read_Block_From_Filesystem_Into_Cache_Entry
-           (System_Block_Cache,
-            Filesystem,
-            Reading_Process,
-            Block_Number,
-            Cache_Index,
-            Result);
-         if Is_Error (Result) then
-            --  In the case that reading the block from the filesystem failed,
-            --  release the cache entry we allocated.
-            System_Block_Cache.Entries (Cache_Index).Entry_Used := False;
+            --  Acquire the cache entry's sleeplock.
+            --  This means that if this block is currently being used by
+            --  another process, the current process will 'sleep' here until
+            --  the other process is done with it.
+            --  If free, the process will acquire the lock and continue.
+            Acquire_Sleeplock
+              (System_Block_Cache.Entries (Cache_Index).Sleeplock,
+               System_Block_Cache.Spinlock,
+               Reading_Process.Process_Id);
 
+            if not Is_Matching_Used_Cache_Entry
+                     (System_Block_Cache,
+                      Cache_Index,
+                      Filesystem,
+                      Block_Number)
+            then
+               --  The cache entry we found is no longer valid. This could
+               --  happen if another process released the cache entry after we
+               --  found it, but before we acquired the sleeplock.
+
+               Log_Error
+                 ("Cache entry found but no longer valid. Retrying...",
+                  Logging_Tags_Block_Cache);
+
+               Release_Sleeplock
+                 (System_Block_Cache.Entries (Cache_Index).Sleeplock);
+               Release_Spinlock (System_Block_Cache.Spinlock);
+            else
+               Release_Spinlock (System_Block_Cache.Spinlock);
+               exit Read_From_Cache_Loop;
+            end if;
+         elsif Result = Cache_Entry_Not_Found then
+            Log_Debug
+              ("Block not found in cache; Reading from filesystem...",
+               Logging_Tags_Block_Cache);
+
+            --  If the block isn't already in the cache, allocate a new cache
+            --  entry, then read the data from the filesystem into that entry.
+            Find_And_Claim_Available_Block_Cache_Entry
+              (System_Block_Cache, Cache_Index, Result);
+            if Is_Error (Result) then
+               Release_Spinlock (System_Block_Cache.Spinlock);
+               return;
+            end if;
+
+            --  Claim the cache entry prior to acquiring the sleeplock, to
+            --  ensure there's absolutely no window for another process to
+            --  claim the same  cache entry.
+            System_Block_Cache.Entries (Cache_Index).Filesystem := Filesystem;
+            System_Block_Cache.Entries (Cache_Index).Block_Number :=
+              Block_Number;
+            System_Block_Cache.Entries (Cache_Index).Last_Access :=
+              RISCV.Get_System_Time;
+
+            --  Acquire the cache entry's sleeplock.
+            --  In this case, it's unlikely the newly allocated block will be
+            --  in use by another process.
+            --  This needs to happen here, under the cache lock, before reading
+            --  the block from the filesystem into the cache entry, to ensure
+            --  that no other process can claim the same cache entry.
+            Acquire_Sleeplock
+              (System_Block_Cache.Entries (Cache_Index).Sleeplock,
+               System_Block_Cache.Spinlock,
+               Reading_Process.Process_Id);
+
+            Release_Spinlock (System_Block_Cache.Spinlock);
+
+            Read_Block_From_Filesystem_Into_Cache_Entry
+              (System_Block_Cache,
+               Filesystem,
+               Reading_Process,
+               Block_Number,
+               Cache_Index,
+               Result);
+            if Is_Error (Result) then
+               --  In the case that reading the block from the filesystem
+               --  failed, release the cache entry we allocated.
+
+               --  Save the original error result.
+               Error_Result : constant Function_Result := Result;
+
+               --  Specifically invalidate the invalid cache entry, so that the
+               --  invalid entry isn't picked up by another process.
+               Release_Block (Filesystem, Block_Number, Result, True);
+
+               Result := Error_Result;
+
+               return;
+            end if;
+
+            exit Read_From_Cache_Loop;
+         end if;
+
+         Retry_Count := Retry_Count + 1;
+         if Retry_Count > Retry_Threshold then
+            Log_Error
+              ("Exceeded retry threshold trying to read block.",
+               Logging_Tags_Block_Cache);
+            Result := Unhandled_Exception;
             return;
          end if;
-      end if;
+      end loop Read_From_Cache_Loop;
 
       Get_Block_Cache_Entry_Data_Address
         (System_Block_Cache,
@@ -312,6 +360,10 @@ package body Filesystems.Block_Cache is
                   Result);
          end case;
 
+         if Is_Error (Result) then
+            return;
+         end if;
+
          Current_Sector := Current_Sector + 1;
 
          Current_Read_Addr_Virtual :=
@@ -333,10 +385,11 @@ package body Filesystems.Block_Cache is
          Result := Constraint_Exception;
    end Read_Block_From_Filesystem_Into_Cache_Entry;
 
-   procedure Release_Block
-     (Filesystem   : Filesystem_Access;
-      Block_Number : Unsigned_64;
-      Result       : out Function_Result)
+   procedure Release_Block_Unlocked
+     (Filesystem             : Filesystem_Access;
+      Block_Number           : Unsigned_64;
+      Result                 : out Function_Result;
+      Invalidate_Cache_Entry : Boolean)
    is
       Cache_Index : Positive := 1;
    begin
@@ -353,23 +406,43 @@ package body Filesystems.Block_Cache is
         (System_Block_Cache, Filesystem, Block_Number, Cache_Index, Result);
       if Is_Error (Result) then
          return;
-      elsif Result = Success then
-         Log_Debug
-           ("Found block to release in cache.", Logging_Tags_Block_Cache);
-
-         Release_Sleeplock
-           (System_Block_Cache.Entries (Cache_Index).Sleeplock);
       elsif Result = Cache_Entry_Not_Found then
          Log_Error ("Block to release not found in cache.");
          Result := Invalid_Argument;
          return;
       end if;
 
+      Log_Debug ("Found block to release in cache.", Logging_Tags_Block_Cache);
+
+      --  Under some circumstances, such as when reading data into the cache
+      --  entry fails, we may want to invalidate the cache entry before
+      --  releasing it, to ensure it's not used by another process in an
+      --  invalid state.
+      if Invalidate_Cache_Entry then
+         System_Block_Cache.Entries (Cache_Index).Entry_Used := False;
+         System_Block_Cache.Entries (Cache_Index).Filesystem := null;
+         System_Block_Cache.Entries (Cache_Index).Block_Number := 0;
+      end if;
+
+      Release_Sleeplock (System_Block_Cache.Entries (Cache_Index).Sleeplock);
+
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Release_Block_Unlocked");
          Result := Constraint_Exception;
+   end Release_Block_Unlocked;
+
+   procedure Release_Block
+     (Filesystem             : Filesystem_Access;
+      Block_Number           : Unsigned_64;
+      Result                 : out Function_Result;
+      Invalidate_Cache_Entry : Boolean := False) is
+   begin
+      Acquire_Spinlock (System_Block_Cache.Spinlock);
+      Release_Block_Unlocked
+        (Filesystem, Block_Number, Result, Invalidate_Cache_Entry);
+      Release_Spinlock (System_Block_Cache.Spinlock);
    end Release_Block;
 
    procedure Release_Sector

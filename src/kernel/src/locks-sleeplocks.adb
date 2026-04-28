@@ -9,7 +9,9 @@ with Processes.Scheduler; use Processes.Scheduler;
 
 package body Locks.Sleeplocks is
    procedure Acquire_Sleeplock
-     (Lock : in out Sleeplock_T; Process_Id : Process_Id_T) is
+     (Lock           : in out Sleeplock_T;
+      Condition_Lock : in out Spinlock_T;
+      Process_Id     : Process_Id_T) is
    begin
       Acquiring_Process : constant Process_Control_Block_Access :=
         Find_Running_Process_With_Id (Process_Id);
@@ -22,6 +24,7 @@ package body Locks.Sleeplocks is
       end if;
 
       Acquire_Spinlock (Lock.Spinlock);
+      Release_Spinlock (Condition_Lock);
 
       while Lock.Locked /= 0 loop
          Lock_Process_Waiting_For_Channel
@@ -33,6 +36,7 @@ package body Locks.Sleeplocks is
       Lock.Locked := Sleeplock_Magic_Number;
       Lock.Process_Id := Process_Id;
 
+      Acquire_Spinlock (Condition_Lock);
       Release_Spinlock (Lock.Spinlock);
    exception
       when Constraint_Error =>

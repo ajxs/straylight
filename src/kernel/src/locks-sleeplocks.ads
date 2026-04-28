@@ -15,7 +15,9 @@ package Locks.Sleeplocks is
    end record;
 
    procedure Acquire_Sleeplock
-     (Lock : in out Sleeplock_T; Process_Id : Process_Id_T);
+     (Lock           : in out Sleeplock_T;
+      Condition_Lock : in out Spinlock_T;
+      Process_Id     : Process_Id_T);
 
    procedure Release_Sleeplock (Lock : in out Sleeplock_T);
 

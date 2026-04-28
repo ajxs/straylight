@@ -16,9 +16,10 @@ private package Filesystems.Block_Cache is
       Result               : out Function_Result);
 
    procedure Release_Block
-     (Filesystem   : Filesystem_Access;
-      Block_Number : Unsigned_64;
-      Result       : out Function_Result);
+     (Filesystem             : Filesystem_Access;
+      Block_Number           : Unsigned_64;
+      Result                 : out Function_Result;
+      Invalidate_Cache_Entry : Boolean := False);
 
    ----------------------------------------------------------------------------
    --  These procedures are functionally identical to the block read/release
@@ -73,12 +74,14 @@ private
 
    Cache_Entry_Age_Threshold : constant Unsigned_64 := 1000000;
 
-   procedure Find_And_Claim_Available_Block_Cache_Entry
-     (Cache       : in out Block_Cache_T;
-      Cache_Index : out Positive;
-      Result      : out Function_Result);
+   function Is_Matching_Used_Cache_Entry
+     (Cache        : Block_Cache_T;
+      Cache_Index  : Positive;
+      Filesystem   : Filesystem_Access;
+      Block_Number : Unsigned_64) return Boolean
+   with Inline;
 
-   procedure Find_And_Claim_Available_Block_Cache_Entry_Unlocked
+   procedure Find_And_Claim_Available_Block_Cache_Entry
      (Cache       : in out Block_Cache_T;
       Cache_Index : out Positive;
       Result      : out Function_Result);
@@ -109,5 +112,11 @@ private
       Block_Number    : Unsigned_64;
       Cache_Index     : Positive;
       Result          : out Function_Result);
+
+   procedure Release_Block_Unlocked
+     (Filesystem             : Filesystem_Access;
+      Block_Number           : Unsigned_64;
+      Result                 : out Function_Result;
+      Invalidate_Cache_Entry : Boolean);
 
 end Filesystems.Block_Cache;
