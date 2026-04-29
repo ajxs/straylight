@@ -206,9 +206,8 @@ package body Devices.Virtio is
    is
       Allocation_Result : Memory_Allocation_Result;
    begin
-      --  @TODO: Revisit error handling.
-      --  This is a remnant of a very early implementation.
       if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
+         Log_Error ("Device not Virtio MMIO");
          Result := Invalid_Argument;
          return;
       end if;
@@ -285,13 +284,6 @@ package body Devices.Virtio is
          & " / "
          & Device.Bus_Info_Virtio.Q_Available.Virtual_Address'Image,
          Logging_Tags_Virtio);
-
-      if Device.Bus_Info_Virtio.Device_Type = Virtio_Device_Type_Block then
-         Initialise_Block_Device (Device, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-      end if;
 
       Result := Success;
    exception
@@ -377,7 +369,7 @@ package body Devices.Virtio is
          Result := Constraint_Exception;
    end Free_Descriptor_Chain;
 
-   procedure Initialise_MMIO_Device
+   procedure Initialise_MMIO_Device_Unlocked
      (Device : in out Device_T; Result : out Function_Result)
    is
       Device_Registers : Virtio_MMIO_Device_Registers_T
@@ -395,9 +387,8 @@ package body Devices.Virtio is
 
       Device_Features : Virtio_Device_Features_Pages_T := [others => 0];
    begin
-      --  @TODO: Revisit error handling.
-      --  This is a remnant of a very early implementation.
       if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
+         Log_Error ("Device not Virtio MMIO");
          Result := Invalid_Argument;
          return;
       end if;
@@ -533,12 +524,33 @@ package body Devices.Virtio is
 
       Log_Debug ("Initialised Virtio MMIO Device.", Logging_Tags_Virtio);
 
+      case Device.Bus_Info_Virtio.Device_Type is
+         when Virtio_Device_Type_Block =>
+            Initialise_Block_Device (Device, Result);
+
+         when others                   =>
+            Result := Success;
+      end case;
+
+      if Is_Error (Result) then
+         return;
+      end if;
+
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Error
-           ("Constraint_Error: Initialise_MMIO_Device", Logging_Tags_Virtio);
+           ("Constraint_Error: Initialise_MMIO_Device_Unlocked",
+            Logging_Tags_Virtio);
          Result := Constraint_Exception;
+   end Initialise_MMIO_Device_Unlocked;
+
+   procedure Initialise_MMIO_Device
+     (Device : in out Device_T; Result : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+      Initialise_MMIO_Device_Unlocked (Device, Result);
+      Release_Spinlock (Device.Spinlock);
    end Initialise_MMIO_Device;
 
 end Devices.Virtio;

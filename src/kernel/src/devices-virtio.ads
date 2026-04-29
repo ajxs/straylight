@@ -110,58 +110,72 @@ private
      end record;
 
    type Virtio_MMIO_Device_Registers_T is record
-      Magic_Value            : Unsigned_32;
-      Version                : Unsigned_32;
-      Device_ID              : Unsigned_32;
-      Vendor_ID              : Unsigned_32;
-      Device_Features        : Unsigned_32;
-      Device_Features_Select : Unsigned_32;
-      Driver_Features        : Unsigned_32;
-      Driver_Features_Select : Unsigned_32;
-      Queue_Select           : Unsigned_32;
-      Queue_Size_Maximum     : Unsigned_32;
-      Queue_Size             : Unsigned_32;
-      Queue_Ready            : Unsigned_32;
-      Queue_Notify           : Unsigned_32;
-      Interrupt_Status       : Unsigned_32;
-      Interrupt_Acknowledge  : Unsigned_32;
-      Status                 : Virtio_Device_Status_T;
-      Queue_Descriptor_Low   : Unsigned_32;
-      Queue_Descriptor_High  : Unsigned_32;
-      Queue_Driver_Low       : Unsigned_32;
-      Queue_Driver_High      : Unsigned_32;
-      Queue_Device_Low       : Unsigned_32;
-      Queue_Device_High      : Unsigned_32;
+      Magic_Value               : Unsigned_32;
+      Version                   : Unsigned_32;
+      Device_ID                 : Unsigned_32;
+      Vendor_ID                 : Unsigned_32;
+      Device_Features           : Unsigned_32;
+      Device_Features_Select    : Unsigned_32;
+      Driver_Features           : Unsigned_32;
+      Driver_Features_Select    : Unsigned_32;
+      Queue_Select              : Unsigned_32;
+      Queue_Size_Maximum        : Unsigned_32;
+      Queue_Size                : Unsigned_32;
+      Queue_Ready               : Unsigned_32;
+      Queue_Notify              : Unsigned_32;
+      Interrupt_Status          : Unsigned_32;
+      Interrupt_Acknowledge     : Unsigned_32;
+      Status                    : Virtio_Device_Status_T;
+      Queue_Descriptor_Low      : Unsigned_32;
+      Queue_Descriptor_High     : Unsigned_32;
+      Queue_Driver_Low          : Unsigned_32;
+      Queue_Driver_High         : Unsigned_32;
+      Queue_Device_Low          : Unsigned_32;
+      Queue_Device_High         : Unsigned_32;
+      Shared_Memory_Select      : Unsigned_32;
+      Shared_Memory_Length_Low  : Unsigned_32;
+      Shared_Memory_Length_High : Unsigned_32;
+      Shared_Memory_Base_Low    : Unsigned_32;
+      Shared_Memory_Base_High   : Unsigned_32;
+      Queue_Reset               : Unsigned_32;
+      Config_Generation         : Unsigned_32;
       --  Device-specific configuration space would follow here.
    end record
    with
      Volatile,
-     Size                 => (168 * 8),
+     Size                 => (256 * 8),
      Scalar_Storage_Order => System.Low_Order_First;
    for Virtio_MMIO_Device_Registers_T use
      record
-       Magic_Value            at 16#000# range 0 .. 31;
-       Version                at 16#004# range 0 .. 31;
-       Device_ID              at 16#008# range 0 .. 31;
-       Vendor_ID              at 16#00c# range 0 .. 31;
-       Device_Features        at 16#010# range 0 .. 31;
-       Device_Features_Select at 16#014# range 0 .. 31;
-       Driver_Features        at 16#020# range 0 .. 31;
-       Driver_Features_Select at 16#024# range 0 .. 31;
-       Queue_Select           at 16#030# range 0 .. 31;
-       Queue_Size_Maximum     at 16#034# range 0 .. 31;
-       Queue_Size             at 16#038# range 0 .. 31;
-       Queue_Ready            at 16#044# range 0 .. 31;
-       Queue_Notify           at 16#050# range 0 .. 31;
-       Interrupt_Status       at 16#060# range 0 .. 31;
-       Interrupt_Acknowledge  at 16#064# range 0 .. 31;
-       Status                 at 16#070# range 0 .. 31;
-       Queue_Descriptor_Low   at 16#080# range 0 .. 31;
-       Queue_Descriptor_High  at 16#084# range 0 .. 31;
-       Queue_Driver_Low       at 16#090# range 0 .. 31;
-       Queue_Driver_High      at 16#094# range 0 .. 31;
-       Queue_Device_Low       at 16#0a0# range 0 .. 31;
-       Queue_Device_High      at 16#0a4# range 0 .. 31;
+       Magic_Value               at 16#000# range 0 .. 31;
+       Version                   at 16#004# range 0 .. 31;
+       Device_ID                 at 16#008# range 0 .. 31;
+       Vendor_ID                 at 16#00c# range 0 .. 31;
+       Device_Features           at 16#010# range 0 .. 31;
+       Device_Features_Select    at 16#014# range 0 .. 31;
+       Driver_Features           at 16#020# range 0 .. 31;
+       Driver_Features_Select    at 16#024# range 0 .. 31;
+       Queue_Select              at 16#030# range 0 .. 31;
+       Queue_Size_Maximum        at 16#034# range 0 .. 31;
+       Queue_Size                at 16#038# range 0 .. 31;
+       Queue_Ready               at 16#044# range 0 .. 31;
+       Queue_Notify              at 16#050# range 0 .. 31;
+       Interrupt_Status          at 16#060# range 0 .. 31;
+       Interrupt_Acknowledge     at 16#064# range 0 .. 31;
+       Status                    at 16#070# range 0 .. 31;
+       Queue_Descriptor_Low      at 16#080# range 0 .. 31;
+       Queue_Descriptor_High     at 16#084# range 0 .. 31;
+       Queue_Driver_Low          at 16#090# range 0 .. 31;
+       Queue_Driver_High         at 16#094# range 0 .. 31;
+       Queue_Device_Low          at 16#0a0# range 0 .. 31;
+       Queue_Device_High         at 16#0a4# range 0 .. 31;
+       Shared_Memory_Select      at 16#0a8# range 0 .. 31;
+       Shared_Memory_Length_Low  at 16#0ac# range 0 .. 31;
+       Shared_Memory_Length_High at 16#0b0# range 0 .. 31;
+       Shared_Memory_Base_Low    at 16#0b4# range 0 .. 31;
+       Shared_Memory_Base_High   at 16#0b8# range 0 .. 31;
+       Queue_Reset               at 16#0bc# range 0 .. 31;
+       Config_Generation         at 16#0fc# range 0 .. 31;
      end record;
 
    function Is_MMIO_Device_Valid
@@ -169,7 +183,8 @@ private
    is (Device_Registers.Magic_Value = 16#7472_6976#
        and then Device_Registers.Version = 2
        and then Device_Registers.Device_ID /= 0
-       and then Device_Registers.Vendor_ID = 16#554d_4551#);
+       and then Device_Registers.Vendor_ID = 16#554d_4551#)
+   with Inline;
 
    procedure Allocate_Descriptor
      (Device : in out Device_T;
@@ -198,6 +213,9 @@ private
    function Increment_Index (Index : Unsigned_16) return Unsigned_16;
 
    procedure Acknowledge_Interrupt_Unlocked
+     (Device : in out Device_T; Result : out Function_Result);
+
+   procedure Initialise_MMIO_Device_Unlocked
      (Device : in out Device_T; Result : out Function_Result);
 
 end Devices.Virtio;

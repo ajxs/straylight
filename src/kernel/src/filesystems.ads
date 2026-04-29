@@ -33,6 +33,9 @@ package Filesystems is
    is record
       Device : access Device_T := null;
 
+      --  Some filesystems require addition runtime metadata for operation.
+      --  These fields can be used to point to an arbitrary metadata structure,
+      --  which can be used at runtime.
       Filesystem_Meta_Info_Address : Virtual_Address_T;
       Filesystem_Meta_Info_Size    : Integer := 0;
    end record;

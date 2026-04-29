@@ -75,6 +75,12 @@ package body Devices.Virtio.Block is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
    begin
+      if Sector >= Device.Bus_Info_Virtio.Total_Sectors then
+         Log_Error ("Sector index out of bounds: " & Sector'Image);
+         Result := Sector_Out_Of_Bounds;
+         return;
+      end if;
+
       --  If this is a write operation, ensure the device is not read-only.
       if Write
         and then (Device_Registers.Device_Features and VIRTIO_BLK_F_RO) /= 0
@@ -243,6 +249,9 @@ package body Devices.Virtio.Block is
      (Device : in out Device_T; Result : out Function_Result)
    is
       Allocation_Result : Memory_Allocation_Result;
+
+      Device_Configuration_Space : Virtio_Block_Device_Configuration_Space_T
+      with Import, Address => Device.Virtual_Address + 16#100#, Alignment => 1;
    begin
       Log_Debug
         ("Allocating Block Device Request Array...", Logging_Tags_Virtio);
@@ -260,6 +269,9 @@ package body Devices.Virtio.Block is
         Allocation_Result;
 
       Log_Debug ("Allocated Block Device Request Array.", Logging_Tags_Virtio);
+
+      Device.Bus_Info_Virtio.Total_Sectors :=
+        Device_Configuration_Space.Capacity;
 
       Result := Success;
    exception

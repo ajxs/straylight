@@ -6,12 +6,25 @@
 with Memory;
 
 package body Devices.Ramdisk is
-   procedure Read_Sector
+   procedure Read_Sector_Unlocked
      (Device               : Device_T;
       Sector_Index         : Unsigned_64;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result) is
    begin
+      Sector_Limit : constant Unsigned_64 :=
+        Unsigned_64 (Device.Memory_Size) / 512;
+      if Sector_Index >= Sector_Limit then
+         Log_Error
+           ("Read_Sector: Sector index out of bounds: "
+            & Sector_Index'Image
+            & " >= "
+            & Sector_Limit'Image);
+
+         Result := Sector_Out_Of_Bounds;
+         return;
+      end if;
+
       Sector_Address : constant Virtual_Address_T :=
         Device.Virtual_Address + Storage_Offset (Sector_Index * 512);
 
@@ -38,5 +51,17 @@ package body Devices.Ramdisk is
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Read_Sector");
          Result := Constraint_Exception;
+   end Read_Sector_Unlocked;
+
+   procedure Read_Sector
+     (Device               : in out Device_T;
+      Sector_Index         : Unsigned_64;
+      Data_Virtual_Address : Virtual_Address_T;
+      Result               : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+      Read_Sector_Unlocked
+        (Device, Sector_Index, Data_Virtual_Address, Result);
+      Release_Spinlock (Device.Spinlock);
    end Read_Sector;
 end Devices.Ramdisk;

@@ -161,7 +161,8 @@ package body Boot is
             Q_Available                   => Default_Unallocated_Addresses,
             Q_Descriptor                  => Default_Unallocated_Addresses,
             Descriptor_Status             => [others => True],
-            Block_Request_Array_Addresses => Default_Unallocated_Addresses));
+            Block_Request_Array_Addresses => Default_Unallocated_Addresses,
+            Total_Sectors                 => 0));
 
       Device_Virtual_Address :=
         Device_Virtual_Address + Disk_Device.Memory_Size;
@@ -206,7 +207,8 @@ package body Boot is
             Q_Available                   => Default_Unallocated_Addresses,
             Q_Descriptor                  => Default_Unallocated_Addresses,
             Descriptor_Status             => [others => True],
-            Block_Request_Array_Addresses => Default_Unallocated_Addresses));
+            Block_Request_Array_Addresses => Default_Unallocated_Addresses,
+            Total_Sectors                 => 0));
 
       Device_Virtual_Address :=
         Device_Virtual_Address + Disk_B_Device.Memory_Size;

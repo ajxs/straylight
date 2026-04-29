@@ -85,6 +85,8 @@ package Devices is
             Block_Request_Array_Addresses :
               Virtio_Resource_Allocated_Addresses_T;
 
+            Total_Sectors : Unsigned_64 := 0;
+
          when Virtio_Device_Type_Graphics =>
             Resource_Id           : Unsigned_32 := 0;
             Framebuffer_Addresses : Virtio_Resource_Allocated_Addresses_T;
