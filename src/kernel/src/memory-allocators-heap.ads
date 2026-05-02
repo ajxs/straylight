@@ -109,7 +109,7 @@ package Memory.Allocators.Heap is
    procedure Print_Memory_Regions (Memory_Heap : Memory_Heap_T);
 
 private
-   Logging_Tags : constant Log_Tags := [Log_Tag_Heap, Log_Tag_Memory];
+   Logging_Tags_Heap : constant Log_Tags := [Log_Tag_Heap, Log_Tag_Memory];
 
    Allocation_Header_Magic_Number : constant := 16#ABCDABCD#;
 

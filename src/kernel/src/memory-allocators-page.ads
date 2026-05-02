@@ -5,6 +5,7 @@
 
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
+with Logging;          use Logging;
 with RISCV.Paging;     use RISCV.Paging;
 
 package Memory.Allocators.Page is
@@ -65,6 +66,9 @@ package Memory.Allocators.Page is
          < Region.Virtual_Address + (Page_Pool_Region_Size * Small_Page_Size));
 
 private
+   Logging_Tags_Page_Pool : constant Log_Tags :=
+     [Log_Tag_Page_Pool, Log_Tag_Memory];
+
    ----------------------------------------------------------------------------
    --  The following methods are the 'unlocked' versions of the above methods
    --  which are called once the spinlock has been acquired.

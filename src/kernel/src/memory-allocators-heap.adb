@@ -41,7 +41,7 @@ package body Memory.Allocators.Heap is
                Physical_Address,
                Size)
          then
-            Log_Error ("Heap memory region overlapping", Logging_Tags);
+            Log_Error ("Heap memory region overlapping", Logging_Tags_Heap);
             Result := Region_Is_Overlapping;
             return;
          end if;
@@ -60,11 +60,11 @@ package body Memory.Allocators.Heap is
          & ASCII.LF
          & "  Size:  "
          & Size'Image,
-         Logging_Tags);
+         Logging_Tags_Heap);
 
       New_Index := Find_Unused_Memory_Region_Entry (Memory_Heap);
       if New_Index = Null_Memory_Region_Index then
-         Log_Error ("Heap memory region array exhausted", Logging_Tags);
+         Log_Error ("Heap memory region array exhausted", Logging_Tags_Heap);
          Result := Region_Array_Exhausted;
          return;
       end if;
@@ -136,7 +136,7 @@ package body Memory.Allocators.Heap is
          & ASCII.LF
          & "  Alignment: "
          & Alignment'Image,
-         Logging_Tags);
+         Logging_Tags_Heap);
 
       Find_And_Allocate_Free_Region
         (Memory_Heap,
@@ -177,7 +177,7 @@ package body Memory.Allocators.Heap is
          & ASCII.LF
          & "  Size:  "
          & Size'Image,
-         Logging_Tags);
+         Logging_Tags_Heap);
 
       --  Clear the newly allocated block of memory.
       Set (Allocation_Result.Virtual_Address, 0, Size);
@@ -299,7 +299,7 @@ package body Memory.Allocators.Heap is
          then
             Log_Debug
               ("Found region perfectly matching size/alignment requirements",
-               Logging_Tags);
+               Logging_Tags_Heap);
 
             --  If the current region is the same size and alignment as the
             --  desired allocation size, it can be 'fully allocated' without
@@ -328,7 +328,7 @@ package body Memory.Allocators.Heap is
          then
             Log_Debug
               ("Found region matching alignment requirements. Resizing to fit",
-               Logging_Tags);
+               Logging_Tags_Heap);
 
             --  If the current region is larger than the desired allocation
             --  size, and aligned, amend the current region so that its new
@@ -357,7 +357,7 @@ package body Memory.Allocators.Heap is
               ("Found region matching size requirements. "
                & "Resizing to pad alignment requirements: "
                & Alignment_Offset'Image,
-               Logging_Tags);
+               Logging_Tags_Heap);
 
             --  If the alignment doesn't match, but the current block is
             --  large enough to fit the allocation (and the number of bytes
@@ -377,7 +377,7 @@ package body Memory.Allocators.Heap is
                   & "after allocating with alignment padding, "
                   & "with size: "
                   & Remaining_Size'Image,
-                  Logging_Tags);
+                  Logging_Tags_Heap);
 
                Inserted_Entry := Find_Unused_Free_Region_Entry (Memory_Heap);
                if Inserted_Entry = null then
@@ -523,7 +523,7 @@ package body Memory.Allocators.Heap is
    begin
       Log_Debug
         ("Freeing heap memory: " & Allocated_Virtual_Address'Image,
-         Logging_Tags);
+         Logging_Tags_Heap);
 
       Region_Virtual_Address : constant Virtual_Address_T :=
         Allocated_Virtual_Address
@@ -577,7 +577,7 @@ package body Memory.Allocators.Heap is
          & ASCII.LF
          & "  Size:  "
          & Region_Size'Image,
-         Logging_Tags);
+         Logging_Tags_Heap);
 
       --  Insert a new 'free region entry' to track the freed space.
       Insert_Free_Region
@@ -631,7 +631,7 @@ package body Memory.Allocators.Heap is
          & ASCII.LF
          & "  Size:  "
          & Size'Image,
-         Logging_Tags);
+         Logging_Tags_Heap);
 
       --  Find an unused entry in the list, and initialise it.
       New_Entry := Find_Unused_Free_Region_Entry (Memory_Heap);
@@ -716,7 +716,7 @@ package body Memory.Allocators.Heap is
    exception
       when Constraint_Error =>
          Log_Error
-           ("Constraint_Error: Is_Virtual_Address_In_Heap", Logging_Tags);
+           ("Constraint_Error: Is_Virtual_Address_In_Heap", Logging_Tags_Heap);
 
          return False;
    end Is_Virtual_Address_In_Heap;
@@ -725,7 +725,7 @@ package body Memory.Allocators.Heap is
       Curr_Region : Free_Region_Access := Memory_Heap.Free_Regions_Head;
       Curr_Index  : Heap_Memory_Region_Index_T;
    begin
-      Log_Debug ("Heap Free Memory Regions:", Logging_Tags);
+      Log_Debug ("Heap Free Memory Regions:", Logging_Tags_Heap);
       while Curr_Region /= null loop
          Log_Debug
            ("Free Region: "
@@ -740,13 +740,13 @@ package body Memory.Allocators.Heap is
             & Curr_Region.all.Size'Image
             & ASCII.LF
             & "--------------",
-            Logging_Tags);
+            Logging_Tags_Heap);
 
          Curr_Region := Curr_Region.all.Next_Region;
       end loop;
 
       Curr_Index := Memory_Heap.Memory_Regions_Head;
-      Log_Debug ("Heap Total Memory Regions:", Logging_Tags);
+      Log_Debug ("Heap Total Memory Regions:", Logging_Tags_Heap);
       while Curr_Index /= Null_Memory_Region_Index loop
          Log_Debug
            ("Total Memory Region: "
@@ -761,7 +761,7 @@ package body Memory.Allocators.Heap is
             & Memory_Heap.Memory_Regions (Curr_Index).Size'Image
             & ASCII.LF
             & "--------------",
-            Logging_Tags);
+            Logging_Tags_Heap);
 
          Curr_Index := Memory_Heap.Memory_Regions (Curr_Index).Next_Region;
       end loop;

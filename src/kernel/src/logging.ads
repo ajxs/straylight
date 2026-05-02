@@ -24,6 +24,7 @@ package Logging is
       Log_Tag_Graphics,
       Log_Tag_Heap,
       Log_Tag_Heap_Test_Region,
+      Log_Tag_Page_Pool,
       Log_Tag_Idle,
       Log_Tag_Memory,
       Log_Tag_Memory_Page_Walking,

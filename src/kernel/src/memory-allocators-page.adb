@@ -3,8 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Logging; use Logging;
-
 package body Memory.Allocators.Page is
    procedure Add_Region_To_Page_Pool
      (Page_Pool        : in out Page_Pool_T;
@@ -60,7 +58,10 @@ package body Memory.Allocators.Page is
                end if;
 
                if Contiguous_Free_Count = Page_Count then
-                  Regions (Curr_Region).Page_Statuses (Curr_Page) := Allocated;
+                  for K in 0 .. Page_Count - 1 loop
+                     Regions (Curr_Region).Page_Statuses (Curr_Page - K) :=
+                       Allocated;
+                  end loop;
 
                   Offset_Within_Region : constant Storage_Offset :=
                     Storage_Offset ((Curr_Page - 1) * 16#1000#);
@@ -72,6 +73,15 @@ package body Memory.Allocators.Page is
                   Allocation_Result.Physical_Address :=
                     Regions (Curr_Region).Physical_Address
                     + Offset_Within_Region;
+
+                  Log_Debug
+                    ("Memory.Allocators.Page: Allocated "
+                     & Page_Count'Image
+                     & " pages at VAddr: "
+                     & Allocation_Result.Virtual_Address'Image
+                     & ", PAddr: "
+                     & Allocation_Result.Physical_Address'Image,
+                     Logging_Tags_Page_Pool);
 
                   Result := Success;
                   return;
@@ -110,8 +120,9 @@ package body Memory.Allocators.Page is
    begin
       for Curr_Region in Regions'Range loop
          if Regions (Curr_Region).Allocated
-           and then Is_Virtual_Address_In_Region
-                      (Regions (Curr_Region), Virtual_Address)
+           and then
+             Is_Virtual_Address_In_Region
+               (Regions (Curr_Region), Virtual_Address)
          then
             --  The index within the region can be calculated by counting
             --  the number of pages that the address is offset from the
