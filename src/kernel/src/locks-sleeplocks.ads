@@ -21,6 +21,12 @@ package Locks.Sleeplocks is
 
    procedure Release_Sleeplock (Lock : in out Sleeplock_T);
 
+   Sleeplock_Magic_Number : constant Unsigned_8;
+
+   function Is_Sleeplock_Locked (Lock : Sleeplock_T) return Boolean
+   is (Lock.Locked = Sleeplock_Magic_Number)
+   with Inline;
+
 private
    No_Process_Id : constant Process_Id_T := Process_Id_T'Last;
 

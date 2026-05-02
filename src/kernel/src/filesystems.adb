@@ -799,7 +799,18 @@ package body Filesystems is
       System_Block_Cache.Data_Address_Virtual :=
         Allocation_Result.Virtual_Address;
 
-      Log_Debug ("Initialised block cache.", Logging_Tags);
+      Log_Debug
+        ("Initialised block cache:"
+         & ASCII.LF
+         & "  Data Physical Address: "
+         & System_Block_Cache.Data_Address_Physical'Image
+         & ASCII.LF
+         & "  Data Virtual Address:  "
+         & System_Block_Cache.Data_Address_Virtual'Image,
+         Logging_Tags);
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Initialise_Block_Cache");
    end Initialise_Block_Cache;
 
    procedure Allocate_Filesystem_Node

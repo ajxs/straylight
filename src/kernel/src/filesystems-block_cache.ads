@@ -82,9 +82,7 @@ private
    with Inline;
 
    procedure Find_And_Claim_Available_Block_Cache_Entry
-     (Cache       : in out Block_Cache_T;
-      Cache_Index : out Positive;
-      Result      : out Function_Result);
+     (Cache_Index : out Positive; Result : out Function_Result);
 
    procedure Get_Block_Cache_Entry_Data_Address
      (Cache                 : Block_Cache_T;

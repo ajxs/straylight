@@ -5,6 +5,7 @@
 
 with Devices.Ramdisk;
 with Devices.Virtio.Block;
+with Processes.Scheduler; use Processes.Scheduler;
 with RISCV;
 
 package body Filesystems.Block_Cache is
@@ -13,42 +14,68 @@ package body Filesystems.Block_Cache is
       Cache_Index  : Positive;
       Current_Time : Unsigned_64) return Boolean is
    begin
-      --  Stub implementation.
-      --  Cache entry invalidation isn't currently supported.
-      pragma Unreferenced (Cache, Cache_Index, Current_Time);
-      return False;
+      return
+        (Cache.Entries (Cache_Index).Entry_Used
+         and then
+           not Is_Sleeplock_Locked (Cache.Entries (Cache_Index).Sleeplock)
+         and then
+           (Current_Time - Cache.Entries (Cache_Index).Last_Access)
+           > Cache_Entry_Age_Threshold);
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Can_Block_Cache_Entry_Be_Invalidated");
+         return False;
    end Can_Block_Cache_Entry_Be_Invalidated;
 
    procedure Find_And_Claim_Available_Block_Cache_Entry
-     (Cache       : in out Block_Cache_T;
-      Cache_Index : out Positive;
-      Result      : out Function_Result) is
+     (Cache_Index : out Positive; Result : out Function_Result) is
    begin
-      --  Search for an unused entry.
-      for I in Cache.Entries'Range loop
-         if not Cache.Entries (I).Entry_Used then
-            Cache_Index := I;
-            goto Claim_Entry;
-         end if;
-      end loop;
+      Claim_Entry_Loop : loop
+         --  Search for an unused entry.
+         for I in System_Block_Cache.Entries'Range loop
+            if not System_Block_Cache.Entries (I).Entry_Used then
+               Cache_Index := I;
 
-      --  No unused entries, search for an entry we can invalidate.
-      for I in Cache.Entries'Range loop
-         if Can_Block_Cache_Entry_Be_Invalidated
-              (Cache, I, RISCV.Get_System_Time)
-         then
-            Cache_Index := I;
-            goto Claim_Entry;
-         end if;
-      end loop;
+               exit Claim_Entry_Loop;
+            end if;
+         end loop;
 
-      Result := Cache_Exhausted;
-      return;
+         --  Search for an entry that can be invalidated.
+         for I in System_Block_Cache.Entries'Range loop
+            if Can_Block_Cache_Entry_Be_Invalidated
+                 (System_Block_Cache, I, RISCV.Get_System_Time)
+            then
+               Log_Debug
+                 ("Invalidating block cache entry at index: " & I'Image,
+                  Logging_Tags_Block_Cache);
 
-      <<Claim_Entry>>
-      Cache.Entries (Cache_Index).Entry_Used := True;
-      Cache.Entries (Cache_Index).Filesystem := null;
-      Cache.Entries (Cache_Index).Block_Number := 0;
+               Cache_Index := I;
+
+               exit Claim_Entry_Loop;
+            end if;
+         end loop;
+
+         Log_Debug
+           ("No available block cache entries. "
+            & "Waiting for an entry to become available...",
+            Logging_Tags_Block_Cache);
+
+         --  If we couldn't find an unused or invalidatable entry, we need to
+         --  wait for an entry to become available.
+         --  To do this, we release the block cache spinlock, and yield the CPU
+         --  to allow other processes to run, which may release cache entries.
+         Release_Spinlock (System_Block_Cache.Spinlock);
+         Run;
+         Acquire_Spinlock (System_Block_Cache.Spinlock);
+
+      end loop Claim_Entry_Loop;
+
+      System_Block_Cache.Entries (Cache_Index).Entry_Used := True;
+      System_Block_Cache.Entries (Cache_Index).Filesystem := null;
+      System_Block_Cache.Entries (Cache_Index).Block_Number := 0;
+      System_Block_Cache.Entries (Cache_Index).Last_Access :=
+        RISCV.Get_System_Time;
+
       Result := Success;
    exception
       when Constraint_Error =>
@@ -204,12 +231,15 @@ package body Filesystems.Block_Cache is
 
             --  If the block isn't already in the cache, allocate a new cache
             --  entry, then read the data from the filesystem into that entry.
-            Find_And_Claim_Available_Block_Cache_Entry
-              (System_Block_Cache, Cache_Index, Result);
+            Find_And_Claim_Available_Block_Cache_Entry (Cache_Index, Result);
             if Is_Error (Result) then
                Release_Spinlock (System_Block_Cache.Spinlock);
                return;
             end if;
+
+            Log_Debug
+              ("Allocating block cache entry at index: " & Cache_Index'Image,
+               Logging_Tags_Block_Cache);
 
             --  Claim the cache entry prior to acquiring the sleeplock, to
             --  ensure there's absolutely no window for another process to
@@ -217,8 +247,6 @@ package body Filesystems.Block_Cache is
             System_Block_Cache.Entries (Cache_Index).Filesystem := Filesystem;
             System_Block_Cache.Entries (Cache_Index).Block_Number :=
               Block_Number;
-            System_Block_Cache.Entries (Cache_Index).Last_Access :=
-              RISCV.Get_System_Time;
 
             --  Acquire the cache entry's sleeplock.
             --  In this case, it's unlikely the newly allocated block will be
