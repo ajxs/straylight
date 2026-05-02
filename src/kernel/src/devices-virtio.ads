@@ -14,11 +14,6 @@ package Devices.Virtio is
    procedure Acknowledge_Interrupt
      (Device : in out Device_T; Result : out Function_Result);
 
-   --  @TODO: Investigate whether this should be moved inside the
-   --  Initialise_MMIO_Device procedure.
-   procedure Allocate_Virtio_Device_Resources
-     (Device : in out Device_T; Result : out Function_Result);
-
    --  Reserved feature bits.
    VIRTIO_F_ANY_LAYOUT    : constant := 2 ** 27;
    VIRTIO_F_INDIRECT_DESC : constant := 2 ** 28;
@@ -216,6 +211,9 @@ private
      (Device : in out Device_T; Result : out Function_Result);
 
    procedure Initialise_MMIO_Device_Unlocked
+     (Device : in out Device_T; Result : out Function_Result);
+
+   procedure Allocate_Virtio_Device_Resources
      (Device : in out Device_T; Result : out Function_Result);
 
 end Devices.Virtio;

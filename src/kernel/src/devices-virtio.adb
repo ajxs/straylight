@@ -238,7 +238,10 @@ package body Devices.Virtio is
              Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
       begin
-         for I in Virtio_Descriptor_Array_Index_T loop
+         for I in
+           0
+           .. Virtio_Descriptor_Array_Index_T (Maximum_Virtio_Queue_Length - 1)
+         loop
             Request_Status_Array (I) := 0;
          end loop;
       end Initialise_Request_Status_Array;
@@ -427,6 +430,11 @@ package body Devices.Virtio is
          & "  Device ID:      "
          & Device_Registers.Device_ID'Image,
          Logging_Tags_Virtio);
+
+      Allocate_Virtio_Device_Resources (Device, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       --  Initialise the device.
       --  Refer to section 3.1: Device Initialization.

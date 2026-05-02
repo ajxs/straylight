@@ -272,12 +272,6 @@ package body Boot is
 
             --  Initialise devices.
             if System_Devices (I).Device_Bus = Device_Bus_Virtio_MMIO then
-               Devices.Virtio.Allocate_Virtio_Device_Resources
-                 (System_Devices (I), Result);
-               if Is_Error (Result) then
-                  Panic ("Error allocating Virtio device resources");
-               end if;
-
                Devices.Virtio.Initialise_MMIO_Device
                  (System_Devices (I), Result);
                if Is_Error (Result) then
