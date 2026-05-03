@@ -40,13 +40,15 @@ package Devices.Ramdisk is
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result);
 
-private
-   Logging_Tags_Ramdisk : constant Log_Tags := [Log_Tag_Devices_Ramdisk];
-
-   procedure Read_Sector_Unlocked
-     (Device               : Device_T;
+   procedure Write_Sector
+     (Device               : in out Device_T;
       Sector_Index         : Unsigned_64;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result);
+
+private
+   Logging_Tags_Ramdisk : constant Log_Tags := [Log_Tag_Devices_Ramdisk];
+
+   Ramdisk_Sector_Size : constant := 512;
 
 end Devices.Ramdisk;
