@@ -462,7 +462,7 @@ private
    function Get_Node_Type_From_Directory_Entry
      (Dir_Entry : FAT_Directory_Entry_T) return Filesystem_Node_Type_T;
 
-   procedure Get_Filesystem_Meta_Info
+   procedure Populate_Filesystem_Meta_Info
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Result          : out Function_Result);
@@ -491,5 +491,13 @@ private
       Filesystem_Node_Name             : out Filesystem_Node_Name_T;
       Filesystem_Node_Name_Byte_Length : out Integer;
       Result                           : out Function_Result);
+
+   procedure Read_Sectors_Into_Buffer
+     (Filesystem             : Filesystem_Access;
+      Reading_Process        : in out Process_Control_Block_T;
+      Sector                 : Unsigned_64;
+      Sector_Count           : Natural;
+      Buffer_Virtual_Address : Virtual_Address_T;
+      Result                 : out Function_Result);
 
 end Filesystems.FAT;

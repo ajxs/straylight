@@ -146,10 +146,11 @@ package body Filesystems.FAT.FAT16 is
       --  Because there's no cluster chain for the root directory in FAT16,
       --  we need to read the entire root directory into memory in one go,
       --  and then parse all the entries.
-      Read_FAT16_Root_Directory_Into_Buffer
+      Read_Sectors_Into_Buffer
         (Filesystem,
          Reading_Process,
-         Filesystem_Info,
+         Filesystem_Info.Root_Directory_Sector,
+         Integer (Filesystem_Info.Root_Directory_Sector_Count),
          Directory_Buffer_Address,
          Result);
       if Is_Error (Result) then
@@ -184,63 +185,6 @@ package body Filesystems.FAT.FAT16 is
          Log_Error ("Constraint_Error: Find_File_In_FAT16_Root_Directory");
          Result := Constraint_Exception;
    end Find_File_In_FAT16_Root_Directory;
-
-   procedure Read_FAT16_Root_Directory_Into_Buffer
-     (Filesystem             : Filesystem_Access;
-      Reading_Process        : in out Process_Control_Block_T;
-      Filesystem_Info        : FAT_Filesystem_Info_T;
-      Buffer_Virtual_Address : Virtual_Address_T;
-      Result                 : out Function_Result)
-   is
-      Current_Read_Sector : Unsigned_64 := 0;
-      Sector_Address      : Virtual_Address_T := Null_Address;
-
-      Destination_Virtual_Address : Virtual_Address_T :=
-        Buffer_Virtual_Address;
-   begin
-      Log_Debug ("Reading FAT16 root directory...", Logging_Tags_FAT);
-
-      Current_Read_Sector := Filesystem_Info.Root_Directory_Sector;
-
-      for Sector_Idx in 1 .. Filesystem_Info.Root_Directory_Sector_Count loop
-         --  Read each FAT logical sector into memory.
-         Read_Sector_From_Filesystem
-           (Filesystem,
-            Reading_Process,
-            Current_Read_Sector,
-            Filesystem_Info.Bytes_Per_Sector,
-            Sector_Address,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Copy
-           (Destination_Virtual_Address,
-            Sector_Address,
-            Filesystem_Info.Bytes_Per_Sector);
-
-         Release_Sector
-           (Filesystem,
-            Current_Read_Sector,
-            Filesystem_Info.Bytes_Per_Sector,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         --  Increment the device read offset.
-         Current_Read_Sector := Current_Read_Sector + 1;
-
-         Destination_Virtual_Address :=
-           Destination_Virtual_Address
-           + Storage_Offset (Filesystem_Info.Bytes_Per_Sector);
-      end loop;
-
-      Log_Debug ("Finished Reading FAT16 Root Directory", Logging_Tags_FAT);
-
-      Result := Success;
-   end Read_FAT16_Root_Directory_Into_Buffer;
 
    procedure Get_FAT16_Table_Entry_Sector_Number
      (Filesystem_Info : FAT_Filesystem_Info_T;
