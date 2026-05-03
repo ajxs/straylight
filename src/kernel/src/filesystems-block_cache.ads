@@ -15,6 +15,13 @@ private package Filesystems.Block_Cache is
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result);
 
+   --  This procedure requires that the caller holds the block being written.
+   procedure Write_Block_To_Filesystem
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Block_Number    : Unsigned_64;
+      Result          : out Function_Result);
+
    procedure Release_Block
      (Filesystem             : Filesystem_Access;
       Block_Number           : Unsigned_64;
@@ -22,7 +29,7 @@ private package Filesystems.Block_Cache is
       Invalidate_Cache_Entry : Boolean := False);
 
    ----------------------------------------------------------------------------
-   --  These procedures are functionally identical to the block read/release
+   --  These procedures are functionally identical to the block-based
    --  procedures above, but allow users to reason about filesystem operations
    --  in terms of sectors rather than blocks.
    --  Many filesystems reason internally in terms of sectors, so these methods
@@ -38,6 +45,14 @@ private package Filesystems.Block_Cache is
       Sector_Size          : Natural;
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result);
+
+   --  This procedure requires that the caller holds the block being written.
+   procedure Write_Sector_To_Filesystem
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Sector_Number   : Unsigned_64;
+      Sector_Size     : Natural;
+      Result          : out Function_Result);
 
    procedure Release_Sector
      (Filesystem    : Filesystem_Access;

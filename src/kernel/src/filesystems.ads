@@ -327,7 +327,7 @@ private
    function Sector_To_Block
      (Sector_Number : Unsigned_64; Sector_Size : Natural) return Unsigned_64;
 
-   function Sectors_Per_Block (Sector_Size : Natural) return Natural;
+   function Get_Sectors_Per_Block (Sector_Size : Natural) return Natural;
 
    function Get_Sector_Offset_Within_Block
      (Sector_Number : Unsigned_64; Sector_Size : Natural)

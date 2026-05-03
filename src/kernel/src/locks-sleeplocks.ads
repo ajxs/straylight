@@ -27,6 +27,11 @@ package Locks.Sleeplocks is
    is (Lock.Locked = Sleeplock_Magic_Number)
    with Inline;
 
+   function Is_Sleeplock_Held_By_Process
+     (Lock : Sleeplock_T; Process_Id : Process_Id_T) return Boolean
+   is (Is_Sleeplock_Locked (Lock) and then Lock.Process_Id = Process_Id)
+   with Inline;
+
 private
    No_Process_Id : constant Process_Id_T := Process_Id_T'Last;
 

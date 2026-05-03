@@ -158,13 +158,12 @@ package body Filesystems.Block_Cache is
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result)
    is
-      Cache_Index     : Positive := 1;
-      Retry_Count     : Natural := 0;
-      Retry_Threshold : constant Natural := 3;
+      Cache_Index : Positive := 1;
 
-      Cache_Entry_Address_Virtual  : Virtual_Address_T := Null_Address;
-      Cache_Entry_Address_Physical : Physical_Address_T :=
-        Null_Physical_Address;
+      Read_Block_Retry_Count     : Natural := 0;
+      Read_Block_Retry_Threshold : constant Natural := 3;
+
+      Cache_Entry_Addr_Physical : Physical_Address_T := Null_Physical_Address;
    begin
       if not Is_Valid_Filesystem_Pointer (Filesystem) then
          Log_Error ("Read_Block_From_Filesystem: Unsupported filesystem");
@@ -203,16 +202,17 @@ package body Filesystems.Block_Cache is
                System_Block_Cache.Spinlock,
                Reading_Process.Process_Id);
 
+            --  Test whether the cache entry we previously found is no longer
+            --  valid. This could happen if another process released the cache
+            --  entry after we found it, but before we acquired the sleeplock.
+            --  During that time, it could have been reused for a different
+            --  block.
             if not Is_Matching_Used_Cache_Entry
                      (System_Block_Cache,
                       Cache_Index,
                       Filesystem,
                       Block_Number)
             then
-               --  The cache entry we found is no longer valid. This could
-               --  happen if another process released the cache entry after we
-               --  found it, but before we acquired the sleeplock.
-
                Log_Error
                  ("Cache entry found but no longer valid. Retrying...",
                   Logging_Tags_Block_Cache);
@@ -287,8 +287,8 @@ package body Filesystems.Block_Cache is
             exit Read_From_Cache_Loop;
          end if;
 
-         Retry_Count := Retry_Count + 1;
-         if Retry_Count > Retry_Threshold then
+         Read_Block_Retry_Count := Read_Block_Retry_Count + 1;
+         if Read_Block_Retry_Count > Read_Block_Retry_Threshold then
             Log_Error
               ("Exceeded retry threshold trying to read block.",
                Logging_Tags_Block_Cache);
@@ -300,14 +300,12 @@ package body Filesystems.Block_Cache is
       Get_Block_Cache_Entry_Data_Address
         (System_Block_Cache,
          Cache_Index,
-         Cache_Entry_Address_Virtual,
-         Cache_Entry_Address_Physical,
+         Data_Virtual_Address,
+         Cache_Entry_Addr_Physical,
          Result);
       if Is_Error (Result) then
          return;
       end if;
-
-      Data_Virtual_Address := Cache_Entry_Address_Virtual;
 
       Result := Success;
    exception
@@ -324,20 +322,20 @@ package body Filesystems.Block_Cache is
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result)
    is
-      Cache_Entry_Address_Virtual : Virtual_Address_T := Null_Address;
+      Cache_Entry_Addr_Virtual : Virtual_Address_T := Null_Address;
    begin
       Read_Block_From_Filesystem
         (Filesystem,
          Reading_Process,
          Sector_To_Block (Sector_Number, Sector_Size),
-         Cache_Entry_Address_Virtual,
+         Cache_Entry_Addr_Virtual,
          Result);
       if Is_Error (Result) then
          return;
       end if;
 
       Data_Virtual_Address :=
-        Cache_Entry_Address_Virtual
+        Cache_Entry_Addr_Virtual
         + Get_Sector_Offset_Within_Block (Sector_Number, Sector_Size);
       Result := Success;
    end Read_Sector_From_Filesystem;
@@ -353,6 +351,9 @@ package body Filesystems.Block_Cache is
       Current_Sector             : Unsigned_64 := 0;
       Current_Read_Addr_Virtual  : Virtual_Address_T := Null_Address;
       Current_Read_Addr_Physical : Physical_Address_T := Null_Physical_Address;
+
+      --  @TODO: This currently assumes 512-byte sectors on all devices.
+      Sector_Size : constant := 512;
    begin
       Get_Block_Cache_Entry_Data_Address
         (Cache,
@@ -364,10 +365,12 @@ package body Filesystems.Block_Cache is
          return;
       end if;
 
-      --  @TODO: This currently assumes 512-byte sectors on all devices.
-      Current_Sector := (Block_Number * Block_Size) / 512;
+      Sectors_Per_Block : constant Natural :=
+        Get_Sectors_Per_Block (Sector_Size);
 
-      for I in 0 .. 7 loop
+      Current_Sector := (Block_Number * Block_Size) / Sector_Size;
+
+      for I in 0 .. Sectors_Per_Block - 1 loop
          Log_Debug
            ("Reading sector into block cache: " & Current_Sector'Image,
             Logging_Tags_Block_Cache);
@@ -395,9 +398,9 @@ package body Filesystems.Block_Cache is
          Current_Sector := Current_Sector + 1;
 
          Current_Read_Addr_Virtual :=
-           Current_Read_Addr_Virtual + Storage_Offset (512);
+           Current_Read_Addr_Virtual + Storage_Offset (Sector_Size);
          Current_Read_Addr_Physical :=
-           Current_Read_Addr_Physical + Storage_Offset (512);
+           Current_Read_Addr_Physical + Storage_Offset (Sector_Size);
       end loop;
 
       Log_Debug
@@ -482,5 +485,154 @@ package body Filesystems.Block_Cache is
       Release_Block
         (Filesystem, Sector_To_Block (Sector_Number, Sector_Size), Result);
    end Release_Sector;
+
+   procedure Write_Block_From_Cache_Entry_To_Filesystem
+     (Cache           : in out Block_Cache_T;
+      Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Block_Number    : Unsigned_64;
+      Cache_Index     : Positive;
+      Result          : out Function_Result)
+   is
+      Current_Sector : Unsigned_64 := 0;
+
+      Curr_Write_Addr_Virtual  : Virtual_Address_T := Null_Address;
+      Curr_Write_Addr_Physical : Physical_Address_T := Null_Physical_Address;
+
+      --  @TODO: This currently assumes 512-byte sectors on all devices.
+      Sector_Size : constant := 512;
+   begin
+      Get_Block_Cache_Entry_Data_Address
+        (Cache,
+         Cache_Index,
+         Curr_Write_Addr_Virtual,
+         Curr_Write_Addr_Physical,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Sectors_Per_Block : constant Natural :=
+        Get_Sectors_Per_Block (Sector_Size);
+
+      Current_Sector := (Block_Number * Block_Size) / Sector_Size;
+
+      for I in 0 .. Sectors_Per_Block - 1 loop
+         Log_Debug
+           ("Writing sector from block cache: " & Current_Sector'Image,
+            Logging_Tags_Block_Cache);
+         case Filesystem.all.Device.all.Device_Bus is
+            when Device_Bus_Virtio_MMIO   =>
+               Devices.Virtio.Block.Write_Sector
+                 (Writing_Process,
+                  Filesystem.all.Device.all,
+                  Curr_Write_Addr_Physical,
+                  Current_Sector,
+                  Result);
+
+            when Device_Bus_Memory_Mapped =>
+               Devices.Ramdisk.Write_Sector
+                 (Filesystem.all.Device.all,
+                  Current_Sector,
+                  Curr_Write_Addr_Virtual,
+                  Result);
+         end case;
+
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Current_Sector := Current_Sector + 1;
+
+         Curr_Write_Addr_Virtual :=
+           Curr_Write_Addr_Virtual + Storage_Offset (Sector_Size);
+         Curr_Write_Addr_Physical :=
+           Curr_Write_Addr_Physical + Storage_Offset (Sector_Size);
+      end loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Write_Block_From_Cache_Entry_To_Filesystem");
+         Result := Constraint_Exception;
+   end Write_Block_From_Cache_Entry_To_Filesystem;
+
+   procedure Write_Block_To_Filesystem
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Block_Number    : Unsigned_64;
+      Result          : out Function_Result)
+   is
+      Cache_Index : Positive := 1;
+   begin
+      if not Is_Valid_Filesystem_Pointer (Filesystem) then
+         Log_Error ("Write_Block_To_Filesystem: Unsupported filesystem");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Log_Debug
+        ("Write_Block_To_Filesystem: " & Block_Number'Image,
+         Logging_Tags_Block_Cache);
+
+      --  Acquire the block cache spinlock prior to searching the cache.
+      --  We need to ensure the block we're looking for isn't being modified
+      --  by another process while we're searching.
+      Acquire_Spinlock (System_Block_Cache.Spinlock);
+
+      Find_Existing_Block_In_Cache
+        (System_Block_Cache, Filesystem, Block_Number, Cache_Index, Result);
+
+      Release_Spinlock (System_Block_Cache.Spinlock);
+
+      if Is_Error (Result) then
+         return;
+      elsif Result = Cache_Entry_Not_Found then
+         Log_Error
+           ("Block to write not found in cache.", Logging_Tags_Block_Cache);
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if not Is_Sleeplock_Held_By_Process
+               (System_Block_Cache.Entries (Cache_Index).Sleeplock,
+                Writing_Process.Process_Id)
+      then
+         Log_Error ("Write_Block_To_Filesystem: Block sleeplock not held.");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Write_Block_From_Cache_Entry_To_Filesystem
+        (System_Block_Cache,
+         Filesystem,
+         Writing_Process,
+         Block_Number,
+         Cache_Index,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Write_Block_To_Filesystem");
+         Result := Constraint_Exception;
+   end Write_Block_To_Filesystem;
+
+   procedure Write_Sector_To_Filesystem
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Sector_Number   : Unsigned_64;
+      Sector_Size     : Natural;
+      Result          : out Function_Result) is
+   begin
+      Write_Block_To_Filesystem
+        (Filesystem,
+         Writing_Process,
+         Sector_To_Block (Sector_Number, Sector_Size),
+         Result);
+   end Write_Sector_To_Filesystem;
 
 end Filesystems.Block_Cache;

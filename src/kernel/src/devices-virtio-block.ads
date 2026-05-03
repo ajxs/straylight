@@ -16,6 +16,13 @@ package Devices.Virtio.Block is
       Sector                : Unsigned_64;
       Result                : out Function_Result);
 
+   procedure Write_Sector
+     (Reading_Process       : in out Process_Control_Block_T;
+      Device                : in out Device_T;
+      Data_Physical_Address : Physical_Address_T;
+      Sector                : Unsigned_64;
+      Result                : out Function_Result);
+
    --  Block device feature bits.
    VIRTIO_BLK_F_SIZE_MAX     : constant := 2 ** 1;
    VIRTIO_BLK_F_SEG_MAX      : constant := 2 ** 2;

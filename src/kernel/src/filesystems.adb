@@ -747,14 +747,14 @@ package body Filesystems is
          return 0;
    end Sector_To_Block;
 
-   function Sectors_Per_Block (Sector_Size : Natural) return Natural is
+   function Get_Sectors_Per_Block (Sector_Size : Natural) return Natural is
    begin
       return Block_Size / Sector_Size;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Sectors_Per_Block");
+         Log_Error ("Constraint_Error: Get_Sectors_Per_Block");
          return 0;
-   end Sectors_Per_Block;
+   end Get_Sectors_Per_Block;
 
    function Get_Sector_Offset_Within_Block
      (Sector_Number : Unsigned_64; Sector_Size : Natural) return Storage_Offset
@@ -762,7 +762,7 @@ package body Filesystems is
    begin
       return
         Storage_Offset
-          ((Integer (Sector_Number) mod Sectors_Per_Block (Sector_Size))
+          ((Integer (Sector_Number) mod Get_Sectors_Per_Block (Sector_Size))
            * Sector_Size);
    exception
       when Constraint_Error =>

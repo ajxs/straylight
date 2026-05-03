@@ -41,6 +41,17 @@ package body Devices.Virtio.Block is
          Result);
    end Read_Sector;
 
+   procedure Write_Sector
+     (Reading_Process       : in out Process_Control_Block_T;
+      Device                : in out Device_T;
+      Data_Physical_Address : Physical_Address_T;
+      Sector                : Unsigned_64;
+      Result                : out Function_Result) is
+   begin
+      Read_Write
+        (Reading_Process, Device, Data_Physical_Address, Sector, True, Result);
+   end Write_Sector;
+
    procedure Read_Write
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
