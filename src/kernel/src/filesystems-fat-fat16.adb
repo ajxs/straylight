@@ -188,12 +188,18 @@ package body Filesystems.FAT.FAT16 is
 
    procedure Get_FAT16_Table_Entry_Sector_Number
      (Filesystem_Info : FAT_Filesystem_Info_T;
+      FAT_Index       : Natural;
       Cluster         : Unsigned_32;
       Sector_Number   : out Unsigned_64;
       Result          : out Function_Result) is
    begin
+      FAT_Table_Offset : constant Unsigned_64 :=
+        Unsigned_64 (FAT_Index)
+        * Unsigned_64 (Filesystem_Info.FAT_Sector_Count);
+
       Sector_Number :=
         Filesystem_Info.First_FAT_Sector
+        + FAT_Table_Offset
         + Unsigned_64
             ((Cluster * 2) / Unsigned_32 (Filesystem_Info.Bytes_Per_Sector));
 
@@ -228,15 +234,17 @@ package body Filesystems.FAT.FAT16 is
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
       Cluster         : Unsigned_32;
-      FAT_Entry       : out Unsigned_32;
+      FAT_Entry       : out Unsigned_16;
       Result          : out Function_Result)
    is
       Sector_Address : Virtual_Address_T := Null_Address;
       Sector_Number  : Sector_Index_T := 0;
       Cluster_Index  : Natural := 0;
    begin
+      --  Uses the primary FAT table (index 0) to read the FAT entry,
+      --  since all FAT tables should be identical.
       Get_FAT16_Table_Entry_Sector_Number
-        (Filesystem_Info, Cluster, Sector_Number, Result);
+        (Filesystem_Info, 0, Cluster, Sector_Number, Result);
       if Is_Error (Result) then
          FAT_Entry := 0;
          return;
@@ -266,7 +274,7 @@ package body Filesystems.FAT.FAT16 is
            FAT16_Table_T (0 .. (Filesystem_Info.Bytes_Per_Sector / 2) - 1)
          with Import, Alignment => 1, Address => Sector_Address;
       begin
-         FAT_Entry := Unsigned_32 (FAT16_Table (Cluster_Index));
+         FAT_Entry := FAT16_Table (Cluster_Index);
       end;
 
       --  Result set by this call.
@@ -278,5 +286,78 @@ package body Filesystems.FAT.FAT16 is
          FAT_Entry := 0;
          Result := Constraint_Exception;
    end Read_FAT16_Table_Entry;
+
+   procedure Write_FAT16_Table_Entry
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Cluster         : Unsigned_32;
+      FAT_Entry       : Unsigned_16;
+      Result          : out Function_Result)
+   is
+      Sector_Address : Virtual_Address_T := Null_Address;
+      Sector_Number  : Sector_Index_T := 0;
+      Cluster_Index  : Natural := 0;
+   begin
+      if Filesystem_Info.FAT_Table_Count = 0 then
+         Log_Error ("FAT_Table_Count is 0 in Write_FAT16_Table_Entry");
+         Result := Invalid_Filesystem;
+         return;
+      end if;
+
+      Get_FAT16_Table_Cluster_Index
+        (Filesystem_Info, Cluster, Cluster_Index, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      for FAT_Table_Idx in 0 .. Filesystem_Info.FAT_Table_Count - 1 loop
+         Get_FAT16_Table_Entry_Sector_Number
+           (Filesystem_Info, FAT_Table_Idx, Cluster, Sector_Number, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Read_Sector_From_Filesystem
+           (Filesystem,
+            Writing_Process,
+            Sector_Number,
+            Filesystem_Info.Bytes_Per_Sector,
+            Sector_Address,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         declare
+            FAT16_Table :
+              FAT16_Table_T (0 .. (Filesystem_Info.Bytes_Per_Sector / 2) - 1)
+            with Import, Alignment => 1, Address => Sector_Address;
+         begin
+            FAT16_Table (Cluster_Index) := FAT_Entry;
+         end;
+
+         Write_Sector_To_Filesystem
+           (Filesystem,
+            Writing_Process,
+            Sector_Number,
+            Filesystem_Info.Bytes_Per_Sector,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         --  Result set by this call.
+         Release_Sector
+           (Filesystem,
+            Sector_Number,
+            Filesystem_Info.Bytes_Per_Sector,
+            Result);
+      end loop;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Write_FAT16_Table_Entry");
+         Result := Constraint_Exception;
+   end Write_FAT16_Table_Entry;
 
 end Filesystems.FAT.FAT16;

@@ -43,6 +43,7 @@ private
       Bytes_Per_Sector            : Natural := 0;
       First_FAT_Sector            : Unsigned_64 := 0;
       First_Data_Sector           : Unsigned_64 := 0;
+      FAT_Table_Count             : Natural := 0;
       FAT_Sector_Count            : Unsigned_32 := 0;
       FAT_Buffer_Size             : Natural := 0;
       Sectors_Per_Cluster         : Natural := 0;
@@ -347,6 +348,14 @@ private
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean
    with Pure_Function, Inline;
 
+   function Is_Cluster_Bad
+     (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean
+   with Pure_Function, Inline;
+
+   function Is_Cluster_Free (Cluster : Unsigned_32) return Boolean
+   is (Cluster = 0)
+   with Pure_Function, Inline;
+
    function Get_First_Sector_Of_Cluster
      (Cluster             : Unsigned_32;
       Sectors_Per_Cluster : Natural;
@@ -355,6 +364,11 @@ private
        * Unsigned_64 (Sectors_Per_Cluster)
        + First_Data_Sector)
    with Inline, Pure_Function;
+
+   procedure Get_First_File_Cluster_From_Filesystem_Node
+     (Filesystem_Node : Filesystem_Node_Access;
+      First_Cluster   : out Unsigned_32;
+      Result          : out Function_Result);
 
    function Get_Root_Directory_Sector_Count
      (Boot_Sector : Boot_Sector_T) return Unsigned_32

@@ -220,6 +220,20 @@ package body Filesystems.FAT is
          return 0;
    end Get_First_Cluster_From_Index;
 
+   function Is_Cluster_Bad
+     (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean is
+   begin
+      if FAT_Type = FAT_Type_FAT16 then
+         return Cluster = 16#FFF7#;
+      elsif FAT_Type = FAT_Type_FAT12 then
+         return Cluster = 16#0FF7#;
+      elsif FAT_Type = FAT_Type_FAT32 then
+         return Cluster = 16#0FFFFFF7#;
+      end if;
+
+      return False;
+   end Is_Cluster_Bad;
+
    function Is_Cluster_End_Of_Chain
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean is
    begin
@@ -529,6 +543,9 @@ package body Filesystems.FAT is
            + Unsigned_64 (Filesystem_Info.Root_Directory_Sector_Count)
            + Total_Tables_Size;
 
+         Filesystem_Info.FAT_Table_Count :=
+           Natural (Boot_Sector.BPB.Table_Count);
+
          Get_Root_Directory_Sector
            (Boot_Sector.EBPB_Reserved_Space'Address,
             Filesystem_Info.FAT_Type,
@@ -624,7 +641,9 @@ package body Filesystems.FAT is
       Filesystem_Info : FAT_Filesystem_Info_T;
       Cluster         : Unsigned_32;
       FAT_Entry       : out Unsigned_32;
-      Result          : out Function_Result) is
+      Result          : out Function_Result)
+   is
+      FAT16_Table_Entry : Unsigned_16 := 0;
    begin
       case Filesystem_Info.FAT_Type is
          when FAT_Type_FAT16 =>
@@ -633,8 +652,10 @@ package body Filesystems.FAT is
                Reading_Process,
                Filesystem_Info,
                Cluster,
-               FAT_Entry,
+               FAT16_Table_Entry,
                Result);
+
+            FAT_Entry := Unsigned_32 (FAT16_Table_Entry);
 
          when others         =>
             Log_Error ("FAT type not supported", Logging_Tags_FAT);
@@ -915,6 +936,28 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Read_File;
 
+   procedure Get_First_File_Cluster_From_Filesystem_Node
+     (Filesystem_Node : Filesystem_Node_Access;
+      First_Cluster   : out Unsigned_32;
+      Result          : out Function_Result) is
+   begin
+      if Filesystem_Node = null then
+         Log_Error ("Filesystem node is null.", Logging_Tags_FAT);
+         First_Cluster := 0;
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      First_Cluster := Unsigned_32 (Filesystem_Node.all.Data_Location);
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Get_First_File_Cluster_From_Filesystem_Node");
+         First_Cluster := 0;
+         Result := Constraint_Exception;
+   end Get_First_File_Cluster_From_Filesystem_Node;
+
    procedure Read_File_Clusters
      (Filesystem      : Filesystem_Access;
       Filesystem_Info : FAT_Filesystem_Info_T;
@@ -961,12 +1004,16 @@ package body Filesystems.FAT is
       Cluster_Size :=
         Filesystem_Info.Sectors_Per_Cluster * Filesystem_Info.Bytes_Per_Sector;
 
-      Allocate_Kernel_Memory (Cluster_Size, Cluster_Buffer_Address, Result);
+      Get_First_File_Cluster_From_Filesystem_Node
+        (Filesystem_Node, Current_Read_Cluster, Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Current_Read_Cluster := Unsigned_32 (Filesystem_Node.all.Data_Location);
+      Allocate_Kernel_Memory (Cluster_Size, Cluster_Buffer_Address, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       --  Follow the file's cluster chain until we get to the file descriptor's
       --  current offset. From there we can start reading the required data.
