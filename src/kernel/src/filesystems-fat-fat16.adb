@@ -148,6 +148,7 @@ package body Filesystems.FAT.FAT16 is
       --  and then parse all the entries.
       Read_Sectors_Into_Buffer
         (Filesystem,
+         Filesystem_Info,
          Reading_Process,
          Filesystem_Info.Root_Directory_Sector,
          Integer (Filesystem_Info.Root_Directory_Sector_Count),

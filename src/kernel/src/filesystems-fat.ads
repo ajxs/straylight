@@ -35,6 +35,10 @@ private
    type FAT_Type_T is
      (FAT_Type_FAT12, FAT_Type_FAT16, FAT_Type_FAT32, FAT_Type_ExFAT);
 
+   --  This structure contains all of the relevant FAT filesystem metadata
+   --  that we will need to perform filesystem operations.
+   --  It is populated by the Populate_Filesystem_Meta_Info procedure,
+   --  which is called by the file operations methods.
    type FAT_Filesystem_Info_T is record
       FAT_Type                    : FAT_Type_T := FAT_Type_FAT12;
       Root_Directory_Sector       : Unsigned_64 := 0;
@@ -508,6 +512,7 @@ private
 
    procedure Read_Sectors_Into_Buffer
      (Filesystem             : Filesystem_Access;
+      Filesystem_Info        : FAT_Filesystem_Info_T;
       Reading_Process        : in out Process_Control_Block_T;
       Start_Sector           : Sector_Index_T;
       Sector_Count           : Natural;

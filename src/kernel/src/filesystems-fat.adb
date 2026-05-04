@@ -437,6 +437,9 @@ package body Filesystems.FAT is
          & "  FAT_Buffer_Size:             "
          & FAT_Filesystem_Info.FAT_Buffer_Size'Image
          & ASCII.LF
+         & "  FAT_Table_Count:             "
+         & FAT_Filesystem_Info.FAT_Table_Count'Image
+         & ASCII.LF
          & "  Sectors_Per_Cluster:         "
          & FAT_Filesystem_Info.Sectors_Per_Cluster'Image,
          Logging_Tags_FAT);
@@ -1204,38 +1207,19 @@ package body Filesystems.FAT is
 
    procedure Read_Sectors_Into_Buffer
      (Filesystem             : Filesystem_Access;
+      Filesystem_Info        : FAT_Filesystem_Info_T;
       Reading_Process        : in out Process_Control_Block_T;
       Start_Sector           : Sector_Index_T;
       Sector_Count           : Natural;
       Buffer_Virtual_Address : Virtual_Address_T;
       Result                 : out Function_Result)
    is
-      Bytes_Per_Sector : Natural := 0;
-
       Current_Read_Sector : Sector_Index_T := 0;
       Sector_Address      : Virtual_Address_T := Null_Address;
 
       Destination_Virtual_Address : Virtual_Address_T :=
         Buffer_Virtual_Address;
    begin
-      --  In case the filesystem meta info hasn't been populated yet...
-      if Filesystem.all.Filesystem_Meta_Info_Address = Null_Address then
-         Populate_Filesystem_Meta_Info (Filesystem, Reading_Process, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-      end if;
-
-      Get_Filesystem_Info : declare
-         Filesystem_Info : FAT_Filesystem_Info_T
-         with
-           Import,
-           Alignment => 1,
-           Address   => Filesystem.all.Filesystem_Meta_Info_Address;
-      begin
-         Bytes_Per_Sector := Filesystem_Info.Bytes_Per_Sector;
-      end Get_Filesystem_Info;
-
       Current_Read_Sector := Start_Sector;
 
       for Sector_Idx in 1 .. Sector_Count loop
@@ -1244,17 +1228,23 @@ package body Filesystems.FAT is
            (Filesystem,
             Reading_Process,
             Current_Read_Sector,
-            Bytes_Per_Sector,
+            Filesystem_Info.Bytes_Per_Sector,
             Sector_Address,
             Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Copy (Destination_Virtual_Address, Sector_Address, Bytes_Per_Sector);
+         Copy
+           (Destination_Virtual_Address,
+            Sector_Address,
+            Filesystem_Info.Bytes_Per_Sector);
 
          Release_Sector
-           (Filesystem, Current_Read_Sector, Bytes_Per_Sector, Result);
+           (Filesystem,
+            Current_Read_Sector,
+            Filesystem_Info.Bytes_Per_Sector,
+            Result);
          if Is_Error (Result) then
             return;
          end if;
@@ -1263,14 +1253,11 @@ package body Filesystems.FAT is
          Current_Read_Sector := Current_Read_Sector + 1;
 
          Destination_Virtual_Address :=
-           Destination_Virtual_Address + Storage_Offset (Bytes_Per_Sector);
+           Destination_Virtual_Address
+           + Storage_Offset (Filesystem_Info.Bytes_Per_Sector);
       end loop;
 
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Sectors_Into_Buffer");
-         Result := Constraint_Exception;
    end Read_Sectors_Into_Buffer;
 
 end Filesystems.FAT;
