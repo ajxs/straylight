@@ -22,6 +22,14 @@ package Filesystems is
 
    Filesystem_Node_Name_Max_Byte_Length : constant Integer := 256;
 
+   --  This type is used to represent the *kernel's* internal representation
+   --  of a storage device sector. It's independent of any particular device's
+   --  specific implementation details.
+   --  This abstraction supports a single, consistent type used to index
+   --  sectors across all devices, regardless of the device's actual internal
+   --  addressing scheme, block size, etc.
+   subtype Sector_Index_T is Unsigned_64;
+
    type Filesystem_Type_T is
      (Filesystem_Type_None,
       Filesystem_Type_FAT,
@@ -178,6 +186,8 @@ package Filesystems is
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Filesystems];
 
+   subtype Block_Index_T is Unsigned_64;
+
    type Process_File_Handle_Array is
      array (1 .. 64) of aliased Process_File_Handle_T;
 
@@ -325,12 +335,13 @@ private
       Mounted_Filesystem : Filesystem_Access);
 
    function Sector_To_Block
-     (Sector_Number : Unsigned_64; Sector_Size : Natural) return Unsigned_64;
+     (Sector_Number : Sector_Index_T; Sector_Size : Natural)
+      return Block_Index_T;
 
    function Get_Sectors_Per_Block (Sector_Size : Natural) return Natural;
 
    function Get_Sector_Offset_Within_Block
-     (Sector_Number : Unsigned_64; Sector_Size : Natural)
+     (Sector_Number : Sector_Index_T; Sector_Size : Natural)
       return Storage_Offset;
 
    procedure Find_Unused_File_Handle_Entry

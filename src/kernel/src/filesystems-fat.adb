@@ -1158,14 +1158,14 @@ package body Filesystems.FAT is
    procedure Read_Sectors_Into_Buffer
      (Filesystem             : Filesystem_Access;
       Reading_Process        : in out Process_Control_Block_T;
-      Sector                 : Unsigned_64;
+      Start_Sector           : Sector_Index_T;
       Sector_Count           : Natural;
       Buffer_Virtual_Address : Virtual_Address_T;
       Result                 : out Function_Result)
    is
       Bytes_Per_Sector : Natural := 0;
 
-      Current_Read_Sector : Unsigned_64 := 0;
+      Current_Read_Sector : Sector_Index_T := 0;
       Sector_Address      : Virtual_Address_T := Null_Address;
 
       Destination_Virtual_Address : Virtual_Address_T :=
@@ -1189,7 +1189,7 @@ package body Filesystems.FAT is
          Bytes_Per_Sector := Filesystem_Info.Bytes_Per_Sector;
       end Get_Filesystem_Info;
 
-      Current_Read_Sector := Sector;
+      Current_Read_Sector := Start_Sector;
 
       for Sector_Idx in 1 .. Sector_Count loop
          --  Read each FAT logical sector into memory.

@@ -14,7 +14,7 @@ package body Filesystems.UStar is
       Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result)
    is
-      Current_Sector : Unsigned_64 := 0;
+      Current_Sector : Sector_Index_T := 0;
 
       Sector_Address   : Virtual_Address_T := Null_Address;
       File_Sector_Size : Unsigned_64 := 0;
@@ -41,7 +41,7 @@ package body Filesystems.UStar is
            (Filesystem,
             Reading_Process,
             Current_Sector,
-            512,
+            Ustar_Sector_Size,
             Sector_Address,
             Result);
          if Is_Error (Result) then
@@ -60,7 +60,8 @@ package body Filesystems.UStar is
                  ("Filesystems.UStar.Find_File: Invalid record reached",
                   Logging_Tags_UStar);
 
-               Release_Sector (Filesystem, Current_Sector, 512, Result);
+               Release_Sector
+                 (Filesystem, Current_Sector, Ustar_Sector_Size, Result);
 
                exit;
             end if;
@@ -69,7 +70,8 @@ package body Filesystems.UStar is
               Octal_To_Unsigned_64 (Header.Size);
 
             --  The number of sectors occupied by the file's data.
-            File_Sector_Size := (File_Size + 511) / 512;
+            File_Sector_Size :=
+              (File_Size + Ustar_Sector_Size - 1) / Ustar_Sector_Size;
 
             Log_Debug
               ("Filesystems.UStar.Find_File: Checking file: '"
@@ -91,7 +93,8 @@ package body Filesystems.UStar is
                if Is_Error (Result) then
                   Found_Node := null;
 
-                  Release_Sector (Filesystem, Current_Sector, 512, Result);
+                  Release_Sector
+                    (Filesystem, Current_Sector, Ustar_Sector_Size, Result);
 
                   return;
                end if;
@@ -100,13 +103,15 @@ package body Filesystems.UStar is
                  Get_Filesystem_Node_Type_From_UStar_Typeflag
                    (Header.Typeflag);
 
-               Release_Sector (Filesystem, Current_Sector, 512, Result);
+               Release_Sector
+                 (Filesystem, Current_Sector, Ustar_Sector_Size, Result);
                Result := Success;
                return;
             end if;
          end;
 
-         Release_Sector (Filesystem, Current_Sector, 512, Result);
+         Release_Sector
+           (Filesystem, Current_Sector, Ustar_Sector_Size, Result);
 
          --  Each file's data is contained right after the header sector,
          --  so skip over the data sectors to get to the next header.
@@ -249,7 +254,6 @@ package body Filesystems.UStar is
       Bytes_Left_To_Read        : Natural := 0;
 
       Actual_Bytes_To_Read : Natural := Bytes_To_Read;
-      Sector_Size          : constant Natural := 512;
    begin
       Bytes_Read := 0;
 
@@ -271,9 +275,9 @@ package body Filesystems.UStar is
          return;
       end if;
 
-      Current_Read_Sector : Unsigned_64 :=
+      Current_Read_Sector : Sector_Index_T :=
         Filesystem_Node.all.Data_Location
-        + Current_Offset / Unsigned_64 (Sector_Size);
+        + Current_Offset / Unsigned_64 (Ustar_Sector_Size);
 
       Bytes_Left_To_Read := Actual_Bytes_To_Read;
 
@@ -281,12 +285,13 @@ package body Filesystems.UStar is
          exit when Bytes_Left_To_Read = 0;
 
          Offset_Within_Sector :=
-           Natural (Current_Offset mod Unsigned_64 (Sector_Size));
+           Natural (Current_Offset mod Unsigned_64 (Ustar_Sector_Size));
 
          --  Truncate the number of bytes to copy within this sector
          --  if it exceeds the sector size.
-         if Offset_Within_Sector + Bytes_Left_To_Read > Sector_Size then
-            Bytes_To_Copy_From_Sector := Sector_Size - Offset_Within_Sector;
+         if Offset_Within_Sector + Bytes_Left_To_Read > Ustar_Sector_Size then
+            Bytes_To_Copy_From_Sector :=
+              Ustar_Sector_Size - Offset_Within_Sector;
          else
             Bytes_To_Copy_From_Sector := Bytes_Left_To_Read;
          end if;
@@ -295,7 +300,7 @@ package body Filesystems.UStar is
            (Filesystem,
             Reading_Process,
             Current_Read_Sector,
-            Sector_Size,
+            Ustar_Sector_Size,
             Sector_Address,
             Result);
          if Is_Error (Result) then
@@ -309,7 +314,8 @@ package body Filesystems.UStar is
 
          Bytes_Read := Bytes_Read + Bytes_To_Copy_From_Sector;
 
-         Release_Sector (Filesystem, Current_Read_Sector, Sector_Size, Result);
+         Release_Sector
+           (Filesystem, Current_Read_Sector, Ustar_Sector_Size, Result);
          if Is_Error (Result) then
             return;
          end if;

@@ -32,7 +32,7 @@ private
    procedure Get_FAT16_Table_Entry_Sector_Number
      (Filesystem_Info : FAT_Filesystem_Info_T;
       Cluster         : Unsigned_32;
-      Sector_Number   : out Unsigned_64;
+      Sector_Number   : out Sector_Index_T;
       Result          : out Function_Result);
 
    procedure Get_FAT16_Table_Cluster_Index

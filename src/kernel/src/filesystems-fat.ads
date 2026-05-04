@@ -495,7 +495,7 @@ private
    procedure Read_Sectors_Into_Buffer
      (Filesystem             : Filesystem_Access;
       Reading_Process        : in out Process_Control_Block_T;
-      Sector                 : Unsigned_64;
+      Start_Sector           : Sector_Index_T;
       Sector_Count           : Natural;
       Buffer_Virtual_Address : Virtual_Address_T;
       Result                 : out Function_Result);

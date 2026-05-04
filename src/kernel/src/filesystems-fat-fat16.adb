@@ -232,7 +232,7 @@ package body Filesystems.FAT.FAT16 is
       Result          : out Function_Result)
    is
       Sector_Address : Virtual_Address_T := Null_Address;
-      Sector_Number  : Unsigned_64 := 0;
+      Sector_Number  : Sector_Index_T := 0;
       Cluster_Index  : Natural := 0;
    begin
       Get_FAT16_Table_Entry_Sector_Number

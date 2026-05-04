@@ -7,10 +7,10 @@ with Memory;
 
 package body Devices.Ramdisk is
    function Is_Valid_Sector_Index
-     (Device : Device_T; Sector_Index : Unsigned_64) return Boolean is
+     (Device : Device_T; Sector_Index : Sector_Index_T) return Boolean is
    begin
-      Sector_Limit : constant Unsigned_64 :=
-        Unsigned_64 (Device.Memory_Size) / Ramdisk_Sector_Size;
+      Sector_Limit : constant Sector_Index_T :=
+        Sector_Index_T (Device.Memory_Size / Ramdisk_Sector_Size);
 
       return Sector_Index < Sector_Limit;
    exception
@@ -21,7 +21,7 @@ package body Devices.Ramdisk is
 
    procedure Read_Sector_Unlocked
      (Device               : Device_T;
-      Sector_Index         : Unsigned_64;
+      Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result) is
    begin
@@ -64,7 +64,7 @@ package body Devices.Ramdisk is
 
    procedure Read_Sector
      (Device               : in out Device_T;
-      Sector_Index         : Unsigned_64;
+      Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result) is
    begin
@@ -76,7 +76,7 @@ package body Devices.Ramdisk is
 
    procedure Write_Sector_Unlocked
      (Device               : Device_T;
-      Sector_Index         : Unsigned_64;
+      Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result) is
    begin
@@ -119,7 +119,7 @@ package body Devices.Ramdisk is
 
    procedure Write_Sector
      (Device               : in out Device_T;
-      Sector_Index         : Unsigned_64;
+      Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result) is
    begin

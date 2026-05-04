@@ -3,6 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Filesystems; use Filesystems;
+
 package Devices.Virtio.Block is
    pragma Preelaborate;
 
@@ -13,14 +15,14 @@ package Devices.Virtio.Block is
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
       Data_Physical_Address : Physical_Address_T;
-      Sector                : Unsigned_64;
+      Sector                : Sector_Index_T;
       Result                : out Function_Result);
 
    procedure Write_Sector
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
       Data_Physical_Address : Physical_Address_T;
-      Sector                : Unsigned_64;
+      Sector                : Sector_Index_T;
       Result                : out Function_Result);
 
    --  Block device feature bits.
@@ -45,7 +47,7 @@ private
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
       Data_Physical_Address : Physical_Address_T;
-      Sector                : Unsigned_64;
+      Sector                : Sector_Index_T;
       Write                 : Boolean;
       Result                : out Function_Result);
 
@@ -61,7 +63,7 @@ private
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
       Data_Physical_Address : Physical_Address_T;
-      Sector                : Unsigned_64;
+      Sector                : Sector_Index_T;
       Write                 : Boolean;
       Result                : out Function_Result);
 

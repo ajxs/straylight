@@ -737,10 +737,11 @@ package body Filesystems is
    end Is_Valid_Filesystem_Pointer;
 
    function Sector_To_Block
-     (Sector_Number : Unsigned_64; Sector_Size : Natural) return Unsigned_64 is
+     (Sector_Number : Sector_Index_T; Sector_Size : Natural)
+      return Block_Index_T is
    begin
       return
-        Unsigned_64 ((Natural (Sector_Number) * Sector_Size) / Block_Size);
+        Block_Index_T ((Natural (Sector_Number) * Sector_Size) / Block_Size);
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Sector_To_Block");
@@ -757,8 +758,8 @@ package body Filesystems is
    end Get_Sectors_Per_Block;
 
    function Get_Sector_Offset_Within_Block
-     (Sector_Number : Unsigned_64; Sector_Size : Natural) return Storage_Offset
-   is
+     (Sector_Number : Sector_Index_T; Sector_Size : Natural)
+      return Storage_Offset is
    begin
       return
         Storage_Offset

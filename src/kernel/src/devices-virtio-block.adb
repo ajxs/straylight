@@ -29,7 +29,7 @@ package body Devices.Virtio.Block is
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
       Data_Physical_Address : Physical_Address_T;
-      Sector                : Unsigned_64;
+      Sector                : Sector_Index_T;
       Result                : out Function_Result) is
    begin
       Read_Write
@@ -45,7 +45,7 @@ package body Devices.Virtio.Block is
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
       Data_Physical_Address : Physical_Address_T;
-      Sector                : Unsigned_64;
+      Sector                : Sector_Index_T;
       Result                : out Function_Result) is
    begin
       Read_Write
@@ -56,7 +56,7 @@ package body Devices.Virtio.Block is
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
       Data_Physical_Address : Physical_Address_T;
-      Sector                : Unsigned_64;
+      Sector                : Sector_Index_T;
       Write                 : Boolean;
       Result                : out Function_Result) is
    begin
@@ -77,7 +77,7 @@ package body Devices.Virtio.Block is
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
       Data_Physical_Address : Physical_Address_T;
-      Sector                : Unsigned_64;
+      Sector                : Sector_Index_T;
       Write                 : Boolean;
       Result                : out Function_Result)
    is

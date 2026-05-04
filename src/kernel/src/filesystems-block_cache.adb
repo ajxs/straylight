@@ -88,7 +88,7 @@ package body Filesystems.Block_Cache is
      (Cache        : Block_Cache_T;
       Cache_Index  : Positive;
       Filesystem   : Filesystem_Access;
-      Block_Number : Unsigned_64) return Boolean is
+      Block_Number : Block_Index_T) return Boolean is
    begin
       return
         (Cache.Entries (Cache_Index).Entry_Used
@@ -103,7 +103,7 @@ package body Filesystems.Block_Cache is
    procedure Find_Existing_Block_In_Cache
      (Cache        : in out Block_Cache_T;
       Filesystem   : Filesystem_Access;
-      Block_Number : Unsigned_64;
+      Block_Number : Block_Index_T;
       Cache_Index  : out Positive;
       Result       : out Function_Result) is
    begin
@@ -154,7 +154,7 @@ package body Filesystems.Block_Cache is
    procedure Read_Block_From_Filesystem
      (Filesystem           : Filesystem_Access;
       Reading_Process      : in out Process_Control_Block_T;
-      Block_Number         : Unsigned_64;
+      Block_Number         : Block_Index_T;
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result)
    is
@@ -317,7 +317,7 @@ package body Filesystems.Block_Cache is
    procedure Read_Sector_From_Filesystem
      (Filesystem           : Filesystem_Access;
       Reading_Process      : in out Process_Control_Block_T;
-      Sector_Number        : Unsigned_64;
+      Sector_Number        : Sector_Index_T;
       Sector_Size          : Natural;
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result)
@@ -344,11 +344,11 @@ package body Filesystems.Block_Cache is
      (Cache           : in out Block_Cache_T;
       Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
-      Block_Number    : Unsigned_64;
+      Block_Number    : Block_Index_T;
       Cache_Index     : Positive;
       Result          : out Function_Result)
    is
-      Current_Sector             : Unsigned_64 := 0;
+      Current_Sector             : Sector_Index_T := 0;
       Current_Read_Addr_Virtual  : Virtual_Address_T := Null_Address;
       Current_Read_Addr_Physical : Physical_Address_T := Null_Physical_Address;
 
@@ -418,7 +418,7 @@ package body Filesystems.Block_Cache is
 
    procedure Release_Block_Unlocked
      (Filesystem             : Filesystem_Access;
-      Block_Number           : Unsigned_64;
+      Block_Number           : Block_Index_T;
       Result                 : out Function_Result;
       Invalidate_Cache_Entry : Boolean)
    is
@@ -466,7 +466,7 @@ package body Filesystems.Block_Cache is
 
    procedure Release_Block
      (Filesystem             : Filesystem_Access;
-      Block_Number           : Unsigned_64;
+      Block_Number           : Block_Index_T;
       Result                 : out Function_Result;
       Invalidate_Cache_Entry : Boolean := False) is
    begin
@@ -478,7 +478,7 @@ package body Filesystems.Block_Cache is
 
    procedure Release_Sector
      (Filesystem    : Filesystem_Access;
-      Sector_Number : Unsigned_64;
+      Sector_Number : Sector_Index_T;
       Sector_Size   : Natural;
       Result        : out Function_Result) is
    begin
@@ -490,11 +490,11 @@ package body Filesystems.Block_Cache is
      (Cache           : in out Block_Cache_T;
       Filesystem      : Filesystem_Access;
       Writing_Process : in out Process_Control_Block_T;
-      Block_Number    : Unsigned_64;
+      Block_Number    : Block_Index_T;
       Cache_Index     : Positive;
       Result          : out Function_Result)
    is
-      Current_Sector : Unsigned_64 := 0;
+      Current_Sector : Sector_Index_T := 0;
 
       Curr_Write_Addr_Virtual  : Virtual_Address_T := Null_Address;
       Curr_Write_Addr_Physical : Physical_Address_T := Null_Physical_Address;
@@ -561,7 +561,7 @@ package body Filesystems.Block_Cache is
    procedure Write_Block_To_Filesystem
      (Filesystem      : Filesystem_Access;
       Writing_Process : in out Process_Control_Block_T;
-      Block_Number    : Unsigned_64;
+      Block_Number    : Block_Index_T;
       Result          : out Function_Result)
    is
       Cache_Index : Positive := 1;
@@ -624,7 +624,7 @@ package body Filesystems.Block_Cache is
    procedure Write_Sector_To_Filesystem
      (Filesystem      : Filesystem_Access;
       Writing_Process : in out Process_Control_Block_T;
-      Sector_Number   : Unsigned_64;
+      Sector_Number   : Sector_Index_T;
       Sector_Size     : Natural;
       Result          : out Function_Result) is
    begin

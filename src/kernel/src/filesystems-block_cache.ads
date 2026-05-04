@@ -11,7 +11,7 @@ private package Filesystems.Block_Cache is
    procedure Read_Block_From_Filesystem
      (Filesystem           : Filesystem_Access;
       Reading_Process      : in out Process_Control_Block_T;
-      Block_Number         : Unsigned_64;
+      Block_Number         : Block_Index_T;
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result);
 
@@ -19,12 +19,12 @@ private package Filesystems.Block_Cache is
    procedure Write_Block_To_Filesystem
      (Filesystem      : Filesystem_Access;
       Writing_Process : in out Process_Control_Block_T;
-      Block_Number    : Unsigned_64;
+      Block_Number    : Block_Index_T;
       Result          : out Function_Result);
 
    procedure Release_Block
      (Filesystem             : Filesystem_Access;
-      Block_Number           : Unsigned_64;
+      Block_Number           : Block_Index_T;
       Result                 : out Function_Result;
       Invalidate_Cache_Entry : Boolean := False);
 
@@ -41,7 +41,7 @@ private package Filesystems.Block_Cache is
    procedure Read_Sector_From_Filesystem
      (Filesystem           : Filesystem_Access;
       Reading_Process      : in out Process_Control_Block_T;
-      Sector_Number        : Unsigned_64;
+      Sector_Number        : Sector_Index_T;
       Sector_Size          : Natural;
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result);
@@ -50,13 +50,13 @@ private package Filesystems.Block_Cache is
    procedure Write_Sector_To_Filesystem
      (Filesystem      : Filesystem_Access;
       Writing_Process : in out Process_Control_Block_T;
-      Sector_Number   : Unsigned_64;
+      Sector_Number   : Sector_Index_T;
       Sector_Size     : Natural;
       Result          : out Function_Result);
 
    procedure Release_Sector
      (Filesystem    : Filesystem_Access;
-      Sector_Number : Unsigned_64;
+      Sector_Number : Sector_Index_T;
       Sector_Size   : Natural;
       Result        : out Function_Result);
 
@@ -67,7 +67,7 @@ private package Filesystems.Block_Cache is
    type Block_Cache_Entry_T is record
       Sleeplock    : Sleeplock_T;
       Filesystem   : Filesystem_Access := null;
-      Block_Number : Unsigned_64 := 0;
+      Block_Number : Block_Index_T := 0;
       Last_Access  : Unsigned_64 := 0;
       Entry_Used   : Boolean := False;
    end record;
@@ -93,7 +93,7 @@ private
      (Cache        : Block_Cache_T;
       Cache_Index  : Positive;
       Filesystem   : Filesystem_Access;
-      Block_Number : Unsigned_64) return Boolean
+      Block_Number : Block_Index_T) return Boolean
    with Inline;
 
    procedure Find_And_Claim_Available_Block_Cache_Entry
@@ -114,7 +114,7 @@ private
    procedure Find_Existing_Block_In_Cache
      (Cache        : in out Block_Cache_T;
       Filesystem   : Filesystem_Access;
-      Block_Number : Unsigned_64;
+      Block_Number : Block_Index_T;
       Cache_Index  : out Positive;
       Result       : out Function_Result);
 
@@ -122,13 +122,13 @@ private
      (Cache           : in out Block_Cache_T;
       Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
-      Block_Number    : Unsigned_64;
+      Block_Number    : Block_Index_T;
       Cache_Index     : Positive;
       Result          : out Function_Result);
 
    procedure Release_Block_Unlocked
      (Filesystem             : Filesystem_Access;
-      Block_Number           : Unsigned_64;
+      Block_Number           : Block_Index_T;
       Result                 : out Function_Result;
       Invalidate_Cache_Entry : Boolean);
 

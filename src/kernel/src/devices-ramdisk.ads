@@ -4,6 +4,7 @@
 -------------------------------------------------------------------------------
 
 with Function_Results; use Function_Results;
+with Filesystems;      use Filesystems;
 
 -------------------------------------------------------------------------------
 --  The ramdisk 'device' provides an interface for reading/writing sectors
@@ -36,13 +37,13 @@ package Devices.Ramdisk is
 
    procedure Read_Sector
      (Device               : in out Device_T;
-      Sector_Index         : Unsigned_64;
+      Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result);
 
    procedure Write_Sector
      (Device               : in out Device_T;
-      Sector_Index         : Unsigned_64;
+      Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result);
 

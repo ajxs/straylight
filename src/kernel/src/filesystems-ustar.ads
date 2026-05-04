@@ -29,6 +29,8 @@ private
 
    subtype USTAR_Header_Name is String (1 .. 100);
 
+   Ustar_Sector_Size : constant := 512;
+
    type Tar_File_Header is record
       Name     : USTAR_Header_Name;
       Mode     : String (1 .. 8);
