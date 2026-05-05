@@ -32,6 +32,8 @@ package Filesystems.FAT is
 private
    Logging_Tags_FAT : constant Log_Tags := [Log_Tag_Filesystems_FAT];
 
+   No_Free_Clusters : constant Function_Result := -1234_0000;
+
    type FAT_Type_T is
      (FAT_Type_FAT12, FAT_Type_FAT16, FAT_Type_FAT32, FAT_Type_ExFAT);
 
