@@ -16,10 +16,10 @@ package body Devices.Virtio is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
-      Interrupt_Status   : Unsigned_32 := 0;
       Interrupt_Ack_Mask : constant := 3;
    begin
-      Interrupt_Status := Device_Registers.Interrupt_Status;
+      Interrupt_Status : constant Unsigned_32 :=
+        Device_Registers.Interrupt_Status;
 
       --  Acknowledge the interrupt and process any completed requests.
       --  Wakeup any processes waiting on the completed request.
@@ -29,10 +29,6 @@ package body Devices.Virtio is
            Import,
            Address   => Device.Bus_Info_Virtio.Q_Used.Virtual_Address,
            Alignment => 1;
-
-         Descriptor_Index : Unsigned_32 := 0;
-
-         Queue_Index : Unsigned_16 := 0;
       begin
          Log_Debug
            ("Q_Used.Index: " & Q_Used.Index'Image, Logging_Tags_Virtio);
@@ -40,7 +36,7 @@ package body Devices.Virtio is
          while Device.Bus_Info_Virtio.Request_Serviced_Index /= Q_Used.Index
          loop
 
-            Queue_Index :=
+            Queue_Index : constant Unsigned_16 :=
               Device.Bus_Info_Virtio.Request_Serviced_Index
               mod Maximum_Virtio_Queue_Length;
 
@@ -68,7 +64,8 @@ package body Devices.Virtio is
                end if;
             end Check_Request_Status;
 
-            Descriptor_Index := Q_Used.Ring (Queue_Index).Id;
+            Descriptor_Index : constant Unsigned_32 :=
+              Q_Used.Ring (Queue_Index).Id;
 
             Log_Debug
               ("Used descriptor index: " & Descriptor_Index'Image,

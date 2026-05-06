@@ -46,6 +46,34 @@ package RISCV is
 
    SV39_Mode_Flags_Mask : constant := 16#8000000000000000#;
 
+   ----------------------------------------------------------------------------
+   --  Scause exception cause codes (interrupt bit stripped).
+   ----------------------------------------------------------------------------
+   Scause_Instruction_Address_Misaligned : constant := 0;
+   Scause_Instruction_Access_Fault       : constant := 1;
+   Scause_Illegal_Instruction            : constant := 2;
+   Scause_Breakpoint                     : constant := 3;
+   Scause_Load_Address_Misaligned        : constant := 4;
+   Scause_Load_Access_Fault              : constant := 5;
+   Scause_Store_AMO_Address_Misaligned   : constant := 6;
+   Scause_Store_AMO_Access_Fault         : constant := 7;
+   Scause_U_Mode_Ecall                   : constant := 8;
+   Scause_S_Mode_Ecall                   : constant := 9;
+   Scause_M_Mode_Ecall                   : constant := 11;
+   Scause_Instruction_Page_Fault         : constant := 12;
+   Scause_Load_Page_Fault                : constant := 13;
+   Scause_Store_AMO_Page_Fault           : constant := 15;
+
+   ----------------------------------------------------------------------------
+   --  Scause interrupt cause codes (interrupt bit stripped).
+   ----------------------------------------------------------------------------
+   Scause_Supervisor_Software_Interrupt  : constant := 1;
+   Scause_Machine_Software_Interrupt     : constant := 3;
+   Scause_Supervisor_Timer_Interrupt     : constant := 5;
+   Scause_Machine_Timer_Interrupt        : constant := 7;
+   Scause_Supervisor_External_Interrupt  : constant := 9;
+   Scause_Machine_External_Interrupt     : constant := 11;
+
    function Create_SATP
      (Page_Table_Address : Address; ASID : Unsigned_16) return Unsigned_64
    is (Shift_Right (Unsigned_64 (To_Integer (Page_Table_Address)), 12)

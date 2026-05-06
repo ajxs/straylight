@@ -196,8 +196,4 @@ private
       Free_Index : out Map_Index_T;
       Result     : out Function_Result);
 
-   function Validate_Memory_Region_Permissions
-     (Region_Flags : Memory_Region_Flags_T) return Boolean
-   with Pure_Function, Inline;
-
 end Memory.Virtual;

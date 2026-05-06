@@ -31,6 +31,7 @@ package Utilities is
    with Pure_Function;
 
    function ASCII_To_Wide_Char (ASCII_Char : Character) return Wide_Character
+   is (Wide_Character'Val (Character'Pos (ASCII_Char)))
    with Pure_Function;
 
    type UTF8_Converted_Char_Buffer_T is array (1 .. 4) of Character;

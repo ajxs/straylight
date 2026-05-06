@@ -10,6 +10,12 @@ with RISCV.Paging;    use RISCV.Paging;
 with Hart_State;      use Hart_State;
 
 package body Memory.Virtual is
+   --  Disallow W^X pages.
+   function Validate_Memory_Region_Permissions
+     (Region_Flags : Memory_Region_Flags_T) return Boolean
+   is (not (Region_Flags.Execute and then Region_Flags.Write))
+   with Pure_Function, Inline;
+
    procedure Copy_Kernel_Memory_Mappings_Into_Address_Space
      (Source_Addr_Space : Virtual_Memory_Space_T;
       Dest_Addr_Space   : in out Virtual_Memory_Space_T;
@@ -166,26 +172,20 @@ package body Memory.Virtual is
    function Is_Region_Intersecting
      (Region     : Virtual_Memory_Mapping_T;
       Start_Addr : Virtual_Address_T;
-      Size       : Memory_Region_Size) return Boolean
-   is
-      Maximum_Start : Virtual_Address_T := Null_Address;
-      Minimum_End   : Virtual_Address_T := Null_Address;
+      Size       : Memory_Region_Size) return Boolean is
    begin
       Test_Region_End : constant Virtual_Address_T := Start_Addr + Size;
+
       Region_End : constant Virtual_Address_T :=
         Region.Virtual_Addr + Region.Size;
 
-      if Region.Virtual_Addr > Start_Addr then
-         Maximum_Start := Region.Virtual_Addr;
-      else
-         Maximum_Start := Start_Addr;
-      end if;
+      Maximum_Start : constant Virtual_Address_T :=
+        (if Region.Virtual_Addr > Start_Addr
+         then Region.Virtual_Addr
+         else Start_Addr);
 
-      if Region_End < Test_Region_End then
-         Minimum_End := Region_End;
-      else
-         Minimum_End := Test_Region_End;
-      end if;
+      Minimum_End : constant Virtual_Address_T :=
+        (if Region_End < Test_Region_End then Region_End else Test_Region_End);
 
       return Minimum_End > Maximum_Start;
    end Is_Region_Intersecting;
@@ -226,7 +226,6 @@ package body Memory.Virtual is
 
       Current_Region  : Map_Index_T := No_Mapping;
       Previous_Region : Map_Index_T := No_Mapping;
-      Real_Size       : Memory_Region_Size := 1;
       New_Index       : Map_Index_T := No_Mapping;
    begin
       if not Allow_Mapping_Kernel_Addresses
@@ -267,7 +266,7 @@ package body Memory.Virtual is
       end if;
 
       --  Ensures the size of the virtual memory mapping is page aligned.
-      Real_Size := Get_Real_Region_Size (Size);
+      Real_Size : constant Memory_Region_Size := Get_Real_Region_Size (Size);
 
       --  Find the first non-allocated mapping entry and use this for the
       --  new mapping.
@@ -438,17 +437,6 @@ package body Memory.Virtual is
          Result := Constraint_Exception;
    end Unmap_Unlocked;
 
-   function Validate_Memory_Region_Permissions
-     (Region_Flags : Memory_Region_Flags_T) return Boolean is
-   begin
-      --  Disallow W^X pages.
-      if Region_Flags.Execute and then Region_Flags.Write then
-         return False;
-      end if;
-
-      return True;
-   end Validate_Memory_Region_Permissions;
-
    procedure Map_Kernel_Memory
      (Virtual_Addr  : Virtual_Address_T;
       Physical_Addr : Physical_Address_T;
@@ -591,12 +579,9 @@ package body Memory.Virtual is
          Panic ("Constraint_Error: Initialise_Kernel_Address_Space");
    end Initialise_Kernel_Address_Space;
 
-   function Get_Kernel_Address_Space_SATP return Unsigned_64 is
-   begin
-      return
-        Create_SATP
-          (Address (Kernel_Address_Space.Base_Page_Table_Addr),
-           Kernel_Address_Space.Address_Space_ID);
-   end Get_Kernel_Address_Space_SATP;
+   function Get_Kernel_Address_Space_SATP return Unsigned_64
+   is (Create_SATP
+         (Address (Kernel_Address_Space.Base_Page_Table_Addr),
+          Kernel_Address_Space.Address_Space_ID));
 
 end Memory.Virtual;

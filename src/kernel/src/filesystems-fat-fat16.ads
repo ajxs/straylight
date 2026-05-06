@@ -56,11 +56,11 @@ private
    with Pack;
 
    procedure Find_Free_FAT16_Cluster
-     (Filesystem          : Filesystem_Access;
-      Writing_Process     : in out Process_Control_Block_T;
-      Filesystem_Info     : FAT_Filesystem_Info_T;
-      Start_Cluster_Index : Unsigned_32;
-      Free_Cluster        : out Unsigned_32;
-      Result              : out Function_Result);
+     (Filesystem         : Filesystem_Access;
+      Writing_Process    : in out Process_Control_Block_T;
+      Filesystem_Info    : FAT_Filesystem_Info_T;
+      Start_Cluster_Hint : Unsigned_32;
+      Free_Cluster       : out Unsigned_32;
+      Result             : out Function_Result);
 
 end Filesystems.FAT.FAT16;

@@ -12,7 +12,7 @@ with Devices.PLIC;
 with Devices.UART;
 with Function_Results; use Function_Results;
 with Processes.Scheduler;
-with RISCV;
+with RISCV;            use RISCV;
 with RISCV.SBI;        use RISCV.SBI;
 with System_Calls;
 with Hart_State;       use Hart_State;
@@ -38,7 +38,8 @@ package body Traps is
          with Import, Alignment => 1, Address => Trapping_Process_Addr;
 
          function Is_Stack_Overflow return Boolean
-         is ((Cause = 13 or else Cause = 15)
+         is ((Cause = Scause_Load_Page_Fault
+              or else Cause = Scause_Store_AMO_Page_Fault)
              and then
                Stval
                < Address_To_Unsigned_64
@@ -157,13 +158,13 @@ package body Traps is
       pragma Unreferenced (Sepc, Stval);
 
       case Cause is
-         when 5      =>
+         when Scause_Supervisor_Timer_Interrupt    =>
             Handle_Timer_Interrupt;
 
-         when 9      =>
+         when Scause_Supervisor_External_Interrupt =>
             Handle_External_Interrupt;
 
-         when others =>
+         when others                               =>
             Log_Debug
               ("Supervisor Mode: Other Interrupt: " & Cause'Image,
                Logging_Tags);
@@ -278,7 +279,7 @@ package body Traps is
         Address    => Trapping_Process.Trap_Context_Addr;
    begin
       case Cause is
-         when 8      =>
+         when Scause_U_Mode_Ecall =>
             System_Calls.Handle_User_Mode_Syscall (Trapping_Process, Result);
             if Is_Error (Result) then
                Panic ("Error handling syscall: " & Result'Image);
@@ -291,7 +292,7 @@ package body Traps is
             --  the ecall instruction. It's always 4 bytes long.
             Trap_Context.Sepc := Sepc + 4;
 
-         when others =>
+         when others              =>
             Panic
               ("Unhandled user mode exception: "
                & ASCII.LF
@@ -318,13 +319,13 @@ package body Traps is
    procedure Handle_User_Mode_Interrupt (Cause : Unsigned_64) is
    begin
       case Cause is
-         when 5      =>
+         when Scause_Supervisor_Timer_Interrupt    =>
             Handle_Timer_Interrupt;
 
-         when 9      =>
+         when Scause_Supervisor_External_Interrupt =>
             Handle_External_Interrupt;
 
-         when others =>
+         when others                               =>
             Log_Debug
               ("User Mode: Other Interrupt: " & Cause'Image, Logging_Tags);
       end case;
@@ -399,12 +400,11 @@ package body Traps is
    end Handle_User_Mode_Trap;
 
    procedure Setup_Next_Timer_Interrupt is
-      SBI_Ret : SBI_Result_T;
    begin
-      SBI_Ret :=
+      SBI_Ret : constant SBI_Result_T :=
         RISCV.SBI.Set_Timer (RISCV.Get_System_Time + System_Tick_Interval);
       if SBI_Ret.Error /= 0 then
-         Log_Error ("Error setting next event time: " & SBI_Ret.Error'Image);
+         Panic ("Error setting next event time: " & SBI_Ret.Error'Image);
       end if;
 
    exception

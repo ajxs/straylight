@@ -208,11 +208,9 @@ package body Devices.UART is
    begin
       --  Get the current status of this device's interrupts to
       --  preserve the current interrupt status.
-      Get_Interrupt_Status : begin
-         Interrupt_Status :=
-           Byte_To_Port_Interrupt_Status
-             (Read_Unsigned_8 (Device.Virtual_Address + Interrupt_Enable));
-      end Get_Interrupt_Status;
+      Interrupt_Status :=
+        Byte_To_Port_Interrupt_Status
+          (Read_Unsigned_8 (Device.Virtual_Address + Interrupt_Enable));
 
       Set_Interrupt_Status : begin
          --  Set the interrupt status var to the desired value.

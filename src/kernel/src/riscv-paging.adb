@@ -33,7 +33,7 @@ package body RISCV.Paging is
    begin
       return
         Are_Address_Bits_39_To_63_Equal_To_Bit_38
-          (Unsigned_64 (To_Integer (Virtual_Address)));
+          (Address_To_Unsigned_64 (Virtual_Address));
    end Is_Valid_SV39_Virtual_Address;
 
    ----------------------------------------------------------------------------
@@ -48,7 +48,7 @@ package body RISCV.Paging is
    begin
       return
         Page_Aligned_Address_T
-          (Shift_Right (Unsigned_64 (To_Integer (Addr)), 12));
+          (Shift_Right (Address_To_Unsigned_64 (Addr), 12));
    exception
       when Constraint_Error =>
          return 0;
