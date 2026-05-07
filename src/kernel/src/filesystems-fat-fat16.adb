@@ -484,4 +484,56 @@ package body Filesystems.FAT.FAT16 is
          Result := Constraint_Exception;
    end Find_Free_FAT16_Cluster;
 
+   procedure Allocate_Cluster
+     (Filesystem        : Filesystem_Access;
+      Writing_Process   : in out Process_Control_Block_T;
+      Filesystem_Info   : FAT_Filesystem_Info_T;
+      New_Cluster_Index : out Unsigned_32;
+      Result            : out Function_Result) is
+   begin
+      --  Start searching from cluster 2, since clusters 0 and 1 are reserved.
+      Find_Free_FAT16_Cluster
+        (Filesystem,
+         Writing_Process,
+         Filesystem_Info,
+         2,
+         New_Cluster_Index,
+         Result);
+      if Is_Error (Result) then
+         New_Cluster_Index := 0;
+         return;
+      end if;
+
+      Log_Error
+        ("Found free FAT16 cluster: " & New_Cluster_Index'Image,
+         Logging_Tags_FAT);
+
+      --  Mark the newly allocated cluster as end-of-chain in the FAT.
+      Write_FAT16_Table_Entry
+        (Filesystem,
+         Writing_Process,
+         Filesystem_Info,
+         New_Cluster_Index,
+         Cluster_Marker_EOC_FAT16,
+         Result);
+      if Is_Error (Result) then
+         New_Cluster_Index := 0;
+         return;
+      end if;
+
+      Log_Error
+        ("Allocated free FAT16 cluster: " & New_Cluster_Index'Image,
+         Logging_Tags_FAT);
+
+      Log_Debug
+        ("Allocated new FAT16 cluster: " & New_Cluster_Index'Image,
+         Logging_Tags_FAT);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Allocate_Cluster");
+         New_Cluster_Index := 0;
+         Result := Constraint_Exception;
+   end Allocate_Cluster;
 end Filesystems.FAT.FAT16;

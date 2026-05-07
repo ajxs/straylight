@@ -223,12 +223,12 @@ package body Filesystems.FAT is
    function Is_Cluster_Bad
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean is
    begin
-      if FAT_Type = FAT_Type_FAT16 then
-         return Cluster = 16#FFF7#;
-      elsif FAT_Type = FAT_Type_FAT12 then
-         return Cluster = 16#0FF7#;
+      if FAT_Type = FAT_Type_FAT12 then
+         return Cluster = Cluster_Marker_Bad_FAT12;
+      elsif FAT_Type = FAT_Type_FAT16 then
+         return Cluster = Cluster_Marker_Bad_FAT16;
       elsif FAT_Type = FAT_Type_FAT32 then
-         return Cluster = 16#0FFFFFF7#;
+         return Cluster = Cluster_Marker_Bad_FAT32;
       end if;
 
       return False;
@@ -237,12 +237,12 @@ package body Filesystems.FAT is
    function Is_Cluster_End_Of_Chain
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean is
    begin
-      if FAT_Type = FAT_Type_FAT16 then
-         return Cluster >= 16#FFF8#;
-      elsif FAT_Type = FAT_Type_FAT12 then
-         return Cluster >= 16#0FF8#;
+      if FAT_Type = FAT_Type_FAT12 then
+         return Cluster >= Cluster_Marker_EOC_FAT12;
+      elsif FAT_Type = FAT_Type_FAT16 then
+         return Cluster >= Cluster_Marker_EOC_FAT16;
       elsif FAT_Type = FAT_Type_FAT32 then
-         return Cluster >= 16#0FFFFFF8#;
+         return Cluster >= Cluster_Marker_EOC_FAT32;
       end if;
 
       return True;

@@ -34,6 +34,14 @@ private
 
    No_Free_Clusters : constant Function_Result := -1234_0000;
 
+   Cluster_Marker_EOC_FAT12 : constant := 16#0FF8#;
+   Cluster_Marker_EOC_FAT16 : constant := 16#FFF8#;
+   Cluster_Marker_EOC_FAT32 : constant := 16#0FFFFFF8#;
+
+   Cluster_Marker_Bad_FAT12 : constant := 16#0FF7#;
+   Cluster_Marker_Bad_FAT16 : constant := 16#FFF7#;
+   Cluster_Marker_Bad_FAT32 : constant := 16#0FFFFFF7#;
+
    type FAT_Type_T is
      (FAT_Type_FAT12, FAT_Type_FAT16, FAT_Type_FAT32, FAT_Type_ExFAT);
 

@@ -63,4 +63,11 @@ private
       Free_Cluster       : out Unsigned_32;
       Result             : out Function_Result);
 
+   procedure Allocate_Cluster
+     (Filesystem        : Filesystem_Access;
+      Writing_Process   : in out Process_Control_Block_T;
+      Filesystem_Info   : FAT_Filesystem_Info_T;
+      New_Cluster_Index : out Unsigned_32;
+      Result            : out Function_Result);
+
 end Filesystems.FAT.FAT16;
