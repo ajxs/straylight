@@ -158,3 +158,38 @@ int fseek(FILE *stream, long offset, int origin)
 
 	return 0;
 }
+
+size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream)
+{
+	if (count == 0 || size == 0)
+	{
+		return 0;
+	}
+
+	size_t total_bytes_to_write = size * count;
+	size_t total_bytes_written = 0;
+	size_t current_bytes_to_write = 0;
+
+	while (total_bytes_written < total_bytes_to_write)
+	{
+		current_bytes_to_write = total_bytes_to_write - total_bytes_written;
+
+		int64_t write_result = straylight_libc_do_syscall(
+		    STRAYLIGHT_SYSCALL_FILE_WRITE, stream->file_handle_id,
+		    (uint64_t)buffer + total_bytes_written, current_bytes_to_write);
+		if (is_syscall_result_error(write_result))
+		{
+			errno = write_result;
+			return total_bytes_written / size;
+		}
+
+		if (write_result == 0)
+		{
+			break;
+		}
+
+		total_bytes_written += write_result;
+	}
+
+	return count;
+}

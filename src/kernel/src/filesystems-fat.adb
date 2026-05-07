@@ -1260,4 +1260,27 @@ package body Filesystems.FAT is
       Result := Success;
    end Read_Sectors_Into_Buffer;
 
+   procedure Write_File
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      Buffer_Address  : Virtual_Address_T;
+      Start_Offset    : Unsigned_64;
+      Bytes_To_Write  : Natural;
+      Bytes_Written   : out Natural;
+      Result          : out Function_Result) is
+   begin
+      pragma
+        Unreferenced
+          (Filesystem,
+           Writing_Process,
+           Filesystem_Node,
+           Buffer_Address,
+           Start_Offset,
+           Bytes_To_Write);
+
+      Bytes_Written := 0;
+      Result := Success;
+   end Write_File;
+
 end Filesystems.FAT;

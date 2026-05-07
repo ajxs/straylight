@@ -29,6 +29,16 @@ package Filesystems.FAT is
       Bytes_Read      : out Natural;
       Result          : out Function_Result);
 
+   procedure Write_File
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      Buffer_Address  : Virtual_Address_T;
+      Start_Offset    : Unsigned_64;
+      Bytes_To_Write  : Natural;
+      Bytes_Written   : out Natural;
+      Result          : out Function_Result);
+
 private
    Logging_Tags_FAT : constant Log_Tags := [Log_Tag_Filesystems_FAT];
 

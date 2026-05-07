@@ -904,11 +904,21 @@ package body Filesystems is
       Bytes_Written  : out Natural;
       Result         : out Function_Result) is
    begin
-      pragma Unreferenced (Process, Buffer_Address, Bytes_To_Write);
       Bytes_Written := 0;
 
       case File_Handle.all.File.all.Parent_Filesystem.all.Filesystem_Type is
-         when others =>
+         when Filesystem_Type_FAT =>
+            Filesystems.FAT.Write_File
+              (File_Handle.all.File.all.Parent_Filesystem,
+               Process,
+               File_Handle.all.File,
+               Buffer_Address,
+               File_Handle.all.Position,
+               Bytes_To_Write,
+               Bytes_Written,
+               Result);
+
+         when others              =>
             Log_Error
               ("Unsupported filesystem type: "
                & File_Handle.all.File.all.Parent_Filesystem.all
