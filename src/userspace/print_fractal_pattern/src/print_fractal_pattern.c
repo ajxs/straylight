@@ -16,7 +16,7 @@ int main()
 	if (framebuffer_address == 0)
 	{
 		log_error("Failed to allocate framebuffer memory");
-		return 1;
+		return EXIT_FAILURE;
 	}
 
 	uint8_t c = 0;
@@ -46,7 +46,7 @@ int main()
 		if (result != 0)
 		{
 			log_error("Failed to update framebuffer");
-			exit(EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		if (direction == 0)
@@ -67,5 +67,5 @@ int main()
 		}
 	}
 
-	exit(EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }

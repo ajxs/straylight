@@ -20,7 +20,7 @@ int main()
 	if (file == NULL)
 	{
 		print_to_serial("Failed to open file!\n");
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
 	while (true)
@@ -28,7 +28,7 @@ int main()
 		if (fseek(file, 0, SEEK_SET) != 0)
 		{
 			print_to_serial("Failed to seek to start of file!\n");
-			exit(EXIT_FAILURE);
+			return EXIT_FAILURE;
 		}
 
 		const int number_of_words = 10;
@@ -41,5 +41,5 @@ int main()
 		}
 	}
 
-	exit(EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }

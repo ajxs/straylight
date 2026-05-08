@@ -718,9 +718,12 @@ package body Boot is
          Result);
 
       Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
-         "/Devices/Disk/Programs/print_random_words.elf",
-         Result);
+        (Init_Process.all, "/Devices/Disk/Programs/test_file_io.elf", Result);
+
+      --  Loader.Load_New_Process_From_Filesystem
+      --    (Init_Process.all,
+      --     "/Devices/Disk/Programs/print_random_words.elf",
+      --     Result);
 
       --  Wait for all the harts to start before freeing the boot memory.
       --  Since their boot stacks are in the boot memory region that would be
