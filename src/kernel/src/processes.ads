@@ -91,6 +91,8 @@ package Processes is
       Heap     : Memory_Heap_T;
       Spinlock : Spinlock_T;
 
+      Next_File_Handle_Id : Unsigned_64 := 1;
+
       Next_Process : Process_Control_Block_Access := null;
    end record;
 

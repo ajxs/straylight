@@ -460,22 +460,27 @@ package body Filesystems is
       File_Handle_Index : Positive := 1;
    begin
       Acquire_Spinlock (Open_Files_Spinlock);
+      Acquire_Spinlock (Process.Spinlock);
 
       Find_Unused_File_Handle_Entry (Open_Files, File_Handle_Index, Result);
       if Is_Error (Result) then
+         Release_Spinlock (Process.Spinlock);
          Release_Spinlock (Open_Files_Spinlock);
          return;
       end if;
 
       File_Handle := Open_Files (File_Handle_Index)'Access;
 
-      File_Handle.all.File_Handle_Id := Unsigned_64 (File_Handle_Index);
+      File_Handle.all.File_Handle_Id := Process.Next_File_Handle_Id;
+      Process.Next_File_Handle_Id := Process.Next_File_Handle_Id + 1;
+
       File_Handle.all.Entry_Used := True;
       File_Handle.all.File := Filesystem_Node;
       File_Handle.all.Position := 0;
       File_Handle.all.Mode := Mode;
       File_Handle.all.Process_Id := Process.Process_Id;
 
+      Release_Spinlock (Process.Spinlock);
       Release_Spinlock (Open_Files_Spinlock);
 
       Result := Success;

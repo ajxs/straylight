@@ -112,12 +112,15 @@ package Filesystems is
      (File_Open_Mode_Read => 0, File_Open_Mode_Write => 1);
 
    type Process_File_Handle_T is record
-      --  The file handle ID is used to reference this handle from user mode.
-      File_Handle_Id : Unsigned_64 := 0;
       Entry_Used     : Boolean := False;
+      --  The file handle ID is used to reference this handle from user mode.
+      --  It's unique to the process, not globally unique across the system.
+      --  A file handle is identified by the process ID and the file handle
+      --  ID together.
+      File_Handle_Id : Unsigned_64 := 0;
+      Process_Id     : Process_Id_T := 0;
       File           : Filesystem_Node_Access := null;
       Mode           : File_Open_Mode_T := File_Open_Mode_Read;
-      Process_Id     : Process_Id_T := 0;
       Position       : Unsigned_64 := 0;
    end record;
 
