@@ -82,17 +82,8 @@ package body Devices.UART is
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
    procedure Put_Char (Device : Device_T; Data : Character) is
-      Put_Char_Timeout : constant := 1_000_000;
    begin
-      for I in 1 .. Put_Char_Timeout loop
-         if Is_Tx_Empty (Device) then
-            Write_Unsigned_8 (Device.Virtual_Address, Character'Pos (Data));
-            return;
-         end if;
-      end loop;
-
-      Log_Error
-        ("Timeout while waiting to put character to UART.", Logging_Tags);
+      Put_Byte (Device, Character'Pos (Data));
    end Put_Char;
 
    ----------------------------------------------------------------------------
@@ -237,4 +228,28 @@ package body Devices.UART is
         (Device.Virtual_Address + Interrupt_Enable,
          Port_Interrupt_Status_To_Byte (Interrupt_Status));
    end Set_Interrupt_Generation;
+
+   procedure Put_Bytes (Device : Device_T; Data : Byte_Array_T) is
+   begin
+      Print_Loop : for C of Data loop
+         Put_Byte (Device, C);
+      end loop Print_Loop;
+   end Put_Bytes;
+
+   ----------------------------------------------------------------------------
+   --  Implementation Notes:
+   --   - Does not determine whether the port has been initialised.
+   ----------------------------------------------------------------------------
+   procedure Put_Byte (Device : Device_T; Data : Unsigned_8) is
+      Put_Byte_Timeout : constant := 1_000_000;
+   begin
+      for I in 1 .. Put_Byte_Timeout loop
+         if Is_Tx_Empty (Device) then
+            Write_Unsigned_8 (Device.Virtual_Address, Data);
+            return;
+         end if;
+      end loop;
+
+      Log_Error ("Timeout while waiting to put byte to UART.", Logging_Tags);
+   end Put_Byte;
 end Devices.UART;

@@ -65,6 +65,12 @@ package Devices.UART is
    --  Prints a character to a UART port.
    ----------------------------------------------------------------------------
    procedure Put_Char (Device : Device_T; Data : Character);
+
+   type Byte_Array_T is array (Natural range <>) of Unsigned_8;
+
+   procedure Put_Bytes (Device : Device_T; Data : Byte_Array_T);
+
+   procedure Put_Byte (Device : Device_T; Data : Unsigned_8);
 private
    --  Register offsets.
    Rx_Buffer_Tx_Holding         : constant := 0;
