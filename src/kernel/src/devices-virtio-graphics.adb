@@ -89,9 +89,7 @@ package body Devices.Virtio.Graphics is
            (Addr    =>
               Address_To_Unsigned_64 (Address (Framebuffer_Physical_Address)),
             Length  =>
-              Device.Bus_Info.Virtio.Framebuffer_Width
-              * Device.Bus_Info.Virtio.Framebuffer_Height
-              * 4,
+              Device.Framebuffer_Width * Device.Framebuffer_Height * 4,
             Padding => 0);
       end Setup_Request;
 
@@ -401,8 +399,8 @@ package body Devices.Virtio.Graphics is
                Padding   => 0),
             Resource_Id => Resource_Id,
             Format      => VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM,
-            Width       => Device.Bus_Info.Virtio.Framebuffer_Width,
-            Height      => Device.Bus_Info.Virtio.Framebuffer_Height);
+            Width       => Device.Framebuffer_Width,
+            Height      => Device.Framebuffer_Height);
       end Setup_Request;
 
       Setup_Queues : declare

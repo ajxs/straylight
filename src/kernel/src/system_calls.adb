@@ -397,8 +397,8 @@ package body System_Calls is
 
       Kernel_Framebuffer_Size :=
         Integer
-          (Graphics_Device.Bus_Info.Virtio.Framebuffer_Width
-           * Graphics_Device.Bus_Info.Virtio.Framebuffer_Height)
+          (Graphics_Device.Framebuffer_Width
+           * Graphics_Device.Framebuffer_Height)
         * 4;
 
       if not Is_Valid_Userspace_Address_Range
@@ -414,12 +414,7 @@ package body System_Calls is
 
       Copy
         (Source => User_Framebuffer_Address,
-         Dest   =>
-           Graphics_Device
-             .Bus_Info
-             .Virtio
-             .Framebuffer_Addresses
-             .Virtual_Address,
+         Dest   => Graphics_Device.Framebuffer_Addresses.Virtual_Address,
          Count  => Kernel_Framebuffer_Size);
 
       Devices.Virtio.Graphics.Transfer_To_Host_2d
@@ -428,8 +423,8 @@ package body System_Calls is
          Graphics_Device.Bus_Info.Virtio.Resource_Id,
          0,
          0,
-         Graphics_Device.Bus_Info.Virtio.Framebuffer_Width,
-         Graphics_Device.Bus_Info.Virtio.Framebuffer_Height,
+         Graphics_Device.Framebuffer_Width,
+         Graphics_Device.Framebuffer_Height,
          Result);
       if Is_Error (Result) then
          --  Error already logged.
@@ -442,8 +437,8 @@ package body System_Calls is
          Graphics_Device.Bus_Info.Virtio.Resource_Id,
          0,
          0,
-         Graphics_Device.Bus_Info.Virtio.Framebuffer_Width,
-         Graphics_Device.Bus_Info.Virtio.Framebuffer_Height,
+         Graphics_Device.Framebuffer_Width,
+         Graphics_Device.Framebuffer_Height,
          Result);
       if Is_Error (Result) then
          Log_Error ("Error transferring: " & Result'Image);

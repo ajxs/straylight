@@ -88,10 +88,7 @@ package Devices is
             Total_Sectors : Unsigned_64 := 0;
 
          when Virtio_Device_Type_Graphics =>
-            Resource_Id           : Unsigned_32 := 0;
-            Framebuffer_Addresses : Virtio_Resource_Allocated_Addresses_T;
-            Framebuffer_Width     : Unsigned_32 := 0;
-            Framebuffer_Height    : Unsigned_32 := 0;
+            Resource_Id : Unsigned_32 := 0;
 
          when others =>
             null;
@@ -124,6 +121,16 @@ package Devices is
       Spinlock           : Spinlock_T;
 
       Bus_Info : Device_Bus_Info_T (Device_Bus);
+
+      case Device_Class is
+         when Device_Class_Graphics =>
+            Framebuffer_Addresses : Virtio_Resource_Allocated_Addresses_T;
+            Framebuffer_Width     : Unsigned_32 := 0;
+            Framebuffer_Height    : Unsigned_32 := 0;
+
+         when others =>
+            null;
+      end case;
 
    end record;
 

@@ -221,16 +221,22 @@ package body Boot is
         Device_Virtual_Address + Disk_B_Device.Memory_Size;
 
       Graphics_Device :=
-        (Device_Class       => Device_Class_Graphics,
-         Device_Bus         => Device_Bus_Virtio_MMIO,
-         Memory_Size        => 16#1000#,
-         Virtual_Address    => Device_Virtual_Address,
-         Physical_Address   => Physical_Address_T (To_Address (16#1000_3000#)),
-         Interrupt_Line     => 3,
-         Interrupt_Priority => 7,
-         Spinlock           => Locks.Null_Spinlock,
-         Record_Used        => True,
-         Bus_Info           =>
+        (Device_Class          => Device_Class_Graphics,
+         Device_Bus            => Device_Bus_Virtio_MMIO,
+         Memory_Size           => 16#1000#,
+         Virtual_Address       => Device_Virtual_Address,
+         Physical_Address      =>
+           Physical_Address_T (To_Address (16#1000_3000#)),
+         Interrupt_Line        => 3,
+         Interrupt_Priority    => 7,
+         Spinlock              => Locks.Null_Spinlock,
+         Record_Used           => True,
+
+         Framebuffer_Addresses => Default_Unallocated_Addresses,
+         Framebuffer_Width     => 0,
+         Framebuffer_Height    => 0,
+
+         Bus_Info              =>
            (Device_Bus => Device_Bus_Virtio_MMIO,
             Virtio     =>
               (Driver_Features        => Graphics_Device_Driver_Features,
@@ -242,10 +248,7 @@ package body Boot is
                Q_Available            => Default_Unallocated_Addresses,
                Q_Descriptor           => Default_Unallocated_Addresses,
                Descriptor_Status      => [others => True],
-               Resource_Id            => 0,
-               Framebuffer_Addresses  => Default_Unallocated_Addresses,
-               Framebuffer_Width      => 0,
-               Framebuffer_Height     => 0)));
+               Resource_Id            => 0)));
 
       Device_Virtual_Address :=
         Device_Virtual_Address + Graphics_Device.Memory_Size;
@@ -643,10 +646,9 @@ package body Boot is
          Logging_Tags);
 
       Graphics_Device.Bus_Info.Virtio.Resource_Id := Resource_Id;
-      Graphics_Device.Bus_Info.Virtio.Framebuffer_Addresses :=
-        Framebuffer_Allocation;
-      Graphics_Device.Bus_Info.Virtio.Framebuffer_Width := Framebuffer_Width;
-      Graphics_Device.Bus_Info.Virtio.Framebuffer_Height := Framebuffer_Height;
+      Graphics_Device.Framebuffer_Addresses := Framebuffer_Allocation;
+      Graphics_Device.Framebuffer_Width := Framebuffer_Width;
+      Graphics_Device.Framebuffer_Height := Framebuffer_Height;
 
       Devices.Virtio.Graphics.Created_2d_Resource
         (Init_Process.all, Graphics_Device, Resource_Id, Result);
