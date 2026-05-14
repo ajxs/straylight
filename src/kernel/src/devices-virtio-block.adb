@@ -15,7 +15,7 @@ package body Devices.Virtio.Block is
       Block_Request_Size : constant Unsigned_64 := Block_Request_T'Size / 8;
 
       return
-        Device.Bus_Info_Virtio.Block_Request_Array_Addresses.Physical_Address
+        Device.Bus_Info.Virtio.Block_Request_Array_Addresses.Physical_Address
         + Physical_Address_T
             (Unsigned_64_To_Address
                (Unsigned_64 (Index) * Block_Request_Size));
@@ -86,7 +86,7 @@ package body Devices.Virtio.Block is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
    begin
-      if Sector >= Device.Bus_Info_Virtio.Total_Sectors then
+      if Sector >= Device.Bus_Info.Virtio.Total_Sectors then
          Log_Error ("Sector index out of bounds: " & Sector'Image);
          Result := Sector_Out_Of_Bounds;
          return;
@@ -109,7 +109,7 @@ package body Devices.Virtio.Block is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Data_Physical_Address));
 
-      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Initialise_Status : declare
@@ -117,7 +117,7 @@ package body Devices.Virtio.Block is
          with
            Import,
            Address   =>
-             Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address,
+             Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
       begin
          Request_Status_Array (Descriptor_Indexes (0)) := 255;
@@ -127,13 +127,13 @@ package body Devices.Virtio.Block is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
          Block_Device_Request_Array : Block_Request_Array_T
@@ -141,7 +141,8 @@ package body Devices.Virtio.Block is
            Import,
            Address   =>
              Device
-               .Bus_Info_Virtio
+               .Bus_Info
+               .Virtio
                .Block_Request_Array_Addresses
                .Virtual_Address,
            Alignment => 1;
@@ -188,7 +189,7 @@ package body Devices.Virtio.Block is
          Descriptors (Descriptor_Indexes (2)) :=
            (Address =>
               --  Get the address of the status byte for this request.
-              Device.Bus_Info_Virtio.Request_Status_Array.Physical_Address
+              Device.Bus_Info.Virtio.Request_Status_Array.Physical_Address
               + Physical_Address_T
                   (Unsigned_64_To_Address
                      (Unsigned_64 (Descriptor_Indexes (0)))),
@@ -226,7 +227,7 @@ package body Devices.Virtio.Block is
          with
            Import,
            Address   =>
-             Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address,
+             Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
 
          VIRTIO_BLK_S_OK     : constant := 0;
@@ -276,12 +277,12 @@ package body Devices.Virtio.Block is
          return;
       end if;
 
-      Device.Bus_Info_Virtio.Block_Request_Array_Addresses :=
+      Device.Bus_Info.Virtio.Block_Request_Array_Addresses :=
         Allocation_Result;
 
       Log_Debug ("Allocated Block Device Request Array.", Logging_Tags_Virtio);
 
-      Device.Bus_Info_Virtio.Total_Sectors :=
+      Device.Bus_Info.Virtio.Total_Sectors :=
         Device_Configuration_Space.Capacity;
 
       Result := Success;

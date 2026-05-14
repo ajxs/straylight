@@ -89,8 +89,8 @@ package body Devices.Virtio.Graphics is
            (Addr    =>
               Address_To_Unsigned_64 (Address (Framebuffer_Physical_Address)),
             Length  =>
-              Device.Bus_Info_Virtio.Framebuffer_Width
-              * Device.Bus_Info_Virtio.Framebuffer_Height
+              Device.Bus_Info.Virtio.Framebuffer_Width
+              * Device.Bus_Info.Virtio.Framebuffer_Height
               * 4,
             Padding => 0);
       end Setup_Request;
@@ -99,13 +99,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -149,7 +149,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -254,13 +254,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -295,7 +295,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -401,21 +401,21 @@ package body Devices.Virtio.Graphics is
                Padding   => 0),
             Resource_Id => Resource_Id,
             Format      => VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM,
-            Width       => Device.Bus_Info_Virtio.Framebuffer_Width,
-            Height      => Device.Bus_Info_Virtio.Framebuffer_Height);
+            Width       => Device.Bus_Info.Virtio.Framebuffer_Width,
+            Height      => Device.Bus_Info.Virtio.Framebuffer_Height);
       end Setup_Request;
 
       Setup_Queues : declare
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -450,7 +450,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -567,13 +567,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -608,7 +608,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -722,13 +722,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -763,7 +763,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -876,13 +876,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Available.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -917,7 +917,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info_Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel

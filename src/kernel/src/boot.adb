@@ -103,7 +103,8 @@ package body Boot is
          Interrupt_Line     => 0,
          Interrupt_Priority => 0,
          Spinlock           => Locks.Null_Spinlock,
-         Record_Used        => True);
+         Record_Used        => True,
+         Bus_Info           => (Device_Bus => Device_Bus_Memory_Mapped));
 
       Device_Virtual_Address :=
         Device_Virtual_Address + APIC_Device.Memory_Size;
@@ -117,7 +118,8 @@ package body Boot is
          Interrupt_Line     => 10,
          Interrupt_Priority => 7,
          Spinlock           => Locks.Null_Spinlock,
-         Record_Used        => True);
+         Record_Used        => True,
+         Bus_Info           => (Device_Bus => Device_Bus_Memory_Mapped));
 
       Device_Virtual_Address :=
         Device_Virtual_Address + UART_Device.Memory_Size;
@@ -151,18 +153,20 @@ package body Boot is
          Interrupt_Priority => 7,
          Spinlock           => Locks.Null_Spinlock,
          Record_Used        => True,
-         Bus_Info_Virtio    =>
-           (Driver_Features               => Disk_Device_Driver_Features,
-            Device_Type                   => Virtio_Device_Type_Block,
-            Request_Info                  => [others => (Channel => 0)],
-            Request_Serviced_Index        => 0,
-            Request_Status_Array          => Default_Unallocated_Addresses,
-            Q_Used                        => Default_Unallocated_Addresses,
-            Q_Available                   => Default_Unallocated_Addresses,
-            Q_Descriptor                  => Default_Unallocated_Addresses,
-            Descriptor_Status             => [others => True],
-            Block_Request_Array_Addresses => Default_Unallocated_Addresses,
-            Total_Sectors                 => 0));
+         Bus_Info           =>
+           (Device_Bus => Device_Bus_Virtio_MMIO,
+            Virtio     =>
+              (Driver_Features               => Disk_Device_Driver_Features,
+               Device_Type                   => Virtio_Device_Type_Block,
+               Request_Info                  => [others => (Channel => 0)],
+               Request_Serviced_Index        => 0,
+               Request_Status_Array          => Default_Unallocated_Addresses,
+               Q_Used                        => Default_Unallocated_Addresses,
+               Q_Available                   => Default_Unallocated_Addresses,
+               Q_Descriptor                  => Default_Unallocated_Addresses,
+               Descriptor_Status             => [others => True],
+               Block_Request_Array_Addresses => Default_Unallocated_Addresses,
+               Total_Sectors                 => 0)));
 
       Device_Virtual_Address :=
         Device_Virtual_Address + Disk_Device.Memory_Size;
@@ -182,7 +186,8 @@ package body Boot is
          Interrupt_Line     => 0,
          Interrupt_Priority => 0,
          Spinlock           => Locks.Null_Spinlock,
-         Record_Used        => True);
+         Record_Used        => True,
+         Bus_Info           => (Device_Bus => Device_Bus_Memory_Mapped));
 
       Device_Virtual_Address :=
         Device_Virtual_Address + Root_Filesystem_Memory_Device.Memory_Size;
@@ -197,18 +202,20 @@ package body Boot is
          Interrupt_Priority => 7,
          Spinlock           => Locks.Null_Spinlock,
          Record_Used        => True,
-         Bus_Info_Virtio    =>
-           (Driver_Features               => Disk_Device_Driver_Features,
-            Device_Type                   => Virtio_Device_Type_Block,
-            Request_Info                  => [others => (Channel => 0)],
-            Request_Serviced_Index        => 0,
-            Request_Status_Array          => Default_Unallocated_Addresses,
-            Q_Used                        => Default_Unallocated_Addresses,
-            Q_Available                   => Default_Unallocated_Addresses,
-            Q_Descriptor                  => Default_Unallocated_Addresses,
-            Descriptor_Status             => [others => True],
-            Block_Request_Array_Addresses => Default_Unallocated_Addresses,
-            Total_Sectors                 => 0));
+         Bus_Info           =>
+           (Device_Bus => Device_Bus_Virtio_MMIO,
+            Virtio     =>
+              (Driver_Features               => Disk_Device_Driver_Features,
+               Device_Type                   => Virtio_Device_Type_Block,
+               Request_Info                  => [others => (Channel => 0)],
+               Request_Serviced_Index        => 0,
+               Request_Status_Array          => Default_Unallocated_Addresses,
+               Q_Used                        => Default_Unallocated_Addresses,
+               Q_Available                   => Default_Unallocated_Addresses,
+               Q_Descriptor                  => Default_Unallocated_Addresses,
+               Descriptor_Status             => [others => True],
+               Block_Request_Array_Addresses => Default_Unallocated_Addresses,
+               Total_Sectors                 => 0)));
 
       Device_Virtual_Address :=
         Device_Virtual_Address + Disk_B_Device.Memory_Size;
@@ -223,20 +230,22 @@ package body Boot is
          Interrupt_Priority => 7,
          Spinlock           => Locks.Null_Spinlock,
          Record_Used        => True,
-         Bus_Info_Virtio    =>
-           (Driver_Features        => Graphics_Device_Driver_Features,
-            Device_Type            => Virtio_Device_Type_Graphics,
-            Request_Info           => [others => (Channel => 0)],
-            Request_Serviced_Index => 0,
-            Request_Status_Array   => Default_Unallocated_Addresses,
-            Q_Used                 => Default_Unallocated_Addresses,
-            Q_Available            => Default_Unallocated_Addresses,
-            Q_Descriptor           => Default_Unallocated_Addresses,
-            Descriptor_Status      => [others => True],
-            Resource_Id            => 0,
-            Framebuffer_Addresses  => Default_Unallocated_Addresses,
-            Framebuffer_Width      => 0,
-            Framebuffer_Height     => 0));
+         Bus_Info           =>
+           (Device_Bus => Device_Bus_Virtio_MMIO,
+            Virtio     =>
+              (Driver_Features        => Graphics_Device_Driver_Features,
+               Device_Type            => Virtio_Device_Type_Graphics,
+               Request_Info           => [others => (Channel => 0)],
+               Request_Serviced_Index => 0,
+               Request_Status_Array   => Default_Unallocated_Addresses,
+               Q_Used                 => Default_Unallocated_Addresses,
+               Q_Available            => Default_Unallocated_Addresses,
+               Q_Descriptor           => Default_Unallocated_Addresses,
+               Descriptor_Status      => [others => True],
+               Resource_Id            => 0,
+               Framebuffer_Addresses  => Default_Unallocated_Addresses,
+               Framebuffer_Width      => 0,
+               Framebuffer_Height     => 0)));
 
       Device_Virtual_Address :=
         Device_Virtual_Address + Graphics_Device.Memory_Size;
@@ -633,11 +642,11 @@ package body Boot is
          & Framebuffer_Allocation.Physical_Address'Image,
          Logging_Tags);
 
-      Graphics_Device.Bus_Info_Virtio.Resource_Id := Resource_Id;
-      Graphics_Device.Bus_Info_Virtio.Framebuffer_Addresses :=
+      Graphics_Device.Bus_Info.Virtio.Resource_Id := Resource_Id;
+      Graphics_Device.Bus_Info.Virtio.Framebuffer_Addresses :=
         Framebuffer_Allocation;
-      Graphics_Device.Bus_Info_Virtio.Framebuffer_Width := Framebuffer_Width;
-      Graphics_Device.Bus_Info_Virtio.Framebuffer_Height := Framebuffer_Height;
+      Graphics_Device.Bus_Info.Virtio.Framebuffer_Width := Framebuffer_Width;
+      Graphics_Device.Bus_Info.Virtio.Framebuffer_Height := Framebuffer_Height;
 
       Devices.Virtio.Graphics.Created_2d_Resource
         (Init_Process.all, Graphics_Device, Resource_Id, Result);

@@ -98,9 +98,23 @@ package Devices is
       end case;
    end record;
 
-   type Device_T (Device_Bus : Device_Bus_T := Device_Bus_Memory_Mapped) is
-   record
-      Device_Class       : Device_Class_T := Device_Class_None;
+   type Device_Bus_Info_T
+     (Device_Bus : Device_Bus_T := Device_Bus_Memory_Mapped)
+   is record
+      case Device_Bus is
+         when Device_Bus_Virtio_MMIO =>
+            Virtio : Device_Bus_Info_Virtio_T;
+
+         when others =>
+            null;
+      end case;
+
+   end record;
+
+   type Device_T
+     (Device_Class : Device_Class_T := Device_Class_None;
+      Device_Bus   : Device_Bus_T := Device_Bus_Memory_Mapped)
+   is record
       Virtual_Address    : Virtual_Address_T;
       Physical_Address   : Physical_Address_T;
       Memory_Size        : Storage_Offset := 0;
@@ -109,13 +123,8 @@ package Devices is
       Interrupt_Priority : Integer := 0;
       Spinlock           : Spinlock_T;
 
-      case Device_Bus is
-         when Device_Bus_Virtio_MMIO =>
-            Bus_Info_Virtio : Device_Bus_Info_Virtio_T;
+      Bus_Info : Device_Bus_Info_T (Device_Bus);
 
-         when others =>
-            null;
-      end case;
    end record;
 
    type Device_Access is access all Device_T;

@@ -27,17 +27,17 @@ package body Devices.Virtio is
          Q_Used : constant Virtqueue_Used_T
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Used.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Used.Virtual_Address,
            Alignment => 1;
       begin
          Log_Debug
            ("Q_Used.Index: " & Q_Used.Index'Image, Logging_Tags_Virtio);
 
-         while Device.Bus_Info_Virtio.Request_Serviced_Index /= Q_Used.Index
+         while Device.Bus_Info.Virtio.Request_Serviced_Index /= Q_Used.Index
          loop
 
             Queue_Index : constant Unsigned_16 :=
-              Device.Bus_Info_Virtio.Request_Serviced_Index
+              Device.Bus_Info.Virtio.Request_Serviced_Index
               mod Maximum_Virtio_Queue_Length;
 
             --  Verify that the status byte has been cleared by the device,
@@ -49,7 +49,7 @@ package body Devices.Virtio is
                with
                  Import,
                  Address   =>
-                   Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address,
+                   Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
                  Alignment => 1;
             begin
                Status_Byte : constant Unsigned_8 :=
@@ -72,13 +72,13 @@ package body Devices.Virtio is
                Logging_Tags_Virtio);
 
             Channel : constant Unsigned_64 :=
-              Device.Bus_Info_Virtio.Request_Info
+              Device.Bus_Info.Virtio.Request_Info
                 (Virtio_Descriptor_Array_Index_T (Descriptor_Index))
                 .Channel;
 
             Log_Debug
               ("Successfully acknowledged driver Q entry: "
-               & Device.Bus_Info_Virtio.Request_Serviced_Index'Image,
+               & Device.Bus_Info.Virtio.Request_Serviced_Index'Image,
                Logging_Tags_Virtio);
 
             Wake_Processes_Waiting_For_Channel (Channel);
@@ -86,8 +86,8 @@ package body Devices.Virtio is
             --  Tell the processor to not move loads or stores past this point.
             Fence;
 
-            Device.Bus_Info_Virtio.Request_Serviced_Index :=
-              Device.Bus_Info_Virtio.Request_Serviced_Index + 1;
+            Device.Bus_Info.Virtio.Request_Serviced_Index :=
+              Device.Bus_Info.Virtio.Request_Serviced_Index + 1;
          end loop;
       end Acknowledge_Interrupt_Channel;
 
@@ -132,9 +132,9 @@ package body Devices.Virtio is
       end if;
 
       for I in Virtio_Descriptor_Array_Index_T loop
-         if Device.Bus_Info_Virtio.Descriptor_Status (I) then
+         if Device.Bus_Info.Virtio.Descriptor_Status (I) then
             Index := I;
-            Device.Bus_Info_Virtio.Descriptor_Status (I) := False;
+            Device.Bus_Info.Virtio.Descriptor_Status (I) := False;
 
             Log_Debug
               ("Allocated descriptor: " & Index'Image, Logging_Tags_Virtio);
@@ -215,7 +215,7 @@ package body Devices.Virtio is
 
       Allocate_Kernel_Physical_Memory
         (Maximum_Virtio_Queue_Length,
-         Device.Bus_Info_Virtio.Request_Status_Array,
+         Device.Bus_Info.Virtio.Request_Status_Array,
          Result);
       if Is_Error (Result) then
          Log_Error ("Error allocating status array memory");
@@ -224,7 +224,7 @@ package body Devices.Virtio is
 
       Log_Debug
         ("Allocated Request Status Array: "
-         & Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address'Image,
+         & Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address'Image,
          Logging_Tags_Virtio);
 
       Initialise_Request_Status_Array : declare
@@ -232,7 +232,7 @@ package body Devices.Virtio is
          with
            Import,
            Address   =>
-             Device.Bus_Info_Virtio.Request_Status_Array.Virtual_Address,
+             Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
       begin
          for I in
@@ -251,38 +251,38 @@ package body Devices.Virtio is
          return;
       end if;
 
-      Device.Bus_Info_Virtio.Q_Descriptor.Physical_Address :=
+      Device.Bus_Info.Virtio.Q_Descriptor.Physical_Address :=
         Allocation_Result.Physical_Address;
-      Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address :=
+      Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address :=
         Allocation_Result.Virtual_Address;
 
-      Device.Bus_Info_Virtio.Q_Used.Physical_Address :=
+      Device.Bus_Info.Virtio.Q_Used.Physical_Address :=
         Allocation_Result.Physical_Address + 16#1000#;
-      Device.Bus_Info_Virtio.Q_Used.Virtual_Address :=
+      Device.Bus_Info.Virtio.Q_Used.Virtual_Address :=
         Allocation_Result.Virtual_Address + 16#1000#;
 
-      Device.Bus_Info_Virtio.Q_Available.Physical_Address :=
+      Device.Bus_Info.Virtio.Q_Available.Physical_Address :=
         Allocation_Result.Physical_Address + 16#2000#;
-      Device.Bus_Info_Virtio.Q_Available.Virtual_Address :=
+      Device.Bus_Info.Virtio.Q_Available.Virtual_Address :=
         Allocation_Result.Virtual_Address + 16#2000#;
 
       Log_Debug
         ("Initialised Device Queues:"
          & ASCII.LF
          & "  Descriptor Q:         "
-         & Device.Bus_Info_Virtio.Q_Descriptor.Physical_Address'Image
+         & Device.Bus_Info.Virtio.Q_Descriptor.Physical_Address'Image
          & " / "
-         & Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address'Image
+         & Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address'Image
          & ASCII.LF
          & "  Initialised Device Q: "
-         & Device.Bus_Info_Virtio.Q_Used.Physical_Address'Image
+         & Device.Bus_Info.Virtio.Q_Used.Physical_Address'Image
          & " / "
-         & Device.Bus_Info_Virtio.Q_Used.Virtual_Address'Image
+         & Device.Bus_Info.Virtio.Q_Used.Virtual_Address'Image
          & ASCII.LF
          & "  Initialised Driver Q: "
-         & Device.Bus_Info_Virtio.Q_Available.Physical_Address'Image
+         & Device.Bus_Info.Virtio.Q_Available.Physical_Address'Image
          & " / "
-         & Device.Bus_Info_Virtio.Q_Available.Virtual_Address'Image,
+         & Device.Bus_Info.Virtio.Q_Available.Virtual_Address'Image,
          Logging_Tags_Virtio);
 
       Result := Success;
@@ -313,14 +313,14 @@ package body Devices.Virtio is
       end if;
 
       if Index > Maximum_Virtio_Queue_Length
-        or else Device.Bus_Info_Virtio.Descriptor_Status (Index)
+        or else Device.Bus_Info.Virtio.Descriptor_Status (Index)
       then
          Log_Error ("Invalid descriptor index to free: " & Index'Image);
          Result := Invalid_Argument;
          return;
       end if;
 
-      Device.Bus_Info_Virtio.Descriptor_Status (Index) := True;
+      Device.Bus_Info.Virtio.Descriptor_Status (Index) := True;
 
       Log_Debug ("Freed descriptor: " & Index'Image, Logging_Tags_Virtio);
 
@@ -344,7 +344,7 @@ package body Devices.Virtio is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info_Virtio.Q_Descriptor.Virtual_Address,
+           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
       begin
          loop
@@ -449,7 +449,7 @@ package body Devices.Virtio is
       --  Iterate through each page of device features, load the supported
       --  features from the device, mask out any features not supported by
       --  the driver, then write the negotiated features back to the device.
-      for I in Device.Bus_Info_Virtio.Driver_Features'Range loop
+      for I in Device.Bus_Info.Virtio.Driver_Features'Range loop
          --  Section 4.2.2.2 Driver Requirements states that:
          --  Before reading from DeviceFeatures, the driver MUST write a
          --  value to DeviceFeaturesSel.
@@ -459,7 +459,7 @@ package body Devices.Virtio is
          --  any features not supported by the driver.
          Device_Features (I) := Device_Registers.Device_Features;
          Device_Features (I) :=
-           Device_Features (I) and Device.Bus_Info_Virtio.Driver_Features (I);
+           Device_Features (I) and Device.Bus_Info.Virtio.Driver_Features (I);
 
          --  Section 4.2.2.2 Driver Requirements states that:
          --  Before writing to the DriverFeatures register, the driver MUST
@@ -499,24 +499,24 @@ package body Devices.Virtio is
 
       Device_Registers.Queue_Descriptor_Low :=
         Get_Address_Word_Low
-          (Address (Device.Bus_Info_Virtio.Q_Descriptor.Physical_Address));
+          (Address (Device.Bus_Info.Virtio.Q_Descriptor.Physical_Address));
       Device_Registers.Queue_Descriptor_High :=
         Get_Address_Word_High
-          (Address (Device.Bus_Info_Virtio.Q_Descriptor.Physical_Address));
+          (Address (Device.Bus_Info.Virtio.Q_Descriptor.Physical_Address));
 
       Device_Registers.Queue_Device_Low :=
         Get_Address_Word_Low
-          (Address (Device.Bus_Info_Virtio.Q_Used.Physical_Address));
+          (Address (Device.Bus_Info.Virtio.Q_Used.Physical_Address));
       Device_Registers.Queue_Device_High :=
         Get_Address_Word_High
-          (Address (Device.Bus_Info_Virtio.Q_Used.Physical_Address));
+          (Address (Device.Bus_Info.Virtio.Q_Used.Physical_Address));
 
       Device_Registers.Queue_Driver_Low :=
         Get_Address_Word_Low
-          (Address (Device.Bus_Info_Virtio.Q_Available.Physical_Address));
+          (Address (Device.Bus_Info.Virtio.Q_Available.Physical_Address));
       Device_Registers.Queue_Driver_High :=
         Get_Address_Word_High
-          (Address (Device.Bus_Info_Virtio.Q_Available.Physical_Address));
+          (Address (Device.Bus_Info.Virtio.Q_Available.Physical_Address));
 
       Device_Registers.Queue_Ready := 1;
 
@@ -524,12 +524,12 @@ package body Devices.Virtio is
       Device_Registers.Status := Status;
 
       for I in Virtio_Descriptor_Array_Index_T loop
-         Device.Bus_Info_Virtio.Descriptor_Status (I) := True;
+         Device.Bus_Info.Virtio.Descriptor_Status (I) := True;
       end loop;
 
       Log_Debug ("Initialised Virtio MMIO Device.", Logging_Tags_Virtio);
 
-      case Device.Bus_Info_Virtio.Device_Type is
+      case Device.Bus_Info.Virtio.Device_Type is
          when Virtio_Device_Type_Block =>
             Initialise_Block_Device (Device, Result);
 
