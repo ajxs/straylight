@@ -9,20 +9,26 @@ with Processes.Scheduler; use Processes.Scheduler;
 with RISCV.Atomics;       use RISCV.Atomics;
 
 package body Devices.Virtio.Block is
-   function Get_Block_Request_Physical_Address
-     (Device : Device_T; Index : Unsigned_16) return Physical_Address_T is
+   procedure Get_Block_Request_Physical_Address
+     (Device : Device_T;
+      Index  : Unsigned_16;
+      Addr   : out Physical_Address_T;
+      Result : out Function_Result) is
    begin
       Block_Request_Size : constant Unsigned_64 := Block_Request_T'Size / 8;
 
-      return
+      Addr :=
         Device.Bus_Info.Virtio.Block_Request_Array_Addresses.Physical_Address
         + Physical_Address_T
             (Unsigned_64_To_Address
                (Unsigned_64 (Index) * Block_Request_Size));
+
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Get_Block_Request_Physical_Address");
-         return Null_Physical_Address;
+         Addr := Null_Physical_Address;
+         Result := Constraint_Exception;
    end Get_Block_Request_Physical_Address;
 
    procedure Read_Sector
@@ -147,6 +153,8 @@ package body Devices.Virtio.Block is
                .Virtual_Address,
            Alignment => 1;
 
+         Block_Request_Phys_Addr : Physical_Address_T := Null_Physical_Address;
+
       begin
          --  Set up the block device request structure.
          Block_Device_Request_Array (Descriptor_Indexes (0)).Sector := Sector;
@@ -160,17 +168,15 @@ package body Devices.Virtio.Block is
               VIRTIO_BLK_T_IN;
          end if;
 
-         Block_Request_Array_Addresses : constant Physical_Address_T :=
-           Get_Block_Request_Physical_Address (Device, Descriptor_Indexes (0));
-         --  Any exception will return a null address.
-         if Block_Request_Array_Addresses = Null_Physical_Address then
+         Get_Block_Request_Physical_Address
+           (Device, Descriptor_Indexes (0), Block_Request_Phys_Addr, Result);
+         if Is_Error (Result) then
             Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
-            Result := Unhandled_Exception;
             return;
          end if;
 
          Descriptors (Descriptor_Indexes (0)) :=
-           (Address => Block_Request_Array_Addresses,
+           (Address => Block_Request_Phys_Addr,
             Length  => Block_Request_T'Size / 8,
             Flags   => VIRTQ_DESC_F_NEXT,
             Next    => Descriptor_Indexes (1));

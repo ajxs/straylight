@@ -171,7 +171,4 @@ private
    is (Block_Number * (BLOCK_SIZE / 512))
    with Pure_Function, Inline;
 
-   function Get_Block_Request_Physical_Address
-     (Device : Device_T; Index : Unsigned_16) return Physical_Address_T;
-
 end Devices.Virtio.Block;
