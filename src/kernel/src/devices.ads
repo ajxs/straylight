@@ -16,6 +16,8 @@ with Processes; use Processes;
 package Devices is
    pragma Preelaborate;
 
+   --  Describes the 'class' of the device, which is used to determine
+   --  which driver should be used to operate the device.
    type Device_Class_T is
      (Device_Class_None,
       Device_Class_Graphics,
@@ -24,6 +26,8 @@ package Devices is
       Device_Class_Serial,
       Device_Class_Storage);
 
+   --  Describes how the device is physically attached to the system, and how
+   --  the kernel should communicate with it.
    type Device_Bus_T is (Device_Bus_Memory_Mapped, Device_Bus_Virtio_MMIO);
 
    type Virtio_Device_Type_T is
