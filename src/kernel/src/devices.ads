@@ -132,6 +132,12 @@ package Devices is
             Framebuffer_Width     : Unsigned_32 := 0;
             Framebuffer_Height    : Unsigned_32 := 0;
 
+         when Device_Class_Serial =>
+            Ring_Buffer_Address      : Virtual_Address_T := Null_Address;
+            Ring_Buffer_Size         : Natural := 0;
+            Ring_Buffer_Offset_Read  : Natural := 0;
+            Ring_Buffer_Offset_Write : Natural := 0;
+
          when others =>
             null;
       end case;

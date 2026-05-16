@@ -18,6 +18,7 @@ package Function_Results is
    No_Free_Entries : constant := -1111_0000;
    Not_Found       : constant := -1111_0001;
    Not_Supported   : constant := -1111_0002;
+   Not_Initialised : constant := -1111_0003;
 
    --  Memory function result codes.
    Address_Not_In_Heap                 : constant := -7777_0000;

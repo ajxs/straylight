@@ -38,7 +38,9 @@ package Devices.UART is
    --  and stop bits for a particular serial port.
    ----------------------------------------------------------------------------
    procedure Initialise
-     (Device : Device_T; Rate : Baud_Rate := MAXIMUM_BAUD_RATE);
+     (Device : in out Device_T;
+      Result : out Function_Result;
+      Rate   : Baud_Rate := MAXIMUM_BAUD_RATE);
 
    ----------------------------------------------------------------------------
    --  Enables or disables the generation of interrupts of a particular type.
@@ -49,7 +51,7 @@ package Devices.UART is
       Status         : Boolean);
 
    procedure Acknowledge_Interrupt
-     (Device : Device_T; Result : out Function_Result);
+     (Device : in out Device_T; Result : out Function_Result);
 
    ----------------------------------------------------------------------------
    --  Prints a string to the specified device.
@@ -73,14 +75,44 @@ package Devices.UART is
    procedure Put_Byte (Device : Device_T; Data : Unsigned_8);
 private
    --  Register offsets.
-   Rx_Buffer_Tx_Holding         : constant := 0;
-   Interrupt_Enable             : constant := 1;
-   Interrupt_Ident_FIFO_Control : constant := 2;
-   Line_Control                 : constant := 3;
-   Modem_Control                : constant := 4;
-   Line_Status                  : constant := 5;
-   Modem_Status                 : constant := 6;
-   Scratch                      : constant := 7;
+   UART_Reg_Rx_Buffer_Tx_Holding         : constant := 0;
+   UART_Reg_Interrupt_Enable             : constant := 1;
+   UART_Reg_Interrupt_Ident_FIFO_Control : constant := 2;
+   UART_Reg_Line_Control                 : constant := 3;
+   UART_Reg_Modem_Control                : constant := 4;
+   UART_Reg_Line_Status                  : constant := 5;
+   UART_Reg_Modem_Status                 : constant := 6;
+   UART_Reg_Scratch                      : constant := 7;
+
+   type IIR_Interrupt_Source is
+     (UART_IRQ_Modem_Status,
+      UART_IRQ_Tx_Holding_Empty,
+      UART_IRQ_Rx_Data_Available,
+      UART_IRQ_Rx_Line_Status,
+      UART_IRQ_Char_Timeout)
+   with Size => 3;
+   for IIR_Interrupt_Source use
+     (UART_IRQ_Modem_Status      => 0,
+      UART_IRQ_Tx_Holding_Empty  => 1,
+      UART_IRQ_Rx_Data_Available => 2,
+      UART_IRQ_Rx_Line_Status    => 3,
+      UART_IRQ_Char_Timeout      => 6);
+
+   type Interrupt_Ident_Register is record
+      No_Interrupt_Pending : Boolean;
+      Interrupt_Source     : IIR_Interrupt_Source;
+   end record
+   with Size => 8, Convention => C, Volatile;
+   for Interrupt_Ident_Register use
+     record
+       No_Interrupt_Pending at 0 range 0 .. 0;
+       Interrupt_Source     at 0 range 1 .. 3;
+     end record;
+
+   function To_Interrupt_Ident_Register is new
+     Ada.Unchecked_Conversion
+       (Source => Unsigned_8,
+        Target => Interrupt_Ident_Register);
 
    ----------------------------------------------------------------------------
    --  Port Interrupt status/enable register type.
@@ -126,12 +158,15 @@ private
    --  an overflow exception is not generated.
    ----------------------------------------------------------------------------
    function Is_Tx_Empty (Device : Device_T) return Boolean
-   is ((Read_Unsigned_8 (Device.Virtual_Address + Line_Status) and 16#20#)
+   is ((Read_Unsigned_8 (Device.Virtual_Address + UART_Reg_Line_Status)
+        and 16#20#)
        /= 0)
    with Volatile_Function;
 
    function Is_Rx_Empty (Device : Device_T) return Boolean
-   is ((Read_Unsigned_8 (Device.Virtual_Address + Line_Status) and 16#01#) = 0)
+   is ((Read_Unsigned_8 (Device.Virtual_Address + UART_Reg_Line_Status)
+        and 16#01#)
+       = 0)
    with Volatile_Function;
 
    ----------------------------------------------------------------------------
@@ -147,6 +182,18 @@ private
    ----------------------------------------------------------------------------
    procedure Set_Baud_Rate (Device : Device_T; Rate : Baud_Rate);
 
-   function Read_Character (Device : Device_T) return Character;
+   function Wait_For_Byte
+     (Device : Device_T; Timeout : Positive := 1_000) return Unsigned_8;
+
+   function Read_Byte (Device : Device_T) return Unsigned_8
+   is (Read_Unsigned_8 (Device.Virtual_Address));
+
+   function Read_Character (Device : Device_T) return Character
+   is (Character'Val (Read_Byte (Device)));
+
+   procedure Read_All_Incoming_Data
+     (Device     : in out Device_T;
+      Bytes_Read : out Integer;
+      Result     : out Function_Result);
 
 end Devices.UART;

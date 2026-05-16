@@ -110,16 +110,21 @@ package body Boot is
         Device_Virtual_Address + APIC_Device.Memory_Size;
 
       UART_Device :=
-        (Device_Class       => Device_Class_Serial,
-         Device_Bus         => Device_Bus_Memory_Mapped,
-         Memory_Size        => 16#1000#,
-         Virtual_Address    => Device_Virtual_Address,
-         Physical_Address   => Physical_Address_T (To_Address (16#1000_0000#)),
-         Interrupt_Line     => 10,
-         Interrupt_Priority => 7,
-         Spinlock           => Locks.Null_Spinlock,
-         Record_Used        => True,
-         Bus_Info           => (Device_Bus => Device_Bus_Memory_Mapped));
+        (Device_Class             => Device_Class_Serial,
+         Device_Bus               => Device_Bus_Memory_Mapped,
+         Memory_Size              => 16#1000#,
+         Virtual_Address          => Device_Virtual_Address,
+         Physical_Address         =>
+           Physical_Address_T (To_Address (16#1000_0000#)),
+         Interrupt_Line           => 10,
+         Interrupt_Priority       => 7,
+         Spinlock                 => Locks.Null_Spinlock,
+         Record_Used              => True,
+         Bus_Info                 => (Device_Bus => Device_Bus_Memory_Mapped),
+         Ring_Buffer_Address      => Null_Address,
+         Ring_Buffer_Size         => 0,
+         Ring_Buffer_Offset_Read  => 0,
+         Ring_Buffer_Offset_Write => 0);
 
       Device_Virtual_Address :=
         Device_Virtual_Address + UART_Device.Memory_Size;
@@ -290,7 +295,11 @@ package body Boot is
                   Panic;
                end if;
             elsif System_Devices (I).Device_Class = Device_Class_Serial then
-               Devices.UART.Initialise (UART_Device);
+               Devices.UART.Initialise (UART_Device, Result);
+               if Is_Error (Result) then
+                  Panic;
+               end if;
+
                Devices.UART.Set_Interrupt_Generation
                  (UART_Device, Devices.UART.Rx_Data_Available, True);
             end if;

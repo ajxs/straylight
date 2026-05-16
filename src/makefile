@@ -51,13 +51,19 @@ QEMU_FLAGS :=        \
 
 QEMU_DEBUG_FLAGS := cpu_reset,int,guest_errors,in_asm
 
-QEMU_DEBUG_SERIAL_OUTPUT := file:${SERIAL_FILENAME}
-QEMU_SERIAL_OUTPUT       := stdio
 # Empty by default (QEMU auto-selects the best display for the platform).
 # Set to `-display vnc=:0` when running inside a Dev Container.
 QEMU_DISPLAY_FLAGS       ?=
+
+QEMU_SERIAL_SOCKET   := /tmp/uart0.sock
+
+QEMU_SERIAL_OUTPUT       := stdio
+# QEMU_SERIAL_OUTPUT       := unix:${QEMU_SERIAL_SOCKET},server,wait
+
 # https://kashyapc.wordpress.com/2016/02/11/qemu-command-line-behavior-of-serial-stdio-vs-serial-monstdio/
 # QEMU_SERIAL_OUTPUT       := mon:stdio
+QEMU_SERIAL_OUTPUT_DEBUG := file:${SERIAL_FILENAME}
+
 QEMU_LOG_FILE            := qemu.log
 
 # all: ${KERNEL_BINARY}
@@ -80,7 +86,7 @@ debug: kernel ${BIOS}
 		-S                     \
 		-gdb tcp::1234         \
 		-monitor stdio         \
-		-serial ${QEMU_DEBUG_SERIAL_OUTPUT}
+		-serial ${QEMU_SERIAL_OUTPUT_DEBUG}
 
 emu: kernel ${BIOS}
 	qemu-system-riscv64     \
@@ -92,7 +98,7 @@ emu-log: kernel ${BIOS}
 	qemu-system-riscv64     \
 		${QEMU_FLAGS}         \
 		${QEMU_DISPLAY_FLAGS} \
-		-serial ${QEMU_DEBUG_SERIAL_OUTPUT}
+		-serial ${QEMU_SERIAL_OUTPUT_DEBUG}
 
 kernel: ${KERNEL_BINARY}
 
