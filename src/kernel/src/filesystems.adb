@@ -267,14 +267,14 @@ package body Filesystems is
 
       --  Skip any leading slashes.
       while Start_Index <= Path'Last loop
-         exit when Path (Start_Index) /= '/';
+         exit when Path (Start_Index) /= Filesystem_Node_Separator;
          Start_Index := Start_Index + 1;
       end loop;
 
       End_Index := Start_Index;
 
       while End_Index <= Path'Last loop
-         exit when Path (End_Index) = '/';
+         exit when Path (End_Index) = Filesystem_Node_Separator;
 
          End_Index := End_Index + 1;
       end loop;
@@ -285,7 +285,7 @@ package body Filesystems is
          Log_Error ("Constraint_Error: Get_Next_Path_Component", Logging_Tags);
    end Get_Next_Path_Component;
 
-   function Is_Searchable_Filesystem_Node
+   function Can_Filesystem_Node_Contain_Child_Nodes
      (Node : Filesystem_Node_Access) return Boolean is
    begin
       return
@@ -296,9 +296,10 @@ package body Filesystems is
              Node.all.Node_Type = Filesystem_Node_Type_Mounted_Filesystem);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Is_Searchable_Filesystem_Node");
+         Log_Error
+           ("Constraint_Error: Can_Filesystem_Node_Contain_Child_Nodes");
          return False;
-   end Is_Searchable_Filesystem_Node;
+   end Can_Filesystem_Node_Contain_Child_Nodes;
 
    procedure Find_File
      (Process         : in out Process_Control_Block_T;
@@ -318,7 +319,7 @@ package body Filesystems is
    begin
       Log_Debug ("Filesystems.Find_File: '" & Path & "'", Logging_Tags);
 
-      if Path (Path'First) = '/' then
+      if Path (Path'First) = Filesystem_Node_Separator then
          --  Absolute path; start at root filesystem.
          Current_Filesystem := System_Root_Filesystem;
          --  The root node index of the in-memory root filesystem is 1.
@@ -341,7 +342,9 @@ package body Filesystems is
 
          if Filesystem_Node_Parent /= null then
             --  Ensure we can traverse the parent node.
-            if not Is_Searchable_Filesystem_Node (Filesystem_Node_Parent) then
+            if not Can_Filesystem_Node_Contain_Child_Nodes
+                     (Filesystem_Node_Parent)
+            then
                Log_Debug ("Unable to traverse node.", Logging_Tags);
                Filesystem_Node := null;
                exit;
@@ -1077,5 +1080,106 @@ package body Filesystems is
            ("Constraint_Error: Validate_Filesystem_And_Node", Logging_Tags);
          Result := Constraint_Exception;
    end Validate_Filesystem_And_Node;
+
+   procedure Create_File
+     (Process : in out Process_Control_Block_T;
+      Path    : Filesystem_Path_T;
+      Result  : out Function_Result)
+   is
+      Parent_Path_Length : Integer := 0;
+
+      Parent_Filesystem : Filesystem_Access := null;
+      Parent_File_Node  : Filesystem_Node_Access := null;
+      New_File_Node     : Filesystem_Node_Access := null;
+   begin
+      for I in reverse Path'Range loop
+         if Path (I) = Filesystem_Node_Separator then
+            Parent_Path_Length := I - Path'First;
+            exit;
+         end if;
+      end loop;
+
+      Parent_File_Path :
+        constant Filesystem_Path_T
+                   (Path'First .. Path'First + Parent_Path_Length - 1) :=
+          Path (Path'First .. Path'First + Parent_Path_Length - 1);
+
+      Child_File_Name :
+        constant Filesystem_Path_T (1 .. Path'Last - Parent_Path_Length) :=
+          Path (Path'First + Parent_Path_Length .. Path'Last);
+
+      Log_Debug
+        ("Filesystems.Create_File: "
+         & ASCII.LF
+         & "  Parent path: '"
+         & Parent_File_Path
+         & "'"
+         & ASCII.LF
+         & "  Child name: '"
+         & Child_File_Name
+         & "'",
+         Logging_Tags);
+
+      Find_File (Process, Parent_File_Path, Parent_File_Node, Result);
+      if Is_Error (Result) then
+         return;
+      elsif Result = File_Not_Found then
+         Log_Debug
+           ("Filesystems.Create_File: File not found: '"
+            & Parent_File_Path
+            & "'",
+            Logging_Tags);
+         return;
+      end if;
+
+      --  Test whether the parent node is one that can actually contain
+      --  child nodes (i.e. is a directory or mounted filesystem).
+      if not Can_Filesystem_Node_Contain_Child_Nodes (Parent_File_Node) then
+         Log_Debug
+           ("Filesystems.Create_File: Node cannot contain child nodes: '"
+            & Parent_File_Path
+            & "'",
+            Logging_Tags);
+
+         Result := Invalid_Filename;
+         return;
+      end if;
+
+      --  If the parent node is a mounted filesystem, then use its filesystem
+      --  pointer as the parent filesystem. Otherwise, use the parent node's
+      --  parent filesystem.
+      Parent_Filesystem :=
+        (if Parent_File_Node.all.Node_Type
+           = Filesystem_Node_Type_Mounted_Filesystem
+         then Parent_File_Node.all.Mounted_Filesystem
+         else Parent_File_Node.all.Parent_Filesystem);
+
+      case Parent_Filesystem.all.Filesystem_Type is
+         when Filesystem_Type_FAT =>
+            Filesystems.FAT.Create_File
+              (Parent_Filesystem,
+               Process,
+               Child_File_Name,
+               Parent_File_Node,
+               New_File_Node,
+               Result);
+
+         when others              =>
+            Log_Error
+              ("Unsupported filesystem type: "
+               & Parent_Filesystem.all.Filesystem_Type'Image);
+            Result := Not_Supported;
+      end case;
+
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Create_File", Logging_Tags);
+         Result := Constraint_Exception;
+   end Create_File;
 
 end Filesystems;

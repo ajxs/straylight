@@ -90,6 +90,10 @@ package Filesystems is
       Parent_Index      : Filesystem_Node_Index_T := 0;
       Parent_Filesystem : Filesystem_Access := null;
 
+      --  Note that a mounted filesystem node type is used to represent the
+      --  root node of a mounted filesystem.
+      --  @TODO: In the future it might make more sense to have separate nodes
+      --  for the mount point and the root of the mounted filesystem.
       Node_Type : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
 
       Mounted_Filesystem : Filesystem_Access := null;
@@ -149,6 +153,11 @@ package Filesystems is
       Bytes_Written  : out Natural;
       Result         : out Function_Result);
 
+   procedure Create_File
+     (Process : in out Process_Control_Block_T;
+      Path    : Filesystem_Path_T;
+      Result  : out Function_Result);
+
    procedure Close_File
      (File_Handle : Process_File_Handle_Access; Result : out Function_Result);
 
@@ -188,6 +197,8 @@ package Filesystems is
 
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Filesystems];
+
+   Filesystem_Node_Separator : constant Character := '/';
 
    subtype Block_Index_T is Unsigned_64;
 
@@ -281,7 +292,7 @@ private
    is (Node /= null
        and then Node.all.Node_Type = Filesystem_Node_Type_Mounted_Filesystem);
 
-   function Is_Searchable_Filesystem_Node
+   function Can_Filesystem_Node_Contain_Child_Nodes
      (Node : Filesystem_Node_Access) return Boolean;
 
    procedure Search_For_Filesystem_Node_In_Cache

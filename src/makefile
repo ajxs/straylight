@@ -58,6 +58,8 @@ QEMU_DISPLAY_FLAGS       ?=
 QEMU_SERIAL_SOCKET   := /tmp/uart0.sock
 
 QEMU_SERIAL_OUTPUT       := stdio
+
+# Connect with socat - UNIX-CONNECT:${QEMU_SERIAL_SOCKET}
 # QEMU_SERIAL_OUTPUT       := unix:${QEMU_SERIAL_SOCKET},server,wait
 
 # https://kashyapc.wordpress.com/2016/02/11/qemu-command-line-behavior-of-serial-stdio-vs-serial-monstdio/

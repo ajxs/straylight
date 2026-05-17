@@ -19,6 +19,14 @@ package Filesystems.FAT is
       Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result);
 
+   procedure Create_File
+     (Filesystem      : Filesystem_Access;
+      Reading_Process : in out Process_Control_Block_T;
+      Filename        : Filesystem_Path_T;
+      Parent_Node     : Filesystem_Node_Access;
+      New_Node        : out Filesystem_Node_Access;
+      Result          : out Function_Result);
+
    procedure Read_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;

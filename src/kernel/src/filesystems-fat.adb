@@ -9,6 +9,55 @@ with Memory.Kernel;           use Memory.Kernel;
 with Utilities;               use Utilities;
 
 package body Filesystems.FAT is
+   procedure Create_File
+     (Filesystem      : Filesystem_Access;
+      Reading_Process : in out Process_Control_Block_T;
+      Filename        : Filesystem_Path_T;
+      Parent_Node     : Filesystem_Node_Access;
+      New_Node        : out Filesystem_Node_Access;
+      Result          : out Function_Result)
+   is
+      Existing_File : Filesystem_Node_Access := null;
+   begin
+      --  The parent node should never be null, because the filesystem should
+      --  always be mounted, and have a parent in the root filesystem.
+      Validate_Filesystem_And_Node
+        (Filesystem, Parent_Node, Filesystem_Type_FAT, Result);
+      if Is_Error (Result) then
+         New_Node := null;
+         return;
+      end if;
+
+      --  Ensure that the file doesn't already exist.
+      Find_File
+        (Filesystem,
+         Reading_Process,
+         Filename,
+         Parent_Node,
+         Existing_File,
+         Result);
+      if Is_Error (Result) then
+         New_Node := null;
+         return;
+      elsif Existing_File /= null then
+         Log_Debug
+           ("File already exists: '" & Filename & "'", Logging_Tags_FAT);
+         New_Node := null;
+         Result := Invalid_Filename;
+         return;
+      end if;
+
+      Log_Debug ("Creating file: '" & Filename & "'", Logging_Tags_FAT);
+
+      New_Node := null;
+      Result := Not_Supported;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Create_File", Logging_Tags_FAT);
+         New_Node := null;
+         Result := Constraint_Exception;
+   end Create_File;
+
    procedure Find_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
