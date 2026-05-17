@@ -694,9 +694,15 @@ package body Filesystems is
       Effective_New_Offset : Unsigned_64 := New_Offset;
    begin
       if New_Offset > File_Handle.all.File.all.Size then
-         Log_Debug
-           ("Seek_File: New offset is beyond end of file", Logging_Tags);
-         Effective_New_Offset := File_Handle.all.File.all.Size - 1;
+         if File_Handle.all.File.all.Size = 0 then
+            Log_Debug
+              ("Seek_File: File size is 0, setting offset to 0", Logging_Tags);
+            Effective_New_Offset := 0;
+         else
+            Log_Debug
+              ("Seek_File: New offset is beyond end of file", Logging_Tags);
+            Effective_New_Offset := File_Handle.all.File.all.Size - 1;
+         end if;
       end if;
 
       File_Handle.all.Position := Effective_New_Offset;
@@ -871,8 +877,10 @@ package body Filesystems is
       Path                  : Filesystem_Path_T) return Boolean is
    begin
       return
-        Node_Name (Node_Name'First .. Node_Name_Byte_Length)
-        = Path (Path'Range);
+        Node_Name_Byte_Length = Path'Length
+        and then
+          Node_Name (Node_Name'First .. Node_Name_Byte_Length)
+          = Path (Path'Range);
    exception
       when Constraint_Error =>
          Log_Error
