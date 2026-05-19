@@ -4,6 +4,7 @@
 -------------------------------------------------------------------------------
 
 with Filesystems.Block_Cache; use Filesystems.Block_Cache;
+with Filesystems.Node_Cache;  use Filesystems.Node_Cache;
 with Filesystems.FAT.FAT16;   use Filesystems.FAT.FAT16;
 with Memory.Kernel;           use Memory.Kernel;
 with Utilities;               use Utilities;

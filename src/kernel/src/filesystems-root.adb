@@ -3,6 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Filesystems.Node_Cache; use Filesystems.Node_Cache;
+
 package body Filesystems.Root is
    procedure Add_Filesystem_Node_To_Root_Filesystem
      (Filesystem         : Filesystem_Access;

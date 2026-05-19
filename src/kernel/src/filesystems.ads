@@ -174,16 +174,6 @@ package Filesystems is
    function Convert_Address_To_Filesystem_Node_Access is new
      Ada.Unchecked_Conversion (Virtual_Address_T, Filesystem_Node_Access);
 
-   procedure Add_Filesystem_Node_To_Cache
-     (Node : Filesystem_Node_Access; Result : out Function_Result);
-
-   procedure Find_Filesystem_Node_In_Cache
-     (Filesystem   : Filesystem_Access;
-      Parent_Index : Unsigned_64;
-      Filename     : Filesystem_Path_T;
-      Node         : out Filesystem_Node_Access;
-      Result       : out Function_Result);
-
    procedure Initialise_Block_Cache;
 
    System_Root_Filesystem : Filesystem_Access := null;
@@ -212,33 +202,6 @@ private
       Time_Acquired => 0,
       Hart_Id       => No_Hart_Id,
       Lock_Id       => Lock_Id_Open_Files);
-
-   type Filesystem_Node_Cache_Entry_T is record
-      Node        : Filesystem_Node_Access := null;
-      Last_Access : Unsigned_64 := 0;
-
-      --  The number of processes currently using this node.
-      Handle_Count : Natural := 0;
-   end record;
-
-   type Filesystem_Node_Cache_Entry_Array_T is
-     array (1 .. 256) of Filesystem_Node_Cache_Entry_T;
-
-   type Filesystem_Node_Cache_T is record
-      Entries          : Filesystem_Node_Cache_Entry_Array_T;
-      Next_Entry_Index : Positive := 1;
-      Spinlock         : Spinlock_T;
-   end record;
-
-   Filesystem_Node_Cache : Filesystem_Node_Cache_T :=
-     (Entries          =>
-        [others => (Node => null, Last_Access => 0, Handle_Count => 0)],
-      Next_Entry_Index => 1,
-      Spinlock         =>
-        (Locked        => 0,
-         Time_Acquired => 0,
-         Hart_Id       => No_Hart_Id,
-         Lock_Id       => Lock_Id_FS_Node_Cache));
 
    Maximum_File_Read_Size  : constant := 16#60_000#;
    Maximum_File_Write_Size : constant := 16#60_000#;
@@ -269,9 +232,6 @@ private
    procedure Close_File_Unlocked
      (File_Handle : Process_File_Handle_Access; Result : out Function_Result);
 
-   procedure Add_Filesystem_Node_To_Cache_Unlocked
-     (Node : Filesystem_Node_Access; Result : out Function_Result);
-
    function Compare_Node_Name_With_Wide_String
      (Name1 : Wide_String; Name1_Length : Integer; Name2 : Wide_String)
       return Boolean;
@@ -295,16 +255,6 @@ private
    function Can_Filesystem_Node_Contain_Child_Nodes
      (Node : Filesystem_Node_Access) return Boolean;
 
-   procedure Search_For_Filesystem_Node_In_Cache
-     (Filesystem   : Filesystem_Access;
-      Parent_Index : Unsigned_64;
-      Filename     : Filesystem_Path_T;
-      Cache_Index  : out Natural;
-      Result       : out Function_Result);
-
-   procedure Find_Free_Cache_Entry
-     (Cache_Index : out Natural; Result : out Function_Result);
-
    procedure Find_File
      (Process         : in out Process_Control_Block_T;
       Path            : Filesystem_Path_T;
@@ -314,39 +264,10 @@ private
    function Is_Valid_Filesystem_Pointer
      (Filesystem : Filesystem_Access) return Boolean;
 
-   function Can_Filesystem_Cache_Entry_Be_Overwritten
-     (Cache_Entry : Filesystem_Node_Cache_Entry_T) return Boolean;
-
    procedure Set_Filesystem_Node_Name
      (Node      : in out Filesystem_Node_T;
       Node_Name : Filesystem_Path_T;
       Result    : out Function_Result);
-
-   procedure Create_Filesystem_Node_Cache_Entry
-     (Parent_Filesystem  : Filesystem_Access;
-      Filename           : Filesystem_Path_T;
-      New_Node           : out Filesystem_Node_Access;
-      Result             : out Function_Result;
-      Index              : Filesystem_Node_Index_T := 0;
-      Parent_Index       : Filesystem_Node_Index_T := 0;
-      Data_Location      : Unsigned_64 := 0;
-      Size               : Unsigned_64 := 0;
-      Node_Type          : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
-      Mounted_Device     : Device_Access := null;
-      Mounted_Filesystem : Filesystem_Access := null);
-
-   procedure Create_Filesystem_Node_Cache_Entry_Unlocked
-     (Parent_Filesystem  : Filesystem_Access;
-      Filename           : Filesystem_Path_T;
-      New_Node           : out Filesystem_Node_Access;
-      Result             : out Function_Result;
-      Index              : Filesystem_Node_Index_T;
-      Parent_Index       : Filesystem_Node_Index_T;
-      Data_Location      : Unsigned_64;
-      Size               : Unsigned_64;
-      Node_Type          : Filesystem_Node_Type_T;
-      Mounted_Device     : Device_Access;
-      Mounted_Filesystem : Filesystem_Access);
 
    function Sector_To_Block
      (Sector_Number : Sector_Index_T; Sector_Size : Natural)
@@ -365,13 +286,6 @@ private
 
    procedure Allocate_Filesystem_Node
      (New_Node : out Filesystem_Node_Access; Result : out Function_Result);
-
-   procedure Find_Filesystem_Node_In_Cache_Unlocked
-     (Filesystem   : Filesystem_Access;
-      Parent_Index : Unsigned_64;
-      Filename     : Filesystem_Path_T;
-      Node         : out Filesystem_Node_Access;
-      Result       : out Function_Result);
 
    procedure Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read
      (Filesystem_Node      : Filesystem_Node_Access;
