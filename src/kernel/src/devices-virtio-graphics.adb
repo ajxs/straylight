@@ -4,25 +4,6 @@ with RISCV.Atomics;       use RISCV.Atomics;
 with Processes.Scheduler; use Processes.Scheduler;
 
 package body Devices.Virtio.Graphics is
-   procedure Attach_Framebuffer_To_Resource
-     (Reading_Process              : in out Process_Control_Block_T;
-      Device                       : in out Device_T;
-      Resource_Id                  : Unsigned_32;
-      Framebuffer_Physical_Address : Physical_Address_T;
-      Result                       : out Function_Result) is
-   begin
-      Acquire_Spinlock (Device.Spinlock);
-
-      Attach_Framebuffer_To_Resource_Unlocked
-        (Reading_Process,
-         Device,
-         Resource_Id,
-         Framebuffer_Physical_Address,
-         Result);
-
-      Release_Spinlock (Device.Spinlock);
-   end Attach_Framebuffer_To_Resource;
-
    procedure Attach_Framebuffer_To_Resource_Unlocked
      (Reading_Process              : in out Process_Control_Block_T;
       Device                       : in out Device_T;
@@ -190,17 +171,24 @@ package body Devices.Virtio.Graphics is
          Result := Constraint_Exception;
    end Attach_Framebuffer_To_Resource_Unlocked;
 
-   procedure Get_Display_Info
-     (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
-      Result          : out Function_Result) is
+   procedure Attach_Framebuffer_To_Resource
+     (Reading_Process              : in out Process_Control_Block_T;
+      Device                       : in out Device_T;
+      Resource_Id                  : Unsigned_32;
+      Framebuffer_Physical_Address : Physical_Address_T;
+      Result                       : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
 
-      Get_Display_Info_Unlocked (Reading_Process, Device, Result);
+      Attach_Framebuffer_To_Resource_Unlocked
+        (Reading_Process,
+         Device,
+         Resource_Id,
+         Framebuffer_Physical_Address,
+         Result);
 
       Release_Spinlock (Device.Spinlock);
-   end Get_Display_Info;
+   end Attach_Framebuffer_To_Resource;
 
    procedure Get_Display_Info_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
@@ -342,19 +330,17 @@ package body Devices.Virtio.Graphics is
          Result := Constraint_Exception;
    end Get_Display_Info_Unlocked;
 
-   procedure Created_2d_Resource
+   procedure Get_Display_Info
      (Reading_Process : in out Process_Control_Block_T;
       Device          : in out Device_T;
-      Resource_Id     : Unsigned_32;
       Result          : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
 
-      Created_2d_Resource_Unlocked
-        (Reading_Process, Device, Resource_Id, Result);
+      Get_Display_Info_Unlocked (Reading_Process, Device, Result);
 
       Release_Spinlock (Device.Spinlock);
-   end Created_2d_Resource;
+   end Get_Display_Info;
 
    procedure Created_2d_Resource_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
@@ -489,28 +475,19 @@ package body Devices.Virtio.Graphics is
          Result := Constraint_Exception;
    end Created_2d_Resource_Unlocked;
 
-   procedure Set_Scanout
+   procedure Created_2d_Resource
      (Reading_Process : in out Process_Control_Block_T;
       Device          : in out Device_T;
       Resource_Id     : Unsigned_32;
-      Scanout_Id      : Unsigned_32;
-      Width           : Unsigned_32;
-      Height          : Unsigned_32;
       Result          : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
 
-      Set_Scanout_Unlocked
-        (Reading_Process,
-         Device,
-         Resource_Id,
-         Scanout_Id,
-         Width,
-         Height,
-         Result);
+      Created_2d_Resource_Unlocked
+        (Reading_Process, Device, Resource_Id, Result);
 
       Release_Spinlock (Device.Spinlock);
-   end Set_Scanout;
+   end Created_2d_Resource;
 
    procedure Set_Scanout_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
@@ -647,23 +624,28 @@ package body Devices.Virtio.Graphics is
          Result := Constraint_Exception;
    end Set_Scanout_Unlocked;
 
-   procedure Transfer_To_Host_2d
+   procedure Set_Scanout
      (Reading_Process : in out Process_Control_Block_T;
       Device          : in out Device_T;
       Resource_Id     : Unsigned_32;
-      X               : Unsigned_32;
-      Y               : Unsigned_32;
+      Scanout_Id      : Unsigned_32;
       Width           : Unsigned_32;
       Height          : Unsigned_32;
       Result          : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
 
-      Transfer_To_Host_2d_Unlocked
-        (Reading_Process, Device, Resource_Id, X, Y, Width, Height, Result);
+      Set_Scanout_Unlocked
+        (Reading_Process,
+         Device,
+         Resource_Id,
+         Scanout_Id,
+         Width,
+         Height,
+         Result);
 
       Release_Spinlock (Device.Spinlock);
-   end Transfer_To_Host_2d;
+   end Set_Scanout;
 
    procedure Transfer_To_Host_2d_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
@@ -802,7 +784,7 @@ package body Devices.Virtio.Graphics is
          Result := Constraint_Exception;
    end Transfer_To_Host_2d_Unlocked;
 
-   procedure Resource_Flush
+   procedure Transfer_To_Host_2d
      (Reading_Process : in out Process_Control_Block_T;
       Device          : in out Device_T;
       Resource_Id     : Unsigned_32;
@@ -814,11 +796,11 @@ package body Devices.Virtio.Graphics is
    begin
       Acquire_Spinlock (Device.Spinlock);
 
-      Resource_Flush_Unlocked
+      Transfer_To_Host_2d_Unlocked
         (Reading_Process, Device, Resource_Id, X, Y, Width, Height, Result);
 
       Release_Spinlock (Device.Spinlock);
-   end Resource_Flush;
+   end Transfer_To_Host_2d;
 
    procedure Resource_Flush_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
@@ -955,5 +937,23 @@ package body Devices.Virtio.Graphics is
          Log_Error ("Constraint_Error: Resource_Flush_Unlocked");
          Result := Constraint_Exception;
    end Resource_Flush_Unlocked;
+
+   procedure Resource_Flush
+     (Reading_Process : in out Process_Control_Block_T;
+      Device          : in out Device_T;
+      Resource_Id     : Unsigned_32;
+      X               : Unsigned_32;
+      Y               : Unsigned_32;
+      Width           : Unsigned_32;
+      Height          : Unsigned_32;
+      Result          : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+
+      Resource_Flush_Unlocked
+        (Reading_Process, Device, Resource_Id, X, Y, Width, Height, Result);
+
+      Release_Spinlock (Device.Spinlock);
+   end Resource_Flush;
 
 end Devices.Virtio.Graphics;

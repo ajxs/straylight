@@ -54,53 +54,6 @@ package Devices.Virtio.Graphics is
       Result          : out Function_Result);
 
 private
-   procedure Attach_Framebuffer_To_Resource_Unlocked
-     (Reading_Process              : in out Process_Control_Block_T;
-      Device                       : in out Device_T;
-      Resource_Id                  : Unsigned_32;
-      Framebuffer_Physical_Address : Physical_Address_T;
-      Result                       : out Function_Result);
-
-   procedure Created_2d_Resource_Unlocked
-     (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
-      Resource_Id     : Unsigned_32;
-      Result          : out Function_Result);
-
-   procedure Get_Display_Info_Unlocked
-     (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
-      Result          : out Function_Result);
-
-   procedure Set_Scanout_Unlocked
-     (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
-      Resource_Id     : Unsigned_32;
-      Scanout_Id      : Unsigned_32;
-      Width           : Unsigned_32;
-      Height          : Unsigned_32;
-      Result          : out Function_Result);
-
-   procedure Transfer_To_Host_2d_Unlocked
-     (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
-      Resource_Id     : Unsigned_32;
-      X               : Unsigned_32;
-      Y               : Unsigned_32;
-      Width           : Unsigned_32;
-      Height          : Unsigned_32;
-      Result          : out Function_Result);
-
-   procedure Resource_Flush_Unlocked
-     (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
-      Resource_Id     : Unsigned_32;
-      X               : Unsigned_32;
-      Y               : Unsigned_32;
-      Width           : Unsigned_32;
-      Height          : Unsigned_32;
-      Result          : out Function_Result);
-
    Device_Control_Queue_Index : constant := 0;
    Device_Cursor_Queue_Index  : constant := 1;
 

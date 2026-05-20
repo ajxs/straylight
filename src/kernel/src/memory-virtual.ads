@@ -151,32 +151,6 @@ private
    --  the base table of the new process.
    Kernel_Address_Space : Virtual_Memory_Space_T;
 
-   ----------------------------------------------------------------------------
-   --  The following methods are the 'unlocked' versions of the above methods
-   --  which are called once the spinlock has been acquired.
-   --  These functions are only called from the 'locked' versions above.
-   --  They are structured this way so that all happy/unhappy paths all lead to
-   --  the same exit point, making it easier to ensure the spinlock is always
-   --  released.
-   ----------------------------------------------------------------------------
-   procedure Map_Unlocked
-     (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
-      Virtual_Address                : Virtual_Address_T;
-      Physical_Address               : Physical_Address_T;
-      Size                           : Memory_Region_Size;
-      Region_Flags                   : Memory_Region_Flags_T;
-      Result                         : out Function_Result;
-      Allow_Mapping_Kernel_Addresses : Boolean := False);
-
-   procedure Unmap_Unlocked
-     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Virt_Addr         : Virtual_Address_T;
-      Result            : out Function_Result);
-
-   procedure Deallocate_Memory_Space_Unlocked
-     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Result            : out Function_Result);
-
    function Is_Region_Intersecting
      (Region     : Virtual_Memory_Mapping_T;
       Start_Addr : Virtual_Address_T;

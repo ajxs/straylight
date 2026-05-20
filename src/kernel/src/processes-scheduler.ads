@@ -23,16 +23,8 @@ private
       Next_Process           : out Process_Control_Block_Access;
       New_Prev_Process_State : Process_Status_T);
 
-   procedure Schedule_Next_Process_Unlocked
-     (Current_Process        : Process_Control_Block_Access;
-      Next_Process           : out Process_Control_Block_Access;
-      New_Prev_Process_State : Process_Status_T);
-
    procedure Print_Process_Switch_Info
      (Prev_Process, Next_Process : Process_Control_Block_Access);
-
-   procedure Wake_Processes_Waiting_For_Channel_Unlocked
-     (Channel : Blocking_Channel_T);
 
    procedure Switch_Process_Context
      (Prev_Process, Next_Process : Process_Control_Block_Access);

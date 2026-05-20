@@ -81,57 +81,6 @@ package body Memory.Virtual is
       Log_Debug ("Created new process memory space.", Logging_Tags);
    end Create_New_Process_Memory_Space;
 
-   procedure Deallocate_Memory_Space
-     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Result            : out Function_Result) is
-   begin
-      Acquire_Spinlock (Virt_Memory_Space.Spinlock);
-
-      Deallocate_Memory_Space_Unlocked (Virt_Memory_Space, Result);
-
-      Release_Spinlock (Virt_Memory_Space.Spinlock);
-   end Deallocate_Memory_Space;
-
-   procedure Deallocate_Memory_Space_Unlocked
-     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Result            : out Function_Result)
-   is
-      VMM_Map renames Virt_Memory_Space.Memory_Map;
-   begin
-      Log_Debug
-        ("Deallocating virtual memory space with base page table address: "
-         & Virt_Memory_Space.Base_Page_Table_Addr'Image,
-         Logging_Tags);
-
-      --  Deallocate all virtual memory mappings.
-      --  This will free any allocated physical memory pages as well.
-      while Virt_Memory_Space.Memory_Map_List_Head /= No_Mapping loop
-         Memory.Virtual.Unmap_Unlocked
-           (Virt_Memory_Space,
-            VMM_Map (Virt_Memory_Space.Memory_Map_List_Head).Virtual_Addr,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-      end loop;
-
-      --  Deallocate the base page table.
-      Free_Physical_Memory (Virt_Memory_Space.Base_Page_Table_Addr, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Log_Debug ("Deallocated virtual memory space.", Logging_Tags);
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Deallocate_Memory_Space_Unlocked",
-            Logging_Tags);
-         Result := Constraint_Exception;
-   end Deallocate_Memory_Space_Unlocked;
-
    procedure Find_Unused_List_Entry_Index
      (Addr_Space : Virtual_Memory_Space_T;
       Free_Index : out Map_Index_T;
@@ -189,29 +138,6 @@ package body Memory.Virtual is
 
       return Minimum_End > Maximum_Start;
    end Is_Region_Intersecting;
-
-   procedure Map
-     (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
-      Virtual_Address                : Virtual_Address_T;
-      Physical_Address               : Physical_Address_T;
-      Size                           : Memory_Region_Size;
-      Region_Flags                   : Memory_Region_Flags_T;
-      Result                         : out Function_Result;
-      Allow_Mapping_Kernel_Addresses : Boolean := False) is
-   begin
-      Acquire_Spinlock (Virt_Memory_Space.Spinlock);
-
-      Memory.Virtual.Map_Unlocked
-        (Virt_Memory_Space,
-         Virtual_Address,
-         Physical_Address,
-         Size,
-         Region_Flags,
-         Result,
-         Allow_Mapping_Kernel_Addresses);
-
-      Release_Spinlock (Virt_Memory_Space.Spinlock);
-   end Map;
 
    procedure Map_Unlocked
      (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
@@ -355,17 +281,28 @@ package body Memory.Virtual is
          Result := Constraint_Exception;
    end Map_Unlocked;
 
-   procedure Unmap
-     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
-      Virt_Addr         : Virtual_Address_T;
-      Result            : out Function_Result) is
+   procedure Map
+     (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
+      Virtual_Address                : Virtual_Address_T;
+      Physical_Address               : Physical_Address_T;
+      Size                           : Memory_Region_Size;
+      Region_Flags                   : Memory_Region_Flags_T;
+      Result                         : out Function_Result;
+      Allow_Mapping_Kernel_Addresses : Boolean := False) is
    begin
       Acquire_Spinlock (Virt_Memory_Space.Spinlock);
 
-      Memory.Virtual.Unmap_Unlocked (Virt_Memory_Space, Virt_Addr, Result);
+      Memory.Virtual.Map_Unlocked
+        (Virt_Memory_Space,
+         Virtual_Address,
+         Physical_Address,
+         Size,
+         Region_Flags,
+         Result,
+         Allow_Mapping_Kernel_Addresses);
 
       Release_Spinlock (Virt_Memory_Space.Spinlock);
-   end Unmap;
+   end Map;
 
    procedure Unmap_Unlocked
      (Virt_Memory_Space : in out Virtual_Memory_Space_T;
@@ -436,6 +373,69 @@ package body Memory.Virtual is
          Log_Error ("Constraint_Error: Unmap_Unlocked", Logging_Tags);
          Result := Constraint_Exception;
    end Unmap_Unlocked;
+
+   procedure Unmap
+     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
+      Virt_Addr         : Virtual_Address_T;
+      Result            : out Function_Result) is
+   begin
+      Acquire_Spinlock (Virt_Memory_Space.Spinlock);
+
+      Memory.Virtual.Unmap_Unlocked (Virt_Memory_Space, Virt_Addr, Result);
+
+      Release_Spinlock (Virt_Memory_Space.Spinlock);
+   end Unmap;
+
+   procedure Deallocate_Memory_Space_Unlocked
+     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
+      Result            : out Function_Result)
+   is
+      VMM_Map renames Virt_Memory_Space.Memory_Map;
+   begin
+      Log_Debug
+        ("Deallocating virtual memory space with base page table address: "
+         & Virt_Memory_Space.Base_Page_Table_Addr'Image,
+         Logging_Tags);
+
+      --  Deallocate all virtual memory mappings.
+      --  This will free any allocated physical memory pages as well.
+      while Virt_Memory_Space.Memory_Map_List_Head /= No_Mapping loop
+         Memory.Virtual.Unmap_Unlocked
+           (Virt_Memory_Space,
+            VMM_Map (Virt_Memory_Space.Memory_Map_List_Head).Virtual_Addr,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+      end loop;
+
+      --  Deallocate the base page table.
+      Free_Physical_Memory (Virt_Memory_Space.Base_Page_Table_Addr, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Log_Debug ("Deallocated virtual memory space.", Logging_Tags);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Deallocate_Memory_Space_Unlocked",
+            Logging_Tags);
+         Result := Constraint_Exception;
+   end Deallocate_Memory_Space_Unlocked;
+
+   procedure Deallocate_Memory_Space
+     (Virt_Memory_Space : in out Virtual_Memory_Space_T;
+      Result            : out Function_Result) is
+   begin
+      Acquire_Spinlock (Virt_Memory_Space.Spinlock);
+
+      Deallocate_Memory_Space_Unlocked (Virt_Memory_Space, Result);
+
+      Release_Spinlock (Virt_Memory_Space.Spinlock);
+   end Deallocate_Memory_Space;
 
    procedure Map_Kernel_Memory
      (Virtual_Addr  : Virtual_Address_T;

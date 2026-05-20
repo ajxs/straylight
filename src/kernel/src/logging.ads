@@ -122,6 +122,4 @@ private
 
    procedure Print_String_To_SBI_Console (Message : String);
 
-   procedure Print_String_To_SBI_Console_Unlocked (Message : String);
-
 end Logging;

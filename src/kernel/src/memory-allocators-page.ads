@@ -69,24 +69,4 @@ private
    Logging_Tags_Page_Pool : constant Log_Tags :=
      [Log_Tag_Page_Pool, Log_Tag_Memory];
 
-   ----------------------------------------------------------------------------
-   --  The following methods are the 'unlocked' versions of the above methods
-   --  which are called once the spinlock has been acquired.
-   --  These functions are only called from the 'locked' versions above.
-   --  They are structured this way so that all happy/unhappy paths all lead to
-   --  the same exit point, making it easier to ensure the spinlock is always
-   --  released.
-   ----------------------------------------------------------------------------
-   procedure Allocate_Unlocked
-     (Page_Pool         : in out Page_Pool_T;
-      Page_Count        : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
-      Result            : out Function_Result);
-
-   procedure Free_Unlocked
-     (Page_Pool       : in out Page_Pool_T;
-      Page_Count      : Positive;
-      Virtual_Address : Virtual_Address_T;
-      Result          : out Function_Result);
-
 end Memory.Allocators.Page;

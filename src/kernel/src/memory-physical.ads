@@ -93,32 +93,6 @@ private
    ----------------------------------------------------------------------------
    Base_Block_Size : constant := 16#1000#;
 
-   ----------------------------------------------------------------------------
-   --  The following methods are the 'unlocked' versions of the above methods
-   --  which are called once the spinlock has been acquired.
-   --  These functions are only called from the 'locked' versions above.
-   --  They are structured this way so that all happy/unhappy paths all lead to
-   --  the same exit point, making it easier to ensure the spinlock is always
-   --  released.
-   ----------------------------------------------------------------------------
-   procedure Allocate_Physical_Memory_Unlocked
-     (Required_Size     : Positive;
-      Allocated_Address : out Physical_Address_T;
-      Result            : out Function_Result);
-
-   procedure Free_Physical_Memory_Unlocked
-     (Addr : Physical_Address_T; Result : out Function_Result);
-
-   procedure Reallocate_Unlocked
-     (Addr     : in out Physical_Address_T;
-      New_Size : Positive;
-      Result   : out Function_Result);
-
-   procedure Create_Free_Region_Unlocked
-     (Region_Start  : Physical_Address_T;
-      Region_Length : Positive;
-      Result        : out Function_Result);
-
    procedure Get_Highest_Possible_Block_Order
      (Physical_Memory_Length       : Natural;
       Highest_Possible_Block_Order : out Natural;

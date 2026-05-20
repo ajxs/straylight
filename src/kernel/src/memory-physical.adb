@@ -8,38 +8,6 @@ with Memory.Virtual;
 package body Memory.Physical is
    PMM_Blocks renames Phys_Memory_Space.Physical_Memory_Blocks;
 
-   procedure Allocate_Physical_Memory
-     (Required_Size     : Positive;
-      Allocated_Address : out Physical_Address_T;
-      Result            : out Function_Result) is
-   begin
-      Acquire_Spinlock (Phys_Memory_Space.Spinlock);
-
-      Allocate_Physical_Memory_Unlocked
-        (Required_Size, Allocated_Address, Result);
-
-      Release_Spinlock (Phys_Memory_Space.Spinlock);
-
-      Log_Debug
-        ("Initialising allocated physical memory block.", Logging_Tags);
-
-      --  @NOTE: Only the specified required size will be initialised, not the
-      --  whole underlying physical memory block. Normally this shouldn't be
-      --  a problem due to the alignment of the memory blocks. It's important
-      --  that no more physical memory is mapped into a process' virtual
-      --  address space than is allocated here, as it would expose
-      --  uninitialised memory to the process.
-      Initialise_Allocated_Physical_Memory : declare
-         Mapped_Address : Virtual_Address_T := Null_Address;
-      begin
-         Mapped_Address :=
-           Memory.Virtual.Get_Physical_Address_Virtual_Mapping
-             (Allocated_Address);
-
-         Memory.Set (Mapped_Address, 0, Required_Size);
-      end Initialise_Allocated_Physical_Memory;
-   end Allocate_Physical_Memory;
-
    procedure Allocate_Physical_Memory_Unlocked
      (Required_Size     : Positive;
       Allocated_Address : out Physical_Address_T;
@@ -160,6 +128,38 @@ package body Memory.Physical is
          Result := Constraint_Exception;
    end Allocate_Physical_Memory_Unlocked;
 
+   procedure Allocate_Physical_Memory
+     (Required_Size     : Positive;
+      Allocated_Address : out Physical_Address_T;
+      Result            : out Function_Result) is
+   begin
+      Acquire_Spinlock (Phys_Memory_Space.Spinlock);
+
+      Allocate_Physical_Memory_Unlocked
+        (Required_Size, Allocated_Address, Result);
+
+      Release_Spinlock (Phys_Memory_Space.Spinlock);
+
+      Log_Debug
+        ("Initialising allocated physical memory block.", Logging_Tags);
+
+      --  @NOTE: Only the specified required size will be initialised, not the
+      --  whole underlying physical memory block. Normally this shouldn't be
+      --  a problem due to the alignment of the memory blocks. It's important
+      --  that no more physical memory is mapped into a process' virtual
+      --  address space than is allocated here, as it would expose
+      --  uninitialised memory to the process.
+      Initialise_Allocated_Physical_Memory : declare
+         Mapped_Address : Virtual_Address_T := Null_Address;
+      begin
+         Mapped_Address :=
+           Memory.Virtual.Get_Physical_Address_Virtual_Mapping
+             (Allocated_Address);
+
+         Memory.Set (Mapped_Address, 0, Required_Size);
+      end Initialise_Allocated_Physical_Memory;
+   end Allocate_Physical_Memory;
+
    procedure Consolidate_Adjacent_Memory_Blocks
      (Block : in out Physical_Memory_Block_T; Result : out Function_Result) is
    begin
@@ -227,18 +227,6 @@ package body Memory.Physical is
            ("Constraint_Error: Consolidate_Free_Physical_Memory_Blocks");
          Result := Constraint_Exception;
    end Consolidate_Free_Physical_Memory_Blocks;
-
-   procedure Create_Free_Physical_Memory_Region
-     (Region_Start  : Physical_Address_T;
-      Region_Length : Positive;
-      Result        : out Function_Result) is
-   begin
-      Acquire_Spinlock (Phys_Memory_Space.Spinlock);
-
-      Create_Free_Region_Unlocked (Region_Start, Region_Length, Result);
-
-      Release_Spinlock (Phys_Memory_Space.Spinlock);
-   end Create_Free_Physical_Memory_Region;
 
    procedure Check_For_Intersecting_Blocks
      (Region_Start  : Physical_Address_T;
@@ -381,6 +369,18 @@ package body Memory.Physical is
          Result := Constraint_Exception;
    end Create_Free_Region_Unlocked;
 
+   procedure Create_Free_Physical_Memory_Region
+     (Region_Start  : Physical_Address_T;
+      Region_Length : Positive;
+      Result        : out Function_Result) is
+   begin
+      Acquire_Spinlock (Phys_Memory_Space.Spinlock);
+
+      Create_Free_Region_Unlocked (Region_Start, Region_Length, Result);
+
+      Release_Spinlock (Phys_Memory_Space.Spinlock);
+   end Create_Free_Physical_Memory_Region;
+
    procedure Divide_Block_To_Specified_Order
      (Block          : in out Physical_Memory_Block_T;
       Required_Order : Block_Order;
@@ -504,16 +504,6 @@ package body Memory.Physical is
       return No_Block;
    end Find_Free_Entry;
 
-   procedure Free_Physical_Memory
-     (Addr : Physical_Address_T; Result : out Function_Result) is
-   begin
-      Acquire_Spinlock (Phys_Memory_Space.Spinlock);
-
-      Free_Physical_Memory_Unlocked (Addr, Result);
-
-      Release_Spinlock (Phys_Memory_Space.Spinlock);
-   end Free_Physical_Memory;
-
    procedure Free_Physical_Memory_Unlocked
      (Addr : Physical_Address_T; Result : out Function_Result)
    is
@@ -539,6 +529,16 @@ package body Memory.Physical is
          Log_Error ("Constraint_Error: Free");
          Result := Constraint_Exception;
    end Free_Physical_Memory_Unlocked;
+
+   procedure Free_Physical_Memory
+     (Addr : Physical_Address_T; Result : out Function_Result) is
+   begin
+      Acquire_Spinlock (Phys_Memory_Space.Spinlock);
+
+      Free_Physical_Memory_Unlocked (Addr, Result);
+
+      Release_Spinlock (Phys_Memory_Space.Spinlock);
+   end Free_Physical_Memory;
 
    function Get_Block_Size_In_Bytes (Order : Block_Order) return Natural is
    begin
@@ -647,18 +647,6 @@ package body Memory.Physical is
       return False;
    end Is_Region_Intersecting;
 
-   procedure Reallocate_Physical_Memory
-     (Addr     : in out Physical_Address_T;
-      New_Size : Positive;
-      Result   : out Function_Result) is
-   begin
-      Acquire_Spinlock (Phys_Memory_Space.Spinlock);
-
-      Reallocate_Unlocked (Addr, New_Size, Result);
-
-      Release_Spinlock (Phys_Memory_Space.Spinlock);
-   end Reallocate_Physical_Memory;
-
    procedure Reallocate_Unlocked
      (Addr     : in out Physical_Address_T;
       New_Size : Positive;
@@ -739,5 +727,17 @@ package body Memory.Physical is
       when Constraint_Error =>
          Result := Constraint_Exception;
    end Reallocate_Unlocked;
+
+   procedure Reallocate_Physical_Memory
+     (Addr     : in out Physical_Address_T;
+      New_Size : Positive;
+      Result   : out Function_Result) is
+   begin
+      Acquire_Spinlock (Phys_Memory_Space.Spinlock);
+
+      Reallocate_Unlocked (Addr, New_Size, Result);
+
+      Release_Spinlock (Phys_Memory_Space.Spinlock);
+   end Reallocate_Physical_Memory;
 
 end Memory.Physical;

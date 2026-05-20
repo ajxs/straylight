@@ -58,27 +58,14 @@ package body Devices.Virtio.Block is
         (Reading_Process, Device, Data_Physical_Address, Sector, True, Result);
    end Write_Sector;
 
-   procedure Read_Write
-     (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
-      Data_Physical_Address : Physical_Address_T;
-      Sector                : Sector_Index_T;
-      Write                 : Boolean;
-      Result                : out Function_Result) is
-   begin
-      Acquire_Spinlock (Device.Spinlock);
-
-      Read_Write_Unlocked
-        (Reading_Process,
-         Device,
-         Data_Physical_Address,
-         Sector,
-         Write,
-         Result);
-
-      Release_Spinlock (Device.Spinlock);
-   end Read_Write;
-
+   ----------------------------------------------------------------------------
+   --  The following methods are the 'unlocked' versions of the above methods
+   --  which are called once the spinlock has been acquired.
+   --  These functions are only called from the 'locked' versions above.
+   --  They are structured this way so that all happy/unhappy paths all lead to
+   --  the same exit point, making it easier to ensure the spinlock is always
+   --  released.
+   ----------------------------------------------------------------------------
    procedure Read_Write_Unlocked
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
@@ -262,6 +249,27 @@ package body Devices.Virtio.Block is
          Log_Error ("Constraint_Error: Read_Write_Unlocked");
          Result := Constraint_Exception;
    end Read_Write_Unlocked;
+
+   procedure Read_Write
+     (Reading_Process       : in out Process_Control_Block_T;
+      Device                : in out Device_T;
+      Data_Physical_Address : Physical_Address_T;
+      Sector                : Sector_Index_T;
+      Write                 : Boolean;
+      Result                : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+
+      Read_Write_Unlocked
+        (Reading_Process,
+         Device,
+         Data_Physical_Address,
+         Sector,
+         Write,
+         Result);
+
+      Release_Spinlock (Device.Spinlock);
+   end Read_Write;
 
    procedure Initialise_Block_Device
      (Device : in out Device_T; Result : out Function_Result)

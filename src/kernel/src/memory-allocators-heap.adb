@@ -4,21 +4,14 @@
 -------------------------------------------------------------------------------
 
 package body Memory.Allocators.Heap is
-   procedure Add_Memory_Region_To_Heap
-     (Memory_Heap      : in out Memory_Heap_T;
-      Virtual_Address  : Virtual_Address_T;
-      Physical_Address : Physical_Address_T;
-      Size             : Storage_Offset;
-      Result           : out Function_Result) is
-   begin
-      Acquire_Spinlock (Memory_Heap.Spinlock);
-
-      Add_Memory_Region_To_Heap_Unlocked
-        (Memory_Heap, Virtual_Address, Physical_Address, Size, Result);
-
-      Release_Spinlock (Memory_Heap.Spinlock);
-   end Add_Memory_Region_To_Heap;
-
+   ----------------------------------------------------------------------------
+   --  The following methods are the 'unlocked' versions of the above methods
+   --  which are called once the spinlock has been acquired.
+   --  These functions are only called from the 'locked' versions above.
+   --  They are structured this way so that all happy/unhappy paths all lead to
+   --  the same exit point, making it easier to ensure the spinlock is always
+   --  released.
+   ----------------------------------------------------------------------------
    procedure Add_Memory_Region_To_Heap_Unlocked
      (Memory_Heap      : in out Memory_Heap_T;
       Virtual_Address  : Virtual_Address_T;
@@ -99,20 +92,20 @@ package body Memory.Allocators.Heap is
          Result := Constraint_Exception;
    end Add_Memory_Region_To_Heap_Unlocked;
 
-   procedure Allocate
-     (Memory_Heap       : in out Memory_Heap_T;
-      Size              : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
-      Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1) is
+   procedure Add_Memory_Region_To_Heap
+     (Memory_Heap      : in out Memory_Heap_T;
+      Virtual_Address  : Virtual_Address_T;
+      Physical_Address : Physical_Address_T;
+      Size             : Storage_Offset;
+      Result           : out Function_Result) is
    begin
       Acquire_Spinlock (Memory_Heap.Spinlock);
 
-      Allocate_Unlocked
-        (Memory_Heap, Size, Allocation_Result, Result, Alignment);
+      Add_Memory_Region_To_Heap_Unlocked
+        (Memory_Heap, Virtual_Address, Physical_Address, Size, Result);
 
       Release_Spinlock (Memory_Heap.Spinlock);
-   end Allocate;
+   end Add_Memory_Region_To_Heap;
 
    procedure Allocate_Unlocked
      (Memory_Heap       : in out Memory_Heap_T;
@@ -188,6 +181,21 @@ package body Memory.Allocators.Heap is
          Log_Error ("Constraint_Error: Allocate_Unlocked");
          Result := Constraint_Exception;
    end Allocate_Unlocked;
+
+   procedure Allocate
+     (Memory_Heap       : in out Memory_Heap_T;
+      Size              : Positive;
+      Allocation_Result : out Memory_Allocation_Result;
+      Result            : out Function_Result;
+      Alignment         : Storage_Offset := 1) is
+   begin
+      Acquire_Spinlock (Memory_Heap.Spinlock);
+
+      Allocate_Unlocked
+        (Memory_Heap, Size, Allocation_Result, Result, Alignment);
+
+      Release_Spinlock (Memory_Heap.Spinlock);
+   end Allocate;
 
    function Calculate_Region_Alignment_Offset
      (Start_Address : Virtual_Address_T; Alignment : Storage_Offset)
@@ -499,18 +507,6 @@ package body Memory.Allocators.Heap is
       return Null_Memory_Region_Index;
    end Find_Unused_Memory_Region_Entry;
 
-   procedure Free
-     (Memory_Heap               : in out Memory_Heap_T;
-      Allocated_Virtual_Address : Virtual_Address_T;
-      Result                    : out Function_Result) is
-   begin
-      Acquire_Spinlock (Memory_Heap.Spinlock);
-
-      Free_Unlocked (Memory_Heap, Allocated_Virtual_Address, Result);
-
-      Release_Spinlock (Memory_Heap.Spinlock);
-   end Free;
-
    procedure Free_Unlocked
      (Memory_Heap               : in out Memory_Heap_T;
       Allocated_Virtual_Address : Virtual_Address_T;
@@ -596,6 +592,18 @@ package body Memory.Allocators.Heap is
          Log_Error ("Constraint_Error: Free_Unlocked");
          Result := Constraint_Exception;
    end Free_Unlocked;
+
+   procedure Free
+     (Memory_Heap               : in out Memory_Heap_T;
+      Allocated_Virtual_Address : Virtual_Address_T;
+      Result                    : out Function_Result) is
+   begin
+      Acquire_Spinlock (Memory_Heap.Spinlock);
+
+      Free_Unlocked (Memory_Heap, Allocated_Virtual_Address, Result);
+
+      Release_Spinlock (Memory_Heap.Spinlock);
+   end Free;
 
    procedure Initialise_Allocated_Region_Header
      (Region_Address : Address; Size : Storage_Offset)

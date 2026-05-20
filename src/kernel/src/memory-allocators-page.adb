@@ -25,19 +25,6 @@ package body Memory.Allocators.Page is
       Result := Region_Array_Exhausted;
    end Add_Region_To_Page_Pool;
 
-   procedure Allocate
-     (Page_Pool         : in out Page_Pool_T;
-      Page_Count        : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
-      Result            : out Function_Result) is
-   begin
-      Acquire_Spinlock (Page_Pool.Spinlock);
-
-      Allocate_Unlocked (Page_Pool, Page_Count, Allocation_Result, Result);
-
-      Release_Spinlock (Page_Pool.Spinlock);
-   end Allocate;
-
    procedure Allocate_Unlocked
      (Page_Pool         : in out Page_Pool_T;
       Page_Count        : Positive;
@@ -97,18 +84,18 @@ package body Memory.Allocators.Page is
          Result := Constraint_Exception;
    end Allocate_Unlocked;
 
-   procedure Free
-     (Page_Pool       : in out Page_Pool_T;
-      Page_Count      : Positive;
-      Virtual_Address : Virtual_Address_T;
-      Result          : out Function_Result) is
+   procedure Allocate
+     (Page_Pool         : in out Page_Pool_T;
+      Page_Count        : Positive;
+      Allocation_Result : out Memory_Allocation_Result;
+      Result            : out Function_Result) is
    begin
       Acquire_Spinlock (Page_Pool.Spinlock);
 
-      Free_Unlocked (Page_Pool, Page_Count, Virtual_Address, Result);
+      Allocate_Unlocked (Page_Pool, Page_Count, Allocation_Result, Result);
 
       Release_Spinlock (Page_Pool.Spinlock);
-   end Free;
+   end Allocate;
 
    procedure Free_Unlocked
      (Page_Pool       : in out Page_Pool_T;
@@ -155,5 +142,18 @@ package body Memory.Allocators.Page is
       when Constraint_Error =>
          Result := Constraint_Exception;
    end Free_Unlocked;
+
+   procedure Free
+     (Page_Pool       : in out Page_Pool_T;
+      Page_Count      : Positive;
+      Virtual_Address : Virtual_Address_T;
+      Result          : out Function_Result) is
+   begin
+      Acquire_Spinlock (Page_Pool.Spinlock);
+
+      Free_Unlocked (Page_Pool, Page_Count, Virtual_Address, Result);
+
+      Release_Spinlock (Page_Pool.Spinlock);
+   end Free;
 
 end Memory.Allocators.Page;

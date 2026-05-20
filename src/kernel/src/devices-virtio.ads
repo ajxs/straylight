@@ -207,12 +207,6 @@ private
 
    function Increment_Index (Index : Unsigned_16) return Unsigned_16;
 
-   procedure Acknowledge_Interrupt_Unlocked
-     (Device : in out Device_T; Result : out Function_Result);
-
-   procedure Initialise_MMIO_Device_Unlocked
-     (Device : in out Device_T; Result : out Function_Result);
-
    procedure Allocate_Virtio_Device_Resources
      (Device : in out Device_T; Result : out Function_Result);
 

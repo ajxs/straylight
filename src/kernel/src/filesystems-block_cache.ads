@@ -126,10 +126,4 @@ private
       Cache_Index     : Positive;
       Result          : out Function_Result);
 
-   procedure Release_Block_Unlocked
-     (Filesystem             : Filesystem_Access;
-      Block_Number           : Block_Index_T;
-      Result                 : out Function_Result;
-      Invalidate_Cache_Entry : Boolean);
-
 end Filesystems.Block_Cache;

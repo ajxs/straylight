@@ -51,22 +51,6 @@ private
       Write                 : Boolean;
       Result                : out Function_Result);
 
-   ----------------------------------------------------------------------------
-   --  The following methods are the 'unlocked' versions of the above methods
-   --  which are called once the spinlock has been acquired.
-   --  These functions are only called from the 'locked' versions above.
-   --  They are structured this way so that all happy/unhappy paths all lead to
-   --  the same exit point, making it easier to ensure the spinlock is always
-   --  released.
-   ----------------------------------------------------------------------------
-   procedure Read_Write_Unlocked
-     (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
-      Data_Physical_Address : Physical_Address_T;
-      Sector                : Sector_Index_T;
-      Write                 : Boolean;
-      Result                : out Function_Result);
-
    type Block_Request_Type_T is
      (VIRTIO_BLK_T_IN,
       VIRTIO_BLK_T_OUT,

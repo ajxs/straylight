@@ -231,9 +231,6 @@ private
       File_Handle     : out Process_File_Handle_Access;
       Result          : out Function_Result);
 
-   procedure Close_File_Unlocked
-     (File_Handle : Process_File_Handle_Access; Result : out Function_Result);
-
    function Compare_Node_Name_With_Wide_String
      (Name1 : Wide_String; Name1_Length : Integer; Name2 : Wide_String)
       return Boolean;

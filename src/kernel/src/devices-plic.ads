@@ -37,17 +37,4 @@ private
        + (Storage_Offset (Context) * 16#1000#))
    with Inline, Pure_Function;
 
-   procedure Set_Interrupt_Priority_Unlocked
-     (Device       : Device_T;
-      IRQ          : Natural;
-      IRQ_Priority : Natural;
-      Result       : out Function_Result);
-
-   procedure Set_IRQ_Enable_State_Unlocked
-     (Device         : Device_T;
-      Context        : Natural;
-      Interrupt_Line : Natural;
-      State          : Boolean;
-      Result         : out Function_Result);
-
 end Devices.PLIC;

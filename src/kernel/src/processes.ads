@@ -129,9 +129,6 @@ package Processes is
    procedure Allocate_Process_Id
      (New_Id : out Process_Id_T; Result : out Function_Result);
 
-   procedure Allocate_Process_Id_Unlocked
-     (New_Id : out Process_Id_T; Result : out Function_Result);
-
    procedure Add_Process_To_Process_Queue
      (New_Process : Process_Control_Block_Access;
       Result      : out Function_Result);
@@ -166,10 +163,6 @@ private
    --  4MiB process heap starting size.
    Process_Heap_Starting_Size  : constant := 1024 * 16#1000#;
 
-   procedure Add_Process_To_Process_Queue_Unlocked
-     (New_Process : Process_Control_Block_Access;
-      Result      : out Function_Result);
-
    procedure Allocate_And_Map_New_Process_Stack
      (New_Process : in out Process_Control_Block_T;
       Result      : out Function_Result);
@@ -181,9 +174,6 @@ private
    procedure Allocate_And_Map_New_Process_Heap
      (New_Process : in out Process_Control_Block_T;
       Result      : out Function_Result);
-
-   procedure Deallocate_Process_Unlocked
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
    procedure Deallocate_Process_Resources
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
@@ -197,8 +187,6 @@ private
       Result                 : out Function_Result);
 
    procedure Cleanup_Stopped_Processes (Result : out Function_Result);
-
-   procedure Cleanup_Stopped_Processes_Unlocked (Result : out Function_Result);
 
    --  This is the entry point for a newly-created process.
    --  Newly-created processes have their initial 'return address' set to this
