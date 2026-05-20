@@ -33,18 +33,8 @@ private
    type Filesystem_Node_Cache_Entry_Array_T is
      array (1 .. 256) of Filesystem_Node_Cache_Entry_T;
 
-   type Filesystem_Node_Cache_T is record
-      Entries  : Filesystem_Node_Cache_Entry_Array_T;
-      Spinlock : Spinlock_T;
-   end record;
-
-   Filesystem_Node_Cache : Filesystem_Node_Cache_T :=
-     (Entries  => [others => (Node => null, Last_Access => 0)],
-      Spinlock =>
-        (Locked        => 0,
-         Time_Acquired => 0,
-         Hart_Id       => No_Hart_Id,
-         Lock_Id       => Lock_Id_FS_Node_Cache));
+   Node_Cache_Entries  : Filesystem_Node_Cache_Entry_Array_T;
+   Node_Cache_Spinlock : Spinlock_T;
 
    procedure Find_Free_Cache_Entry
      (Cache_Index : out Natural; Result : out Function_Result);

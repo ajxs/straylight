@@ -2,8 +2,6 @@ with Memory.Kernel; use Memory.Kernel;
 with RISCV;
 
 package body Filesystems.Node_Cache is
-   Cache renames Filesystem_Node_Cache;
-
    procedure Add_Filesystem_Node_To_Cache_Unlocked
      (Node : Filesystem_Node_Access; Result : out Function_Result)
    is
@@ -14,8 +12,8 @@ package body Filesystems.Node_Cache is
          return;
       end if;
 
-      Cache.Entries (Cache_Index).Node := Node;
-      Cache.Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
+      Node_Cache_Entries (Cache_Index).Node := Node;
+      Node_Cache_Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
 
       Result := Success;
 
@@ -28,9 +26,9 @@ package body Filesystems.Node_Cache is
    procedure Add_Filesystem_Node_To_Cache
      (Node : Filesystem_Node_Access; Result : out Function_Result) is
    begin
-      Acquire_Spinlock (Filesystem_Node_Cache.Spinlock);
+      Acquire_Spinlock (Node_Cache_Spinlock);
       Add_Filesystem_Node_To_Cache_Unlocked (Node, Result);
-      Release_Spinlock (Filesystem_Node_Cache.Spinlock);
+      Release_Spinlock (Node_Cache_Spinlock);
    end Add_Filesystem_Node_To_Cache;
 
    procedure Create_Filesystem_Node_Cache_Entry_Unlocked
@@ -81,8 +79,8 @@ package body Filesystems.Node_Cache is
          return;
       end if;
 
-      Cache.Entries (Cache_Index).Node := New_Node;
-      Cache.Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
+      Node_Cache_Entries (Cache_Index).Node := New_Node;
+      Node_Cache_Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
 
       Log_Debug
         ("Added new filesystem node to cache at index: " & Cache_Index'Image,
@@ -109,7 +107,7 @@ package body Filesystems.Node_Cache is
       Mounted_Device     : Device_Access := null;
       Mounted_Filesystem : Filesystem_Access := null) is
    begin
-      Acquire_Spinlock (Filesystem_Node_Cache.Spinlock);
+      Acquire_Spinlock (Node_Cache_Spinlock);
       Create_Filesystem_Node_Cache_Entry_Unlocked
         (Parent_Filesystem,
          Filename,
@@ -122,7 +120,7 @@ package body Filesystems.Node_Cache is
          Node_Type,
          Mounted_Device,
          Mounted_Filesystem);
-      Release_Spinlock (Filesystem_Node_Cache.Spinlock);
+      Release_Spinlock (Node_Cache_Spinlock);
    end Create_Filesystem_Node_Cache_Entry;
 
    --  Assumes that the caller already holds the cache spinlock.
@@ -131,9 +129,9 @@ package body Filesystems.Node_Cache is
    begin
       Cache_Index := 0;
 
-      for Index in Filesystem_Node_Cache.Entries'Range loop
+      for Index in Node_Cache_Entries'Range loop
          if Can_Filesystem_Cache_Entry_Be_Overwritten
-              (Filesystem_Node_Cache.Entries (Index))
+              (Node_Cache_Entries (Index))
          then
             Cache_Index := Index;
             Result := Success;
@@ -161,10 +159,9 @@ package body Filesystems.Node_Cache is
          return;
       end if;
 
-      Filesystem_Node_Cache.Entries (Cache_Index).Last_Access :=
-        RISCV.Get_System_Time;
+      Node_Cache_Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
 
-      Node := Filesystem_Node_Cache.Entries (Cache_Index).Node;
+      Node := Node_Cache_Entries (Cache_Index).Node;
       Result := Success;
    exception
       when Constraint_Error =>
@@ -180,10 +177,10 @@ package body Filesystems.Node_Cache is
       Node         : out Filesystem_Node_Access;
       Result       : out Function_Result) is
    begin
-      Acquire_Spinlock (Filesystem_Node_Cache.Spinlock);
+      Acquire_Spinlock (Node_Cache_Spinlock);
       Find_Filesystem_Node_In_Cache_Unlocked
         (Filesystem, Parent_Index, Filename, Node, Result);
-      Release_Spinlock (Filesystem_Node_Cache.Spinlock);
+      Release_Spinlock (Node_Cache_Spinlock);
    end Find_Filesystem_Node_In_Cache;
 
    function Can_Filesystem_Cache_Entry_Be_Overwritten
@@ -210,15 +207,16 @@ package body Filesystems.Node_Cache is
    begin
       Cache_Index := 0;
 
-      for Index in Cache.Entries'Range loop
-         if Cache.Entries (Index).Node /= null then
-            if Filesystem = Cache.Entries (Index).Node.all.Parent_Filesystem
+      for Index in Node_Cache_Entries'Range loop
+         if Node_Cache_Entries (Index).Node /= null then
+            if Filesystem
+              = Node_Cache_Entries (Index).Node.all.Parent_Filesystem
               and then
-                Parent_Index = Cache.Entries (Index).Node.all.Parent_Index
+                Parent_Index = Node_Cache_Entries (Index).Node.all.Parent_Index
               and then
                 Does_Node_Name_Match_Path_Name
-                  (Cache.Entries (Index).Node.all.Filename,
-                   Cache.Entries (Index).Node.all.Filename_Byte_Length,
+                  (Node_Cache_Entries (Index).Node.all.Filename,
+                   Node_Cache_Entries (Index).Node.all.Filename_Byte_Length,
                    Filename)
             then
                Cache_Index := Index;
