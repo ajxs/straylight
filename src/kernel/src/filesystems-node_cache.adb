@@ -16,7 +16,6 @@ package body Filesystems.Node_Cache is
 
       Cache.Entries (Cache_Index).Node := Node;
       Cache.Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
-      Cache.Entries (Cache_Index).Handle_Count := 0;
 
       Result := Success;
 
@@ -72,7 +71,8 @@ package body Filesystems.Node_Cache is
          Node_Type            => Node_Type,
          Parent_Filesystem    => Parent_Filesystem,
          Mounted_Device       => Mounted_Device,
-         Mounted_Filesystem   => Mounted_Filesystem);
+         Mounted_Filesystem   => Mounted_Filesystem,
+         Handle_Count         => 0);
 
       Set_Filesystem_Node_Name (New_Node.all, Filename, Result);
       if Is_Error (Result) then
@@ -83,7 +83,6 @@ package body Filesystems.Node_Cache is
 
       Cache.Entries (Cache_Index).Node := New_Node;
       Cache.Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
-      Cache.Entries (Cache_Index).Handle_Count := 0;
 
       Log_Debug
         ("Added new filesystem node to cache at index: " & Cache_Index'Image,
@@ -190,8 +189,16 @@ package body Filesystems.Node_Cache is
    function Can_Filesystem_Cache_Entry_Be_Overwritten
      (Cache_Entry : Filesystem_Node_Cache_Entry_T) return Boolean is
    begin
-      --  @TODO: Implement cache eviction policy.
-      return Cache_Entry.Node = null and then Cache_Entry.Handle_Count = 0;
+      if Cache_Entry.Node = null then
+         return True;
+      end if;
+
+      return Cache_Entry.Node.all.Handle_Count = 0;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Can_Filesystem_Cache_Entry_Be_Overwritten");
+         return False;
    end Can_Filesystem_Cache_Entry_Be_Overwritten;
 
    procedure Search_For_Filesystem_Node_In_Cache

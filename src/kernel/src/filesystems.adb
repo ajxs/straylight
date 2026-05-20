@@ -249,7 +249,7 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Find_File;
 
-   procedure Create_File_Handle_For_Filesystem_Node
+   procedure Create_File_Handle_For_Filesystem_Node_Unlocked
      (Process         : in out Process_Control_Block_T;
       Filesystem_Node : Filesystem_Node_Access;
       Mode            : File_Open_Mode_T;
@@ -258,13 +258,8 @@ package body Filesystems is
    is
       File_Handle_Index : Positive := 1;
    begin
-      Acquire_Spinlock (Open_Files_Spinlock);
-      Acquire_Spinlock (Process.Spinlock);
-
       Find_Unused_File_Handle_Entry (Open_Files, File_Handle_Index, Result);
       if Is_Error (Result) then
-         Release_Spinlock (Process.Spinlock);
-         Release_Spinlock (Open_Files_Spinlock);
          return;
       end if;
 
@@ -279,15 +274,32 @@ package body Filesystems is
       File_Handle.all.Mode := Mode;
       File_Handle.all.Process_Id := Process.Process_Id;
 
-      Release_Spinlock (Process.Spinlock);
-      Release_Spinlock (Open_Files_Spinlock);
+      Filesystem_Node.all.Handle_Count := Filesystem_Node.all.Handle_Count + 1;
 
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Error
-           ("Constraint_Error: Create_File_Handle_For_Filesystem_Node");
+           ("Constraint_Error: "
+            & "Create_File_Handle_For_Filesystem_Node_Unlocked");
          Result := Constraint_Exception;
+   end Create_File_Handle_For_Filesystem_Node_Unlocked;
+
+   procedure Create_File_Handle_For_Filesystem_Node
+     (Process         : in out Process_Control_Block_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      Mode            : File_Open_Mode_T;
+      File_Handle     : out Process_File_Handle_Access;
+      Result          : out Function_Result) is
+   begin
+      Acquire_Spinlock (Open_Files_Spinlock);
+      Acquire_Spinlock (Process.Spinlock);
+
+      Create_File_Handle_For_Filesystem_Node_Unlocked
+        (Process, Filesystem_Node, Mode, File_Handle, Result);
+
+      Release_Spinlock (Process.Spinlock);
+      Release_Spinlock (Open_Files_Spinlock);
    end Create_File_Handle_For_Filesystem_Node;
 
    procedure Open_File
@@ -313,9 +325,14 @@ package body Filesystems is
 
       Log_Debug ("File found: '" & Path & "'", Logging_Tags);
 
-      --  Result set by this call.
       Create_File_Handle_For_Filesystem_Node
         (Process, Filesystem_Node, Mode, File_Handle, Result);
+      if Is_Error (Result) then
+         File_Handle := null;
+         return;
+      end if;
+
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Open_File");
@@ -655,6 +672,9 @@ package body Filesystems is
       Log_Debug ("Filesystems.Close_File_Unlocked", Logging_Tags);
 
       File_Handle.all.Entry_Used := False;
+
+      File_Handle.all.File.all.Handle_Count :=
+        File_Handle.all.File.all.Handle_Count - 1;
 
       Result := Success;
    exception

@@ -28,9 +28,6 @@ private
    type Filesystem_Node_Cache_Entry_T is record
       Node        : Filesystem_Node_Access := null;
       Last_Access : Unsigned_64 := 0;
-
-      --  The number of processes currently using this node.
-      Handle_Count : Natural := 0;
    end record;
 
    type Filesystem_Node_Cache_Entry_Array_T is
@@ -42,8 +39,7 @@ private
    end record;
 
    Filesystem_Node_Cache : Filesystem_Node_Cache_T :=
-     (Entries  =>
-        [others => (Node => null, Last_Access => 0, Handle_Count => 0)],
+     (Entries  => [others => (Node => null, Last_Access => 0)],
       Spinlock =>
         (Locked        => 0,
          Time_Acquired => 0,

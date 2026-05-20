@@ -105,6 +105,8 @@ package Filesystems is
       --  file's data.
       Data_Location : Unsigned_64 := 0;
       Size          : Unsigned_64 := 0;
+
+      Handle_Count : Natural := 0;
    end record;
 
    type Filesystem_Node_Access is access all Filesystem_Node_T
