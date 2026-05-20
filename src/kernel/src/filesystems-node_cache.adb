@@ -154,7 +154,7 @@ package body Filesystems.Node_Cache is
    begin
       Search_For_Filesystem_Node_In_Cache
         (Filesystem, Parent_Index, Filename, Cache_Index, Result);
-      if Is_Error (Result) or else Cache_Index = 0 then
+      if Is_Error (Result) or else Result = Cache_Entry_Not_Found then
          Node := null;
          return;
       end if;
@@ -162,6 +162,11 @@ package body Filesystems.Node_Cache is
       Node_Cache_Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
 
       Node := Node_Cache_Entries (Cache_Index).Node;
+
+      Log_Debug
+        ("Found node in system cache: '" & Node.all.Filename & "'",
+         Logging_Tags);
+
       Result := Success;
    exception
       when Constraint_Error =>
@@ -220,16 +225,18 @@ package body Filesystems.Node_Cache is
                    Filename)
             then
                Cache_Index := Index;
-               exit;
+               Result := Success;
+               return;
             end if;
          end if;
       end loop;
 
-      Result := Success;
+      Result := Cache_Entry_Not_Found;
    exception
       when Constraint_Error =>
          Log_Error
-           ("Constraint_Error: Find_Filesystem_Node_In_Cache", Logging_Tags);
+           ("Constraint_Error: Search_For_Filesystem_Node_In_Cache",
+            Logging_Tags);
          Result := Constraint_Exception;
    end Search_For_Filesystem_Node_In_Cache;
 

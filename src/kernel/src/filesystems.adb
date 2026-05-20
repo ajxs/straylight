@@ -147,69 +147,65 @@ package body Filesystems is
             end if;
          end if;
 
-         declare
-            --  Create a new string for the next path token.
-            --  This is ideal because string slicing in Ada keeps the original
-            --  string indexes, which can be more complicated to work with.
-            Next_Path_Token :
-              constant Filesystem_Path_T (1 .. Next_Token_Length) :=
-                Path (Next_Token_Start_Index .. Next_Token_End_Index - 1);
-         begin
-            Log_Debug
-              ("Current path token: '" & Next_Path_Token & "'", Logging_Tags);
+         --  Create a new string for the next path token.
+         --  This is ideal because string slicing in Ada keeps the original
+         --  string indexes, which can be more complicated to work with.
+         Next_Path_Token :
+           constant Filesystem_Path_T (1 .. Next_Token_Length) :=
+             Path (Next_Token_Start_Index .. Next_Token_End_Index - 1);
 
-            Find_Filesystem_Node_In_Cache
-              (Current_Filesystem,
-               Filesystem_Node_Parent_Index,
-               Next_Path_Token,
-               Filesystem_Node,
-               Result);
+         Log_Debug
+           ("Current path token: '" & Next_Path_Token & "'", Logging_Tags);
+
+         Find_Filesystem_Node_In_Cache
+           (Current_Filesystem,
+            Filesystem_Node_Parent_Index,
+            Next_Path_Token,
+            Filesystem_Node,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         if Result = Cache_Entry_Not_Found then
+            case Current_Filesystem.all.Filesystem_Type is
+               when Filesystem_Type_UStar =>
+                  Filesystems.UStar.Find_File
+                    (Current_Filesystem,
+                     Process,
+                     Next_Path_Token,
+                     Filesystem_Node_Parent,
+                     Filesystem_Node,
+                     Result);
+
+               when Filesystem_Type_Root  =>
+                  Filesystems.Root.Find_File
+                    (Current_Filesystem,
+                     Next_Path_Token,
+                     Filesystem_Node_Parent_Index,
+                     Filesystem_Node,
+                     Result);
+
+               when Filesystem_Type_FAT   =>
+                  Filesystems.FAT.Find_File
+                    (Current_Filesystem,
+                     Process,
+                     Next_Path_Token,
+                     Filesystem_Node_Parent,
+                     Filesystem_Node,
+                     Result);
+
+               when others                =>
+                  Log_Error
+                    ("Unsupported filesystem type: "
+                     & Current_Filesystem.all.Filesystem_Type'Image);
+                  Result := File_Not_Found;
+            end case;
+
             if Is_Error (Result) then
                return;
             end if;
-
-            if Filesystem_Node /= null then
-               Log_Debug ("Found node in system cache.", Logging_Tags);
-            else
-               case Current_Filesystem.all.Filesystem_Type is
-                  when Filesystem_Type_UStar =>
-                     Filesystems.UStar.Find_File
-                       (Current_Filesystem,
-                        Process,
-                        Next_Path_Token,
-                        Filesystem_Node_Parent,
-                        Filesystem_Node,
-                        Result);
-
-                  when Filesystem_Type_Root  =>
-                     Filesystems.Root.Find_File
-                       (Current_Filesystem,
-                        Next_Path_Token,
-                        Filesystem_Node_Parent_Index,
-                        Filesystem_Node,
-                        Result);
-
-                  when Filesystem_Type_FAT   =>
-                     Filesystems.FAT.Find_File
-                       (Current_Filesystem,
-                        Process,
-                        Next_Path_Token,
-                        Filesystem_Node_Parent,
-                        Filesystem_Node,
-                        Result);
-
-                  when others                =>
-                     Log_Error
-                       ("Unsupported filesystem type: "
-                        & Current_Filesystem.all.Filesystem_Type'Image);
-                     Result := File_Not_Found;
-               end case;
-
-               if Is_Error (Result) then
-                  return;
-               end if;
-            end if;
-         end;
+         end if;
 
          if Filesystem_Node = null then
             Log_Debug
