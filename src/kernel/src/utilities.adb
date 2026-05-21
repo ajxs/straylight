@@ -114,4 +114,16 @@ package body Utilities is
       return Bitmask;
    end Create_U32_Bitmask_From_Flags;
 
+   function To_Upper (C : Character) return Character is
+   begin
+      return
+        (if C in 'a' .. 'z'
+         then Character'Val (Character'Pos (C) - 32)
+         else C);
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: To_Upper");
+         return ' ';
+   end To_Upper;
+
 end Utilities;

@@ -49,4 +49,6 @@ package Utilities is
      (Flags : Bit_Flag_Array_T) return Unsigned_32
    with Pure_Function, Inline;
 
+   function To_Upper (C : Character) return Character;
+
 end Utilities;
