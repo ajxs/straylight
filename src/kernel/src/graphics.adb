@@ -2,6 +2,37 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 package body Graphics is
+   function Make_Colour
+     (Red   : Unsigned_8;
+      Green : Unsigned_8;
+      Blue  : Unsigned_8;
+      Alpha : Unsigned_8 := 255) return Colour_T is
+   begin
+      return
+        Shift_Left (Colour_T (Alpha), 24)
+        or Shift_Left (Colour_T (Blue), 16)
+        or Shift_Left (Colour_T (Green), 8)
+        or Colour_T (Red);
+   end Make_Colour;
+
+   procedure Fill_Framebuffer
+     (Framebuffer_Base_Address : Virtual_Address_T;
+      Framebuffer_Width        : Integer;
+      Framebuffer_Height       : Integer;
+      Colour                   : Colour_T) is
+   begin
+      Pixel_Data :
+        array (0 .. (Framebuffer_Width * Framebuffer_Height) - 1) of Colour_T
+      with Import, Alignment => 1, Address => Framebuffer_Base_Address;
+
+      for I in Pixel_Data'Range loop
+         Pixel_Data (I) := Colour;
+      end loop;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Fill_Framebuffer");
+   end Fill_Framebuffer;
+
    procedure Transfer_Image_Data
      (Source_Pixel_Data_Addr : Virtual_Address_T;
       Source_Buffer_Width    : Natural;
@@ -46,8 +77,7 @@ package body Graphics is
          Rows_To_Copy := Dest_Buffer_Height - Destination_Y;
       end if;
 
-      Copy_Pixel_Data :
-      declare
+      Copy_Pixel_Data : declare
          Source_Pixel_Data :
            array (0 .. (Source_Buffer_Width * Source_Buffer_Height) - 1)
            of Colour_T
