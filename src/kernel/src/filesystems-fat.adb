@@ -819,8 +819,7 @@ package body Filesystems.FAT is
 
       --  The UCS-2-encoded filename converted to the OS' native UTF-8 format.
       --  This is used to compare against the target filename.
-      UTF8_Encoded_Filename             : Filesystem_Node_Name_T;
-      UTF8_Encoded_Filename_Byte_Length : Natural := 0;
+      UTF8_Encoded_Filename : Filesystem_Node_Name_T;
    begin
       Log_Debug
         ("Searching directory for file '" & Filename & "'", Logging_Tags_FAT);
@@ -874,7 +873,6 @@ package body Filesystems.FAT is
                  (Entry_Filename,
                   Entry_Filename_Length,
                   UTF8_Encoded_Filename,
-                  UTF8_Encoded_Filename_Byte_Length,
                   Result);
                if Is_Error (Result) then
                   return;
@@ -882,16 +880,14 @@ package body Filesystems.FAT is
 
                Log_Debug
                  ("Parsed FAT file entry with filename: '"
-                  & UTF8_Encoded_Filename
-                      (1 .. UTF8_Encoded_Filename_Byte_Length)
+                  & UTF8_Encoded_Filename.Value
+                      (1 .. UTF8_Encoded_Filename.Byte_Length)
                   & "'",
                   Logging_Tags_FAT);
 
                --  Check if the parsed filename matches the target filename.
                if Does_Node_Name_Match_Path_Name
-                    (UTF8_Encoded_Filename,
-                     UTF8_Encoded_Filename_Byte_Length,
-                     Filename)
+                    (UTF8_Encoded_Filename, Filename)
                then
                   First_Cluster : constant Unsigned_32 :=
                     Get_First_Cluster_Of_Dir_Entry (Directory (Dir_Idx));
@@ -1212,11 +1208,10 @@ package body Filesystems.FAT is
    end Validate_FAT_Filesystem;
 
    procedure Read_FAT_Filename_Into_Filesystem_Node_Name
-     (FAT_Filename                     : Wide_String;
-      FAT_Filename_Length              : Natural;
-      Filesystem_Node_Name             : out Filesystem_Node_Name_T;
-      Filesystem_Node_Name_Byte_Length : out Integer;
-      Result                           : out Function_Result)
+     (FAT_Filename         : Wide_String;
+      FAT_Filename_Length  : Natural;
+      Filesystem_Node_Name : out Filesystem_Node_Name_T;
+      Result               : out Function_Result)
    is
       Current_Node_Name_Index : Natural := 1;
 
@@ -1226,8 +1221,7 @@ package body Filesystems.FAT is
       --  The length of the converted UTF-8 character in bytes.
       Converted_UCS2_Char_Byte_Length : Integer := 0;
    begin
-      Filesystem_Node_Name := [others => Character'Val (0)];
-      Filesystem_Node_Name_Byte_Length := 0;
+      Filesystem_Node_Name := Null_Filesystem_Node_Name;
 
       for I in 1 .. FAT_Filename_Length loop
          Encode_UCS2_Wide_Char_As_UTF8_Buffer
@@ -1236,10 +1230,10 @@ package body Filesystems.FAT is
             Converted_UCS2_Char_Byte_Length);
 
          for J in 1 .. Converted_UCS2_Char_Byte_Length loop
-            Filesystem_Node_Name_Byte_Length :=
-              Filesystem_Node_Name_Byte_Length + 1;
+            Filesystem_Node_Name.Byte_Length :=
+              Filesystem_Node_Name.Byte_Length + 1;
 
-            Filesystem_Node_Name (Current_Node_Name_Index) :=
+            Filesystem_Node_Name.Value (Current_Node_Name_Index) :=
               Converted_UCS2_Char_Buffer (J);
 
             Current_Node_Name_Index := Current_Node_Name_Index + 1;

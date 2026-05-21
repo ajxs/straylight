@@ -491,16 +491,16 @@ package body Filesystems is
       Node_Name : Filesystem_Path_T;
       Result    : out Function_Result) is
    begin
-      if Node_Name'Length > Filesystem_Node_Name_T'Last then
+      if Node_Name'Length > Filesystem_Node_Name_Max_Byte_Length then
          Log_Error
            ("Filesystem node name too long: " & Node_Name'Length'Image);
          Result := Invalid_Argument;
          return;
       end if;
 
-      Node.Filename_Byte_Length := Node_Name'Length;
+      Node.Filename.Byte_Length := Node_Name'Length;
       for Index in Node_Name'Range loop
-         Node.Filename (Index) := Node_Name (Index);
+         Node.Filename.Value (Index) := Node_Name (Index);
       end loop;
 
       Result := Success;
@@ -645,14 +645,13 @@ package body Filesystems is
    end Find_File_Handle;
 
    function Does_Node_Name_Match_Path_Name
-     (Node_Name             : Filesystem_Node_Name_T;
-      Node_Name_Byte_Length : Integer;
-      Path                  : Filesystem_Path_T) return Boolean is
+     (Node_Name : Filesystem_Node_Name_T; Path : Filesystem_Path_T)
+      return Boolean is
    begin
       return
-        Node_Name_Byte_Length = Path'Length
+        Node_Name.Byte_Length = Path'Length
         and then
-          Node_Name (Node_Name'First .. Node_Name_Byte_Length)
+          Node_Name.Value (Node_Name.Value'First .. Node_Name.Byte_Length)
           = Path (Path'Range);
    exception
       when Constraint_Error =>

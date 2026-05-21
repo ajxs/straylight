@@ -65,10 +65,15 @@ package Filesystems is
    subtype Filesystem_Path_T is String;
 
    --  A filesystem node's name is stored as a fixed-size array of
-   --  UTF-8 encoded bytes, with a separate length field indicating how
+   --  UTF-8 encoded bytes, with a length field indicating how
    --  many bytes are actually used.
-   subtype Filesystem_Node_Name_T is
-     Filesystem_Path_T (1 .. Filesystem_Node_Name_Max_Byte_Length);
+   type Filesystem_Node_Name_T is record
+      Value       : String (1 .. Filesystem_Node_Name_Max_Byte_Length);
+      Byte_Length : Natural := 0;
+   end record;
+
+   Null_Filesystem_Node_Name : constant Filesystem_Node_Name_T :=
+     (Value => [others => Character'Val (0)], Byte_Length => 0);
 
    --  Unique index of an individual node within its filesystem.
    --  This type is a generic identifier, which is only meaningful within the
@@ -81,9 +86,7 @@ package Filesystems is
       --  @TODO: In the future it might be worthwhile allocating the names of
       --  filesystem nodes on the heap, to avoid allocating the full maximum
       --  path length for every node in memory.
-      Filename             : Filesystem_Node_Name_T :=
-        [others => Character'Val (0)];
-      Filename_Byte_Length : Natural := 0;
+      Filename : Filesystem_Node_Name_T := Null_Filesystem_Node_Name;
 
       --  The index uniquely identifies this node within its filesystem.
       Index             : Filesystem_Node_Index_T := 0;
@@ -236,9 +239,8 @@ private
       return Boolean;
 
    function Does_Node_Name_Match_Path_Name
-     (Node_Name             : Filesystem_Node_Name_T;
-      Node_Name_Byte_Length : Integer;
-      Path                  : Filesystem_Path_T) return Boolean;
+     (Node_Name : Filesystem_Node_Name_T; Path : Filesystem_Path_T)
+      return Boolean;
 
    procedure Get_Next_Path_Component
      (Path                   : Filesystem_Path_T;

@@ -242,12 +242,15 @@ private
        Reserved     at 0 range 7 .. 7;
      end record;
 
+   subtype FAT_DOS_File_Name_T is String (1 .. 8);
+   subtype FAT_DOS_File_Ext_T is String (1 .. 3);
+
    ----------------------------------------------------------------------------
    --  DOS 8.3 Directory Entry
    ----------------------------------------------------------------------------
    type FAT_Directory_Entry_T is record
-      File_Name          : String (1 .. 8);
-      File_Ext           : String (1 .. 3);
+      File_Name          : FAT_DOS_File_Name_T;
+      File_Ext           : FAT_DOS_File_Ext_T;
       Attributes         : Directory_Entry_Attributes_T;
       Reserved           : Unsigned_8;
       Creation_Seconds   : Unsigned_8;
@@ -532,11 +535,10 @@ private
    --  UTF-8 encoded filesystem node name.
    ----------------------------------------------------------------------------
    procedure Read_FAT_Filename_Into_Filesystem_Node_Name
-     (FAT_Filename                     : Wide_String;
-      FAT_Filename_Length              : Natural;
-      Filesystem_Node_Name             : out Filesystem_Node_Name_T;
-      Filesystem_Node_Name_Byte_Length : out Integer;
-      Result                           : out Function_Result);
+     (FAT_Filename         : Wide_String;
+      FAT_Filename_Length  : Natural;
+      Filesystem_Node_Name : out Filesystem_Node_Name_T;
+      Result               : out Function_Result);
 
    procedure Read_Sectors_Into_Buffer
      (Filesystem             : Filesystem_Access;

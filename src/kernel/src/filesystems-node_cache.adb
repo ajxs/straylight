@@ -60,17 +60,16 @@ package body Filesystems.Node_Cache is
       end if;
 
       New_Node.all :=
-        (Index                => Index,
-         Parent_Index         => Parent_Index,
-         Filename             => [others => Character'Val (0)],
-         Filename_Byte_Length => 0,
-         Data_Location        => Data_Location,
-         Size                 => Size,
-         Node_Type            => Node_Type,
-         Parent_Filesystem    => Parent_Filesystem,
-         Mounted_Device       => Mounted_Device,
-         Mounted_Filesystem   => Mounted_Filesystem,
-         Handle_Count         => 0);
+        (Index              => Index,
+         Parent_Index       => Parent_Index,
+         Filename           => Null_Filesystem_Node_Name,
+         Data_Location      => Data_Location,
+         Size               => Size,
+         Node_Type          => Node_Type,
+         Parent_Filesystem  => Parent_Filesystem,
+         Mounted_Device     => Mounted_Device,
+         Mounted_Filesystem => Mounted_Filesystem,
+         Handle_Count       => 0);
 
       Set_Filesystem_Node_Name (New_Node.all, Filename, Result);
       if Is_Error (Result) then
@@ -164,7 +163,9 @@ package body Filesystems.Node_Cache is
       Node := Node_Cache_Entries (Cache_Index).Node;
 
       Log_Debug
-        ("Found node in system cache: '" & Node.all.Filename & "'",
+        ("Found node in system cache: '"
+         & Node.all.Filename.Value (1 .. Node.all.Filename.Byte_Length)
+         & "'",
          Logging_Tags);
 
       Result := Success;
@@ -220,9 +221,7 @@ package body Filesystems.Node_Cache is
                 Parent_Index = Node_Cache_Entries (Index).Node.all.Parent_Index
               and then
                 Does_Node_Name_Match_Path_Name
-                  (Node_Cache_Entries (Index).Node.all.Filename,
-                   Node_Cache_Entries (Index).Node.all.Filename_Byte_Length,
-                   Filename)
+                  (Node_Cache_Entries (Index).Node.all.Filename, Filename)
             then
                Cache_Index := Index;
                Result := Success;
