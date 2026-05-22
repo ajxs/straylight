@@ -128,21 +128,6 @@ package body Filesystems.UStar is
          Result := Constraint_Exception;
    end Find_File;
 
-   function Get_Filesystem_Node_Type_From_UStar_Typeflag
-     (Typeflag : Character) return Filesystem_Node_Type_T is
-   begin
-      case Typeflag is
-         when '0' | ASCII.NUL =>
-            return Filesystem_Node_Type_File;
-
-         when '5'             =>
-            return Filesystem_Node_Type_Directory;
-
-         when others          =>
-            return Filesystem_Node_Type_None;
-      end case;
-   end Get_Filesystem_Node_Type_From_UStar_Typeflag;
-
    function Get_UStar_String_Length (Str : USTAR_Header_Name) return Integer is
       Length : Integer := 0;
    begin

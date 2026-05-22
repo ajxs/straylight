@@ -62,6 +62,10 @@ private
    is (Header.Magic (1 .. 5) = "ustar");
 
    function Get_Filesystem_Node_Type_From_UStar_Typeflag
-     (Typeflag : Character) return Filesystem_Node_Type_T;
+     (Typeflag : Character) return Filesystem_Node_Type_T
+   is (case Typeflag is
+         when '0' | ASCII.NUL => Filesystem_Node_Type_File,
+         when '5'             => Filesystem_Node_Type_Directory,
+         when others          => Filesystem_Node_Type_None);
 
 end Filesystems.UStar;

@@ -55,7 +55,7 @@ package body Boot.Early is
       begin
          return
            Page_Aligned_Address_T
-             (Shift_Right (Unsigned_64 (To_Integer (Addr)), 12));
+             (Shift_Right (Address_To_Unsigned_64 (Addr), 12));
       exception
          when Constraint_Error =>
             return 0;
