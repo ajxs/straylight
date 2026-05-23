@@ -644,22 +644,6 @@ package body Filesystems is
       Result := Not_Found;
    end Find_File_Handle;
 
-   function Does_Node_Name_Match_Path_Name
-     (Node_Name : Filesystem_Node_Name_T; Path : Filesystem_Path_T)
-      return Boolean is
-   begin
-      return
-        Node_Name.Byte_Length = Path'Length
-        and then
-          Node_Name.Value (Node_Name.Value'First .. Node_Name.Byte_Length)
-          = Path (Path'Range);
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Does_Node_Name_Match_Path_Name", Logging_Tags);
-         return False;
-   end Does_Node_Name_Match_Path_Name;
-
    procedure Close_File_Unlocked
      (File_Handle : Process_File_Handle_Access; Result : out Function_Result)
    is

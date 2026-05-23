@@ -14,6 +14,7 @@ with Function_Results; use Function_Results;
 with Logging;          use Logging;
 with Memory;           use Memory;
 with Processes;        use Processes;
+with Utilities;        use Utilities;
 
 package Filesystems is
    pragma Preelaborate;
@@ -67,13 +68,13 @@ package Filesystems is
    --  A filesystem node's name is stored as a fixed-size array of
    --  UTF-8 encoded bytes, with a length field indicating how
    --  many bytes are actually used.
-   type Filesystem_Node_Name_T is record
-      Value       : String (1 .. Filesystem_Node_Name_Max_Byte_Length);
-      Byte_Length : Natural := 0;
-   end record;
+   type Filesystem_Node_Name_T is
+     new Fixed_Length_String_T (Filesystem_Node_Name_Max_Byte_Length);
 
    Null_Filesystem_Node_Name : constant Filesystem_Node_Name_T :=
-     (Value => [others => Character'Val (0)], Byte_Length => 0);
+     (Value       => [others => Character'Val (0)],
+      Max_Length  => Filesystem_Node_Name_Max_Byte_Length,
+      Byte_Length => 0);
 
    --  Unique index of an individual node within its filesystem.
    --  This type is a generic identifier, which is only meaningful within the
@@ -240,7 +241,8 @@ private
 
    function Does_Node_Name_Match_Path_Name
      (Node_Name : Filesystem_Node_Name_T; Path : Filesystem_Path_T)
-      return Boolean;
+      return Boolean
+   is (Compare_Fixed_Length_String_With_String (Node_Name, Path));
 
    procedure Get_Next_Path_Component
      (Path                   : Filesystem_Path_T;
