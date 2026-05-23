@@ -1,6 +1,7 @@
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Function_Results; use Function_Results;
+with Utilities;        use Utilities;
 
 package Boot.Devicetree is
    pragma Preelaborate;
@@ -66,7 +67,8 @@ private
 
    Maximum_String_Length : constant := 256;
 
-   subtype Devicetree_String_T is String (1 .. Maximum_String_Length);
+   subtype Devicetree_String_T is
+     Fixed_Length_String_T (Maximum_String_Length);
 
    procedure Parse_Structure_Block
      (Structure_Block_Address : Address;
@@ -77,7 +79,6 @@ private
      (Structure_Block_Address : Address;
       String_Table_Address    : Address;
       Property_Name           : out Devicetree_String_T;
-      Property_Name_Length    : out Natural;
       Property_Length         : out Unsigned_32;
       Property_Address        : out Address;
       Curr_Offset             : in out Storage_Offset);
@@ -85,22 +86,13 @@ private
    procedure Read_Property_Name_String
      (String_Table_Address : Address;
       String_Table_Offset  : Storage_Offset;
-      Property_Name        : out Devicetree_String_T;
-      Property_Name_Length : out Natural);
-
-   function Compare_Property_Name
-     (Property_Name        : Devicetree_String_T;
-      Property_Name_Length : Natural;
-      Target_Name          : String) return Boolean;
+      Property_Name        : out Devicetree_String_T);
 
    function Compare_Node_Name
-     (Node_Name        : Devicetree_String_T;
-      Node_Name_Length : Natural;
-      Target_Name      : String) return Boolean;
+     (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean;
 
    function Is_String_Value
-     (Property_Name : Devicetree_String_T; Property_Name_Length : Natural)
-      return Boolean;
+     (Property_Name : Devicetree_String_T) return Boolean;
 
    --  The current address and size cells context is captured in a stack, so
    --  that we can properly handle nested nodes that override the

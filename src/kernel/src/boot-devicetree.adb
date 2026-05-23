@@ -1,5 +1,3 @@
-with Utilities; use Utilities;
-
 package body Boot.Devicetree is
    procedure Parse_Devicetree
      (DTB_Address : Address; Result : out Function_Result)
@@ -102,7 +100,6 @@ package body Boot.Devicetree is
      (Structure_Block_Address : Address;
       String_Table_Address    : Address;
       Property_Name           : out Devicetree_String_T;
-      Property_Name_Length    : out Natural;
       Property_Length         : out Unsigned_32;
       Property_Address        : out Address;
       Curr_Offset             : in out Storage_Offset)
@@ -116,8 +113,7 @@ package body Boot.Devicetree is
       Read_Property_Name_String
         (String_Table_Address,
          Storage_Offset (Convert_BEU32_To_LEU32 (Property.Name_Offset)),
-         Property_Name,
-         Property_Name_Length);
+         Property_Name);
 
       Property_Length := Convert_BEU32_To_LEU32 (Property.Length);
       Property_Address := Structure_Block_Address + Curr_Offset + 8;
@@ -135,13 +131,11 @@ package body Boot.Devicetree is
    is
       Curr_Offset : Storage_Offset := 0;
 
-      Node_Name        : Devicetree_String_T;
-      Node_Name_Length : Natural := 0;
+      Node_Name : Devicetree_String_T;
 
-      Property_Name        : Devicetree_String_T;
-      Property_Name_Length : Natural := 0;
-      Property_Length      : Unsigned_32;
-      Property_Address     : Address;
+      Property_Name    : Devicetree_String_T;
+      Property_Length  : Unsigned_32;
+      Property_Address : Address;
 
       FDT_BEGIN_NODE : constant := 1;
       FDT_END_NODE   : constant := 2;
@@ -173,7 +167,7 @@ package body Boot.Devicetree is
             if Token_Value = FDT_BEGIN_NODE then
                Log_Debug ("START STRUCTURE", Devicetree_Logging_Tags);
                Curr_Offset := Curr_Offset + 4;
-               Node_Name_Length := 0;
+               Node_Name.Byte_Length := 0;
 
                Push_Cells_Context
                  (Cells_Context_Stack,
@@ -193,12 +187,12 @@ package body Boot.Devicetree is
                begin
                   for I in Name_String'Range loop
                      exit when Name_String (I) = ASCII.NUL;
-                     Node_Name (I) := Name_String (I);
-                     Node_Name_Length := I;
+                     Node_Name.Value (I) := Name_String (I);
+                     Node_Name.Byte_Length := I;
                   end loop;
 
                   Curr_Offset :=
-                    Curr_Offset + Storage_Offset (Node_Name_Length) + 1;
+                    Curr_Offset + Storage_Offset (Node_Name.Byte_Length) + 1;
                end Read_Name;
 
                while Curr_Offset mod 4 /= 0 loop
@@ -206,7 +200,9 @@ package body Boot.Devicetree is
                end loop;
 
                Log_Debug
-                 ("  Node Name: '" & Node_Name (1 .. Node_Name_Length) & "'",
+                 ("  Node Name: '"
+                  & Node_Name.Value (1 .. Node_Name.Byte_Length)
+                  & "'",
                   Devicetree_Logging_Tags);
 
             elsif Token_Value = FDT_END_NODE then
@@ -238,7 +234,6 @@ package body Boot.Devicetree is
                  (Structure_Block_Address,
                   String_Table_Address,
                   Property_Name,
-                  Property_Name_Length,
                   Property_Length,
                   Property_Address,
                   Curr_Offset);
@@ -247,13 +242,13 @@ package body Boot.Devicetree is
 
                Log_Debug
                  ("  Name: '"
-                  & Property_Name (1 .. Property_Name_Length)
+                  & Property_Name.Value (1 .. Property_Name.Byte_Length)
                   & "'",
                   Devicetree_Logging_Tags);
 
                if Property_Length = 0 then
                   Log_Debug ("  (No Value)", Devicetree_Logging_Tags);
-               elsif Is_String_Value (Property_Name, Property_Name_Length) then
+               elsif Is_String_Value (Property_Name) then
                   Read_Property_Value : declare
                      Prop_Value : String (1 .. Integer (Property_Length))
                      with Import, Address => Property_Address, Alignment => 1;
@@ -264,11 +259,11 @@ package body Boot.Devicetree is
                   end Read_Property_Value;
                end if;
 
-               if Compare_Property_Name
-                    (Property_Name, Property_Name_Length, "#size-cells")
+               if Compare_Fixed_Length_String_With_String
+                    (Property_Name, "#size-cells")
                  or else
-                   Compare_Property_Name
-                     (Property_Name, Property_Name_Length, "#address-cells")
+                   Compare_Fixed_Length_String_With_String
+                     (Property_Name, "#address-cells")
                then
                   Read_Cells_Property_Value : declare
                      Prop_Value : Unsigned_32
@@ -278,14 +273,12 @@ package body Boot.Devicetree is
                      Cells_Value : constant Unsigned_32 :=
                        Convert_BEU32_To_LEU32 (Prop_Value);
 
-                     if Compare_Property_Name
-                          (Property_Name, Property_Name_Length, "#size-cells")
+                     if Compare_Fixed_Length_String_With_String
+                          (Property_Name, "#size-cells")
                      then
                         Current_Cells_Context.Size_Cells := Cells_Value;
-                     elsif Compare_Property_Name
-                             (Property_Name,
-                              Property_Name_Length,
-                              "#address-cells")
+                     elsif Compare_Fixed_Length_String_With_String
+                             (Property_Name, "#address-cells")
                      then
                         Current_Cells_Context.Address_Cells := Cells_Value;
                      end if;
@@ -320,8 +313,7 @@ package body Boot.Devicetree is
    procedure Read_Property_Name_String
      (String_Table_Address : Address;
       String_Table_Offset  : Storage_Offset;
-      Property_Name        : out Devicetree_String_T;
-      Property_Name_Length : out Natural)
+      Property_Name        : out Devicetree_String_T)
    is
       S : array (0 .. Maximum_String_Length - 1) of Character
       with
@@ -330,51 +322,27 @@ package body Boot.Devicetree is
         Address    => String_Table_Address + String_Table_Offset,
         Alignment  => 1;
    begin
-      Property_Name_Length := 0;
+      Property_Name.Byte_Length := 0;
 
       for I in S'Range loop
          exit when S (I) = ASCII.NUL;
-         Property_Name (I + 1) := S (I);
-         Property_Name_Length := I + 1;
+         Property_Name.Value (I + 1) := S (I);
+         Property_Name.Byte_Length := I + 1;
       end loop;
 
    end Read_Property_Name_String;
 
-   function Compare_Property_Name
-     (Property_Name        : Devicetree_String_T;
-      Property_Name_Length : Natural;
-      Target_Name          : String) return Boolean is
-   begin
-      if Property_Name_Length /= Target_Name'Length then
-         return False;
-      end if;
-
-      for I in Target_Name'Range loop
-         if Property_Name (I) /= Target_Name (I) then
-            return False;
-         end if;
-      end loop;
-
-      return True;
-   exception
-      when others =>
-         Log_Error ("Constraint_Error: Compare_Property_Name");
-         return False;
-   end Compare_Property_Name;
-
    function Is_String_Value
-     (Property_Name : Devicetree_String_T; Property_Name_Length : Natural)
-      return Boolean is
+     (Property_Name : Devicetree_String_T) return Boolean is
    begin
       --  For simplicity, assume properties with names ending in
       --  "compatible", "model", or "device_type" are string values.
-      if Compare_Property_Name
-           (Property_Name, Property_Name_Length, "compatible")
+      if Compare_Fixed_Length_String_With_String (Property_Name, "compatible")
         or else
-          Compare_Property_Name (Property_Name, Property_Name_Length, "model")
+          Compare_Fixed_Length_String_With_String (Property_Name, "model")
         or else
-          Compare_Property_Name
-            (Property_Name, Property_Name_Length, "device_type")
+          Compare_Fixed_Length_String_With_String
+            (Property_Name, "device_type")
       then
          return True;
       end if;
@@ -438,18 +406,16 @@ package body Boot.Devicetree is
    end Pop_Cells_Context;
 
    function Compare_Node_Name
-     (Node_Name        : Devicetree_String_T;
-      Node_Name_Length : Natural;
-      Target_Name      : String) return Boolean is
+     (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean is
    begin
-      if Target_Name'Length > Node_Name_Length then
+      if Target_Name'Length > Node_Name.Byte_Length then
          return False;
       end if;
 
       for I in Target_Name'Range loop
-         if Node_Name (I) /= Target_Name (I) then
+         if Node_Name.Value (I) /= Target_Name (I) then
             return False;
-         elsif Node_Name (I) = ASCII.At_Sign then
+         elsif Node_Name.Value (I) = ASCII.At_Sign then
             --  If we've reached the '@' character in the node name, without
             --  finding any mismatches, consider it a match.
             return True;

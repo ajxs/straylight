@@ -126,4 +126,22 @@ package body Utilities is
          return ' ';
    end To_Upper;
 
+   function Compare_Fixed_Length_String_With_String
+     (Fixed_Length_String : Fixed_Length_String_T; Comparison : String)
+      return Boolean is
+   begin
+      if Fixed_Length_String.Byte_Length /= Comparison'Length then
+         return False;
+      end if;
+
+      return
+        Fixed_Length_String.Value (1 .. Fixed_Length_String.Byte_Length)
+        = Comparison;
+   exception
+      when others =>
+         Log_Error
+           ("Constraint_Error: Compare_Fixed_Length_String_With_String");
+         return False;
+   end Compare_Fixed_Length_String_With_String;
+
 end Utilities;

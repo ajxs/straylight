@@ -8,6 +8,15 @@ with Interfaces; use Interfaces;
 package Utilities is
    pragma Preelaborate;
 
+   type Fixed_Length_String_T (Max_Length : Positive) is record
+      Value       : String (1 .. Max_Length);
+      Byte_Length : Natural := 0;
+   end record;
+
+   function Compare_Fixed_Length_String_With_String
+     (Fixed_Length_String : Fixed_Length_String_T; Comparison : String)
+      return Boolean;
+
    function Convert_BEU32_To_LEU32 (BEU32 : Unsigned_32) return Unsigned_32
    is (Shift_Left (BEU32 and 16#0000_00FF#, 24)
        or Shift_Left (BEU32 and 16#0000_FF00#, 8)
