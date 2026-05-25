@@ -28,15 +28,14 @@ package Logging is
       Log_Tag_Idle,
       Log_Tag_Memory,
       Log_Tag_Memory_Page_Walking,
+      Log_Tag_Memory_Physical,
+      Log_Tag_Memory_Virtual,
       Log_Tag_Loader,
       Log_Tag_Locks,
-      Log_Tag_Physical_Memory_Allocation,
-      Log_Tag_Physical_Memory_Manager,
       Log_Tag_Processes,
       Log_Tag_Scheduler,
       Log_Tag_System_Calls,
-      Log_Tag_Traps,
-      Log_Tag_Virtual_Memory_Manager);
+      Log_Tag_Traps);
 
    type Log_Tags is array (Natural range <>) of Log_Tag_T;
 

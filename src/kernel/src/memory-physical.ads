@@ -35,9 +35,7 @@ package Memory.Physical is
 
 private
    Logging_Tags : constant Log_Tags :=
-     [Log_Tag_Memory,
-      Log_Tag_Physical_Memory_Allocation,
-      Log_Tag_Physical_Memory_Manager];
+     [Log_Tag_Memory, Log_Tag_Memory_Physical];
 
    Maximum_Physical_Memory_Blocks : constant := 1024;
 

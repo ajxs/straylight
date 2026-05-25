@@ -17,6 +17,8 @@ package Memory.Virtual is
    ----------------------------------------------------------------------------
    procedure Initialise_Kernel_Address_Space;
 
+   --  This would be declared as a function expression, except that it
+   --  references the private kernel memory space.
    function Get_Kernel_Address_Space_SATP return Unsigned_64;
 
    Maximum_Virtual_Memory_Mapping_Entries : constant := 128;
@@ -143,7 +145,7 @@ package Memory.Virtual is
 
 private
    Logging_Tags : constant Log_Tags :=
-     [Log_Tag_Memory, Log_Tag_Virtual_Memory_Manager];
+     [Log_Tag_Memory, Log_Tag_Memory_Virtual];
 
    --  This address space holds the canonical mapping structures for all
    --  kernel memory. When creating new userspace processes, the page
