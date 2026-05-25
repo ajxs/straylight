@@ -8,6 +8,10 @@ with Interfaces; use Interfaces;
 package Utilities is
    pragma Preelaborate;
 
+   --  Numerous kernel structures include strings, which require them to be
+   --  defined with fixed-bounds. Unfortunately this means that these string
+   --  types only record the 'maximum' string length, not its effective length.
+   --  This type can be used in those cases.
    type Fixed_Length_String_T (Max_Length : Positive) is record
       Value       : String (1 .. Max_Length);
       Byte_Length : Natural := 0;
