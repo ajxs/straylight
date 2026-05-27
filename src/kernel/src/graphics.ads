@@ -13,7 +13,11 @@ package Graphics is
      (Red   : Unsigned_8;
       Green : Unsigned_8;
       Blue  : Unsigned_8;
-      Alpha : Unsigned_8 := 255) return Colour_T;
+      Alpha : Unsigned_8 := 255) return Colour_T
+   is (Shift_Left (Colour_T (Alpha), 24)
+       or Shift_Left (Colour_T (Blue), 16)
+       or Shift_Left (Colour_T (Green), 8)
+       or Colour_T (Red));
 
    procedure Fill_Framebuffer
      (Framebuffer_Base_Address : Virtual_Address_T;
