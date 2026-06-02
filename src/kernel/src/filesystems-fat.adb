@@ -9,6 +9,8 @@ with Filesystems.FAT.FAT16;   use Filesystems.FAT.FAT16;
 with Memory.Kernel;           use Memory.Kernel;
 
 package body Filesystems.FAT is
+   --  @TODO: Should file creation be part of the 'find file' interface?
+   --  e.g. 'create if not found'?
    procedure Create_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -49,8 +51,30 @@ package body Filesystems.FAT is
 
       Log_Debug ("Creating file: '" & Filename & "'", Logging_Tags_FAT);
 
-      New_Node := null;
-      Result := Not_Supported;
+      declare
+         Filesystem_Info : FAT_Filesystem_Info_T
+         with
+           Import,
+           Alignment => 1,
+           Address   => Filesystem.all.Filesystem_Meta_Info_Address;
+      begin
+         case Filesystem_Info.FAT_Type is
+            when FAT_Type_FAT16 =>
+               Create_File_FAT16
+                 (Filesystem,
+                  Reading_Process,
+                  Filesystem_Info,
+                  Filename,
+                  Parent_Node,
+                  New_Node,
+                  Result);
+
+            when others         =>
+               Log_Error ("FAT type not supported", Logging_Tags_FAT);
+               New_Node := null;
+               Result := Not_Supported;
+         end case;
+      end;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Create_File", Logging_Tags_FAT);
@@ -86,109 +110,35 @@ package body Filesystems.FAT is
       end if;
 
       declare
-         FAT_Filesystem_Info : FAT_Filesystem_Info_T
+         Filesystem_Info : FAT_Filesystem_Info_T
          with
            Import,
            Alignment => 1,
            Address   => Filesystem.all.Filesystem_Meta_Info_Address;
       begin
-         if Parent_Node = null
-           or else
-             Parent_Node.all.Node_Type
-             = Filesystem_Node_Type_Mounted_Filesystem
-         then
-            Find_File_In_Root_Directory
-              (Filesystem,
-               Reading_Process,
-               FAT_Filesystem_Info,
-               Filename,
-               Parent_Node,
-               Found_Node,
-               Result);
-         else
-            Find_File_In_Directory
-              (Filesystem,
-               Reading_Process,
-               FAT_Filesystem_Info,
-               Filename,
-               Parent_Node,
-               Found_Node,
-               Result);
-         end if;
+         case Filesystem_Info.FAT_Type is
+            when FAT_Type_FAT16 =>
+               Find_File_FAT16
+                 (Filesystem,
+                  Reading_Process,
+                  Filesystem_Info,
+                  Filename,
+                  Parent_Node,
+                  Found_Node,
+                  Result);
 
-         if Is_Error (Result) then
-            Found_Node := null;
-            return;
-         end if;
+            when others         =>
+               Log_Error ("FAT type not supported", Logging_Tags_FAT);
+               Found_Node := null;
+               Result := Not_Supported;
+         end case;
       end;
-
-      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Find_File", Logging_Tags_FAT);
          Found_Node := null;
          Result := Constraint_Exception;
    end Find_File;
-
-   procedure Find_File_In_Directory
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
-      Result          : out Function_Result) is
-   begin
-      if Filesystem_Info.FAT_Type = FAT_Type_FAT16 then
-         Find_File_In_FAT16_Directory
-           (Filesystem,
-            Reading_Process,
-            Filesystem_Info,
-            Filename,
-            Parent_Node,
-            Filesystem_Node,
-            Result);
-      else
-         Log_Error ("FAT type not supported", Logging_Tags_FAT);
-         Filesystem_Node := null;
-         Result := Not_Supported;
-      end if;
-   end Find_File_In_Directory;
-
-   procedure Find_File_In_Root_Directory
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
-      Result          : out Function_Result) is
-   begin
-      if Filesystem_Info.FAT_Type = FAT_Type_FAT16 then
-         Find_File_In_FAT16_Root_Directory
-           (Filesystem,
-            Reading_Process,
-            Filesystem_Info,
-            Filename,
-            Parent_Node,
-            Filesystem_Node,
-            Result);
-         if Is_Error (Result) then
-            Log_Error
-              ("Error reading root dir: " & Result'Image, Logging_Tags_FAT);
-         end if;
-      else
-         Log_Error ("FAT type not supported", Logging_Tags_FAT);
-         Filesystem_Node := null;
-         Result := Not_Supported;
-      end if;
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Find_File_In_Root_Directory", Logging_Tags_FAT);
-         Filesystem_Node := null;
-         Result := Constraint_Exception;
-   end Find_File_In_Root_Directory;
 
    pragma
      Warnings
@@ -248,26 +198,6 @@ package body Filesystems.FAT is
          Log_Error ("Constraint_Error: Populate_Filesystem_Meta_Info");
          Result := Constraint_Exception;
    end Populate_Filesystem_Meta_Info;
-
-   function Get_Filesystem_Node_First_FAT_Cluster
-     (Node : Filesystem_Node_Access) return Unsigned_32 is
-   begin
-      return Get_First_Cluster_From_Index (Node.all.Index);
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Filesystem_Node_First_FAT_Cluster");
-         return 0;
-   end Get_Filesystem_Node_First_FAT_Cluster;
-
-   function Get_First_Cluster_From_Index
-     (Index : Filesystem_Node_Index_T) return Unsigned_32 is
-   begin
-      return Unsigned_32 (Shift_Right (Index, 32));
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_First_Cluster_From_Index");
-         return 0;
-   end Get_First_Cluster_From_Index;
 
    function Is_Cluster_Bad
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean is
@@ -699,11 +629,11 @@ package body Filesystems.FAT is
    begin
       case Filesystem_Info.FAT_Type is
          when FAT_Type_FAT16 =>
-            Read_FAT16_Table_Entry
+            Read_Table_Entry_FAT16
               (Filesystem,
                Reading_Process,
                Filesystem_Info,
-               Cluster,
+               Unsigned_16 (Cluster),
                FAT16_Table_Entry,
                Result);
 
@@ -801,12 +731,13 @@ package body Filesystems.FAT is
    end Read_LFN_Entry_Filename;
 
    procedure Search_FAT_Directory_For_File
-     (Filesystem      : Filesystem_Access;
-      Directory       : Directory_Index_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
-      Result          : out Function_Result)
+     (Filesystem         : Filesystem_Access;
+      Directory          : Directory_Index_T;
+      Filename           : Filesystem_Path_T;
+      Parent_Node        : Filesystem_Node_Access;
+      Filesystem_Node    : out Filesystem_Node_Access;
+      Last_Entry_Reached : out Boolean;
+      Result             : out Function_Result)
    is
       --  Whether a long file name entry is currently being read.
       Entry_Has_Long_Filename : Boolean := False;
@@ -823,6 +754,12 @@ package body Filesystems.FAT is
       Log_Debug
         ("Searching directory for file '" & Filename & "'", Logging_Tags_FAT);
 
+      --  Track when we've reached the last directory entry, which is
+      --  indicated by a special marker in the first byte of the directory
+      --  entry. This is done so that a caller can know when to stop scanning
+      --  directory entry clusters.
+      Last_Entry_Reached := False;
+
       Filesystem_Node := null;
 
       for Dir_Idx in 1 .. Directory'Length loop
@@ -831,6 +768,7 @@ package body Filesystems.FAT is
 
          if Is_Last_Directory_Entry (Directory (Dir_Idx)) then
             Log_Debug ("Reached last directory entry.", Logging_Tags_FAT);
+            Last_Entry_Reached := True;
             exit;
          end if;
 
@@ -1247,61 +1185,6 @@ package body Filesystems.FAT is
 
          Result := Constraint_Exception;
    end Read_FAT_Filename_Into_Filesystem_Node_Name;
-
-   procedure Read_Sectors_Into_Buffer
-     (Filesystem             : Filesystem_Access;
-      Filesystem_Info        : FAT_Filesystem_Info_T;
-      Reading_Process        : in out Process_Control_Block_T;
-      Start_Sector           : Sector_Index_T;
-      Sector_Count           : Natural;
-      Buffer_Virtual_Address : Virtual_Address_T;
-      Result                 : out Function_Result)
-   is
-      Current_Read_Sector : Sector_Index_T := 0;
-      Sector_Address      : Virtual_Address_T := Null_Address;
-
-      Destination_Virtual_Address : Virtual_Address_T :=
-        Buffer_Virtual_Address;
-   begin
-      Current_Read_Sector := Start_Sector;
-
-      for Sector_Idx in 1 .. Sector_Count loop
-         --  Read each FAT logical sector into memory.
-         Read_Sector_From_Filesystem
-           (Filesystem,
-            Reading_Process,
-            Current_Read_Sector,
-            Filesystem_Info.Bytes_Per_Sector,
-            Sector_Address,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Copy
-           (Destination_Virtual_Address,
-            Sector_Address,
-            Filesystem_Info.Bytes_Per_Sector);
-
-         Release_Sector
-           (Filesystem,
-            Current_Read_Sector,
-            Filesystem_Info.Bytes_Per_Sector,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         --  Increment the device read offset.
-         Current_Read_Sector := Current_Read_Sector + 1;
-
-         Destination_Virtual_Address :=
-           Destination_Virtual_Address
-           + Storage_Offset (Filesystem_Info.Bytes_Per_Sector);
-      end loop;
-
-      Result := Success;
-   end Read_Sectors_Into_Buffer;
 
    procedure Write_File
      (Filesystem      : Filesystem_Access;

@@ -32,5 +32,12 @@ int main()
 
 	print_to_serial("Wrote to file!\n");
 
+	FILE *new_file = fopen("/Devices/Disk/nonexistent_file.txt", "w+");
+	if (new_file == NULL)
+	{
+		print_to_serial("Failed to create file!\n");
+		return EXIT_FAILURE;
+	}
+
 	return EXIT_SUCCESS;
 }

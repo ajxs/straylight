@@ -315,8 +315,28 @@ package body Filesystems is
          return;
       elsif Result = File_Not_Found then
          Log_Debug ("File not found: '" & Path & "'", Logging_Tags);
-         File_Handle := null;
-         return;
+
+         if not Mode.Create then
+            File_Handle := null;
+            return;
+         end if;
+
+         Log_Debug ("Creating missing file: '" & Path & "'", Logging_Tags);
+         Create_File (Process, Path, Result);
+         if Is_Error (Result) then
+            File_Handle := null;
+            return;
+         end if;
+
+         Find_File (Process, Path, Filesystem_Node, Result);
+         if Is_Error (Result) then
+            File_Handle := null;
+            return;
+         elsif Result = File_Not_Found then
+            Log_Error ("File not found after creation: '" & Path & "'");
+            File_Handle := null;
+            return;
+         end if;
       end if;
 
       Log_Debug ("File found: '" & Path & "'", Logging_Tags);
@@ -732,7 +752,7 @@ package body Filesystems is
          & "  Bytes_To_Write: "
          & Bytes_To_Write'Image
          & ASCII.LF
-         & "  File_Position: "
+         & "  File_Position:  "
          & File_Handle.all.Position'Image,
          Logging_Tags);
 
@@ -872,8 +892,8 @@ package body Filesystems is
           Path (Path'First .. Path'First + Parent_Path_Length - 1);
 
       Child_File_Name :
-        constant Filesystem_Path_T (1 .. Path'Last - Parent_Path_Length) :=
-          Path (Path'First + Parent_Path_Length .. Path'Last);
+        constant Filesystem_Path_T (1 .. Path'Last - Parent_Path_Length - 1) :=
+          Path (Path'First + Parent_Path_Length + 1 .. Path'Last);
 
       Log_Debug
         ("Filesystems.Create_File: "

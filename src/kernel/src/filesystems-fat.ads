@@ -281,9 +281,6 @@ private
        File_Size          at 0 range 224 .. 255;
      end record;
 
-   ----------------------------------------------------------------------------
-   --  Directory Index array type.
-   ----------------------------------------------------------------------------
    type Directory_Index_T is array (Natural range <>) of FAT_Directory_Entry_T
    with Convention => C, Pack;
 
@@ -309,17 +306,13 @@ private
    ----------------------------------------------------------------------------
    type Long_File_Name_Sequence is record
       Number     : File_Name_Number_T;
-      Empty_1    : Boolean := False;
       Last_Entry : Boolean;
-      Empty_2    : Boolean := False;
    end record
    with Size => 8;
    for Long_File_Name_Sequence use
      record
        Number     at 0 range 0 .. 4;
-       Empty_1    at 0 range 5 .. 5;
        Last_Entry at 0 range 6 .. 6;
-       Empty_2    at 0 range 7 .. 7;
      end record;
 
    ----------------------------------------------------------------------------
@@ -348,6 +341,10 @@ private
        Name_3        at 0 range 224 .. 255;
      end record;
 
+   type LFN_Directory_Index_T is
+     array (Natural range <>) of Long_File_Name_Directory_Entry
+   with Convention => C, Pack;
+
    function Is_Last_Directory_Entry
      (Dir_Entry : FAT_Directory_Entry_T) return Boolean
    is (Dir_Entry.File_Name (1) = ASCII.NUL)
@@ -356,6 +353,12 @@ private
    function Is_Unused_Directory_Entry
      (Dir_Entry : FAT_Directory_Entry_T) return Boolean
    is (Character'Pos (Dir_Entry.File_Name (1)) = 16#E5#)
+   with Pure_Function, Inline;
+
+   function Is_Free_Directory_Entry
+     (Dir_Entry : FAT_Directory_Entry_T) return Boolean
+   is (Is_Last_Directory_Entry (Dir_Entry)
+       or else Is_Unused_Directory_Entry (Dir_Entry))
    with Pure_Function, Inline;
 
    function Is_LFN_Directory_Entry
@@ -424,31 +427,14 @@ private
       Filesystem_Info : out FAT_Filesystem_Info_T;
       Result          : out Function_Result);
 
-   procedure Find_File_In_Root_Directory
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
-      Result          : out Function_Result);
-
-   procedure Find_File_In_Directory
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
-      Result          : out Function_Result);
-
    procedure Search_FAT_Directory_For_File
-     (Filesystem      : Filesystem_Access;
-      Directory       : Directory_Index_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      Filesystem_Node : out Filesystem_Node_Access;
-      Result          : out Function_Result);
+     (Filesystem         : Filesystem_Access;
+      Directory          : Directory_Index_T;
+      Filename           : Filesystem_Path_T;
+      Parent_Node        : Filesystem_Node_Access;
+      Filesystem_Node    : out Filesystem_Node_Access;
+      Last_Entry_Reached : out Boolean;
+      Result             : out Function_Result);
 
    ----------------------------------------------------------------------------
    --  Reads the portion of a file name from a long filename entry.
@@ -502,12 +488,6 @@ private
    is (Shift_Left (Unsigned_64 (First_Cluster), 32)
        + Unsigned_64 (Directory_Index));
 
-   function Get_Filesystem_Node_First_FAT_Cluster
-     (Node : Filesystem_Node_Access) return Unsigned_32;
-
-   function Get_First_Cluster_From_Index
-     (Index : Filesystem_Node_Index_T) return Unsigned_32;
-
    function Get_Node_Type_From_Directory_Entry
      (Dir_Entry : FAT_Directory_Entry_T) return Filesystem_Node_Type_T;
 
@@ -539,14 +519,5 @@ private
       FAT_Filename_Length  : Natural;
       Filesystem_Node_Name : out Filesystem_Node_Name_T;
       Result               : out Function_Result);
-
-   procedure Read_Sectors_Into_Buffer
-     (Filesystem             : Filesystem_Access;
-      Filesystem_Info        : FAT_Filesystem_Info_T;
-      Reading_Process        : in out Process_Control_Block_T;
-      Start_Sector           : Sector_Index_T;
-      Sector_Count           : Natural;
-      Buffer_Virtual_Address : Virtual_Address_T;
-      Result                 : out Function_Result);
 
 end Filesystems.FAT;

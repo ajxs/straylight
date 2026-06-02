@@ -187,4 +187,26 @@ package body Filesystems.FAT.DOS_Filenames is
          Result := Constraint_Exception;
    end Create_DOS_Filename;
 
+   function Get_DOS_Filename_Checksum
+     (DOS_Filename : FAT_DOS_File_Name_T; DOS_Extension : FAT_DOS_File_Ext_T)
+      return Unsigned_8
+   is
+      Result : Unsigned_8 := 0;
+   begin
+      Combined_Name : constant String := DOS_Filename & DOS_Extension;
+
+      for I in Combined_Name'Range loop
+         if I = Combined_Name'First then
+            Result := 0;
+         end if;
+
+         Result :=
+           (if (Result and 1) /= 0 then 16#80# else 0)
+           + Shift_Right (Result, 1)
+           + Character'Pos (Combined_Name (I));
+      end loop;
+
+      return Result;
+   end Get_DOS_Filename_Checksum;
+
 end Filesystems.FAT.DOS_Filenames;
