@@ -26,6 +26,9 @@ package body Filesystems.FAT.FAT16 is
          First_Cluster_Low  => 0,
          File_Size          => 0);
 
+      --  @TODO: After creating the DOS filename, if the conversion was lossy
+      --  we should check if the resulting DOS filename collides with any
+      --  existing DOS filenames in the same directory.
       Create_DOS_Filename
         (Filename,
          Directory_Entry.File_Name,
@@ -127,20 +130,21 @@ package body Filesystems.FAT.FAT16 is
          Result := Constraint_Exception;
    end Create_LFN_Directory_Entry;
 
-   procedure Get_Number_Of_LFN_Entries_Needed
-     (Filename           : Filesystem_Path_T;
-      LFN_Entries_Needed : out Natural;
-      Result             : out Function_Result) is
+   procedure Get_Number_Of_LFN_Entries_Needed_For_Filename
+     (Filename                     : Filesystem_Path_T;
+      Number_Of_LFN_Entries_Needed : out Natural;
+      Result                       : out Function_Result) is
    begin
-      LFN_Entries_Needed :=
+      Number_Of_LFN_Entries_Needed :=
         (Filename'Length / 13) + (if Filename'Length mod 13 = 0 then 0 else 1);
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Number_Of_LFN_Entries_Needed");
-         LFN_Entries_Needed := 0;
+         Log_Error
+           ("Constraint_Error: Get_Number_Of_LFN_Entries_Needed_For_Filename");
+         Number_Of_LFN_Entries_Needed := 0;
          Result := Constraint_Exception;
-   end Get_Number_Of_LFN_Entries_Needed;
+   end Get_Number_Of_LFN_Entries_Needed_For_Filename;
 
    procedure Create_Long_File_Name_Entries
      (Filename                 : Filesystem_Path_T;
@@ -175,6 +179,48 @@ package body Filesystems.FAT.FAT16 is
          Result := Constraint_Exception;
    end Create_Long_File_Name_Entries;
 
+   function Are_LFN_Entries_Required
+     (Filename : Filesystem_Path_T) return Boolean
+   is
+      Last_Dot_Index : Integer := 0;
+   begin
+      --  If any character in the filename is lowercase, we need LFN entries.
+      --  Technically, Windows NT supports mixed-case DOS entries, but for
+      --  the sake of simplicity this driver only uses uppercase characters
+      --  in DOS filename entries.
+      for I in Filename'Range loop
+         if Filename (I) in 'a' .. 'z' then
+            return True;
+         end if;
+      end loop;
+
+      --  Find the last dot instance in the filename.
+      for I in reverse Filename'Range loop
+         if Filename (I) = '.' then
+            Last_Dot_Index := I;
+            exit;
+         end if;
+      end loop;
+
+      if Last_Dot_Index = 0 then
+         return Filename'Length > 8;
+      end if;
+
+      if Last_Dot_Index - Filename'First > 8 then
+         return True;
+      end if;
+
+      if Filename'Last - Last_Dot_Index > 3 then
+         return True;
+      end if;
+
+      return False;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Are_LFN_Entries_Required");
+         return False;
+   end Are_LFN_Entries_Required;
+
    procedure Create_File_In_Root_Directory_FAT16
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -184,16 +230,35 @@ package body Filesystems.FAT.FAT16 is
       New_Node        : out Filesystem_Node_Access;
       Result          : out Function_Result)
    is
+      pragma Unreferenced (Parent_Node, New_Node);
+
       Sector_Address      : Virtual_Address_T := Null_Address;
       Current_Read_Sector : Sector_Index_T := 0;
 
-      New_Entry_Created   : Boolean := False;
-      New_Dir_Entry_Index : Natural := 0;
-   begin
-      pragma Unreferenced (Parent_Node, New_Node);
+      Was_New_Entry_Created : Boolean := False;
+      New_Dir_Entry_Index   : Natural := 0;
 
+      Number_Of_LFN_Entries_Needed : Natural := 0;
+   begin
       Current_Read_Sector := Filesystem_Info.Root_Directory_Sector;
 
+      LFN_Entries_Are_Required : constant Boolean :=
+        Are_LFN_Entries_Required (Filename);
+
+      if LFN_Entries_Are_Required then
+         Get_Number_Of_LFN_Entries_Needed_For_Filename
+           (Filename, Number_Of_LFN_Entries_Needed, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+      end if;
+
+      Total_Entries_Needed : constant Natural :=
+        Number_Of_LFN_Entries_Needed + 1;
+
+      --  A current limitation of this implementation is that LFN entries don't
+      --  span across sector boundaries. This may be resolved in a future
+      --  update.
       Read_Sectors_Loop : for I in
         1 .. Filesystem_Info.Root_Directory_Sector_Count
       loop
@@ -213,19 +278,12 @@ package body Filesystems.FAT.FAT16 is
             Directory : Directory_Index_T (1 .. 16)
             with Import, Address => Sector_Address, Alignment => 1;
 
-            Number_Of_Entries_Needed : Natural := 0;
             Current_Free_Entry_Count : Natural := 0;
             DOS_Filename_Checksum    : Unsigned_8 := 0;
          begin
-            Get_Number_Of_LFN_Entries_Needed
-              (Filename, Number_Of_Entries_Needed, Result);
-            if Is_Error (Result) then
-               return;
-            end if;
-
             Log_Debug
               ("Scanning for "
-               & Number_Of_Entries_Needed'Image
+               & Total_Entries_Needed'Image
                & " free directory entries.",
                Logging_Tags_FAT);
 
@@ -240,7 +298,7 @@ package body Filesystems.FAT.FAT16 is
                   end if;
 
                   Current_Free_Entry_Count := Current_Free_Entry_Count + 1;
-                  if Current_Free_Entry_Count = Number_Of_Entries_Needed then
+                  if Current_Free_Entry_Count = Total_Entries_Needed then
                      Log_Debug
                        ("Found "
                         & Current_Free_Entry_Count'Image
@@ -249,7 +307,7 @@ package body Filesystems.FAT.FAT16 is
                         Logging_Tags_FAT);
 
                      DOS_Entry_Index : constant Natural :=
-                       New_Dir_Entry_Index + Number_Of_Entries_Needed;
+                       New_Dir_Entry_Index + Number_Of_LFN_Entries_Needed;
 
                      Create_DOS_Directory_Entry
                        (Filename,
@@ -260,15 +318,17 @@ package body Filesystems.FAT.FAT16 is
                         return;
                      end if;
 
-                     Create_Long_File_Name_Entries
-                       (Filename,
-                        Sector_Address,
-                        Number_Of_Entries_Needed,
-                        New_Dir_Entry_Index,
-                        DOS_Filename_Checksum,
-                        Result);
-                     if Is_Error (Result) then
-                        return;
+                     if LFN_Entries_Are_Required then
+                        Create_Long_File_Name_Entries
+                          (Filename,
+                           Sector_Address,
+                           Number_Of_LFN_Entries_Needed,
+                           New_Dir_Entry_Index,
+                           DOS_Filename_Checksum,
+                           Result);
+                        if Is_Error (Result) then
+                           return;
+                        end if;
                      end if;
 
                      Write_Sector_To_Filesystem
@@ -281,15 +341,13 @@ package body Filesystems.FAT.FAT16 is
                         return;
                      end if;
 
-                     New_Entry_Created := True;
+                     Was_New_Entry_Created := True;
                      exit Parse_Directory_Loop;
                   end if;
                else
                   Current_Free_Entry_Count := 0;
                end if;
-
             end loop Parse_Directory_Loop;
-
          end Parse_Directory_Buffer;
 
          Release_Sector
@@ -301,7 +359,7 @@ package body Filesystems.FAT.FAT16 is
             return;
          end if;
 
-         if New_Entry_Created then
+         if Was_New_Entry_Created then
             Result := Success;
             return;
          end if;
@@ -309,6 +367,8 @@ package body Filesystems.FAT.FAT16 is
          --  Increment the current read sector.
          Current_Read_Sector := Current_Read_Sector + 1;
       end loop Read_Sectors_Loop;
+
+      Result := No_Free_Entries;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Create_File_In_Root_Directory_FAT16");

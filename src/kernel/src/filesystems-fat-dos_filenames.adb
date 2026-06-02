@@ -196,10 +196,6 @@ package body Filesystems.FAT.DOS_Filenames is
       Combined_Name : constant String := DOS_Filename & DOS_Extension;
 
       for I in Combined_Name'Range loop
-         if I = Combined_Name'First then
-            Result := 0;
-         end if;
-
          Result :=
            (if (Result and 1) /= 0 then 16#80# else 0)
            + Shift_Right (Result, 1)
