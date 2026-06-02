@@ -25,6 +25,9 @@ private package Filesystems.Node_Cache is
      (Node : Filesystem_Node_Access; Result : out Function_Result);
 
 private
+   Logging_Tags_Node_Cache : constant Log_Tags :=
+     [Log_Tag_Filesystems_Node_Cache];
+
    type Filesystem_Node_Cache_Entry_T is record
       Node        : Filesystem_Node_Access := null;
       Last_Access : Unsigned_64 := 0;

@@ -83,7 +83,7 @@ package body Filesystems.Node_Cache is
 
       Log_Debug
         ("Added new filesystem node to cache at index: " & Cache_Index'Image,
-         Logging_Tags);
+         Logging_Tags_Node_Cache);
 
       Result := Success;
    exception
@@ -129,6 +129,14 @@ package body Filesystems.Node_Cache is
       Cache_Index := 0;
 
       for Index in Node_Cache_Entries'Range loop
+         if Node_Cache_Entries (Index).Node = null then
+            Cache_Index := Index;
+            Result := Success;
+            return;
+         end if;
+      end loop;
+
+      for Index in Node_Cache_Entries'Range loop
          if Can_Filesystem_Cache_Entry_Be_Overwritten
               (Node_Cache_Entries (Index))
          then
@@ -151,6 +159,12 @@ package body Filesystems.Node_Cache is
    is
       Cache_Index : Natural := 0;
    begin
+      Log_Debug
+        ("Searching for filesystem node in cache with name: '"
+         & Filename
+         & "'",
+         Logging_Tags_Node_Cache);
+
       Search_For_Filesystem_Node_In_Cache
         (Filesystem, Parent_Index, Filename, Cache_Index, Result);
       if Is_Error (Result) or else Result = Cache_Entry_Not_Found then
@@ -166,7 +180,7 @@ package body Filesystems.Node_Cache is
         ("Found node in system cache: '"
          & Node.all.Filename.Value (1 .. Node.all.Filename.Byte_Length)
          & "'",
-         Logging_Tags);
+         Logging_Tags_Node_Cache);
 
       Result := Success;
    exception
@@ -235,7 +249,7 @@ package body Filesystems.Node_Cache is
       when Constraint_Error =>
          Log_Error
            ("Constraint_Error: Search_For_Filesystem_Node_In_Cache",
-            Logging_Tags);
+            Logging_Tags_Node_Cache);
          Result := Constraint_Exception;
    end Search_For_Filesystem_Node_In_Cache;
 

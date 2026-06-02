@@ -19,6 +19,7 @@ package Logging is
       Log_Tag_Filesystems,
       Log_Tag_Filesystems_Block_Cache,
       Log_Tag_Filesystems_FAT,
+      Log_Tag_Filesystems_Node_Cache,
       Log_Tag_Filesystems_Root,
       Log_Tag_Filesystems_UStar,
       Log_Tag_Graphics,
