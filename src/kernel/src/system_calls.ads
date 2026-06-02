@@ -6,7 +6,6 @@
 with Ada.Unchecked_Conversion;
 with Interfaces; use Interfaces;
 
-with Filesystems;      use Filesystems;
 with Function_Results; use Function_Results;
 with Logging;          use Logging;
 with Processes;        use Processes;
@@ -58,9 +57,6 @@ private
 
    procedure Handle_Update_Framebuffer_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
-
-   function Unsigned_64_To_File_Open_Mode
-     (Mode : Unsigned_64) return File_Open_Mode_T;
 
    Syscall_Result_Success : constant := 0;
 

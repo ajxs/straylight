@@ -14,4 +14,6 @@ void *memset(void *dest, int value, size_t size);
 
 size_t strlen(const char *str);
 
+int strcmp(const char *lhs, const char *rhs);
+
 #endif

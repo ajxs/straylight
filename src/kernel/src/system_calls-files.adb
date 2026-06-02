@@ -34,6 +34,15 @@ package body System_Calls.Files is
 
       File_Open_Mode :=
         Unsigned_64_To_File_Open_Mode (Trap_Context.Gp_Registers (a3));
+      if not Validate_File_Open_Mode (File_Open_Mode) then
+         Log_Error ("Invalid file open mode");
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64
+             (Syscall_Error_Invalid_Argument);
+
+         goto Syscall_Unsuccessful_No_Kernel_Error;
+      end if;
 
       if not Is_Valid_Userspace_Address_Range
                (Path_String_Address, Path_String_Length)

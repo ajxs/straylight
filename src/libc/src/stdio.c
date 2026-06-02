@@ -21,12 +21,49 @@ int fclose(FILE *stream)
 
 int feof(FILE *stream) { return stream->eof ? 1 : 0; }
 
+#define OPEN_MODE_FLAG_READ (1 << 0)
+#define OPEN_MODE_FLAG_WRITE (1 << 1)
+#define OPEN_MODE_FLAG_CREATE (1 << 2)
+
+static uint64_t parse_mode_string(const char *mode)
+{
+	if (strcmp(mode, "r") == 0)
+	{
+		return OPEN_MODE_FLAG_READ;
+	}
+
+	if (strcmp(mode, "w") == 0)
+	{
+		return OPEN_MODE_FLAG_WRITE | OPEN_MODE_FLAG_CREATE;
+	}
+
+	if (strcmp(mode, "r+") == 0)
+	{
+		return OPEN_MODE_FLAG_READ | OPEN_MODE_FLAG_WRITE;
+	}
+
+	if (strcmp(mode, "w+") == 0)
+	{
+		return OPEN_MODE_FLAG_READ | OPEN_MODE_FLAG_WRITE | OPEN_MODE_FLAG_CREATE;
+	}
+
+	return 0;
+}
+
 FILE *fopen(const char *restrict file_path, const char *restrict mode)
 {
 	size_t filename_length = strlen(file_path);
 
-	int64_t result = straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_FILE_OPEN,
-	                                            file_path, filename_length, 0);
+	uint64_t open_mode_flags = parse_mode_string(mode);
+	if (open_mode_flags == 0)
+	{
+		errno = EINVAL;
+		return NULL;
+	}
+
+	int64_t result =
+	    straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_FILE_OPEN, file_path,
+	                               filename_length, open_mode_flags);
 	if (is_syscall_result_error(result))
 	{
 		errno = result;
@@ -141,10 +178,10 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 	return total_bytes_read / size;
 }
 
-int fseek(FILE *stream, long offset, int origin)
+int fseek(FILE *stream, long offset, int whence)
 {
-	int64_t result = straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_FILE_SEEK,
-	                                            stream->file_handle_id, offset);
+	int64_t result = straylight_libc_do_syscall(
+	    STRAYLIGHT_SYSCALL_FILE_SEEK, stream->file_handle_id, offset, whence);
 	if (is_syscall_result_error(result))
 	{
 		errno = result;

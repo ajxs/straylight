@@ -68,3 +68,19 @@ size_t strlen(const char *str)
 
 	return len;
 }
+
+int strcmp(const char *lhs, const char *rhs)
+{
+	size_t i = 0;
+	while (lhs[i] != '\0' && rhs[i] != '\0')
+	{
+		if (lhs[i] != rhs[i])
+		{
+			return (int)((uint8_t)lhs[i] - (uint8_t)rhs[i]);
+		}
+
+		i++;
+	}
+
+	return (int)((uint8_t)lhs[i] - (uint8_t)rhs[i]);
+}

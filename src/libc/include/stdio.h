@@ -28,7 +28,7 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 
 int fclose(FILE *stream);
 
-int fseek(FILE *stream, long offset, int origin);
+int fseek(FILE *stream, long offset, int whence);
 
 int feof(FILE *stream);
 

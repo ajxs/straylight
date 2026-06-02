@@ -116,10 +116,21 @@ package Filesystems is
    type Filesystem_Node_Access is access all Filesystem_Node_T
    with Convention => C;
 
-   type File_Open_Mode_T is (File_Open_Mode_Read, File_Open_Mode_Write)
+   type File_Open_Mode_T is record
+      Read   : Boolean := False;
+      Write  : Boolean := False;
+      Create : Boolean := False;
+   end record
    with Size => 64;
    for File_Open_Mode_T use
-     (File_Open_Mode_Read => 0, File_Open_Mode_Write => 1);
+     record
+       Read   at 0 range 0 .. 0;
+       Write  at 0 range 1 .. 1;
+       Create at 0 range 2 .. 2;
+     end record;
+
+   function Validate_File_Open_Mode (Mode : File_Open_Mode_T) return Boolean
+   is (Mode.Read or else Mode.Write);
 
    type Process_File_Handle_T is record
       Entry_Used     : Boolean := False;
@@ -130,7 +141,7 @@ package Filesystems is
       File_Handle_Id : Unsigned_64 := 0;
       Process_Id     : Process_Id_T := 0;
       File           : Filesystem_Node_Access := null;
-      Mode           : File_Open_Mode_T := File_Open_Mode_Read;
+      Mode           : File_Open_Mode_T;
       Position       : Unsigned_64 := 0;
    end record;
 

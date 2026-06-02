@@ -362,18 +362,6 @@ package body System_Calls is
          Result := Constraint_Exception;
    end Handle_User_Mode_Syscall;
 
-   function Unsigned_64_To_File_Open_Mode
-     (Mode : Unsigned_64) return File_Open_Mode_T is
-   begin
-      case Mode is
-         when 1      =>
-            return File_Open_Mode_Write;
-
-         when others =>
-            return File_Open_Mode_Read;
-      end case;
-   end Unsigned_64_To_File_Open_Mode;
-
    procedure Handle_Update_Framebuffer_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is

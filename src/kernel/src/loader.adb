@@ -37,7 +37,11 @@ package body Loader is
         ("Loading new process from filesystem: '" & Path & "'", Logging_Tags);
 
       Open_File
-        (Loading_Process, Path, File_Open_Mode_Read, Executable_File, Result);
+        (Loading_Process,
+         Path,
+         (Read => True, others => False),
+         Executable_File,
+         Result);
       if Is_Error (Result) then
          return;
       end if;
