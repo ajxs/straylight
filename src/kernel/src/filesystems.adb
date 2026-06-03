@@ -969,4 +969,30 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Create_File;
 
+   procedure Get_Sector_Block_Number_And_Offset
+     (Sector_Number              : Sector_Index_T;
+      Sector_Size                : Natural;
+      Block_Number               : out Block_Index_T;
+      Sector_Offset_Within_Block : out Storage_Offset;
+      Result                     : out Function_Result) is
+   begin
+      Block_Number :=
+        Block_Index_T ((Natural (Sector_Number) * Sector_Size) / Block_Size);
+
+      Sector_Offset_Within_Block :=
+        Storage_Offset
+          ((Integer (Sector_Number) mod Get_Sectors_Per_Block (Sector_Size))
+           * Sector_Size);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Get_Sector_Block_Number_And_Offset",
+            Logging_Tags);
+         Block_Number := 0;
+         Sector_Offset_Within_Block := 0;
+         Result := Constraint_Exception;
+   end Get_Sector_Block_Number_And_Offset;
+
 end Filesystems;

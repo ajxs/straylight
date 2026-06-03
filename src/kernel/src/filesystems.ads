@@ -314,4 +314,11 @@ private
       Filesystem_Type : Filesystem_Type_T;
       Result          : out Function_Result);
 
+   procedure Get_Sector_Block_Number_And_Offset
+     (Sector_Number              : Sector_Index_T;
+      Sector_Size                : Natural;
+      Block_Number               : out Block_Index_T;
+      Sector_Offset_Within_Block : out Storage_Offset;
+      Result                     : out Function_Result);
+
 end Filesystems;

@@ -322,12 +322,24 @@ package body Filesystems.Block_Cache is
       Data_Virtual_Address : out Virtual_Address_T;
       Result               : out Function_Result)
    is
-      Cache_Entry_Addr_Virtual : Virtual_Address_T := Null_Address;
+      Cache_Entry_Addr_Virtual   : Virtual_Address_T := Null_Address;
+      Block_Number               : Block_Index_T := 0;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
    begin
+      Get_Sector_Block_Number_And_Offset
+        (Sector_Number,
+         Sector_Size,
+         Block_Number,
+         Sector_Offset_Within_Block,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
       Read_Block_From_Filesystem
         (Filesystem,
          Reading_Process,
-         Sector_To_Block (Sector_Number, Sector_Size),
+         Block_Number,
          Cache_Entry_Addr_Virtual,
          Result);
       if Is_Error (Result) then
@@ -335,8 +347,7 @@ package body Filesystems.Block_Cache is
       end if;
 
       Data_Virtual_Address :=
-        Cache_Entry_Addr_Virtual
-        + Get_Sector_Offset_Within_Block (Sector_Number, Sector_Size);
+        Cache_Entry_Addr_Virtual + Sector_Offset_Within_Block;
       Result := Success;
    end Read_Sector_From_Filesystem;
 
