@@ -105,7 +105,8 @@ package body Filesystems.FAT.FAT16 is
       LFN_Entry :=
         (Sequence      =>
            (Number     => File_Name_Number_T (Sequence_Number),
-            Last_Entry => Is_Last_Entry),
+            Last_Entry => Is_Last_Entry,
+            others     => False),
          Name_1        => Wide_Name (1 .. 5),
          --  Set the attributes to indicate that this is an LFN entry.
          Attributes    =>
@@ -240,7 +241,7 @@ package body Filesystems.FAT.FAT16 is
 
       Number_Of_LFN_Entries_Needed : Natural := 0;
    begin
-      Current_Read_Sector := Filesystem_Info.Root_Directory_Sector;
+      Current_Read_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
 
       LFN_Entries_Are_Required : constant Boolean :=
         Are_LFN_Entries_Required (Filename);
@@ -260,7 +261,7 @@ package body Filesystems.FAT.FAT16 is
       --  span across sector boundaries. This may be resolved in a future
       --  update.
       Read_Sectors_Loop : for I in
-        1 .. Filesystem_Info.Root_Directory_Sector_Count
+        1 .. Filesystem_Info.Sectors_In_Root_Directory
       loop
          --  Read each FAT logical sector in the root directory into memory.
          Read_Sector_From_Filesystem
@@ -584,10 +585,13 @@ package body Filesystems.FAT.FAT16 is
       Release_Sector_Result : Function_Result := Unset;
       Last_Entry_Reached    : Boolean := False;
    begin
-      Current_Read_Sector := Filesystem_Info.Root_Directory_Sector;
+      Current_Read_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
+
+      Directory_Entries_Per_Sector : constant Natural :=
+        Filesystem_Info.Bytes_Per_Sector / 32;
 
       Read_Sectors_Loop : for I in
-        1 .. Filesystem_Info.Root_Directory_Sector_Count
+        1 .. Filesystem_Info.Sectors_In_Root_Directory
       loop
          --  Read each FAT logical sector in the root directory into memory.
          Read_Sector_From_Filesystem
@@ -602,7 +606,7 @@ package body Filesystems.FAT.FAT16 is
          end if;
 
          Parse_Directory_Buffer : declare
-            Directory : Directory_Index_T (1 .. 16)
+            Directory : Directory_Index_T (1 .. Directory_Entries_Per_Sector)
             with Import, Address => Sector_Address, Alignment => 1;
          begin
             Search_FAT_Directory_For_File
@@ -661,7 +665,7 @@ package body Filesystems.FAT.FAT16 is
    begin
       FAT_Table_Offset : constant Unsigned_64 :=
         Unsigned_64 (FAT_Index)
-        * Unsigned_64 (Filesystem_Info.FAT_Sector_Count);
+        * Unsigned_64 (Filesystem_Info.Sectors_In_FAT_Table);
 
       Sector_Number :=
         Filesystem_Info.First_FAT_Sector
@@ -853,7 +857,7 @@ package body Filesystems.FAT.FAT16 is
       Last_FAT_Sector_Number : constant Sector_Index_T :=
         Sector_Index_T
           (Filesystem_Info.First_FAT_Sector
-           + Unsigned_64 (Filesystem_Info.FAT_Sector_Count)
+           + Unsigned_64 (Filesystem_Info.Total_Sectors_In_All_FAT_Tables)
            - 1);
 
       --  Loop through the FAT sectors starting from the sector containing

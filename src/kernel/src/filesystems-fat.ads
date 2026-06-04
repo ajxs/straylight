@@ -70,18 +70,18 @@ private
    --  The field types of this standard are chosen to reflect the list of
    --  valid values for each field according to the FAT32 v1.03 specification.
    type FAT_Filesystem_Info_T is record
-      FAT_Type                    : FAT_Type_T := FAT_Type_FAT12;
-      Bytes_Per_Sector            : Positive;
-      Sectors_Per_Cluster         : Positive;
-      FAT_Table_Count             : Positive;
-      FAT_Table_Size              : Positive;
-      Total_Sector_Count          : Positive;
-      Total_Clusters              : Positive;
-      Root_Directory_Sector       : Sector_Index_T := 0;
-      Root_Directory_Sector_Count : Natural := 0;
-      First_FAT_Sector            : Sector_Index_T := 0;
-      First_Data_Sector           : Sector_Index_T := 0;
-      FAT_Sector_Count            : Positive;
+      FAT_Type                        : FAT_Type_T := FAT_Type_FAT12;
+      Bytes_Per_Sector                : Positive;
+      Sectors_Per_Cluster             : Positive;
+      FAT_Table_Count                 : Positive;
+      Sectors_In_FAT_Table            : Positive;
+      Total_Sector_Count              : Positive;
+      Total_Clusters                  : Positive;
+      Total_Sectors_In_All_FAT_Tables : Positive;
+      Sectors_In_Root_Directory       : Natural := 0;
+      First_FAT_Sector                : Sector_Index_T := 0;
+      First_Data_Sector               : Sector_Index_T := 0;
+      FAT12_16_Root_Directory_Sector  : Sector_Index_T := 0;
    end record;
 
    ----------------------------------------------------------------------------
@@ -308,14 +308,18 @@ private
    --  Stores the sequence number and attributes for a LFN directory entry.
    ----------------------------------------------------------------------------
    type Long_File_Name_Sequence is record
-      Number     : File_Name_Number_T;
-      Last_Entry : Boolean;
+      Number     : File_Name_Number_T := 0;
+      Reserved   : Boolean := False;
+      Last_Entry : Boolean := False;
+      Reserved_2 : Boolean := False;
    end record
    with Size => 8;
    for Long_File_Name_Sequence use
      record
        Number     at 0 range 0 .. 4;
+       Reserved   at 0 range 5 .. 5;
        Last_Entry at 0 range 6 .. 6;
+       Reserved_2 at 0 range 7 .. 7;
      end record;
 
    ----------------------------------------------------------------------------
@@ -401,13 +405,12 @@ private
       Result          : out Function_Result);
 
    procedure Get_Root_Directory_Sector_Count
-     (Boot_Sector                 : Boot_Sector_T;
-      Root_Directory_Sector_Count : out Natural;
-      Result                      : out Function_Result);
+     (Boot_Sector               : Boot_Sector_T;
+      Sectors_In_Root_Directory : out Natural;
+      Result                    : out Function_Result);
 
-   procedure Read_Boot_Sector
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
+   procedure Parse_Boot_Sector
+     (Boot_Sector     : Boot_Sector_T;
       Filesystem_Info : out FAT_Filesystem_Info_T;
       Result          : out Function_Result);
 
