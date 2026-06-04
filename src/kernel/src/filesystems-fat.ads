@@ -67,18 +67,21 @@ private
    --  that we will need to perform filesystem operations.
    --  It is populated by the Populate_Filesystem_Meta_Info procedure,
    --  which is called by the file operations methods.
+   --  The field types of this standard are chosen to reflect the list of
+   --  valid values for each field according to the FAT32 v1.03 specification.
    type FAT_Filesystem_Info_T is record
       FAT_Type                    : FAT_Type_T := FAT_Type_FAT12;
-      Root_Directory_Sector       : Unsigned_64 := 0;
-      Root_Directory_Sector_Count : Unsigned_32 := 0;
-      Root_Directory_Buffer_Size  : Natural := 0;
-      Bytes_Per_Sector            : Natural := 0;
-      First_FAT_Sector            : Unsigned_64 := 0;
-      First_Data_Sector           : Unsigned_64 := 0;
-      FAT_Table_Count             : Natural := 0;
-      FAT_Sector_Count            : Unsigned_32 := 0;
-      FAT_Buffer_Size             : Natural := 0;
-      Sectors_Per_Cluster         : Natural := 0;
+      Bytes_Per_Sector            : Positive;
+      Sectors_Per_Cluster         : Positive;
+      FAT_Table_Count             : Positive;
+      FAT_Table_Size              : Positive;
+      Total_Sector_Count          : Positive;
+      Total_Clusters              : Positive;
+      Root_Directory_Sector       : Sector_Index_T := 0;
+      Root_Directory_Sector_Count : Natural := 0;
+      First_FAT_Sector            : Sector_Index_T := 0;
+      First_Data_Sector           : Sector_Index_T := 0;
+      FAT_Sector_Count            : Positive;
    end record;
 
    ----------------------------------------------------------------------------
@@ -371,17 +374,6 @@ private
 
    function Get_Filesystem_Type (Total_Clusters : Natural) return FAT_Type_T;
 
-   function Get_Total_Sectors (Boot_Sector : Boot_Sector_T) return Unsigned_32
-   with Inline;
-
-   procedure Get_Total_Clusters
-     (Boot_Sector    : Boot_Sector_T;
-      Total_Clusters : out Natural;
-      Result         : out Function_Result);
-
-   function Get_FAT_Table_Size
-     (Boot_Sector : Boot_Sector_T) return Unsigned_32;
-
    function Is_Cluster_End_Of_Chain
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean
    with Pure_Function, Inline;
@@ -408,17 +400,9 @@ private
       First_Cluster   : out Unsigned_32;
       Result          : out Function_Result);
 
-   function Get_Root_Directory_Sector_Count
-     (Boot_Sector : Boot_Sector_T) return Unsigned_32
-   with Inline;
-
-   procedure Get_Root_Directory_Sector
-     (EBPB_Address                : Virtual_Address_T;
-      FAT_Type                    : FAT_Type_T;
-      Sectors_Per_Cluster         : Natural;
-      First_Data_Sector           : Unsigned_64;
-      Root_Directory_Sector_Count : Unsigned_32;
-      Root_Directory_Sector       : out Unsigned_64;
+   procedure Get_Root_Directory_Sector_Count
+     (Boot_Sector                 : Boot_Sector_T;
+      Root_Directory_Sector_Count : out Natural;
       Result                      : out Function_Result);
 
    procedure Read_Boot_Sector
@@ -508,7 +492,7 @@ private
       Result          : out Function_Result);
 
    procedure Validate_FAT_Filesystem
-     (Filesystem_Info : FAT_Filesystem_Info_T; Result : out Function_Result);
+     (Boot_Sector : Boot_Sector_T; Result : out Function_Result);
 
    ----------------------------------------------------------------------------
    --  'Reads' a UCS-2 formatted filename from a FAT directory entry into a

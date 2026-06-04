@@ -88,9 +88,11 @@ Custom syscall numbers with the prefix `5446_0xxx` (defined in `system_calls.ads
 ## Ada Conventions
 
 ### Error Handling
-All procedures return errors via an `out Function_Result` parameter (defined in `function_results.ads`). Use `Is_Error (Result)` to check — any value `<= 0` is an error. `Success` is `9999_9999` (high Hamming distance from other values). Panicking is done with `Utilities.Panic`.
+All procedures return errors via an `out Function_Result` parameter (defined in `function_results.ads`). Use `Is_Error (Result)` to check — any value `<= 0` is an error. `Success` is `9999_9999` (high Hamming distance from other values). Panicking is done with `Hart_State.Panic`.
 
-The kernel restrictions (`kernel.adc`) disable exception propagation. Every package body catches `Constraint_Error` locally and calls `Panic`.
+The kernel restrictions (`kernel.adc`) disable exception propagation. Every package body catches `Constraint_Error` locally and calls `Panic`. The compiler determines whether a `Constraint_Error` is .possible within a particular function body.
+
+Procedures with `out Function_Result` parameters are preferred over functions where a `Constraint_Error` is possible, and where no in-band way of handling the constraint exception exists.
 
 ### Ada Restrictions
 `kernel.adc` disables: exceptions propagation, dynamic dispatch, finalization, allocators, tasking, protected types, fixed-point, IO, streams, and implicit heap allocations. Do not use these features in kernel code.

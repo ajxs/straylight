@@ -185,11 +185,6 @@ package body Filesystems.FAT is
          end if;
 
          Print_FAT_Filesystem_Info (FAT_Filesystem_Info);
-
-         Validate_FAT_Filesystem (FAT_Filesystem_Info, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
       end;
 
       Result := Success;
@@ -283,22 +278,6 @@ package body Filesystems.FAT is
       return Filesystem_Node_Type_File;
    end Get_Node_Type_From_Directory_Entry;
 
-   function Get_FAT_Table_Size (Boot_Sector : Boot_Sector_T) return Unsigned_32
-   is
-      --  The extended BIOS parameter block, if the filesystem is FAT32.
-      FAT32_EBPB : EBPB_FAT32_T
-      with
-        Import,
-        Alignment => 1,
-        Address   => Boot_Sector.EBPB_Reserved_Space'Address;
-   begin
-      if Boot_Sector.BPB.Table_Size > 0 then
-         return Unsigned_32 (Boot_Sector.BPB.Table_Size);
-      end if;
-
-      return FAT32_EBPB.Table_Size;
-   end Get_FAT_Table_Size;
-
    function Get_Filesystem_Type (Total_Clusters : Natural) return FAT_Type_T is
    begin
       if Total_Clusters < 4085 then
@@ -312,8 +291,10 @@ package body Filesystems.FAT is
       return FAT_Type_ExFAT;
    end Get_Filesystem_Type;
 
-   function Get_Root_Directory_Sector_Count
-     (Boot_Sector : Boot_Sector_T) return Unsigned_32 is
+   procedure Get_Root_Directory_Sector_Count
+     (Boot_Sector                 : Boot_Sector_T;
+      Root_Directory_Sector_Count : out Natural;
+      Result                      : out Function_Result) is
    begin
       Root_Entry_Size : constant Unsigned_32 :=
         Unsigned_32 (Boot_Sector.BPB.Root_Entry_Count) * 32;
@@ -321,70 +302,18 @@ package body Filesystems.FAT is
       Total_Size : constant Unsigned_32 :=
         Root_Entry_Size + Unsigned_32 (Boot_Sector.BPB.Bytes_Per_Sector) - 1;
 
-      return Total_Size / Unsigned_32 (Boot_Sector.BPB.Bytes_Per_Sector);
+      Root_Directory_Sector_Count :=
+        Natural (Total_Size / Unsigned_32 (Boot_Sector.BPB.Bytes_Per_Sector));
+
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error
            ("Constraint_Error: Get_Root_Directory_Sector_Count",
             Logging_Tags_FAT);
-         return 0;
-   end Get_Root_Directory_Sector_Count;
-
-   function Get_Total_Sectors (Boot_Sector : Boot_Sector_T) return Unsigned_32
-   is
-   begin
-      if Boot_Sector.BPB.Total_Sector_Count = 0 then
-         return Boot_Sector.BPB.Large_Sector_Count;
-      end if;
-
-      return Unsigned_32 (Boot_Sector.BPB.Total_Sector_Count);
-   end Get_Total_Sectors;
-
-   procedure Get_Total_Clusters
-     (Boot_Sector    : Boot_Sector_T;
-      Total_Clusters : out Natural;
-      Result         : out Function_Result) is
-   begin
-      Total_Sectors : constant Unsigned_32 := Get_Total_Sectors (Boot_Sector);
-      Root_Directory_Sector_Count : constant Unsigned_32 :=
-        Get_Root_Directory_Sector_Count (Boot_Sector);
-
-      FAT_Table_Size : constant Unsigned_32 :=
-        Get_FAT_Table_Size (Boot_Sector);
-
-      FAT_Sector_Count : constant Unsigned_32 :=
-        Unsigned_32 (Boot_Sector.BPB.Table_Count) * FAT_Table_Size;
-
-      Overhead_Sectors : constant Unsigned_32 :=
-        FAT_Sector_Count
-        + Unsigned_32 (Boot_Sector.BPB.Reserved_Sector_Count)
-        + Root_Directory_Sector_Count;
-
-      --  Guard against the possibility of an underflow when calculating the
-      --  number of data sectors caused by a corrupt BPB.
-      if Total_Sectors < Overhead_Sectors then
-         Log_Error
-           ("Invalid BPB: Total sectors less than reserved + FAT sectors.",
-            Logging_Tags_FAT);
-
-         Total_Clusters := 0;
-         Result := Unhandled_Exception;
-         return;
-      end if;
-
-      Data_Sectors : constant Unsigned_32 := Total_Sectors - Overhead_Sectors;
-
-      Total_Clusters :=
-        Natural
-          (Data_Sectors / Unsigned_32 (Boot_Sector.BPB.Sectors_Per_Cluster));
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Total_Clusters", Logging_Tags_FAT);
-         Total_Clusters := 0;
+         Root_Directory_Sector_Count := 0;
          Result := Constraint_Exception;
-   end Get_Total_Clusters;
+   end Get_Root_Directory_Sector_Count;
 
    procedure Print_FAT_Filesystem_Info
      (FAT_Filesystem_Info : FAT_Filesystem_Info_T) is
@@ -398,9 +327,6 @@ package body Filesystems.FAT is
          & "  Root_Directory_Sector_Count: "
          & FAT_Filesystem_Info.Root_Directory_Sector_Count'Image
          & ASCII.LF
-         & "  Root_Directory_Buffer_Size:  "
-         & FAT_Filesystem_Info.Root_Directory_Buffer_Size'Image
-         & ASCII.LF
          & "  Bytes_Per_Sector:            "
          & FAT_Filesystem_Info.Bytes_Per_Sector'Image
          & ASCII.LF
@@ -412,9 +338,6 @@ package body Filesystems.FAT is
          & ASCII.LF
          & "  FAT_Sector_Count:            "
          & FAT_Filesystem_Info.FAT_Sector_Count'Image
-         & ASCII.LF
-         & "  FAT_Buffer_Size:             "
-         & FAT_Filesystem_Info.FAT_Buffer_Size'Image
          & ASCII.LF
          & "  FAT_Table_Count:             "
          & FAT_Filesystem_Info.FAT_Table_Count'Image
@@ -431,9 +354,9 @@ package body Filesystems.FAT is
      (EBPB_Address                : Virtual_Address_T;
       FAT_Type                    : FAT_Type_T;
       Sectors_Per_Cluster         : Natural;
-      First_Data_Sector           : Unsigned_64;
-      Root_Directory_Sector_Count : Unsigned_32;
-      Root_Directory_Sector       : out Unsigned_64;
+      First_Data_Sector           : Sector_Index_T;
+      Root_Directory_Sector_Count : Natural;
+      Root_Directory_Sector       : out Sector_Index_T;
       Result                      : out Function_Result)
    is
       --  The extended FAT32 BIOS parameter block,
@@ -472,11 +395,11 @@ package body Filesystems.FAT is
    begin
       Log_Debug ("Reading boot sector...", Logging_Tags_FAT);
 
-      --  Read a single 512 byte sector.
+      --  Read the boot sector.
       --  We don't know the real sector size yet, but the boot sector is
       --  always located in the first 512 bytes.
-      Read_Sector_From_Filesystem
-        (Filesystem, Reading_Process, 0, 512, Sector_Address, Result);
+      Read_Block_From_Filesystem
+        (Filesystem, Reading_Process, 0, Sector_Address, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -485,40 +408,77 @@ package body Filesystems.FAT is
          Boot_Sector : aliased Boot_Sector_T
          with Import, Alignment => 1, Address => Sector_Address;
 
-         Total_Clusters : Natural := 0;
+         --  The extended BIOS parameter block, if the filesystem is FAT32.
+         FAT32_EBPB : EBPB_FAT32_T
+         with
+           Import,
+           Alignment => 1,
+           Address   => Boot_Sector.EBPB_Reserved_Space'Address;
       begin
-         Get_Total_Clusters (Boot_Sector, Total_Clusters, Result);
+         Validate_FAT_Filesystem (Boot_Sector, Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Filesystem_Info.FAT_Type := Get_Filesystem_Type (Total_Clusters);
+         Filesystem_Info.Total_Sector_Count :=
+           (if Boot_Sector.BPB.Total_Sector_Count = 0
+            then Natural (Boot_Sector.BPB.Large_Sector_Count)
+            else Natural (Boot_Sector.BPB.Total_Sector_Count));
 
-         Filesystem_Info.Root_Directory_Sector_Count :=
-           Get_Root_Directory_Sector_Count (Boot_Sector);
+         Filesystem_Info.FAT_Table_Size :=
+           Positive
+             (if Boot_Sector.BPB.Table_Size > 0
+              then Boot_Sector.BPB.Table_Size
+              else FAT32_EBPB.Table_Size);
 
-         Filesystem_Info.Bytes_Per_Sector :=
-           Natural (Boot_Sector.BPB.Bytes_Per_Sector);
+         Filesystem_Info.FAT_Table_Count :=
+           Positive (Boot_Sector.BPB.Table_Count);
 
-         Filesystem_Info.Root_Directory_Buffer_Size :=
-           Filesystem_Info.Bytes_Per_Sector
-           * Natural (Filesystem_Info.Root_Directory_Sector_Count);
+         Filesystem_Info.FAT_Sector_Count :=
+           Filesystem_Info.FAT_Table_Count * Filesystem_Info.FAT_Table_Size;
 
-         Filesystem_Info.FAT_Sector_Count := Get_FAT_Table_Size (Boot_Sector);
+         Get_Root_Directory_Sector_Count
+           (Boot_Sector, Filesystem_Info.Root_Directory_Sector_Count, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
 
-         Filesystem_Info.First_FAT_Sector :=
-           Unsigned_64 (Boot_Sector.BPB.Reserved_Sector_Count);
+         Overhead_Sectors : constant Natural :=
+           Filesystem_Info.FAT_Sector_Count
+           + Natural (Boot_Sector.BPB.Reserved_Sector_Count)
+           + Filesystem_Info.Root_Directory_Sector_Count;
 
-         Filesystem_Info.FAT_Buffer_Size :=
-           Natural (Filesystem_Info.FAT_Sector_Count)
-           * Filesystem_Info.Bytes_Per_Sector;
+         --  Guard against the possibility of an underflow when calculating the
+         --  number of data sectors caused by a corrupt BPB.
+         if Filesystem_Info.Total_Sector_Count < Overhead_Sectors then
+            Log_Error
+              ("Invalid BPB: Total sectors less than reserved + FAT sectors.",
+               Logging_Tags_FAT);
+
+            Result := Invalid_Filesystem;
+            return;
+         end if;
+
+         Data_Sectors : constant Natural :=
+           Filesystem_Info.Total_Sector_Count - Overhead_Sectors;
 
          Filesystem_Info.Sectors_Per_Cluster :=
            Natural (Boot_Sector.BPB.Sectors_Per_Cluster);
 
+         Filesystem_Info.Total_Clusters :=
+           (Data_Sectors / Filesystem_Info.Sectors_Per_Cluster);
+
+         Filesystem_Info.FAT_Type :=
+           Get_Filesystem_Type (Filesystem_Info.Total_Clusters);
+
+         Filesystem_Info.Bytes_Per_Sector :=
+           Natural (Boot_Sector.BPB.Bytes_Per_Sector);
+
+         Filesystem_Info.First_FAT_Sector :=
+           Sector_Index_T (Boot_Sector.BPB.Reserved_Sector_Count);
+
          Total_Tables_Size : constant Unsigned_64 :=
-           Unsigned_64 (Boot_Sector.BPB.Table_Count)
-           * Unsigned_64 (Filesystem_Info.FAT_Sector_Count);
+           Unsigned_64 (Filesystem_Info.FAT_Sector_Count);
 
          Filesystem_Info.First_Data_Sector :=
            Unsigned_64 (Boot_Sector.BPB.Reserved_Sector_Count)
@@ -542,7 +502,7 @@ package body Filesystems.FAT is
 
       end Parse_Boot_Sector;
 
-      Release_Sector (Filesystem, 0, 512, Result);
+      Release_Block (Filesystem, 0, Result);
 
    exception
       when Constraint_Error =>
@@ -1107,13 +1067,13 @@ package body Filesystems.FAT is
    end Read_File_Clusters;
 
    procedure Validate_FAT_Filesystem
-     (Filesystem_Info : FAT_Filesystem_Info_T; Result : out Function_Result) is
+     (Boot_Sector : Boot_Sector_T; Result : out Function_Result) is
    begin
       Sector_Size_Valid : constant Boolean :=
-        (Filesystem_Info.Bytes_Per_Sector = 512)
-        or else (Filesystem_Info.Bytes_Per_Sector = 1024)
-        or else (Filesystem_Info.Bytes_Per_Sector = 2048)
-        or else (Filesystem_Info.Bytes_Per_Sector = 4096);
+        (Boot_Sector.BPB.Bytes_Per_Sector = 512)
+        or else (Boot_Sector.BPB.Bytes_Per_Sector = 1024)
+        or else (Boot_Sector.BPB.Bytes_Per_Sector = 2048)
+        or else (Boot_Sector.BPB.Bytes_Per_Sector = 4096);
 
       if not Sector_Size_Valid then
          Log_Error
@@ -1122,20 +1082,9 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      if Filesystem_Info.Sectors_Per_Cluster = 0 then
+      if Boot_Sector.BPB.Sectors_Per_Cluster = 0 then
          Log_Error
            ("Filesystem Invalid: Sectors per cluster cannot be zero.",
-            Logging_Tags_FAT);
-         Result := Invalid_Filesystem;
-         return;
-      end if;
-
-      if Unsigned_64 (Filesystem_Info.Root_Directory_Sector_Count)
-        > Filesystem_Info.First_Data_Sector
-      then
-         Log_Error
-           ("Filesystem Invalid: "
-            & "Root directory cannot be located within data region.",
             Logging_Tags_FAT);
          Result := Invalid_Filesystem;
          return;

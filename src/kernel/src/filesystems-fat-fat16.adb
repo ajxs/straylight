@@ -274,8 +274,11 @@ package body Filesystems.FAT.FAT16 is
             return;
          end if;
 
+         Directory_Entries_Per_Sector : constant Natural :=
+           Filesystem_Info.Bytes_Per_Sector / 32;
+
          Parse_Directory_Buffer : declare
-            Directory : Directory_Index_T (1 .. 16)
+            Directory : Directory_Index_T (1 .. Directory_Entries_Per_Sector)
             with Import, Address => Sector_Address, Alignment => 1;
 
             Current_Free_Entry_Count : Natural := 0;
@@ -643,6 +646,10 @@ package body Filesystems.FAT.FAT16 is
       end loop Read_Sectors_Loop;
 
       Result := File_Not_Found;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Find_File_In_FAT16_Root_Directory");
+         Result := Constraint_Exception;
    end Find_File_In_FAT16_Root_Directory;
 
    procedure Get_FAT16_Table_Entry_Sector_Number
@@ -758,12 +765,6 @@ package body Filesystems.FAT.FAT16 is
       Sector_Number  : Sector_Index_T := 0;
       Cluster_Index  : Natural := 0;
    begin
-      if Filesystem_Info.FAT_Table_Count = 0 then
-         Log_Error ("FAT_Table_Count is 0 in Write_Table_Entry_FAT16");
-         Result := Invalid_Filesystem;
-         return;
-      end if;
-
       Get_FAT16_Table_Cluster_Index
         (Filesystem_Info, Cluster, Cluster_Index, Result);
       if Is_Error (Result) then
@@ -835,12 +836,9 @@ package body Filesystems.FAT.FAT16 is
       Clusters_Per_Sector : constant Integer :=
         (Filesystem_Info.Bytes_Per_Sector / 2);
 
-      Total_Clusters_In_Filesystem : constant Unsigned_32 :=
-        Filesystem_Info.FAT_Sector_Count * Unsigned_32 (Clusters_Per_Sector);
-
       Start_Cluster : constant Unsigned_16 :=
         (if Start_Cluster_Hint
-            in 2 .. Unsigned_16 (Total_Clusters_In_Filesystem - 1)
+            in 2 .. Unsigned_16 (Filesystem_Info.Total_Clusters - 1)
          then Start_Cluster_Hint
          else 2);
 
