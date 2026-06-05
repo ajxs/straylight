@@ -19,7 +19,7 @@ private package Filesystems.FAT.FAT16 is
       Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result);
 
-   procedure Read_Table_Entry_FAT16
+   procedure Get_FAT16_Entry
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;

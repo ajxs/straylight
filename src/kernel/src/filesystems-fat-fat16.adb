@@ -1,6 +1,5 @@
 with Filesystems.FAT.DOS_Filenames; use Filesystems.FAT.DOS_Filenames;
 with Filesystems.Block_Cache;       use Filesystems.Block_Cache;
-with Memory.Kernel;                 use Memory.Kernel;
 
 package body Filesystems.FAT.FAT16 is
    procedure Create_DOS_Directory_Entry
@@ -463,108 +462,119 @@ package body Filesystems.FAT.FAT16 is
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result)
    is
-      Cluster_Buffer_Address : Virtual_Address_T := Null_Address;
-      Cluster_Size           : Positive;
-
-      --  The maximum number of directory entries that can fit in the buffer.
-      Maximum_Directory_Entries : Natural;
-
-      Current_Read_Cluster  : Unsigned_16 := 0;
+      Current_Cluster       : Unsigned_16 := 0;
       Next_Cluster_In_Chain : Unsigned_16 := 0;
 
-      --  An alternative 'result' for freeing the allocated buffer, so that
-      --  we don't overwrite the main result variable.
-      Free_Buffer_Result : Function_Result := Unset;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Current_Block              : Block_Index_T := 0;
 
+      Search_Result      : Function_Result := Unset;
       Last_Entry_Reached : Boolean := False;
    begin
       Log_Debug ("Finding file in FAT16 directory", Logging_Tags_FAT);
 
-      Cluster_Size :=
-        Filesystem_Info.Sectors_Per_Cluster * Filesystem_Info.Bytes_Per_Sector;
+      Directory_Entries_In_Sector : constant Natural :=
+        Get_Buffer_Max_Directory_Entry_Count
+          (Filesystem_Info.Bytes_Per_Sector);
 
-      Maximum_Directory_Entries :=
-        Get_Buffer_Max_Directory_Entry_Count (Cluster_Size);
-
-      Current_Read_Cluster :=
+      Current_Cluster :=
         Get_First_Cluster_From_Index_FAT16 (Parent_Node.all.Index);
 
-      Allocate_Kernel_Memory (Cluster_Size, Cluster_Buffer_Address, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
+      Follow_Cluster_Chain_Loop : loop
+         First_Sector_Of_Cluster : constant Sector_Index_T :=
+           Get_First_Sector_Of_Cluster
+             (Unsigned_32 (Current_Cluster),
+              Filesystem_Info.Sectors_Per_Cluster,
+              Filesystem_Info.First_Data_Sector);
 
-      --  Read each cluster in the directory's cluster chain into the buffer,
-      --  parsing the directory entries contained in the cluster as we go.
-      --  This is done for the sake of efficiency.
-      --  If we find the file we're looking for in the first cluster we
-      --  read, we can avoid reading further clusters.
-      loop
-         Read_Cluster_Into_Buffer
-           (Filesystem,
-            Reading_Process,
-            Filesystem_Info,
-            Unsigned_32 (Current_Read_Cluster),
-            Cluster_Buffer_Address,
-            Result);
-         if Is_Error (Result) then
-            goto Free_Buffer;
-         end if;
+         --  According to the FAT32 v1.03 spec there can be 1 .. 128 sectors
+         --  in a FAT16 cluster, and the value is always a power of 2.
+         --  Bytes per sector is always 512, 1024, 2048 or 4096.
+         Read_Sectors_Loop : for I in
+           0 .. Filesystem_Info.Sectors_Per_Cluster - 1
+         loop
+            Current_Sector : constant Sector_Index_T :=
+              First_Sector_Of_Cluster + Sector_Index_T (I);
 
-         Parse_Directory_Buffer : declare
-            Directory : Directory_Index_T (1 .. Maximum_Directory_Entries)
-            with Import, Address => Cluster_Buffer_Address, Alignment => 1;
-         begin
-            Search_FAT_Directory_For_File
-              (Filesystem,
-               Directory,
-               Filename,
-               Parent_Node,
-               Filesystem_Node,
-               Last_Entry_Reached,
+            Get_Sector_Block_Number_And_Offset
+              (Current_Sector,
+               Filesystem_Info.Bytes_Per_Sector,
+               Current_Block,
+               Sector_Offset_Within_Block,
                Result);
             if Is_Error (Result) then
-               goto Free_Buffer;
+               return;
+            end if;
+
+            Read_Block_From_Filesystem
+              (Filesystem,
+               Reading_Process,
+               Current_Block,
+               Block_Address,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+
+            Parse_Directory_Buffer : declare
+               Directory : Directory_Index_T (1 .. Directory_Entries_In_Sector)
+               with
+                 Import,
+                 Address   => Block_Address + Sector_Offset_Within_Block,
+                 Alignment => 1;
+            begin
+               Search_FAT_Directory_For_File
+                 (Filesystem,
+                  Directory,
+                  Filename,
+                  Parent_Node,
+                  Filesystem_Node,
+                  Last_Entry_Reached,
+                  Search_Result);
+            end Parse_Directory_Buffer;
+
+            Release_Block (Filesystem, Current_Block, Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+
+            Result := Search_Result;
+
+            if Is_Error (Result) then
+               return;
             elsif Result = Success then
                Log_Debug ("Found matching file entry.", Logging_Tags_FAT);
-               goto Free_Buffer;
+               return;
             elsif Last_Entry_Reached then
-               exit;
+               Log_Debug
+                 ("Last entry in directory reached.", Logging_Tags_FAT);
+               exit Follow_Cluster_Chain_Loop;
             end if;
-         end Parse_Directory_Buffer;
+         end loop Read_Sectors_Loop;
 
          --  Check for end of cluster chain.
-         if Is_Cluster_End_Of_Chain
-              (Unsigned_32 (Current_Read_Cluster), Filesystem_Info.FAT_Type)
-         then
-            Log_Debug ("End of cluster chain reached.", Logging_Tags_FAT);
-            exit;
-         end if;
+         exit Follow_Cluster_Chain_Loop when
+           Is_Cluster_End_Of_Chain
+             (Unsigned_32 (Current_Cluster), Filesystem_Info.FAT_Type);
 
          --  Read the next cluster in the FAT chain.
-         Read_FAT_Entry
+         Get_FAT16_Entry
            (Filesystem,
             Reading_Process,
             Filesystem_Info,
-            Unsigned_32 (Current_Read_Cluster),
-            Unsigned_32 (Next_Cluster_In_Chain),
+            Current_Cluster,
+            Next_Cluster_In_Chain,
             Result);
          if Is_Error (Result) then
-            goto Free_Buffer;
+            return;
          end if;
 
-         Log_Debug
-           ("Next directory cluster: " & Next_Cluster_In_Chain'Image,
-            Logging_Tags_FAT);
-
-         Current_Read_Cluster := Next_Cluster_In_Chain;
-      end loop;
+         Current_Cluster := Next_Cluster_In_Chain;
+      end loop Follow_Cluster_Chain_Loop;
 
       Log_Debug ("File not found in FAT directory.", Logging_Tags_FAT);
       Result := File_Not_Found;
-
-      <<Free_Buffer>>
-      Free_Kernel_Memory (Cluster_Buffer_Address, Free_Buffer_Result);
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Find_File_In_FAT16_Directory");
@@ -699,7 +709,7 @@ package body Filesystems.FAT.FAT16 is
          Result := Constraint_Exception;
    end Get_FAT16_Table_Cluster_Index;
 
-   procedure Read_Table_Entry_FAT16
+   procedure Get_FAT16_Entry
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
@@ -752,10 +762,10 @@ package body Filesystems.FAT.FAT16 is
         (Filesystem, Sector_Number, Filesystem_Info.Bytes_Per_Sector, Result);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Table_Entry_FAT16");
+         Log_Error ("Constraint_Error: Get_FAT16_Entry");
          FAT_Entry := 0;
          Result := Constraint_Exception;
-   end Read_Table_Entry_FAT16;
+   end Get_FAT16_Entry;
 
    procedure Write_Table_Entry_FAT16
      (Filesystem      : Filesystem_Access;

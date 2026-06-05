@@ -351,28 +351,28 @@ package body Filesystems.FAT is
       Log_Debug
         ("FAT Filesystem Info:"
          & ASCII.LF
-         & "  FAT12_16_Root_Directory_Sector:       "
+         & "  FAT12_16_Root_Directory_Sector:  "
          & FAT_Filesystem_Info.FAT12_16_Root_Directory_Sector'Image
          & ASCII.LF
-         & "  Sectors_In_Root_Directory: "
+         & "  Sectors_In_Root_Directory:       "
          & FAT_Filesystem_Info.Sectors_In_Root_Directory'Image
          & ASCII.LF
-         & "  Bytes_Per_Sector:            "
+         & "  Bytes_Per_Sector:                "
          & FAT_Filesystem_Info.Bytes_Per_Sector'Image
          & ASCII.LF
-         & "  First_FAT_Sector:            "
+         & "  First_FAT_Sector:                "
          & FAT_Filesystem_Info.First_FAT_Sector'Image
          & ASCII.LF
-         & "  First_Data_Sector:           "
+         & "  First_Data_Sector:               "
          & FAT_Filesystem_Info.First_Data_Sector'Image
          & ASCII.LF
-         & "  Total_Sectors_In_All_FAT_Tables:            "
+         & "  Total_Sectors_In_All_FAT_Tables: "
          & FAT_Filesystem_Info.Total_Sectors_In_All_FAT_Tables'Image
          & ASCII.LF
-         & "  FAT_Table_Count:             "
+         & "  FAT_Table_Count:                 "
          & FAT_Filesystem_Info.FAT_Table_Count'Image
          & ASCII.LF
-         & "  Sectors_Per_Cluster:         "
+         & "  Sectors_Per_Cluster:             "
          & FAT_Filesystem_Info.Sectors_Per_Cluster'Image,
          Logging_Tags_FAT);
    exception
@@ -557,7 +557,7 @@ package body Filesystems.FAT is
    begin
       case Filesystem_Info.FAT_Type is
          when FAT_Type_FAT16 =>
-            Read_Table_Entry_FAT16
+            Get_FAT16_Entry
               (Filesystem,
                Reading_Process,
                Filesystem_Info,
