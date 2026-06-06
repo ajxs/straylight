@@ -1105,6 +1105,47 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Read_FAT_Filename_Into_Filesystem_Node_Name;
 
+   procedure Does_FAT_Directory_Entry_Name_Match_Filename
+     (Directory_Entry_Name        : Wide_String;
+      Directory_Entry_Name_Length : Natural;
+      Path_Name                   : Filesystem_Path_T;
+      Match_Found                 : out Boolean;
+      Result                      : out Function_Result)
+   is
+      --  The UCS-2-encoded filename converted to the OS' native UTF-8 format.
+      --  This is used to compare against the target filename.
+      UTF8_Encoded_Filename : Filesystem_Node_Name_T;
+   begin
+      --  Convert the cached long filename to its UTF-8 representation
+      --  so we can compare it against the target filename.
+      Read_FAT_Filename_Into_Filesystem_Node_Name
+        (Directory_Entry_Name,
+         Directory_Entry_Name_Length,
+         UTF8_Encoded_Filename,
+         Result);
+      if Is_Error (Result) then
+         Match_Found := False;
+         return;
+      end if;
+
+      Log_Debug
+        ("Parsed FAT file entry with filename: '"
+         & UTF8_Encoded_Filename.Value (1 .. UTF8_Encoded_Filename.Byte_Length)
+         & "'",
+         Logging_Tags_FAT);
+
+      Match_Found :=
+        Does_Node_Name_Match_Path_Name (UTF8_Encoded_Filename, Path_Name);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Does_FAT_Directory_Entry_Name_Match_Filename");
+         Match_Found := False;
+         Result := Constraint_Exception;
+   end Does_FAT_Directory_Entry_Name_Match_Filename;
+
    procedure Write_File
      (Filesystem      : Filesystem_Access;
       Writing_Process : in out Process_Control_Block_T;
@@ -1129,20 +1170,16 @@ package body Filesystems.FAT is
    end Write_File;
 
    procedure Search_FAT_Directory_For_File_2
-     (Filesystem            : Filesystem_Access;
-      Directory             : Directory_Index_T;
-      Filename              : Filesystem_Path_T;
-      Parent_Node           : Filesystem_Node_Access;
-      Entry_Filename        : in out Wide_String;
-      Entry_Filename_Length : in out Natural;
-      Filesystem_Node       : out Filesystem_Node_Access;
-      Last_Entry_Reached    : out Boolean;
-      Result                : out Function_Result)
+     (Filesystem                 : Filesystem_Access;
+      Directory                  : Directory_Index_T;
+      Filename                   : Filesystem_Path_T;
+      Parent_Node                : Filesystem_Node_Access;
+      Entry_Long_Filename        : in out Wide_String;
+      Entry_Long_Filename_Length : in out Natural;
+      Filesystem_Node            : out Filesystem_Node_Access;
+      Last_Entry_Reached         : out Boolean;
+      Result                     : out Function_Result)
    is
-      --  The UCS-2-encoded filename converted to the OS' native UTF-8 format.
-      --  This is used to compare against the target filename.
-      UTF8_Encoded_Filename : Filesystem_Node_Name_T;
-
       DOS_Filename        : Wide_String (1 .. 12) :=
         [others => Wide_Character'Val (0)];
       DOS_Filename_Length : Natural := 0;
@@ -1177,8 +1214,8 @@ package body Filesystems.FAT is
             if Is_LFN_Directory_Entry (Directory (Dir_Idx)) then
                Read_LFN_Entry_Filename
                  (Directory (Dir_Idx),
-                  Entry_Filename,
-                  Entry_Filename_Length,
+                  Entry_Long_Filename,
+                  Entry_Long_Filename_Length,
                   Result);
                if Is_Error (Result) then
                   return;
@@ -1189,28 +1226,17 @@ package body Filesystems.FAT is
                --  either the full filename of the long directory entry, or the
                --  full DOS directory entry, and can now convert it to UTF-8,
                --  and compare it against the target filename.
-
-               --  Convert the cached long filename to its UTF-8 representation
-               --  so we can compare it against the target filename.
-               Read_FAT_Filename_Into_Filesystem_Node_Name
-                 (Entry_Filename,
-                  Entry_Filename_Length,
-                  UTF8_Encoded_Filename,
-                  Result);
-               if Is_Error (Result) then
-                  return;
+               if Entry_Long_Filename_Length > 0 then
+                  Does_FAT_Directory_Entry_Name_Match_Filename
+                    (Entry_Long_Filename,
+                     Entry_Long_Filename_Length,
+                     Filename,
+                     Match_Found,
+                     Result);
+                  if Is_Error (Result) then
+                     return;
+                  end if;
                end if;
-
-               Log_Debug
-                 ("Parsed FAT file entry with long filename: '"
-                  & UTF8_Encoded_Filename.Value
-                      (1 .. UTF8_Encoded_Filename.Byte_Length)
-                  & "'",
-                  Logging_Tags_FAT);
-
-               Match_Found :=
-                 Does_Node_Name_Match_Path_Name
-                   (UTF8_Encoded_Filename, Filename);
 
                --  As per the FAT32 v1.03 spec:
                --  " As soon as a short directory entry is encountered that is
@@ -1227,25 +1253,15 @@ package body Filesystems.FAT is
                      return;
                   end if;
 
-                  Read_FAT_Filename_Into_Filesystem_Node_Name
+                  Does_FAT_Directory_Entry_Name_Match_Filename
                     (DOS_Filename,
                      DOS_Filename_Length,
-                     UTF8_Encoded_Filename,
+                     Filename,
+                     Match_Found,
                      Result);
                   if Is_Error (Result) then
                      return;
                   end if;
-
-                  Log_Debug
-                    ("Parsed FAT file entry with DOS filename: '"
-                     & UTF8_Encoded_Filename.Value
-                         (1 .. UTF8_Encoded_Filename.Byte_Length)
-                     & "'",
-                     Logging_Tags_FAT);
-
-                  Match_Found :=
-                    Does_Node_Name_Match_Path_Name
-                      (UTF8_Encoded_Filename, Filename);
                end if;
 
                if Match_Found then
@@ -1280,8 +1296,9 @@ package body Filesystems.FAT is
                   return;
                end if;
 
-               Entry_Filename := [others => Wide_Character'Val (0)];
-               Entry_Filename_Length := 0;
+               --  If we didn't find a match, reset the cached long filename.
+               Entry_Long_Filename := [others => Wide_Character'Val (0)];
+               Entry_Long_Filename_Length := 0;
             end if;
          end if;
       end loop;

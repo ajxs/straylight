@@ -424,15 +424,15 @@ private
       Result             : out Function_Result);
 
    procedure Search_FAT_Directory_For_File_2
-     (Filesystem            : Filesystem_Access;
-      Directory             : Directory_Index_T;
-      Filename              : Filesystem_Path_T;
-      Parent_Node           : Filesystem_Node_Access;
-      Entry_Filename        : in out Wide_String;
-      Entry_Filename_Length : in out Natural;
-      Filesystem_Node       : out Filesystem_Node_Access;
-      Last_Entry_Reached    : out Boolean;
-      Result                : out Function_Result);
+     (Filesystem                 : Filesystem_Access;
+      Directory                  : Directory_Index_T;
+      Filename                   : Filesystem_Path_T;
+      Parent_Node                : Filesystem_Node_Access;
+      Entry_Long_Filename        : in out Wide_String;
+      Entry_Long_Filename_Length : in out Natural;
+      Filesystem_Node            : out Filesystem_Node_Access;
+      Last_Entry_Reached         : out Boolean;
+      Result                     : out Function_Result);
 
    ----------------------------------------------------------------------------
    --  Reads the portion of a file name from a long filename entry.
