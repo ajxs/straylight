@@ -415,32 +415,31 @@ private
       Result          : out Function_Result);
 
    procedure Search_FAT_Directory_For_File
-     (Filesystem                 : Filesystem_Access;
-      Directory                  : Directory_Index_T;
-      Filename                   : Filesystem_Path_T;
-      Parent_Node                : Filesystem_Node_Access;
-      Entry_Long_Filename        : in out Wide_String;
-      Entry_Long_Filename_Length : in out Natural;
-      Filesystem_Node            : out Filesystem_Node_Access;
-      Last_Entry_Reached         : out Boolean;
-      Result                     : out Function_Result);
+     (Filesystem                   : Filesystem_Access;
+      Directory                    : Directory_Index_T;
+      Filename                     : Filesystem_Path_T;
+      Parent_Node                  : Filesystem_Node_Access;
+      Entry_Long_Filename          : in out Wide_String;
+      Entry_Long_Filename_Length   : in out Natural;
+      Entry_Long_Filename_Checksum : in out Unsigned_8;
+      Checksum_Valid               : in out Boolean;
+      Filesystem_Node              : out Filesystem_Node_Access;
+      Last_Entry_Reached           : out Boolean;
+      Result                       : out Function_Result);
 
-   ----------------------------------------------------------------------------
-   --  Reads the portion of a file name from a long filename entry.
-   ----------------------------------------------------------------------------
-   procedure Read_LFN_Entry_Filename
+   procedure Parse_LFN_Directory_Entry
      (Dir_Entry       : FAT_Directory_Entry_T;
       Filename        : in out Wide_String;
       Filename_Length : in out Natural;
+      Checksum        : out Unsigned_8;
+      Is_Last_Entry   : out Boolean;
       Result          : out Function_Result);
 
-   ----------------------------------------------------------------------------
-   --  Reads a DOS filename from an 8.3 directory entry.
-   ----------------------------------------------------------------------------
-   procedure Read_DOS_Filename
+   procedure Parse_DOS_Directory_Entry
      (Dir_Entry       : FAT_Directory_Entry_T;
       Filename        : out Wide_String;
       Filename_Length : out Natural;
+      Checksum        : out Unsigned_8;
       Result          : out Function_Result);
 
    procedure Print_FAT_Filesystem_Info

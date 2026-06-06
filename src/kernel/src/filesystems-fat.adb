@@ -3,10 +3,11 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Filesystems.Block_Cache; use Filesystems.Block_Cache;
-with Filesystems.Node_Cache;  use Filesystems.Node_Cache;
-with Filesystems.FAT.FAT16;   use Filesystems.FAT.FAT16;
-with Memory.Kernel;           use Memory.Kernel;
+with Filesystems.Block_Cache;       use Filesystems.Block_Cache;
+with Filesystems.Node_Cache;        use Filesystems.Node_Cache;
+with Filesystems.FAT.DOS_Filenames; use Filesystems.FAT.DOS_Filenames;
+with Filesystems.FAT.FAT16;         use Filesystems.FAT.FAT16;
+with Memory.Kernel;                 use Memory.Kernel;
 
 package body Filesystems.FAT is
    --  @TODO: Should file creation be part of the 'find file' interface?
@@ -252,13 +253,17 @@ package body Filesystems.FAT is
       return True;
    end Is_Cluster_End_Of_Chain;
 
-   procedure Read_DOS_Filename
+   procedure Parse_DOS_Directory_Entry
      (Dir_Entry       : FAT_Directory_Entry_T;
       Filename        : out Wide_String;
       Filename_Length : out Natural;
+      Checksum        : out Unsigned_8;
       Result          : out Function_Result) is
    begin
       Filename_Length := 0;
+
+      Checksum :=
+        Get_DOS_Filename_Checksum (Dir_Entry.File_Name, Dir_Entry.File_Ext);
 
       Copy_Name : for I in 1 .. 8 loop
          --  The DOS filename is padded by spaces.
@@ -296,9 +301,10 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_DOS_Filename", Logging_Tags_FAT);
+         Log_Error
+           ("Constraint_Error: Parse_DOS_Directory_Entry", Logging_Tags_FAT);
          Result := Unhandled_Exception;
-   end Read_DOS_Filename;
+   end Parse_DOS_Directory_Entry;
 
    function Get_Node_Type_From_Directory_Entry
      (Dir_Entry : FAT_Directory_Entry_T) return Filesystem_Node_Type_T is
@@ -398,7 +404,7 @@ package body Filesystems.FAT is
       Log_Debug ("Parsing boot sector...", Logging_Tags_FAT);
 
       --  On FAT32 systems, the 'Total_Sector_Count' field (BPB_TotSec16) is
-      --  set to 0, and the actual total sector count is fuond in the
+      --  set to 0, and the actual total sector count is found in the
       --  'Large_Sector_Count' field (BPB_TotSec32).
       Filesystem_Info.Total_Sector_Count :=
         (if Boot_Sector.BPB.Total_Sector_Count = 0
@@ -607,10 +613,12 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Read_FAT_Entry;
 
-   procedure Read_LFN_Entry_Filename
+   procedure Parse_LFN_Directory_Entry
      (Dir_Entry       : FAT_Directory_Entry_T;
       Filename        : in out Wide_String;
       Filename_Length : in out Natural;
+      Checksum        : out Unsigned_8;
+      Is_Last_Entry   : out Boolean;
       Result          : out Function_Result)
    is
       --  The long file name entry being parsed.
@@ -621,14 +629,30 @@ package body Filesystems.FAT is
       Name_offset : Natural := 1;
    begin
       if not Is_LFN_Directory_Entry (Dir_Entry) then
+         Checksum := 0;
+         Is_Last_Entry := False;
          Result := Invalid_Argument;
          return;
       end if;
 
       if LFN_Entry.Sequence.Number = 0 then
+         Checksum := 0;
+         Is_Last_Entry := False;
          Result := Invalid_Argument;
          return;
       end if;
+
+      Is_Last_Entry := LFN_Entry.Sequence.Last_Entry;
+      if Is_Last_Entry then
+         --  If this is the last entry, then we are starting to read the name
+         --  from the beginning, so reset the filename length to 0.
+         --  This helps deal with 'orphaned' LFN entries by ignoring any
+         --  previous LFN entries that may have been read before encountering
+         --  the new 'last entry'.
+         Filename_Length := 0;
+      end if;
+
+      Checksum := LFN_Entry.Checksum;
 
       --  The offset into the name is always the sequence number
       --  multiplied by the maximum string length that each
@@ -685,7 +709,7 @@ package body Filesystems.FAT is
       when Constraint_Error =>
          Log_Error ("Constraint error reading LFN", Logging_Tags_FAT);
          Result := Constraint_Exception;
-   end Read_LFN_Entry_Filename;
+   end Parse_LFN_Directory_Entry;
 
    procedure Read_File
      (Filesystem      : Filesystem_Access;
@@ -1053,21 +1077,26 @@ package body Filesystems.FAT is
    end Write_File;
 
    procedure Search_FAT_Directory_For_File
-     (Filesystem                 : Filesystem_Access;
-      Directory                  : Directory_Index_T;
-      Filename                   : Filesystem_Path_T;
-      Parent_Node                : Filesystem_Node_Access;
-      Entry_Long_Filename        : in out Wide_String;
-      Entry_Long_Filename_Length : in out Natural;
-      Filesystem_Node            : out Filesystem_Node_Access;
-      Last_Entry_Reached         : out Boolean;
-      Result                     : out Function_Result)
+     (Filesystem                   : Filesystem_Access;
+      Directory                    : Directory_Index_T;
+      Filename                     : Filesystem_Path_T;
+      Parent_Node                  : Filesystem_Node_Access;
+      Entry_Long_Filename          : in out Wide_String;
+      Entry_Long_Filename_Length   : in out Natural;
+      Entry_Long_Filename_Checksum : in out Unsigned_8;
+      Checksum_Valid               : in out Boolean;
+      Filesystem_Node              : out Filesystem_Node_Access;
+      Last_Entry_Reached           : out Boolean;
+      Result                       : out Function_Result)
    is
       DOS_Filename        : Wide_String (1 .. 12) :=
         [others => Wide_Character'Val (0)];
       DOS_Filename_Length : Natural := 0;
 
       Match_Found : Boolean := False;
+
+      Is_Last_Entry : Boolean := False;
+      New_Checksum  : Unsigned_8 := 0;
    begin
       Log_Debug
         ("Searching directory for file '" & Filename & "'", Logging_Tags_FAT);
@@ -1095,21 +1124,69 @@ package body Filesystems.FAT is
             --  file name entry, read its section of the name into the cached
             --  filename buffer.
             if Is_LFN_Directory_Entry (Directory (Dir_Idx)) then
-               Read_LFN_Entry_Filename
+               Parse_LFN_Directory_Entry
                  (Directory (Dir_Idx),
                   Entry_Long_Filename,
                   Entry_Long_Filename_Length,
+                  New_Checksum,
+                  Is_Last_Entry,
                   Result);
                if Is_Error (Result) then
                   return;
                end if;
+
+               if Is_Last_Entry then
+                  --  If this is the last entry, then we are starting to read a
+                  --  new long filename sequence. So reset the checksum state.
+                  Entry_Long_Filename_Checksum := New_Checksum;
+                  Checksum_Valid := True;
+               else
+                  --  Accumulate the checksum valid state for this sequence.
+                  Checksum_Valid :=
+                    Checksum_Valid
+                    and then (New_Checksum = Entry_Long_Filename_Checksum);
+
+                  if New_Checksum /= Entry_Long_Filename_Checksum then
+                     Log_Debug
+                       ("Directory entry "
+                        & Dir_Idx'Image
+                        & " checksum does not match expected value.",
+                        Logging_Tags_FAT);
+                  end if;
+               end if;
             else
+               Parse_DOS_Directory_Entry
+                 (Directory (Dir_Idx),
+                  DOS_Filename,
+                  DOS_Filename_Length,
+                  New_Checksum,
+                  Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
+               if Entry_Long_Filename_Length > 0 then
+                  Checksum_Valid :=
+                    Checksum_Valid
+                    and then (New_Checksum = Entry_Long_Filename_Checksum);
+
+                  if not Checksum_Valid then
+                     Log_Debug
+                       ("Filename checksum is invalid.", Logging_Tags_FAT);
+                  end if;
+               end if;
+
+               --  Only compare against the long filename if we have a valid
+               --  checksum, and we've actually read a long filename.
+               Use_Long_Filename : constant Boolean :=
+                 Checksum_Valid and then Entry_Long_Filename_Length > 0;
+
                --  Every sequence of LFN entries is followed by its
                --  corresponding DOS 8.3 entry, so at this point we have
                --  either the full filename of the long directory entry, or the
                --  full DOS directory entry, and can now convert it to UTF-8,
                --  and compare it against the target filename.
-               if Entry_Long_Filename_Length > 0 then
+               if Use_Long_Filename then
                   Does_FAT_Directory_Entry_Name_Match_Filename
                     (Entry_Long_Filename,
                      Entry_Long_Filename_Length,
@@ -1127,15 +1204,6 @@ package body Filesystems.FAT is
                --  operation will check the cached long name first and then the
                --  short name for a match."
                if not Match_Found then
-                  Read_DOS_Filename
-                    (Directory (Dir_Idx),
-                     DOS_Filename,
-                     DOS_Filename_Length,
-                     Result);
-                  if Is_Error (Result) then
-                     return;
-                  end if;
-
                   Does_FAT_Directory_Entry_Name_Match_Filename
                     (DOS_Filename,
                      DOS_Filename_Length,
@@ -1182,6 +1250,7 @@ package body Filesystems.FAT is
                --  If we didn't find a match, reset the cached long filename.
                Entry_Long_Filename := [others => Wide_Character'Val (0)];
                Entry_Long_Filename_Length := 0;
+               Checksum_Valid := False;
             end if;
          end if;
       end loop;

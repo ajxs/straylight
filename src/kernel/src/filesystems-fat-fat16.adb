@@ -474,10 +474,12 @@ package body Filesystems.FAT.FAT16 is
       Last_Entry_Reached : Boolean := False;
 
       --  The UCS-2-encoded filename read from the current directory entry.
-      Entry_Long_Filename        :
+      Entry_Long_Filename          :
         Wide_String (1 .. Filesystem_Node_Name_Max_Byte_Length) :=
           [others => Wide_Character'Val (0)];
-      Entry_Long_Filename_Length : Natural := 0;
+      Entry_Long_Filename_Length   : Natural := 0;
+      Entry_Long_Filename_Checksum : Unsigned_8 := 0;
+      Checksum_Valid               : Boolean := False;
    begin
       Log_Debug ("Finding file in FAT16 directory", Logging_Tags_FAT);
 
@@ -538,6 +540,8 @@ package body Filesystems.FAT.FAT16 is
                   Parent_Node,
                   Entry_Long_Filename,
                   Entry_Long_Filename_Length,
+                  Entry_Long_Filename_Checksum,
+                  Checksum_Valid,
                   Filesystem_Node,
                   Last_Entry_Reached,
                   Search_Result);
@@ -603,10 +607,12 @@ package body Filesystems.FAT.FAT16 is
       Last_Entry_Reached : Boolean := False;
 
       --  The UCS-2-encoded filename read from the current directory entry.
-      Entry_Long_Filename        :
+      Entry_Long_Filename          :
         Wide_String (1 .. Filesystem_Node_Name_Max_Byte_Length) :=
           [others => Wide_Character'Val (0)];
-      Entry_Long_Filename_Length : Natural := 0;
+      Entry_Long_Filename_Length   : Natural := 0;
+      Entry_Long_Filename_Checksum : Unsigned_8 := 0;
+      Checksum_Valid               : Boolean := False;
 
       Block_Address              : Virtual_Address_T := Null_Address;
       Current_Sector             : Sector_Index_T := 0;
@@ -671,6 +677,8 @@ package body Filesystems.FAT.FAT16 is
                Parent_Node,
                Entry_Long_Filename,
                Entry_Long_Filename_Length,
+               Entry_Long_Filename_Checksum,
+               Checksum_Valid,
                Filesystem_Node,
                Last_Entry_Reached,
                Search_Result);
