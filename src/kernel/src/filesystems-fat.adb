@@ -660,144 +660,6 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Read_LFN_Entry_Filename;
 
-   procedure Search_FAT_Directory_For_File
-     (Filesystem         : Filesystem_Access;
-      Directory          : Directory_Index_T;
-      Filename           : Filesystem_Path_T;
-      Parent_Node        : Filesystem_Node_Access;
-      Filesystem_Node    : out Filesystem_Node_Access;
-      Last_Entry_Reached : out Boolean;
-      Result             : out Function_Result)
-   is
-      --  Whether a long file name entry is currently being read.
-      Entry_Has_Long_Filename : Boolean := False;
-      --  The UCS-2-encoded filename read from the current directory entry.
-      Entry_Filename          :
-        Wide_String (1 .. Filesystem_Node_Name_Max_Byte_Length) :=
-          [others => Wide_Character'Val (0)];
-      Entry_Filename_Length   : Natural := 0;
-
-      --  The UCS-2-encoded filename converted to the OS' native UTF-8 format.
-      --  This is used to compare against the target filename.
-      UTF8_Encoded_Filename : Filesystem_Node_Name_T;
-   begin
-      Log_Debug
-        ("Searching directory for file '" & Filename & "'", Logging_Tags_FAT);
-
-      --  Track when we've reached the last directory entry, which is
-      --  indicated by a special marker in the first byte of the directory
-      --  entry. This is done so that a caller can know when to stop scanning
-      --  directory entry clusters.
-      Last_Entry_Reached := False;
-
-      Filesystem_Node := null;
-
-      for Dir_Idx in 1 .. Directory'Length loop
-         Log_Debug
-           ("Scanning directory entry: " & Dir_Idx'Image, Logging_Tags_FAT);
-
-         if Is_Last_Directory_Entry (Directory (Dir_Idx)) then
-            Log_Debug ("Reached last directory entry.", Logging_Tags_FAT);
-            Last_Entry_Reached := True;
-            exit;
-         end if;
-
-         if not Is_Unused_Directory_Entry (Directory (Dir_Idx)) then
-            --  If the entry attributes indicate that this is a long
-            --  file name entry, then parse it differently.
-            if Is_LFN_Directory_Entry (Directory (Dir_Idx)) then
-               Entry_Has_Long_Filename := True;
-
-               --  Read this section of the name from the LFN entry.
-               Read_LFN_Entry_Filename
-                 (Directory (Dir_Idx),
-                  Entry_Filename,
-                  Entry_Filename_Length,
-                  Result);
-               if Is_Error (Result) then
-                  return;
-               end if;
-            else
-               --  If we're not in the process of reading a long file name
-               --  then read the DOS filename from the 8.3 entry.
-               if not Entry_Has_Long_Filename then
-                  Read_DOS_Filename
-                    (Directory (Dir_Idx),
-                     Entry_Filename,
-                     Entry_Filename_Length,
-                     Result);
-                  if Is_Error (Result) then
-                     return;
-                  end if;
-               end if;
-
-               --  Every sequence of LFN entries is followed by its
-               --  corresponding DOS 8.3 entry, so at this point we have
-               --  either the full filename of the long directory entry, or the
-               --  full DOS directory entry, and can now convert it to UTF-8,
-               --  and compare it against the target filename.
-               Read_FAT_Filename_Into_Filesystem_Node_Name
-                 (Entry_Filename,
-                  Entry_Filename_Length,
-                  UTF8_Encoded_Filename,
-                  Result);
-               if Is_Error (Result) then
-                  return;
-               end if;
-
-               Log_Debug
-                 ("Parsed FAT file entry with filename: '"
-                  & UTF8_Encoded_Filename.Value
-                      (1 .. UTF8_Encoded_Filename.Byte_Length)
-                  & "'",
-                  Logging_Tags_FAT);
-
-               --  Check if the parsed filename matches the target filename.
-               if Does_Node_Name_Match_Path_Name
-                    (UTF8_Encoded_Filename, Filename)
-               then
-                  First_Cluster : constant Unsigned_32 :=
-                    Get_First_Cluster_Of_Dir_Entry (Directory (Dir_Idx));
-
-                  --  If we have a match, create a filesystem node cache entry,
-                  --  set the node type, and exit.
-                  Create_Filesystem_Node_Cache_Entry
-                    (Filesystem,
-                     Filename,
-                     Filesystem_Node,
-                     Result,
-                     Size          =>
-                       Unsigned_64 (Directory (Dir_Idx).File_Size),
-                     Data_Location => Unsigned_64 (First_Cluster),
-                     Index         =>
-                       Get_Directory_Entry_Node_Index (First_Cluster, Dir_Idx),
-                     Parent_Index  => Parent_Node.all.Index);
-                  if Is_Error (Result) then
-                     Filesystem_Node := null;
-                     return;
-                  end if;
-
-                  Filesystem_Node.all.Node_Type :=
-                    Get_Node_Type_From_Directory_Entry (Directory (Dir_Idx));
-
-                  Result := Success;
-                  return;
-               end if;
-
-               Entry_Filename := [others => Wide_Character'Val (0)];
-               Entry_Filename_Length := 0;
-               Entry_Has_Long_Filename := False;
-            end if;
-         end if;
-      end loop;
-
-      Result := File_Not_Found;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Search_FAT_Directory_For_File");
-         Result := Constraint_Exception;
-   end Search_FAT_Directory_For_File;
-
    procedure Read_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -1172,7 +1034,7 @@ package body Filesystems.FAT is
       Result := Success;
    end Write_File;
 
-   procedure Search_FAT_Directory_For_File_2
+   procedure Search_FAT_Directory_For_File
      (Filesystem                 : Filesystem_Access;
       Directory                  : Directory_Index_T;
       Filename                   : Filesystem_Path_T;
@@ -1309,8 +1171,8 @@ package body Filesystems.FAT is
       Result := File_Not_Found;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Search_FAT_Directory_For_File_2");
+         Log_Error ("Constraint_Error: Search_FAT_Directory_For_File");
          Result := Constraint_Exception;
-   end Search_FAT_Directory_For_File_2;
+   end Search_FAT_Directory_For_File;
 
 end Filesystems.FAT;

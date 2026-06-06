@@ -473,10 +473,10 @@ package body Filesystems.FAT.FAT16 is
       Last_Entry_Reached : Boolean := False;
 
       --  The UCS-2-encoded filename read from the current directory entry.
-      Test_Entry_Filename        :
+      Entry_Long_Filename        :
         Wide_String (1 .. Filesystem_Node_Name_Max_Byte_Length) :=
           [others => Wide_Character'Val (0)];
-      Test_Entry_Filename_Length : Natural := 0;
+      Entry_Long_Filename_Length : Natural := 0;
    begin
       Log_Debug ("Finding file in FAT16 directory", Logging_Tags_FAT);
 
@@ -530,13 +530,13 @@ package body Filesystems.FAT.FAT16 is
                  Address   => Block_Address + Sector_Offset_Within_Block,
                  Alignment => 1;
             begin
-               Search_FAT_Directory_For_File_2
+               Search_FAT_Directory_For_File
                  (Filesystem,
                   Directory,
                   Filename,
                   Parent_Node,
-                  Test_Entry_Filename,
-                  Test_Entry_Filename_Length,
+                  Entry_Long_Filename,
+                  Entry_Long_Filename_Length,
                   Filesystem_Node,
                   Last_Entry_Reached,
                   Search_Result);
@@ -602,6 +602,12 @@ package body Filesystems.FAT.FAT16 is
       Current_Read_Sector   : Sector_Index_T := 0;
       Release_Sector_Result : Function_Result := Unset;
       Last_Entry_Reached    : Boolean := False;
+
+      --  The UCS-2-encoded filename read from the current directory entry.
+      Entry_Long_Filename        :
+        Wide_String (1 .. Filesystem_Node_Name_Max_Byte_Length) :=
+          [others => Wide_Character'Val (0)];
+      Entry_Long_Filename_Length : Natural := 0;
    begin
       Current_Read_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
 
@@ -632,6 +638,8 @@ package body Filesystems.FAT.FAT16 is
                Directory,
                Filename,
                Parent_Node,
+               Entry_Long_Filename,
+               Entry_Long_Filename_Length,
                Filesystem_Node,
                Last_Entry_Reached,
                Result);

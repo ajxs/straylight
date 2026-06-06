@@ -415,15 +415,6 @@ private
       Result          : out Function_Result);
 
    procedure Search_FAT_Directory_For_File
-     (Filesystem         : Filesystem_Access;
-      Directory          : Directory_Index_T;
-      Filename           : Filesystem_Path_T;
-      Parent_Node        : Filesystem_Node_Access;
-      Filesystem_Node    : out Filesystem_Node_Access;
-      Last_Entry_Reached : out Boolean;
-      Result             : out Function_Result);
-
-   procedure Search_FAT_Directory_For_File_2
      (Filesystem                 : Filesystem_Access;
       Directory                  : Directory_Index_T;
       Filename                   : Filesystem_Path_T;
