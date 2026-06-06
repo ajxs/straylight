@@ -232,15 +232,15 @@ package body Filesystems.FAT.FAT16 is
    is
       pragma Unreferenced (Parent_Node, New_Node);
 
-      Sector_Address      : Virtual_Address_T := Null_Address;
-      Current_Read_Sector : Sector_Index_T := 0;
+      Sector_Address : Virtual_Address_T := Null_Address;
+      Current_Sector : Sector_Index_T := 0;
 
       Was_New_Entry_Created : Boolean := False;
       New_Dir_Entry_Index   : Natural := 0;
 
       Number_Of_LFN_Entries_Needed : Natural := 0;
    begin
-      Current_Read_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
+      Current_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
 
       LFN_Entries_Are_Required : constant Boolean :=
         Are_LFN_Entries_Required (Filename);
@@ -266,7 +266,7 @@ package body Filesystems.FAT.FAT16 is
          Read_Sector_From_Filesystem
            (Filesystem,
             Reading_Process,
-            Current_Read_Sector,
+            Current_Sector,
             Filesystem_Info.Bytes_Per_Sector,
             Sector_Address,
             Result);
@@ -274,11 +274,12 @@ package body Filesystems.FAT.FAT16 is
             return;
          end if;
 
-         Directory_Entries_Per_Sector : constant Natural :=
+         Directory_Entries_In_This_Block : constant Natural :=
            Filesystem_Info.Bytes_Per_Sector / 32;
 
          Parse_Directory_Buffer : declare
-            Directory : Directory_Index_T (1 .. Directory_Entries_Per_Sector)
+            Directory :
+              Directory_Index_T (1 .. Directory_Entries_In_This_Block)
             with Import, Address => Sector_Address, Alignment => 1;
 
             Current_Free_Entry_Count : Natural := 0;
@@ -337,7 +338,7 @@ package body Filesystems.FAT.FAT16 is
                      Write_Sector_To_Filesystem
                        (Filesystem,
                         Reading_Process,
-                        Current_Read_Sector,
+                        Current_Sector,
                         Filesystem_Info.Bytes_Per_Sector,
                         Result);
                      if Is_Error (Result) then
@@ -355,7 +356,7 @@ package body Filesystems.FAT.FAT16 is
 
          Release_Sector
            (Filesystem,
-            Current_Read_Sector,
+            Current_Sector,
             Filesystem_Info.Bytes_Per_Sector,
             Result);
          if Is_Error (Result) then
@@ -368,7 +369,7 @@ package body Filesystems.FAT.FAT16 is
          end if;
 
          --  Increment the current read sector.
-         Current_Read_Sector := Current_Read_Sector + 1;
+         Current_Sector := Current_Sector + 1;
       end loop Read_Sectors_Loop;
 
       Result := No_Free_Entries;
@@ -598,40 +599,70 @@ package body Filesystems.FAT.FAT16 is
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result)
    is
-      Sector_Address        : Virtual_Address_T := Null_Address;
-      Current_Read_Sector   : Sector_Index_T := 0;
-      Release_Sector_Result : Function_Result := Unset;
-      Last_Entry_Reached    : Boolean := False;
+      Search_Result      : Function_Result := Unset;
+      Last_Entry_Reached : Boolean := False;
 
       --  The UCS-2-encoded filename read from the current directory entry.
       Entry_Long_Filename        :
         Wide_String (1 .. Filesystem_Node_Name_Max_Byte_Length) :=
           [others => Wide_Character'Val (0)];
       Entry_Long_Filename_Length : Natural := 0;
+
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Current_Sector             : Sector_Index_T := 0;
+      Current_Block              : Block_Index_T := 0;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
    begin
-      Current_Read_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
+      Last_Sector : constant Sector_Index_T :=
+        Filesystem_Info.FAT12_16_Root_Directory_Sector
+        + Sector_Index_T (Filesystem_Info.Sectors_In_Root_Directory);
 
-      Directory_Entries_Per_Sector : constant Natural :=
-        Filesystem_Info.Bytes_Per_Sector / 32;
+      Current_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
 
-      Read_Sectors_Loop : for I in
-        1 .. Filesystem_Info.Sectors_In_Root_Directory
-      loop
-         --  Read each FAT logical sector in the root directory into memory.
-         Read_Sector_From_Filesystem
-           (Filesystem,
-            Reading_Process,
-            Current_Read_Sector,
+      Read_Sectors_Loop : loop
+         Get_Sector_Block_Number_And_Offset
+           (Current_Sector,
             Filesystem_Info.Bytes_Per_Sector,
-            Sector_Address,
+            Current_Block,
+            Sector_Offset_Within_Block,
             Result);
          if Is_Error (Result) then
             return;
          end if;
 
+         Read_Block_From_Filesystem
+           (Filesystem, Reading_Process, Current_Block, Block_Address, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Remaining_Sectors : constant Natural :=
+           Natural (Last_Sector - Current_Sector);
+
+         --  We need to take into account that the starting sector of the root
+         --  directory may not be block-aligned. e.g.
+         --  If the root directory starts at sector 33, and the sector size is
+         --  512 bytes and the block size is 4096 bytes, then the first block
+         --  read will contain sectors 33 - 40 (7 sectors), and the directory
+         --  entries for the root directory will start at an offset of 512
+         --  bytes into that block.
+         Sectors_Within_This_Block : constant Natural :=
+           Natural'Min
+             (Natural (Block_Size - Sector_Offset_Within_Block)
+              / Filesystem_Info.Bytes_Per_Sector,
+              Remaining_Sectors);
+
+         Directory_Entries_In_This_Block : constant Natural :=
+           Get_Buffer_Max_Directory_Entry_Count
+             (Sectors_Within_This_Block * Filesystem_Info.Bytes_Per_Sector);
+
          Parse_Directory_Buffer : declare
-            Directory : Directory_Index_T (1 .. Directory_Entries_Per_Sector)
-            with Import, Address => Sector_Address, Alignment => 1;
+            Directory :
+              Directory_Index_T (1 .. Directory_Entries_In_This_Block)
+            with
+              Import,
+              Address   => Block_Address + Sector_Offset_Within_Block,
+              Alignment => 1;
          begin
             Search_FAT_Directory_For_File
               (Filesystem,
@@ -642,37 +673,30 @@ package body Filesystems.FAT.FAT16 is
                Entry_Long_Filename_Length,
                Filesystem_Node,
                Last_Entry_Reached,
-               Result);
-
-            --  Note that this uses a separate 'result' variable, so that
-            --  we don't overwrite the main result, unless this fails.
-            Release_Sector
-              (Filesystem,
-               Current_Read_Sector,
-               Filesystem_Info.Bytes_Per_Sector,
-               Release_Sector_Result);
-            if Is_Error (Release_Sector_Result) then
-               Result := Release_Sector_Result;
-               return;
-            end if;
-
-            if Is_Error (Result) then
-               return;
-            end if;
-
-            if Last_Entry_Reached then
-               exit Read_Sectors_Loop;
-            end if;
+               Search_Result);
          end Parse_Directory_Buffer;
 
-         if Filesystem_Node /= null then
-            Log_Debug ("Found matching file entry.", Logging_Tags_FAT);
-            Result := Success;
+         Release_Block (Filesystem, Current_Block, Result);
+         if Is_Error (Result) then
             return;
          end if;
 
-         --  Increment the current read sector.
-         Current_Read_Sector := Current_Read_Sector + 1;
+         Result := Search_Result;
+
+         if Is_Error (Result) then
+            return;
+         elsif Result = Success then
+            Log_Debug ("Found matching file entry.", Logging_Tags_FAT);
+            return;
+         elsif Last_Entry_Reached then
+            Log_Debug ("Last entry in directory reached.", Logging_Tags_FAT);
+            exit Read_Sectors_Loop;
+         end if;
+
+         Current_Sector :=
+           Current_Sector + Sector_Index_T (Sectors_Within_This_Block);
+
+         exit Read_Sectors_Loop when Current_Sector >= Last_Sector;
       end loop Read_Sectors_Loop;
 
       Result := File_Not_Found;
