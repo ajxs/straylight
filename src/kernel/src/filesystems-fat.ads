@@ -393,10 +393,10 @@ private
    function Get_First_Sector_Of_Cluster
      (Cluster             : Unsigned_32;
       Sectors_Per_Cluster : Natural;
-      First_Data_Sector   : Unsigned_64) return Unsigned_64
-   is (Unsigned_64 (Cluster - 2)
-       * Unsigned_64 (Sectors_Per_Cluster)
-       + First_Data_Sector)
+      First_Data_Sector   : Unsigned_64) return Sector_Index_T
+   is (Sector_Index_T (Cluster - 2)
+       * Sector_Index_T (Sectors_Per_Cluster)
+       + Sector_Index_T (First_Data_Sector))
    with Inline, Pure_Function;
 
    procedure Get_First_File_Cluster_From_Filesystem_Node

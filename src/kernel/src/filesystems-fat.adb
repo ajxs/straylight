@@ -488,14 +488,14 @@ package body Filesystems.FAT is
       Buffer_Virtual_Address : Virtual_Address_T;
       Result                 : out Function_Result)
    is
-      Current_Read_Sector : Unsigned_64 := 0;
-      Sector_Address      : Virtual_Address_T := Null_Address;
-
       Destination_Virtual_Address : Virtual_Address_T :=
         Buffer_Virtual_Address;
-   begin
-      Log_Debug ("Reading cluster: " & Cluster'Image, Logging_Tags_FAT);
 
+      Current_Block              : Block_Index_T := 0;
+      Current_Sector             : Sector_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+   begin
       if Cluster < 2 then
          Log_Error
            ("Invalid cluster number: " & Cluster'Image, Logging_Tags_FAT);
@@ -503,44 +503,71 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Current_Read_Sector :=
+      Log_Debug ("Reading cluster: " & Cluster'Image, Logging_Tags_FAT);
+
+      Current_Sector :=
         Get_First_Sector_Of_Cluster
           (Cluster,
            Filesystem_Info.Sectors_Per_Cluster,
            Filesystem_Info.First_Data_Sector);
 
-      for I in 0 .. Filesystem_Info.Sectors_Per_Cluster - 1 loop
-         Read_Sector_From_Filesystem
-           (Filesystem,
-            Reading_Process,
-            Current_Read_Sector,
+      Last_Sector : constant Sector_Index_T :=
+        Current_Sector + Sector_Index_T (Filesystem_Info.Sectors_Per_Cluster);
+
+      Read_Sectors_Loop : loop
+         Get_Sector_Block_Number_And_Offset
+           (Current_Sector,
             Filesystem_Info.Bytes_Per_Sector,
-            Sector_Address,
+            Current_Block,
+            Sector_Offset_Within_Block,
             Result);
          if Is_Error (Result) then
             return;
          end if;
+
+         Read_Block_From_Filesystem
+           (Filesystem, Reading_Process, Current_Block, Block_Address, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Remaining_Sectors : constant Natural :=
+           Natural (Last_Sector - Current_Sector);
+
+         --  We need to take into account that the starting sector of the root
+         --  directory may not be block-aligned. e.g.
+         --  If the root directory starts at sector 33, and the sector size is
+         --  512 bytes and the block size is 4096 bytes, then the first block
+         --  read will contain sectors 33 - 40 (7 sectors), and the directory
+         --  entries for the root directory will start at an offset of 512
+         --  bytes into that block.
+         Sectors_Within_This_Block : constant Natural :=
+           Natural'Min
+             (Natural (Block_Size - Sector_Offset_Within_Block)
+              / Filesystem_Info.Bytes_Per_Sector,
+              Remaining_Sectors);
+
+         Bytes_In_This_Block : constant Natural :=
+           Sectors_Within_This_Block * Filesystem_Info.Bytes_Per_Sector;
 
          Copy
            (Destination_Virtual_Address,
-            Sector_Address,
-            Filesystem_Info.Bytes_Per_Sector);
+            Block_Address + Sector_Offset_Within_Block,
+            Bytes_In_This_Block);
 
          Destination_Virtual_Address :=
-           Destination_Virtual_Address
-           + Storage_Offset (Filesystem_Info.Bytes_Per_Sector);
+           Destination_Virtual_Address + Storage_Offset (Bytes_In_This_Block);
 
-         Release_Sector
-           (Filesystem,
-            Current_Read_Sector,
-            Filesystem_Info.Bytes_Per_Sector,
-            Result);
+         Release_Block (Filesystem, Current_Block, Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Current_Read_Sector := Current_Read_Sector + 1;
-      end loop;
+         Current_Sector :=
+           Current_Sector + Sector_Index_T (Sectors_Within_This_Block);
+
+         exit Read_Sectors_Loop when Current_Sector >= Last_Sector;
+      end loop Read_Sectors_Loop;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Read_Cluster_Into_Buffer");
