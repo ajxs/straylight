@@ -1134,8 +1134,11 @@ package body Filesystems.FAT is
          & "'",
          Logging_Tags_FAT);
 
+      --  Note that all operations on FAT filesystems are case-insensitive.
+      --  As perFAT32 v1.03 spec page 30.
       Match_Found :=
-        Does_Node_Name_Match_Path_Name (UTF8_Encoded_Filename, Path_Name);
+        Does_Node_Name_Match_Path_Name
+          (UTF8_Encoded_Filename, Path_Name, True);
 
       Result := Success;
    exception

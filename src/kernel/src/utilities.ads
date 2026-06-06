@@ -18,8 +18,9 @@ package Utilities is
    end record;
 
    function Compare_Fixed_Length_String_With_String
-     (Fixed_Length_String : Fixed_Length_String_T; Comparison : String)
-      return Boolean;
+     (Fixed_Length_String : Fixed_Length_String_T;
+      Comparison          : String;
+      Case_Insensitive    : Boolean := False) return Boolean;
 
    function Convert_BEU32_To_LEU32 (BEU32 : Unsigned_32) return Unsigned_32
    is (Shift_Left (BEU32 and 16#0000_00FF#, 24)

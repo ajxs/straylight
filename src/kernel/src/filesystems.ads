@@ -251,9 +251,11 @@ private
       return Boolean;
 
    function Does_Node_Name_Match_Path_Name
-     (Node_Name : Filesystem_Node_Name_T; Path : Filesystem_Path_T)
-      return Boolean
-   is (Compare_Fixed_Length_String_With_String (Node_Name, Path));
+     (Node_Name        : Filesystem_Node_Name_T;
+      Path             : Filesystem_Path_T;
+      Case_Insensitive : Boolean := False) return Boolean
+   is (Compare_Fixed_Length_String_With_String
+         (Node_Name, Path, Case_Insensitive));
 
    procedure Get_Next_Path_Component
      (Path                   : Filesystem_Path_T;

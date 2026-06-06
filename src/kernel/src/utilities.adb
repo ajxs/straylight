@@ -127,11 +127,24 @@ package body Utilities is
    end To_Upper;
 
    function Compare_Fixed_Length_String_With_String
-     (Fixed_Length_String : Fixed_Length_String_T; Comparison : String)
-      return Boolean is
+     (Fixed_Length_String : Fixed_Length_String_T;
+      Comparison          : String;
+      Case_Insensitive    : Boolean := False) return Boolean is
    begin
       if Fixed_Length_String.Byte_Length /= Comparison'Length then
          return False;
+      end if;
+
+      if Case_Insensitive then
+         for I in 1 .. Fixed_Length_String.Byte_Length loop
+            if To_Upper (Fixed_Length_String.Value (I))
+              /= To_Upper (Comparison (I))
+            then
+               return False;
+            end if;
+         end loop;
+
+         return True;
       end if;
 
       return
