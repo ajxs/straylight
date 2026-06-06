@@ -80,14 +80,14 @@ package body Filesystems.FAT.DOS_Filenames is
       DOS_Extension       : out FAT_DOS_File_Ext_T;
       Conversion_Is_Lossy : out Boolean;
       Result              : out Function_Result;
-      Version             : Integer := 1)
+      Version             : Positive := 1)
    is
       Start_Index         : Integer := Filename'First;
       DOS_Filename_Length : Integer := 0;
 
-      --  Cap max version string length so that there's a guarantee that at
-      --  least 3 characters will be available for the filename stem.
-      Max_Version_String_Length : constant Integer := 5;
+      --  Cap max version so that there's a guarantee that at least 3
+      --  characters will be available for the filename stem.
+      Max_Version : constant := 9999;
    begin
       Conversion_Is_Lossy := False;
 
@@ -96,21 +96,13 @@ package body Filesystems.FAT.DOS_Filenames is
          return;
       end if;
 
-      --  Convert the version number to a string, and check if it can fit in
-      --  the DOS filename. This number will be appended to the end of the
-      --  filename stem in the case that the conversion is lossy.
-      --  Do this early so we can avoid unnecessary
-      --  processing if the version number is too large.
-      Version_Number_String : String := Integer'Image (Version);
-      if Version_Number_String'Length > Max_Version_String_Length then
+      if Version > Max_Version then
          Log_Error
            ("Version number is too large to fit in the DOS filename.",
             Logging_Tags_FAT);
-         Result := Constraint_Exception;
+         Result := Invalid_Argument;
          return;
       end if;
-
-      Version_Number_String (Version_Number_String'First) := '~';
 
       --  Initialize the DOS filename.
       DOS_Filename := [others => ' '];
@@ -153,6 +145,11 @@ package body Filesystems.FAT.DOS_Filenames is
       --  If the name conversion was lossy, append the version number to the
       --  end of the filename stem.
       if Conversion_Is_Lossy then
+         Version_Number_String : String := Integer'Image (Version);
+         --  In Ada, Integer'Image returns a string with a leading space for
+         --  positive numbers, so we can safely use this index for the '~'.
+         Version_Number_String (Version_Number_String'First) := '~';
+
          declare
             Char_Pos : Integer :=
               (if (DOS_Filename_Length + Version_Number_String'Length) > 8

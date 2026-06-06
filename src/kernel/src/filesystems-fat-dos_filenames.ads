@@ -10,7 +10,7 @@ is
       --  In this case, a version number suffix is appended.
       Conversion_Is_Lossy : out Boolean;
       Result              : out Function_Result;
-      Version             : Integer := 1);
+      Version             : Positive := 1);
 
    function Get_DOS_Filename_Checksum
      (DOS_Filename : FAT_DOS_File_Name_T; DOS_Extension : FAT_DOS_File_Ext_T)
