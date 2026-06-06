@@ -786,11 +786,7 @@ package body Filesystems.FAT is
       Current_Read_Cluster  : Unsigned_32 := 0;
       Next_Cluster_In_Chain : Unsigned_32 := 0;
 
-      Current_Offset             : Unsigned_64 := Start_Offset;
-      Offset_Within_Cluster      : Natural := 0;
-      Bytes_To_Copy_From_Cluster : Natural := 0;
-      Bytes_Left_To_Read         : Natural := 0;
-
+      Current_Offset       : Unsigned_64 := Start_Offset;
       Actual_Bytes_To_Read : Natural := Bytes_To_Read;
    begin
       Bytes_Read := 0;
@@ -856,18 +852,18 @@ package body Filesystems.FAT is
       --  the necessary bytes from each cluster until the requested
       --  number of bytes have been read.
       loop
-         Bytes_Left_To_Read := Actual_Bytes_To_Read - Bytes_Read;
+         Bytes_Left_To_Read : constant Natural :=
+           Actual_Bytes_To_Read - Bytes_Read;
 
-         Offset_Within_Cluster :=
+         Offset_Within_Cluster : constant Natural :=
            Natural (Current_Offset mod Unsigned_64 (Cluster_Size));
 
          --  Truncate the number of bytes to copy within this cluster
          --  if it exceeds the cluster size.
-         if Offset_Within_Cluster + Bytes_Left_To_Read > Cluster_Size then
-            Bytes_To_Copy_From_Cluster := Cluster_Size - Offset_Within_Cluster;
-         else
-            Bytes_To_Copy_From_Cluster := Bytes_Left_To_Read;
-         end if;
+         Bytes_To_Copy_From_Cluster : constant Natural :=
+           (if Offset_Within_Cluster + Bytes_Left_To_Read > Cluster_Size
+            then Cluster_Size - Offset_Within_Cluster
+            else Bytes_Left_To_Read);
 
          Read_Cluster_Into_Buffer
            (Filesystem,
@@ -928,13 +924,8 @@ package body Filesystems.FAT is
    procedure Validate_FAT_Filesystem
      (Boot_Sector : Boot_Sector_T; Result : out Function_Result) is
    begin
-      Sector_Size_Valid : constant Boolean :=
-        (Boot_Sector.BPB.Bytes_Per_Sector = 512)
-        or else (Boot_Sector.BPB.Bytes_Per_Sector = 1024)
-        or else (Boot_Sector.BPB.Bytes_Per_Sector = 2048)
-        or else (Boot_Sector.BPB.Bytes_Per_Sector = 4096);
-
-      if not Sector_Size_Valid then
+      if not (Boot_Sector.BPB.Bytes_Per_Sector in 512 | 1024 | 2048 | 4096)
+      then
          Log_Error
            ("Filesystem Invalid: Invalid sector size.", Logging_Tags_FAT);
          Result := Invalid_Filesystem;
