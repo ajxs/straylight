@@ -1172,9 +1172,9 @@ package body Filesystems.FAT is
 
          if not Is_Unused_Directory_Entry (Directory (Dir_Idx)) then
             --  If the entry attributes indicate that this is a long
-            --  file name entry, then parse it differently.
+            --  file name entry, read its section of the name into the cached
+            --  filename buffer.
             if Is_LFN_Directory_Entry (Directory (Dir_Idx)) then
-               --  Read this section of the name from the LFN entry.
                Read_LFN_Entry_Filename
                  (Directory (Dir_Idx),
                   Entry_Filename,
@@ -1189,32 +1189,47 @@ package body Filesystems.FAT is
                --  either the full filename of the long directory entry, or the
                --  full DOS directory entry, and can now convert it to UTF-8,
                --  and compare it against the target filename.
-               Read_DOS_Filename
-                 (Directory (Dir_Idx),
-                  DOS_Filename,
-                  DOS_Filename_Length,
-                  Result);
-               if Is_Error (Result) then
-                  return;
-               end if;
 
+               --  Convert the cached long filename to its UTF-8 representation
+               --  so we can compare it against the target filename.
                Read_FAT_Filename_Into_Filesystem_Node_Name
-                 (DOS_Filename,
-                  DOS_Filename_Length,
+                 (Entry_Filename,
+                  Entry_Filename_Length,
                   UTF8_Encoded_Filename,
                   Result);
                if Is_Error (Result) then
                   return;
                end if;
 
+               Log_Debug
+                 ("Parsed FAT file entry with long filename: '"
+                  & UTF8_Encoded_Filename.Value
+                      (1 .. UTF8_Encoded_Filename.Byte_Length)
+                  & "'",
+                  Logging_Tags_FAT);
+
                Match_Found :=
                  Does_Node_Name_Match_Path_Name
                    (UTF8_Encoded_Filename, Filename);
 
+               --  As per the FAT32 v1.03 spec:
+               --  " As soon as a short directory entry is encountered that is
+               --  associated with the cached long name, the long name search
+               --  operation will check the cached long name first and then the
+               --  short name for a match."
                if not Match_Found then
+                  Read_DOS_Filename
+                    (Directory (Dir_Idx),
+                     DOS_Filename,
+                     DOS_Filename_Length,
+                     Result);
+                  if Is_Error (Result) then
+                     return;
+                  end if;
+
                   Read_FAT_Filename_Into_Filesystem_Node_Name
-                    (Entry_Filename,
-                     Entry_Filename_Length,
+                    (DOS_Filename,
+                     DOS_Filename_Length,
                      UTF8_Encoded_Filename,
                      Result);
                   if Is_Error (Result) then
@@ -1222,7 +1237,7 @@ package body Filesystems.FAT is
                   end if;
 
                   Log_Debug
-                    ("Parsed FAT file entry with filename: '"
+                    ("Parsed FAT file entry with DOS filename: '"
                      & UTF8_Encoded_Filename.Value
                          (1 .. UTF8_Encoded_Filename.Byte_Length)
                      & "'",
