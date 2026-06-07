@@ -714,22 +714,56 @@ package body Filesystems.FAT.FAT16 is
          Result := Constraint_Exception;
    end Find_File_In_FAT16_Root_Directory;
 
+   procedure Get_FAT16_Table_Entry_Block_Number_And_Sector_Offset
+     (Filesystem_Info            : FAT_Filesystem_Info_T;
+      FAT_Index                  : Natural;
+      Cluster                    : Unsigned_16;
+      Block_Number               : out Unsigned_64;
+      Sector_Offset_Within_Block : out Storage_Offset;
+      Result                     : out Function_Result)
+   is
+      Sector_Number : Sector_Index_T := 0;
+   begin
+      Get_FAT16_Table_Entry_Sector_Number
+        (Filesystem_Info, FAT_Index, Cluster, Sector_Number, Result);
+      if Is_Error (Result) then
+         Block_Number := 0;
+         Sector_Offset_Within_Block := 0;
+         return;
+      end if;
+
+      Get_Sector_Block_Number_And_Offset
+        (Sector_Number,
+         Filesystem_Info.Bytes_Per_Sector,
+         Block_Number,
+         Sector_Offset_Within_Block,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Result := Success;
+   end Get_FAT16_Table_Entry_Block_Number_And_Sector_Offset;
+
    procedure Get_FAT16_Table_Entry_Sector_Number
      (Filesystem_Info : FAT_Filesystem_Info_T;
       FAT_Index       : Natural;
       Cluster         : Unsigned_16;
-      Sector_Number   : out Unsigned_64;
+      Sector_Number   : out Sector_Index_T;
       Result          : out Function_Result) is
    begin
-      FAT_Table_Offset : constant Unsigned_64 :=
-        Unsigned_64 (FAT_Index)
-        * Unsigned_64 (Filesystem_Info.Sectors_In_FAT_Table);
+      --  The number of sectors to reach the start of the specified FAT table.
+      FAT_Table_Offset : constant Sector_Index_T :=
+        Sector_Index_T (FAT_Index * Filesystem_Info.Sectors_In_FAT_Table);
+
+      FAT_Sector_Offset : constant Sector_Index_T :=
+        Sector_Index_T
+          (Positive (Cluster) * 2 / Filesystem_Info.Bytes_Per_Sector);
 
       Sector_Number :=
         Filesystem_Info.First_FAT_Sector
         + FAT_Table_Offset
-        + Unsigned_64
-            ((Cluster * 2) / Unsigned_16 (Filesystem_Info.Bytes_Per_Sector));
+        + FAT_Sector_Offset;
 
       Result := Success;
    exception
@@ -739,24 +773,6 @@ package body Filesystems.FAT.FAT16 is
          Result := Constraint_Exception;
    end Get_FAT16_Table_Entry_Sector_Number;
 
-   procedure Get_FAT16_Table_Cluster_Index
-     (Filesystem_Info : FAT_Filesystem_Info_T;
-      Cluster         : Unsigned_16;
-      Cluster_Index   : out Natural;
-      Result          : out Function_Result) is
-   begin
-      Cluster_Index :=
-        Natural
-          (Cluster mod Unsigned_16 (Filesystem_Info.Bytes_Per_Sector / 2));
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_FAT16_Table_Cluster_Index");
-         Cluster_Index := 0;
-         Result := Constraint_Exception;
-   end Get_FAT16_Table_Cluster_Index;
-
    procedure Get_FAT16_Entry
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -765,49 +781,54 @@ package body Filesystems.FAT.FAT16 is
       FAT_Entry       : out Unsigned_16;
       Result          : out Function_Result)
    is
-      Sector_Address : Virtual_Address_T := Null_Address;
-      Sector_Number  : Sector_Index_T := 0;
-      Cluster_Index  : Natural := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Block_Number               : Block_Index_T := 0;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
    begin
       --  Uses the primary FAT table (index 0) to read the FAT entry,
       --  since all FAT tables should be identical.
-      Get_FAT16_Table_Entry_Sector_Number
-        (Filesystem_Info, 0, Cluster, Sector_Number, Result);
-      if Is_Error (Result) then
-         FAT_Entry := 0;
-         return;
-      end if;
-
-      Get_FAT16_Table_Cluster_Index
-        (Filesystem_Info, Cluster, Cluster_Index, Result);
-      if Is_Error (Result) then
-         FAT_Entry := 0;
-         return;
-      end if;
-
-      Read_Sector_From_Filesystem
-        (Filesystem,
-         Reading_Process,
-         Sector_Number,
-         Filesystem_Info.Bytes_Per_Sector,
-         Sector_Address,
+      Get_FAT16_Table_Entry_Block_Number_And_Sector_Offset
+        (Filesystem_Info,
+         0,
+         Cluster,
+         Block_Number,
+         Sector_Offset_Within_Block,
          Result);
       if Is_Error (Result) then
          FAT_Entry := 0;
          return;
       end if;
 
+      Read_Block_From_Filesystem
+        (Filesystem, Reading_Process, Block_Number, Block_Address, Result);
+      if Is_Error (Result) then
+         FAT_Entry := 0;
+         return;
+      end if;
+
+      Cluster_Index_Within_Sector : constant Natural :=
+        Natural
+          (Cluster mod Unsigned_16 (Filesystem_Info.Bytes_Per_Sector / 2));
+
+      Number_Of_Entries_Within_Sector : constant Natural :=
+        Natural (Filesystem_Info.Bytes_Per_Sector / 2);
+
       declare
-         FAT16_Table :
-           FAT16_Table_T (0 .. (Filesystem_Info.Bytes_Per_Sector / 2) - 1)
-         with Import, Alignment => 1, Address => Sector_Address;
+         --  Despite the fact that we're loading an entire block, since the
+         --  filesystem reasons about its layout in terms of variable-size
+         --  'sectors' we only want to work with a single sector, since we
+         --  can't guarantee its size.
+         FAT16_Table : FAT16_Table_T (0 .. Number_Of_Entries_Within_Sector - 1)
+         with
+           Import,
+           Alignment => 1,
+           Address   => Block_Address + Sector_Offset_Within_Block;
       begin
-         FAT_Entry := FAT16_Table (Cluster_Index);
+         FAT_Entry := FAT16_Table (Cluster_Index_Within_Sector);
       end;
 
       --  Result set by this call.
-      Release_Sector
-        (Filesystem, Sector_Number, Filesystem_Info.Bytes_Per_Sector, Result);
+      Release_Block (Filesystem, Block_Number, Result);
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Get_FAT16_Entry");
@@ -823,58 +844,54 @@ package body Filesystems.FAT.FAT16 is
       FAT_Entry       : Unsigned_16;
       Result          : out Function_Result)
    is
-      Sector_Address : Virtual_Address_T := Null_Address;
-      Sector_Number  : Sector_Index_T := 0;
-      Cluster_Index  : Natural := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Block_Number               : Block_Index_T := 0;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
    begin
-      Get_FAT16_Table_Cluster_Index
-        (Filesystem_Info, Cluster, Cluster_Index, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
+      Number_Of_Entries_Within_Sector : constant Natural :=
+        Natural (Filesystem_Info.Bytes_Per_Sector / 2);
+
+      Cluster_Index_Within_Sector : constant Natural :=
+        Natural
+          (Cluster mod Unsigned_16 (Filesystem_Info.Bytes_Per_Sector / 2));
 
       for FAT_Table_Idx in 0 .. Filesystem_Info.FAT_Table_Count - 1 loop
-         Get_FAT16_Table_Entry_Sector_Number
-           (Filesystem_Info, FAT_Table_Idx, Cluster, Sector_Number, Result);
+         Get_FAT16_Table_Entry_Block_Number_And_Sector_Offset
+           (Filesystem_Info,
+            FAT_Table_Idx,
+            Cluster,
+            Block_Number,
+            Sector_Offset_Within_Block,
+            Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Read_Sector_From_Filesystem
-           (Filesystem,
-            Writing_Process,
-            Sector_Number,
-            Filesystem_Info.Bytes_Per_Sector,
-            Sector_Address,
-            Result);
+         Read_Block_From_Filesystem
+           (Filesystem, Writing_Process, Block_Number, Block_Address, Result);
          if Is_Error (Result) then
             return;
          end if;
 
          declare
             FAT16_Table :
-              FAT16_Table_T (0 .. (Filesystem_Info.Bytes_Per_Sector / 2) - 1)
-            with Import, Alignment => 1, Address => Sector_Address;
+              FAT16_Table_T (0 .. Number_Of_Entries_Within_Sector - 1)
+            with
+              Import,
+              Alignment => 1,
+              Address   => Block_Address + Sector_Offset_Within_Block;
          begin
-            FAT16_Table (Cluster_Index) := FAT_Entry;
+            FAT16_Table (Cluster_Index_Within_Sector) := FAT_Entry;
          end;
 
-         Write_Sector_To_Filesystem
-           (Filesystem,
-            Writing_Process,
-            Sector_Number,
-            Filesystem_Info.Bytes_Per_Sector,
-            Result);
+         Write_Block_To_Filesystem
+           (Filesystem, Writing_Process, Block_Number, Result);
          if Is_Error (Result) then
             return;
          end if;
 
          --  Result set by this call.
-         Release_Sector
-           (Filesystem,
-            Sector_Number,
-            Filesystem_Info.Bytes_Per_Sector,
-            Result);
+         Release_Block (Filesystem, Block_Number, Result);
       end loop;
    exception
       when Constraint_Error =>

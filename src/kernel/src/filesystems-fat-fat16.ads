@@ -46,17 +46,19 @@ private
       Filesystem_Node : out Filesystem_Node_Access;
       Result          : out Function_Result);
 
+   procedure Get_FAT16_Table_Entry_Block_Number_And_Sector_Offset
+     (Filesystem_Info            : FAT_Filesystem_Info_T;
+      FAT_Index                  : Natural;
+      Cluster                    : Unsigned_16;
+      Block_Number               : out Unsigned_64;
+      Sector_Offset_Within_Block : out Storage_Offset;
+      Result                     : out Function_Result);
+
    procedure Get_FAT16_Table_Entry_Sector_Number
      (Filesystem_Info : FAT_Filesystem_Info_T;
       FAT_Index       : Natural;
       Cluster         : Unsigned_16;
       Sector_Number   : out Unsigned_64;
-      Result          : out Function_Result);
-
-   procedure Get_FAT16_Table_Cluster_Index
-     (Filesystem_Info : FAT_Filesystem_Info_T;
-      Cluster         : Unsigned_16;
-      Cluster_Index   : out Natural;
       Result          : out Function_Result);
 
    --  It's best to use 'Unsigned_16' for the cluster numbers in FAT16,
