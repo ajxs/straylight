@@ -15,16 +15,19 @@ package body Filesystems.UStar is
       Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result)
    is
-      Current_Sector : Sector_Index_T := 0;
+      Sector_Number : Sector_Index_T := 0;
 
-      Sector_Address   : Virtual_Address_T := Null_Address;
+      Block_Number               : Block_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+
       File_Sector_Size : Unsigned_64 := 0;
    begin
       --  Note that the parent node isn't meaningful for a UStar filesystem,
       --  since it doesn't have a hierarchical structure, but it's still
       --  validated it to ensure that the caller isn't passing in an invalid
       --  node pointer.
-      --  This should also never be null, because the USTAR filesystem should
+      --  This should also never be null, because the UStar filesystem should
       --  always be mounted, and have a parent in the root filesystem.
       Validate_Filesystem_And_Node
         (Filesystem, Parent_Node, Filesystem_Type_UStar, Result);
@@ -38,20 +41,28 @@ package body Filesystems.UStar is
          Logging_Tags_UStar);
 
       loop
-         Read_Sector_From_Filesystem
-           (Filesystem,
-            Reading_Process,
-            Current_Sector,
+         Get_Sector_Block_Number_And_Offset
+           (Sector_Number,
             Ustar_Sector_Size,
-            Sector_Address,
+            Block_Number,
+            Sector_Offset_Within_Block,
             Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Read_Block_From_Filesystem
+           (Filesystem, Reading_Process, Block_Number, Block_Address, Result);
          if Is_Error (Result) then
             return;
          end if;
 
          declare
             Header : constant Tar_File_Header
-            with Import, Alignment => 1, Address => Sector_Address;
+            with
+              Import,
+              Alignment => 1,
+              Address   => Block_Address + Sector_Offset_Within_Block;
 
             Filename_Length : constant Natural :=
               Get_UStar_String_Length (Header.Name);
@@ -61,8 +72,7 @@ package body Filesystems.UStar is
                  ("Filesystems.UStar.Find_File: Invalid record reached",
                   Logging_Tags_UStar);
 
-               Release_Sector
-                 (Filesystem, Current_Sector, Ustar_Sector_Size, Result);
+               Release_Block (Filesystem, Block_Number, Result);
 
                exit;
             end if;
@@ -87,15 +97,14 @@ package body Filesystems.UStar is
                   Filename,
                   Found_Node,
                   Result,
-                  Index         => Current_Sector,
-                  Data_Location => Current_Sector + 1,
+                  Index         => Sector_Number,
+                  Data_Location => Sector_Number + 1,
                   Size          => File_Size,
                   Parent_Index  => Parent_Node.all.Index);
                if Is_Error (Result) then
                   Found_Node := null;
 
-                  Release_Sector
-                    (Filesystem, Current_Sector, Ustar_Sector_Size, Result);
+                  Release_Block (Filesystem, Block_Number, Result);
 
                   return;
                end if;
@@ -104,19 +113,17 @@ package body Filesystems.UStar is
                  Get_Filesystem_Node_Type_From_UStar_Typeflag
                    (Header.Typeflag);
 
-               Release_Sector
-                 (Filesystem, Current_Sector, Ustar_Sector_Size, Result);
+               Release_Block (Filesystem, Block_Number, Result);
                Result := Success;
                return;
             end if;
          end;
 
-         Release_Sector
-           (Filesystem, Current_Sector, Ustar_Sector_Size, Result);
+         Release_Block (Filesystem, Block_Number, Result);
 
          --  Each file's data is contained right after the header sector,
          --  so skip over the data sectors to get to the next header.
-         Current_Sector := Current_Sector + File_Sector_Size + 1;
+         Sector_Number := Sector_Number + File_Sector_Size + 1;
       end loop;
 
       Found_Node := null;
@@ -148,7 +155,7 @@ package body Filesystems.UStar is
       Digit  : Unsigned_64;
    begin
       for I in Octal_String'Range loop
-         --  USTAR numeric fields are NUL- or space-terminated.
+         --  UStar numeric fields are NUL- or space-terminated.
          exit when Octal_String (I) = ASCII.NUL or else Octal_String (I) = ' ';
 
          --  Any non-octal character indicates a corrupt header field.
@@ -158,7 +165,7 @@ package body Filesystems.UStar is
 
          Digit := Character'Pos (Octal_String (I)) - Character'Pos ('0');
 
-         --  Note that a USTAR Octal string is at most 12 characters long,
+         --  Note that a UStar Octal string is at most 12 characters long,
          --  so we know that the result of the conversion will not overflow
          --  the Unsigned_64 type.
          Result := Result * 8 + Digit;
@@ -232,12 +239,13 @@ package body Filesystems.UStar is
       Bytes_Read      : out Natural;
       Result          : out Function_Result)
    is
-      Sector_Address : Virtual_Address_T := Null_Address;
+      Sector_Number              : Sector_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Block_Number               : Block_Index_T := 0;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
 
-      Current_Offset            : Unsigned_64 := Start_Offset;
-      Offset_Within_Sector      : Natural := 0;
-      Bytes_To_Copy_From_Sector : Natural := 0;
-      Bytes_Left_To_Read        : Natural := 0;
+      Current_Offset     : Unsigned_64 := Start_Offset;
+      Bytes_Left_To_Read : Natural := 0;
 
       Actual_Bytes_To_Read : Natural := Bytes_To_Read;
    begin
@@ -261,7 +269,7 @@ package body Filesystems.UStar is
          return;
       end if;
 
-      Current_Read_Sector : Sector_Index_T :=
+      Sector_Number :=
         Filesystem_Node.all.Data_Location
         + Current_Offset / Unsigned_64 (Ustar_Sector_Size);
 
@@ -270,47 +278,51 @@ package body Filesystems.UStar is
       loop
          exit when Bytes_Left_To_Read = 0;
 
-         Offset_Within_Sector :=
-           Natural (Current_Offset mod Unsigned_64 (Ustar_Sector_Size));
-
-         --  Truncate the number of bytes to copy within this sector
-         --  if it exceeds the sector size.
-         if Offset_Within_Sector + Bytes_Left_To_Read > Ustar_Sector_Size then
-            Bytes_To_Copy_From_Sector :=
-              Ustar_Sector_Size - Offset_Within_Sector;
-         else
-            Bytes_To_Copy_From_Sector := Bytes_Left_To_Read;
-         end if;
-
-         Read_Sector_From_Filesystem
-           (Filesystem,
-            Reading_Process,
-            Current_Read_Sector,
+         Get_Sector_Block_Number_And_Offset
+           (Sector_Number,
             Ustar_Sector_Size,
-            Sector_Address,
+            Block_Number,
+            Sector_Offset_Within_Block,
             Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Copy
-           (Buffer_Address + Storage_Offset (Bytes_Read),
-            Sector_Address + Storage_Offset (Offset_Within_Sector),
-            Bytes_To_Copy_From_Sector);
-
-         Bytes_Read := Bytes_Read + Bytes_To_Copy_From_Sector;
-
-         Release_Sector
-           (Filesystem, Current_Read_Sector, Ustar_Sector_Size, Result);
+         Read_Block_From_Filesystem
+           (Filesystem, Reading_Process, Block_Number, Block_Address, Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Current_Offset :=
-           Current_Offset + Unsigned_64 (Bytes_To_Copy_From_Sector);
-         Bytes_Left_To_Read := Bytes_Left_To_Read - Bytes_To_Copy_From_Sector;
+         Offset_Within_Block : constant Storage_Offset :=
+           Sector_Offset_Within_Block
+           + Storage_Offset
+               (Current_Offset mod Unsigned_64 (Ustar_Sector_Size));
 
-         Current_Read_Sector := Current_Read_Sector + 1;
+         --  Truncate the number of bytes to copy within the current block
+         --  if it exceeds the block's boundaries.
+         Bytes_To_Copy_From_Block : constant Natural :=
+           Natural'Min
+             (Bytes_Left_To_Read, Block_Size - Natural (Offset_Within_Block));
+
+         Copy
+           (Buffer_Address + Storage_Offset (Bytes_Read),
+            Block_Address + Offset_Within_Block,
+            Bytes_To_Copy_From_Block);
+
+         Bytes_Read := Bytes_Read + Bytes_To_Copy_From_Block;
+
+         Release_Block (Filesystem, Block_Number, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Current_Offset := @ + Unsigned_64 (Bytes_To_Copy_From_Block);
+         Bytes_Left_To_Read := @ - Bytes_To_Copy_From_Block;
+         Sector_Number :=
+           Filesystem_Node.all.Data_Location
+           + Current_Offset / Unsigned_64 (Ustar_Sector_Size);
+
       end loop;
 
       Result := Success;
