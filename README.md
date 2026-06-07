@@ -13,7 +13,7 @@ The name *Straylight* comes from William Gibson's groundbreaking cyberpunk novel
 |Multitasking|✅|Pre-emptive multitasking.
 |Graphics Devices|✅|Virtio GPU support.
 |Block Devices|✅|Virtio Block Device support.
-|Filesystem|✅|Supports mounting FAT16 and USTAR images.
+|Filesystem|✅|Supports mounting FAT16 and UStar images.
 |Userspace|✅|Supports loading ELF binaries written in C and Ada.
 |SMP|❌|Currently no SMP support. This will be added in a future update.
 |Multi-platform|❌|Currently only supports QEMU's [*virt* platform](https://www.qemu.org/docs/master/system/riscv/virt.html). Support for device discovery via the Devicetree standard will be added in a future update.
@@ -35,3 +35,9 @@ Once all the build dependencies are installed, to build the kernel executablea a
 ### OpenSBI 
 
 OpenSBI is included as a git submodule, and is built as part of the full build process. OpenSBI's build system expects a Linux-targeting toolchain (`riscv64-linux-gnu-`).
+
+## Statement on AI Usage
+
+Straylight is developed with *the assistance of* AI. However Straylight is ***not*** *'vibe coded'*. Every line of code has been *hand-written* by a real human, with the *reasonable* assistance of various tools (IDEs, intellisense, autocomplete, etc.). AI *has* however been used to help review code, and as a [rubber duck](https://en.wikipedia.org/wiki/Rubber_duck_debugging). In case you're inclined not to trust me, you're welcome to try 'vibe coding' a kernel of your very own. Despite having an exhaustive knowledge of Unix internals, and being generally pretty good at spotting silly mistakes, AI tends to tie itself up in knots writing kernel code; Let alone writing kernel code in *Ada*. The *real* difficulties in building your own kernel lie in designing reliable, loosely-coupled subsystems, and managing the creeping complexity; Things AI doesn't necessarily help you with. Anyway, blindly letting AI do the hard work would remove all the joy of learning and creation. Which is the reason why I work on this project in the first place. 
+
+If you have any concerns, or want any clarifications, please get in touch. - @ajxs (lead maintainer)
