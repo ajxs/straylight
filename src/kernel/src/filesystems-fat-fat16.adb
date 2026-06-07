@@ -900,55 +900,46 @@ package body Filesystems.FAT.FAT16 is
    end Write_Table_Entry_FAT16;
 
    procedure Find_Free_Cluster_FAT16
-     (Filesystem         : Filesystem_Access;
-      Writing_Process    : in out Process_Control_Block_T;
-      Filesystem_Info    : FAT_Filesystem_Info_T;
-      Start_Cluster_Hint : Unsigned_16;
-      Free_Cluster       : out Unsigned_16;
-      Result             : out Function_Result)
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Free_Cluster    : out Unsigned_16;
+      Result          : out Function_Result)
    is
-      Sector_Data_Address   : Virtual_Address_T := Null_Address;
-      Release_Sector_Result : Function_Result := Unset;
-
-      Start_Sector_Number : Sector_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Current_Block              : Block_Index_T := 0;
+      Found_Free_Cluster         : Boolean := False;
    begin
       Clusters_Per_Sector : constant Integer :=
         (Filesystem_Info.Bytes_Per_Sector / 2);
 
-      Start_Cluster : constant Unsigned_16 :=
-        (if Start_Cluster_Hint
-            in 2 .. Unsigned_16 (Filesystem_Info.Total_Clusters - 1)
-         then Start_Cluster_Hint
-         else 2);
-
-      --  Find out what sector the starting cluster's FAT Table entry is in.
-      Get_FAT16_Table_Entry_Sector_Number
-        (Filesystem_Info, 0, Start_Cluster, Start_Sector_Number, Result);
-      if Is_Error (Result) then
-         Free_Cluster := 0;
-         return;
-      end if;
-
       Last_FAT_Sector_Number : constant Sector_Index_T :=
         Sector_Index_T
           (Filesystem_Info.First_FAT_Sector
-           + Unsigned_64 (Filesystem_Info.Total_Sectors_In_All_FAT_Tables)
+           + Sector_Index_T (Filesystem_Info.Sectors_In_FAT_Table)
            - 1);
 
       --  Loop through the FAT sectors starting from the sector containing
       --  the starting cluster's FAT entry, and read each sector into a buffer.
       --  For each sector, loop through the FAT entries contained in the sector
       --  to see if any of them are free.
-      Read_Sectors_Loop : for Curr_Sector in
-        Start_Sector_Number .. Last_FAT_Sector_Number
+      Read_Sectors_Loop : for Sector_Number in
+        Filesystem_Info.First_FAT_Sector .. Last_FAT_Sector_Number
       loop
-         Read_Sector_From_Filesystem
-           (Filesystem,
-            Writing_Process,
-            Curr_Sector,
+         Get_Sector_Block_Number_And_Offset
+           (Sector_Number,
             Filesystem_Info.Bytes_Per_Sector,
-            Sector_Data_Address,
+            Current_Block,
+            Sector_Offset_Within_Block,
             Result);
+         if Is_Error (Result) then
+            Free_Cluster := 0;
+            return;
+         end if;
+
+         Read_Block_From_Filesystem
+           (Filesystem, Writing_Process, Current_Block, Block_Address, Result);
          if Is_Error (Result) then
             Free_Cluster := 0;
             return;
@@ -957,57 +948,51 @@ package body Filesystems.FAT.FAT16 is
          --  Check all of the FAT entries in the sector for a free cluster.
          declare
             --  If the current sector is the starting sector, we need to start
-            --  checking from the starting cluster index, rather than from the
-            --  beginning of the sector.
+            --  checking from index 2, rather than from the index 0, which
+            --  contains reserved entries.
             Start_Index : constant Integer :=
-              (if Curr_Sector = Start_Sector_Number
-               then
-                 Integer (Start_Cluster mod Unsigned_16 (Clusters_Per_Sector))
+              (if Sector_Number = Filesystem_Info.First_FAT_Sector
+               then 2
                else 0);
 
             FAT16_Table_Sector : FAT16_Table_T (0 .. Clusters_Per_Sector - 1)
-            with Import, Alignment => 1, Address => Sector_Data_Address;
+            with
+              Import,
+              Alignment => 1,
+              Address   => Block_Address + Sector_Offset_Within_Block;
          begin
-            Check_Cluster_Loop : for Curr_Cluster in
+            Check_Cluster_Loop : for Current_Cluster in
               Start_Index .. Clusters_Per_Sector - 1
             loop
                if Is_Cluster_Free
-                    (Unsigned_32 (FAT16_Table_Sector (Curr_Cluster)))
+                    (Unsigned_32 (FAT16_Table_Sector (Current_Cluster)))
                then
+                  Found_Free_Cluster := True;
                   Free_Cluster :=
                     Unsigned_16
-                      (Curr_Sector - Filesystem_Info.First_FAT_Sector)
+                      (Sector_Number - Filesystem_Info.First_FAT_Sector)
                     * Unsigned_16 (Clusters_Per_Sector)
-                    + Unsigned_16 (Curr_Cluster);
+                    + Unsigned_16 (Current_Cluster);
 
-                  Log_Debug
-                    ("Found free FAT16 cluster: " & Free_Cluster'Image,
-                     Logging_Tags_FAT);
-
-                  Release_Sector
-                    (Filesystem,
-                     Curr_Sector,
-                     Filesystem_Info.Bytes_Per_Sector,
-                     Result);
-                  if Is_Error (Result) then
-                     Free_Cluster := 0;
-                     return;
-                  end if;
-
-                  Result := Success;
-                  return;
+                  exit Check_Cluster_Loop;
                end if;
             end loop Check_Cluster_Loop;
-         end;
 
-         Release_Sector
-           (Filesystem,
-            Curr_Sector,
-            Filesystem_Info.Bytes_Per_Sector,
-            Release_Sector_Result);
-         if Is_Error (Release_Sector_Result) then
-            Result := Release_Sector_Result;
-         end if;
+            Release_Block (Filesystem, Current_Block, Result);
+            if Is_Error (Result) then
+               Free_Cluster := 0;
+               return;
+            end if;
+
+            if Found_Free_Cluster then
+               Log_Debug
+                 ("Found free FAT16 cluster: " & Free_Cluster'Image,
+                  Logging_Tags_FAT);
+
+               Result := Success;
+               return;
+            end if;
+         end;
       end loop Read_Sectors_Loop;
 
       Free_Cluster := 0;
@@ -1026,9 +1011,8 @@ package body Filesystems.FAT.FAT16 is
       New_Cluster     : out Unsigned_16;
       Result          : out Function_Result) is
    begin
-      --  Start searching from cluster 2, since clusters 0 and 1 are reserved.
       Find_Free_Cluster_FAT16
-        (Filesystem, Writing_Process, Filesystem_Info, 2, New_Cluster, Result);
+        (Filesystem, Writing_Process, Filesystem_Info, New_Cluster, Result);
       if Is_Error (Result) then
          New_Cluster := 0;
          return;

@@ -66,12 +66,11 @@ private
    type FAT16_Table_T is array (Natural range <>) of Unsigned_16 with Pack;
 
    procedure Find_Free_Cluster_FAT16
-     (Filesystem         : Filesystem_Access;
-      Writing_Process    : in out Process_Control_Block_T;
-      Filesystem_Info    : FAT_Filesystem_Info_T;
-      Start_Cluster_Hint : Unsigned_16;
-      Free_Cluster       : out Unsigned_16;
-      Result             : out Function_Result);
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Free_Cluster    : out Unsigned_16;
+      Result          : out Function_Result);
 
    function Get_First_Cluster_From_Index_FAT16
      (Index : Filesystem_Node_Index_T) return Unsigned_16;
