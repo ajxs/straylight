@@ -28,38 +28,6 @@ private package Filesystems.Block_Cache is
       Result                 : out Function_Result;
       Invalidate_Cache_Entry : Boolean := False);
 
-   ----------------------------------------------------------------------------
-   --  These procedures are functionally identical to the block-based
-   --  procedures above, but allow users to reason about filesystem operations
-   --  in terms of sectors rather than blocks.
-   --  Many filesystems reason internally in terms of sectors, so these methods
-   --  provide a more convenient interface for those filesystems.
-   --  The underlying implementation still operates in terms of blocks. e.g.
-   --  If you read sector 1, with size 512 bytes, block 0 (of 4KiB) will still
-   --  be read from the filesystem into the cache.
-   ----------------------------------------------------------------------------
-   procedure Read_Sector_From_Filesystem
-     (Filesystem           : Filesystem_Access;
-      Reading_Process      : in out Process_Control_Block_T;
-      Sector_Number        : Sector_Index_T;
-      Sector_Size          : Natural;
-      Data_Virtual_Address : out Virtual_Address_T;
-      Result               : out Function_Result);
-
-   --  This procedure requires that the caller holds the block being written.
-   procedure Write_Sector_To_Filesystem
-     (Filesystem      : Filesystem_Access;
-      Writing_Process : in out Process_Control_Block_T;
-      Sector_Number   : Sector_Index_T;
-      Sector_Size     : Natural;
-      Result          : out Function_Result);
-
-   procedure Release_Sector
-     (Filesystem    : Filesystem_Access;
-      Sector_Number : Sector_Index_T;
-      Sector_Size   : Natural;
-      Result        : out Function_Result);
-
    --  The block cache entries don't require an individual spinlock.
    --  The block cache as a whole is protected by a single spinlock. No
    --  individual entry can be modified without holding the main block cache

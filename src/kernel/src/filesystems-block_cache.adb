@@ -314,43 +314,6 @@ package body Filesystems.Block_Cache is
          Result := Constraint_Exception;
    end Read_Block_From_Filesystem;
 
-   procedure Read_Sector_From_Filesystem
-     (Filesystem           : Filesystem_Access;
-      Reading_Process      : in out Process_Control_Block_T;
-      Sector_Number        : Sector_Index_T;
-      Sector_Size          : Natural;
-      Data_Virtual_Address : out Virtual_Address_T;
-      Result               : out Function_Result)
-   is
-      Cache_Entry_Addr_Virtual   : Virtual_Address_T := Null_Address;
-      Block_Number               : Block_Index_T := 0;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
-   begin
-      Get_Sector_Block_Number_And_Offset
-        (Sector_Number,
-         Sector_Size,
-         Block_Number,
-         Sector_Offset_Within_Block,
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Read_Block_From_Filesystem
-        (Filesystem,
-         Reading_Process,
-         Block_Number,
-         Cache_Entry_Addr_Virtual,
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Data_Virtual_Address :=
-        Cache_Entry_Addr_Virtual + Sector_Offset_Within_Block;
-      Result := Success;
-   end Read_Sector_From_Filesystem;
-
    procedure Read_Block_From_Filesystem_Into_Cache_Entry
      (Cache           : in out Block_Cache_T;
       Filesystem      : Filesystem_Access;
@@ -487,16 +450,6 @@ package body Filesystems.Block_Cache is
       Release_Spinlock (System_Block_Cache.Spinlock);
    end Release_Block;
 
-   procedure Release_Sector
-     (Filesystem    : Filesystem_Access;
-      Sector_Number : Sector_Index_T;
-      Sector_Size   : Natural;
-      Result        : out Function_Result) is
-   begin
-      Release_Block
-        (Filesystem, Sector_To_Block (Sector_Number, Sector_Size), Result);
-   end Release_Sector;
-
    procedure Write_Block_From_Cache_Entry_To_Filesystem
      (Cache           : in out Block_Cache_T;
       Filesystem      : Filesystem_Access;
@@ -631,19 +584,5 @@ package body Filesystems.Block_Cache is
          Log_Error ("Constraint_Error: Write_Block_To_Filesystem");
          Result := Constraint_Exception;
    end Write_Block_To_Filesystem;
-
-   procedure Write_Sector_To_Filesystem
-     (Filesystem      : Filesystem_Access;
-      Writing_Process : in out Process_Control_Block_T;
-      Sector_Number   : Sector_Index_T;
-      Sector_Size     : Natural;
-      Result          : out Function_Result) is
-   begin
-      Write_Block_To_Filesystem
-        (Filesystem,
-         Writing_Process,
-         Sector_To_Block (Sector_Number, Sector_Size),
-         Result);
-   end Write_Sector_To_Filesystem;
 
 end Filesystems.Block_Cache;
