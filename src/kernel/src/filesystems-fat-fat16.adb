@@ -1,5 +1,6 @@
 with Filesystems.FAT.DOS_Filenames; use Filesystems.FAT.DOS_Filenames;
 with Filesystems.Block_Cache;       use Filesystems.Block_Cache;
+with Filesystems.Node_Cache;        use Filesystems.Node_Cache;
 
 package body Filesystems.FAT.FAT16 is
    procedure Create_LFN_Directory_Entry
@@ -88,8 +89,6 @@ package body Filesystems.FAT.FAT16 is
       New_Node        : out Filesystem_Node_Access;
       Result          : out Function_Result)
    is
-      pragma Unreferenced (Parent_Node, New_Node);
-
       Current_Sector             : Sector_Index_T := 0;
       Block_Address              : Virtual_Address_T := Null_Address;
       Sector_Offset_Within_Block : Storage_Offset := 0;
@@ -112,6 +111,8 @@ package body Filesystems.FAT.FAT16 is
 
       Release_Block_Result : Function_Result := Unset;
    begin
+      New_Node := null;
+
       --  Create the DOS filename/extension up-front, so we can determine
       --  whether LFN entries are needed for this filename.
       --  If the conversion is lossy, we need LFN entries to preserve the
@@ -390,6 +391,22 @@ package body Filesystems.FAT.FAT16 is
 
          exit Update_Sectors_Loop when Current_Sector >= Last_Sector;
       end loop Update_Sectors_Loop;
+
+      --  Create the new filesystem node.
+      Create_Filesystem_Node_Cache_Entry
+        (Filesystem,
+         Filename,
+         New_Node,
+         Result,
+         Size          => 0,
+         Data_Location => 0,
+         Index         =>
+           Get_Directory_Entry_Node_Index (0, First_Free_Entry_Index),
+         Parent_Index  => Parent_Node.all.Index);
+      if Is_Error (Result) then
+         New_Node := null;
+         return;
+      end if;
 
       Result := Success;
    exception

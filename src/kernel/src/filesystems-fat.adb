@@ -10,8 +10,6 @@ with Filesystems.FAT.FAT16;         use Filesystems.FAT.FAT16;
 with Memory.Kernel;                 use Memory.Kernel;
 
 package body Filesystems.FAT is
-   --  @TODO: Should file creation be part of the 'find file' interface?
-   --  e.g. 'create if not found'?
    procedure Create_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;

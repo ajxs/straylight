@@ -316,24 +316,16 @@ package body Filesystems is
       elsif Result = File_Not_Found then
          Log_Debug ("File not found: '" & Path & "'", Logging_Tags);
 
+         --  If 'Mode' indicates that the missing file should be created,
+         --  create it and return the new node, else exit.
          if not Mode.Create then
             File_Handle := null;
             return;
          end if;
 
          Log_Debug ("Creating missing file: '" & Path & "'", Logging_Tags);
-         Create_File (Process, Path, Result);
+         Create_File (Process, Path, Filesystem_Node, Result);
          if Is_Error (Result) then
-            File_Handle := null;
-            return;
-         end if;
-
-         Find_File (Process, Path, Filesystem_Node, Result);
-         if Is_Error (Result) then
-            File_Handle := null;
-            return;
-         elsif Result = File_Not_Found then
-            Log_Error ("File not found after creation: '" & Path & "'");
             File_Handle := null;
             return;
          end if;
@@ -869,15 +861,15 @@ package body Filesystems is
    end Validate_Filesystem_And_Node;
 
    procedure Create_File
-     (Process : in out Process_Control_Block_T;
-      Path    : Filesystem_Path_T;
-      Result  : out Function_Result)
+     (Process  : in out Process_Control_Block_T;
+      Path     : Filesystem_Path_T;
+      New_Node : out Filesystem_Node_Access;
+      Result   : out Function_Result)
    is
       Parent_Path_Length : Integer := 0;
 
       Parent_Filesystem : Filesystem_Access := null;
       Parent_File_Node  : Filesystem_Node_Access := null;
-      New_File_Node     : Filesystem_Node_Access := null;
    begin
       for I in reverse Path'Range loop
          if Path (I) = Filesystem_Node_Separator then
@@ -948,7 +940,7 @@ package body Filesystems is
                Process,
                Child_File_Name,
                Parent_File_Node,
-               New_File_Node,
+               New_Node,
                Result);
 
          when others              =>
