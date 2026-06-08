@@ -80,6 +80,165 @@ package body Filesystems.FAT.FAT16 is
          Result := Constraint_Exception;
    end Create_LFN_Directory_Entry;
 
+   procedure Scan_Directory_For_Unused_Entries
+     (Directory                        : Directory_Index_T;
+      Total_Number_Of_Entries_Required : Natural;
+      Total_Entries_Parsed             : Natural;
+      Current_Free_Entry_Count         : in out Natural;
+      Found_Required_Entries           : in out Boolean;
+      First_Free_Entry_Index           : in out Natural;
+      Result                           : out Function_Result) is
+   begin
+      Log_Debug
+        ("Scanning for "
+         & Total_Number_Of_Entries_Required'Image
+         & " free directory entries.",
+         Logging_Tags_FAT);
+
+      Parse_Directory_Loop : for Dir_Idx in 0 .. Directory'Length - 1 loop
+         if Is_Free_Directory_Entry (Directory (Dir_Idx)) then
+            Log_Debug
+              ("Found free directory entry at idx:" & Dir_Idx'Image,
+               Logging_Tags_FAT);
+
+            if Current_Free_Entry_Count = 0 then
+               First_Free_Entry_Index := Dir_Idx + Total_Entries_Parsed;
+            end if;
+
+            Current_Free_Entry_Count := @ + 1;
+         else
+            Current_Free_Entry_Count := 0;
+         end if;
+
+         if Current_Free_Entry_Count = Total_Number_Of_Entries_Required then
+            Found_Required_Entries := True;
+
+            Log_Debug
+              ("Found "
+               & Current_Free_Entry_Count'Image
+               & " free directory entries starting at index "
+               & First_Free_Entry_Index'Image,
+               Logging_Tags_FAT);
+
+            exit Parse_Directory_Loop;
+         end if;
+      end loop Parse_Directory_Loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Scan_Directory_For_Unused_Entries");
+         Result := Constraint_Exception;
+   end Scan_Directory_For_Unused_Entries;
+
+   procedure Search_Root_Directory_For_Unused_Entries
+     (Filesystem                       : Filesystem_Access;
+      Reading_Process                  : in out Process_Control_Block_T;
+      Filesystem_Info                  : FAT_Filesystem_Info_T;
+      Total_Number_Of_Entries_Required : Natural;
+      Last_Sector                      : Sector_Index_T;
+      Entries_Per_Sector               : Natural;
+      First_Free_Entry_Index           : out Natural;
+      Result                           : out Function_Result)
+   is
+      Current_Sector             : Sector_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Current_Block              : Block_Index_T := 0;
+
+      Current_Free_Entry_Count : Natural := 0;
+      Found_Required_Entries   : Boolean := False;
+
+      Total_Entries_Parsed : Natural := 0;
+
+      Scan_Directory_Result : Function_Result := Unset;
+   begin
+      Current_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
+      First_Free_Entry_Index := 0;
+
+      Read_Sectors_Loop : loop
+         Get_Sector_Block_Number_And_Offset
+           (Current_Sector,
+            Filesystem_Info.Bytes_Per_Sector,
+            Current_Block,
+            Sector_Offset_Within_Block,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Read_Block_From_Filesystem
+           (Filesystem, Reading_Process, Current_Block, Block_Address, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Remaining_Sectors : constant Natural :=
+           Natural (Last_Sector - Current_Sector);
+
+         Number_Of_Sectors_Within_This_Block : constant Natural :=
+           Natural'Min
+             (Remaining_Sectors,
+              (Block_Size - Natural (Sector_Offset_Within_Block))
+              / Filesystem_Info.Bytes_Per_Sector);
+
+         Number_Of_Directory_Entries_In_This_Block : constant Natural :=
+           Entries_Per_Sector * Number_Of_Sectors_Within_This_Block;
+
+         Search_Directory_Buffer : declare
+            Directory :
+              Directory_Index_T
+                (0 .. Number_Of_Directory_Entries_In_This_Block - 1)
+            with
+              Import,
+              Address   => Block_Address + Sector_Offset_Within_Block,
+              Alignment => 1;
+         begin
+            Scan_Directory_For_Unused_Entries
+              (Directory,
+               Total_Number_Of_Entries_Required,
+               Total_Entries_Parsed,
+               Current_Free_Entry_Count,
+               Found_Required_Entries,
+               First_Free_Entry_Index,
+               Scan_Directory_Result);
+         end Search_Directory_Buffer;
+
+         Release_Block (Filesystem, Current_Block, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         if Is_Error (Scan_Directory_Result) then
+            Result := Scan_Directory_Result;
+            return;
+         end if;
+
+         exit Read_Sectors_Loop when Found_Required_Entries;
+
+         Current_Sector :=
+           @ + Sector_Index_T (Number_Of_Sectors_Within_This_Block);
+
+         Total_Entries_Parsed := @ + Number_Of_Directory_Entries_In_This_Block;
+
+         exit Read_Sectors_Loop when Current_Sector >= Last_Sector;
+      end loop Read_Sectors_Loop;
+
+      if not Found_Required_Entries then
+         Log_Error
+           ("Not enough free directory entries found in root directory.");
+         Result := No_Free_Entries;
+         return;
+      end if;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Search_Root_Directory_For_Unused_Entries");
+         Result := Constraint_Exception;
+   end Search_Root_Directory_For_Unused_Entries;
+
    procedure Create_File_In_Root_Directory_FAT16
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -101,8 +260,6 @@ package body Filesystems.FAT.FAT16 is
       Are_LFN_Entries_Required       : Boolean := False;
       Number_Of_LFN_Entries_Required : Natural := 0;
       First_Free_Entry_Index         : Natural := 0;
-      Current_Free_Entry_Count       : Natural := 0;
-      Found_Required_Entries         : Boolean := False;
 
       Current_Updated_Entry_Count  : Natural := 0;
       All_Required_Entries_Updated : Boolean := False;
@@ -144,106 +301,19 @@ package body Filesystems.FAT.FAT16 is
         Filesystem_Info.FAT12_16_Root_Directory_Sector
         + Sector_Index_T (Filesystem_Info.Sectors_In_Root_Directory);
 
-      Current_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
-
       Entries_Per_Sector : constant Natural :=
         Filesystem_Info.Bytes_Per_Sector / 32;
 
-      Read_Sectors_Loop : loop
-         Get_Sector_Block_Number_And_Offset
-           (Current_Sector,
-            Filesystem_Info.Bytes_Per_Sector,
-            Current_Block,
-            Sector_Offset_Within_Block,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Read_Block_From_Filesystem
-           (Filesystem, Reading_Process, Current_Block, Block_Address, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Remaining_Sectors : constant Natural :=
-           Natural (Last_Sector - Current_Sector);
-
-         Number_Of_Sectors_Within_This_Block : constant Natural :=
-           Natural'Min
-             (Remaining_Sectors,
-              (Block_Size - Natural (Sector_Offset_Within_Block))
-              / Filesystem_Info.Bytes_Per_Sector);
-
-         Number_Of_Directory_Entries_In_This_Block : constant Natural :=
-           Entries_Per_Sector * Number_Of_Sectors_Within_This_Block;
-
-         Search_Directory_Buffer : declare
-            Directory :
-              Directory_Index_T
-                (0 .. Number_Of_Directory_Entries_In_This_Block - 1)
-            with
-              Import,
-              Address   => Block_Address + Sector_Offset_Within_Block,
-              Alignment => 1;
-         begin
-            Log_Debug
-              ("Scanning for "
-               & Total_Number_Of_Entries_Required'Image
-               & " free directory entries.",
-               Logging_Tags_FAT);
-
-            Parse_Directory_Loop : for Dir_Idx in 0 .. Directory'Length - 1
-            loop
-               if Is_Free_Directory_Entry (Directory (Dir_Idx)) then
-                  Log_Debug
-                    ("Found free directory entry at idx:" & Dir_Idx'Image,
-                     Logging_Tags_FAT);
-
-                  if Current_Free_Entry_Count = 0 then
-                     First_Free_Entry_Index := Dir_Idx + Total_Entries_Parsed;
-                  end if;
-
-                  Current_Free_Entry_Count := @ + 1;
-               else
-                  Current_Free_Entry_Count := 0;
-               end if;
-
-               if Current_Free_Entry_Count = Total_Number_Of_Entries_Required
-               then
-                  Found_Required_Entries := True;
-
-                  Log_Debug
-                    ("Found "
-                     & Current_Free_Entry_Count'Image
-                     & " free directory entries starting at index "
-                     & First_Free_Entry_Index'Image,
-                     Logging_Tags_FAT);
-
-                  exit Parse_Directory_Loop;
-               end if;
-            end loop Parse_Directory_Loop;
-         end Search_Directory_Buffer;
-
-         Release_Block (Filesystem, Current_Block, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         exit Read_Sectors_Loop when Found_Required_Entries;
-
-         Current_Sector :=
-           @ + Sector_Index_T (Number_Of_Sectors_Within_This_Block);
-
-         Total_Entries_Parsed := @ + Number_Of_Directory_Entries_In_This_Block;
-
-         exit Read_Sectors_Loop when Current_Sector >= Last_Sector;
-      end loop Read_Sectors_Loop;
-
-      if not Found_Required_Entries then
-         Log_Error
-           ("Not enough free directory entries found in root directory.");
-         Result := No_Free_Entries;
+      Search_Root_Directory_For_Unused_Entries
+        (Filesystem,
+         Reading_Process,
+         Filesystem_Info,
+         Total_Number_Of_Entries_Required,
+         Last_Sector,
+         Entries_Per_Sector,
+         First_Free_Entry_Index,
+         Result);
+      if Is_Error (Result) then
          return;
       end if;
 
