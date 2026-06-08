@@ -2,57 +2,6 @@ with Filesystems.FAT.DOS_Filenames; use Filesystems.FAT.DOS_Filenames;
 with Filesystems.Block_Cache;       use Filesystems.Block_Cache;
 
 package body Filesystems.FAT.FAT16 is
-   procedure Create_DOS_Directory_Entry
-     (Filename              : Filesystem_Path_T;
-      Directory_Entry       : out FAT_Directory_Entry_T;
-      DOS_Filename_Checksum : out Unsigned_8;
-      Result                : out Function_Result)
-   is
-      Conversion_Is_Lossy : Boolean := False;
-   begin
-      Directory_Entry :=
-        (File_Name          => [others => ' '],
-         File_Ext           => [others => ' '],
-         Attributes         => (others => False),
-         Reserved           => 0,
-         Creation_Seconds   => 0,
-         Creation_Time      => 0,
-         Creation_Date      => 0,
-         Last_Accessed_Date => 0,
-         First_Cluster_High => 0,
-         Last_Modified_Time => 0,
-         Last_Modified_Date => 0,
-         First_Cluster_Low  => 0,
-         File_Size          => 0);
-
-      --  @TODO: After creating the DOS filename, if the conversion was lossy
-      --  we should check if the resulting DOS filename collides with any
-      --  existing DOS filenames in the same directory.
-      Create_DOS_Filename
-        (Filename,
-         Directory_Entry.File_Name,
-         Directory_Entry.File_Ext,
-         Conversion_Is_Lossy,
-         Result);
-      if Is_Error (Result) then
-         DOS_Filename_Checksum := 0;
-         return;
-      end if;
-
-      DOS_Filename_Checksum :=
-        Get_DOS_Filename_Checksum
-          (Directory_Entry.File_Name, Directory_Entry.File_Ext);
-
-      Log_Debug ("Conversion: " & Conversion_Is_Lossy'Image, Logging_Tags_FAT);
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_DOS_Directory_Entry");
-         DOS_Filename_Checksum := 0;
-         Result := Constraint_Exception;
-   end Create_DOS_Directory_Entry;
-
    procedure Create_LFN_Directory_Entry
      (Filename              : Filesystem_Path_T;
       Sequence_Number       : Natural;
@@ -130,97 +79,6 @@ package body Filesystems.FAT.FAT16 is
          Result := Constraint_Exception;
    end Create_LFN_Directory_Entry;
 
-   procedure Get_Number_Of_LFN_Entries_Needed_For_Filename
-     (Filename                     : Filesystem_Path_T;
-      Number_Of_LFN_Entries_Needed : out Natural;
-      Result                       : out Function_Result) is
-   begin
-      Number_Of_LFN_Entries_Needed :=
-        (Filename'Length / 13) + (if Filename'Length mod 13 = 0 then 0 else 1);
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Get_Number_Of_LFN_Entries_Needed_For_Filename");
-         Number_Of_LFN_Entries_Needed := 0;
-         Result := Constraint_Exception;
-   end Get_Number_Of_LFN_Entries_Needed_For_Filename;
-
-   procedure Create_Long_File_Name_Entries
-     (Filename                 : Filesystem_Path_T;
-      Directory_Sector_Address : Virtual_Address_T;
-      Number_Of_Entries_Needed : Natural;
-      Starting_Index           : Natural;
-      DOS_Filename_Checksum    : Unsigned_8;
-      Result                   : out Function_Result) is
-   begin
-      Parse_LFN_Directory_Buffer : declare
-         LFN_Directory_Buffer : LFN_Directory_Index_T (1 .. 16)
-         with Import, Address => Directory_Sector_Address, Alignment => 1;
-      begin
-         for I in 0 .. Number_Of_Entries_Needed - 1 loop
-            Create_LFN_Directory_Entry
-              (Filename,
-               Number_Of_Entries_Needed - I,
-               I = 0,
-               DOS_Filename_Checksum,
-               LFN_Directory_Buffer (Starting_Index + I),
-               Result);
-            if Is_Error (Result) then
-               return;
-            end if;
-         end loop;
-      end Parse_LFN_Directory_Buffer;
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_Long_File_Name_Entries");
-         Result := Constraint_Exception;
-   end Create_Long_File_Name_Entries;
-
-   function Are_LFN_Entries_Required
-     (Filename : Filesystem_Path_T) return Boolean
-   is
-      Last_Dot_Index : Integer := 0;
-   begin
-      --  If any character in the filename is lowercase, we need LFN entries.
-      --  Technically, Windows NT supports mixed-case DOS entries, but for
-      --  the sake of simplicity this driver only uses uppercase characters
-      --  in DOS filename entries.
-      for I in Filename'Range loop
-         if Filename (I) in 'a' .. 'z' then
-            return True;
-         end if;
-      end loop;
-
-      --  Find the last dot instance in the filename.
-      for I in reverse Filename'Range loop
-         if Filename (I) = '.' then
-            Last_Dot_Index := I;
-            exit;
-         end if;
-      end loop;
-
-      if Last_Dot_Index = 0 then
-         return Filename'Length > 8;
-      end if;
-
-      if Last_Dot_Index - Filename'First > 8 then
-         return True;
-      end if;
-
-      if Filename'Last - Last_Dot_Index > 3 then
-         return True;
-      end if;
-
-      return False;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Are_LFN_Entries_Required");
-         return False;
-   end Are_LFN_Entries_Required;
-
    procedure Create_File_In_Root_Directory_FAT16
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -232,147 +90,308 @@ package body Filesystems.FAT.FAT16 is
    is
       pragma Unreferenced (Parent_Node, New_Node);
 
-      Sector_Address : Virtual_Address_T := Null_Address;
-      Current_Sector : Sector_Index_T := 0;
+      Current_Sector             : Sector_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Current_Block              : Block_Index_T := 0;
 
-      Was_New_Entry_Created : Boolean := False;
-      New_Dir_Entry_Index   : Natural := 0;
+      DOS_Filename  : FAT_DOS_File_Name_T;
+      DOS_Extension : FAT_DOS_File_Ext_T;
+      DOS_Checksum  : Unsigned_8 := 0;
 
-      Number_Of_LFN_Entries_Needed : Natural := 0;
+      Are_LFN_Entries_Required       : Boolean := False;
+      Number_Of_LFN_Entries_Required : Natural := 0;
+      First_Free_Entry_Index         : Natural := 0;
+      Current_Free_Entry_Count       : Natural := 0;
+      Found_Required_Entries         : Boolean := False;
+
+      Current_Updated_Entry_Count  : Natural := 0;
+      All_Required_Entries_Updated : Boolean := False;
+
+      Total_Entries_Parsed : Natural := 0;
+
+      Release_Block_Result : Function_Result := Unset;
    begin
-      Current_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
-
-      LFN_Entries_Are_Required : constant Boolean :=
-        Are_LFN_Entries_Required (Filename);
-
-      if LFN_Entries_Are_Required then
-         Get_Number_Of_LFN_Entries_Needed_For_Filename
-           (Filename, Number_Of_LFN_Entries_Needed, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
+      --  Create the DOS filename/extension up-front, so we can determine
+      --  whether LFN entries are needed for this filename.
+      --  If the conversion is lossy, we need LFN entries to preserve the
+      --  original filename. Note that a change in case isn't considered lossy,
+      --  since FAT compares filenames in a case-insensitive manner.
+      Create_DOS_Filename
+        (Filename,
+         DOS_Filename,
+         DOS_Extension,
+         Are_LFN_Entries_Required,
+         Result);
+      if Is_Error (Result) then
+         return;
       end if;
 
-      Total_Entries_Needed : constant Natural :=
-        Number_Of_LFN_Entries_Needed + 1;
+      if Are_LFN_Entries_Required then
+         Number_Of_LFN_Entries_Required :=
+           (Filename'Length / 13)
+           + (if Filename'Length mod 13 = 0 then 0 else 1);
 
-      --  A current limitation of this implementation is that LFN entries don't
-      --  span across sector boundaries. This may be resolved in a future
-      --  update.
-      Read_Sectors_Loop : for I in
-        1 .. Filesystem_Info.Sectors_In_Root_Directory
-      loop
-         --  Read each FAT logical sector in the root directory into memory.
-         Read_Sector_From_Filesystem
-           (Filesystem,
-            Reading_Process,
-            Current_Sector,
+         DOS_Checksum :=
+           Get_DOS_Filename_Checksum (DOS_Filename, DOS_Extension);
+      end if;
+
+      Total_Number_Of_Entries_Required : constant Natural :=
+        Number_Of_LFN_Entries_Required + 1;
+
+      Last_Sector : constant Sector_Index_T :=
+        Filesystem_Info.FAT12_16_Root_Directory_Sector
+        + Sector_Index_T (Filesystem_Info.Sectors_In_Root_Directory);
+
+      Current_Sector := Filesystem_Info.FAT12_16_Root_Directory_Sector;
+
+      Entries_Per_Sector : constant Natural :=
+        Filesystem_Info.Bytes_Per_Sector / 32;
+
+      Read_Sectors_Loop : loop
+         Get_Sector_Block_Number_And_Offset
+           (Current_Sector,
             Filesystem_Info.Bytes_Per_Sector,
-            Sector_Address,
+            Current_Block,
+            Sector_Offset_Within_Block,
             Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         Directory_Entries_In_This_Block : constant Natural :=
-           Filesystem_Info.Bytes_Per_Sector / 32;
+         Read_Block_From_Filesystem
+           (Filesystem, Reading_Process, Current_Block, Block_Address, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
 
-         Parse_Directory_Buffer : declare
+         Remaining_Sectors : constant Natural :=
+           Natural (Last_Sector - Current_Sector);
+
+         Number_Of_Sectors_Within_This_Block : constant Natural :=
+           Natural'Min
+             (Remaining_Sectors,
+              (Block_Size - Natural (Sector_Offset_Within_Block))
+              / Filesystem_Info.Bytes_Per_Sector);
+
+         Number_Of_Directory_Entries_In_This_Block : constant Natural :=
+           Entries_Per_Sector * Number_Of_Sectors_Within_This_Block;
+
+         Search_Directory_Buffer : declare
             Directory :
-              Directory_Index_T (1 .. Directory_Entries_In_This_Block)
-            with Import, Address => Sector_Address, Alignment => 1;
-
-            Current_Free_Entry_Count : Natural := 0;
-            DOS_Filename_Checksum    : Unsigned_8 := 0;
+              Directory_Index_T
+                (0 .. Number_Of_Directory_Entries_In_This_Block - 1)
+            with
+              Import,
+              Address   => Block_Address + Sector_Offset_Within_Block,
+              Alignment => 1;
          begin
             Log_Debug
               ("Scanning for "
-               & Total_Entries_Needed'Image
+               & Total_Number_Of_Entries_Required'Image
                & " free directory entries.",
                Logging_Tags_FAT);
 
-            Parse_Directory_Loop : for Dir_Idx in 1 .. Directory'Length loop
+            Parse_Directory_Loop : for Dir_Idx in 0 .. Directory'Length - 1
+            loop
                if Is_Free_Directory_Entry (Directory (Dir_Idx)) then
                   Log_Debug
                     ("Found free directory entry at idx:" & Dir_Idx'Image,
                      Logging_Tags_FAT);
 
                   if Current_Free_Entry_Count = 0 then
-                     New_Dir_Entry_Index := Dir_Idx;
+                     First_Free_Entry_Index := Dir_Idx + Total_Entries_Parsed;
                   end if;
 
-                  Current_Free_Entry_Count := Current_Free_Entry_Count + 1;
-                  if Current_Free_Entry_Count = Total_Entries_Needed then
-                     Log_Debug
-                       ("Found "
-                        & Current_Free_Entry_Count'Image
-                        & " free directory entries at index "
-                        & New_Dir_Entry_Index'Image,
-                        Logging_Tags_FAT);
-
-                     DOS_Entry_Index : constant Natural :=
-                       New_Dir_Entry_Index + Number_Of_LFN_Entries_Needed;
-
-                     Create_DOS_Directory_Entry
-                       (Filename,
-                        Directory (DOS_Entry_Index),
-                        DOS_Filename_Checksum,
-                        Result);
-                     if Is_Error (Result) then
-                        return;
-                     end if;
-
-                     if LFN_Entries_Are_Required then
-                        Create_Long_File_Name_Entries
-                          (Filename,
-                           Sector_Address,
-                           Number_Of_LFN_Entries_Needed,
-                           New_Dir_Entry_Index,
-                           DOS_Filename_Checksum,
-                           Result);
-                        if Is_Error (Result) then
-                           return;
-                        end if;
-                     end if;
-
-                     Write_Sector_To_Filesystem
-                       (Filesystem,
-                        Reading_Process,
-                        Current_Sector,
-                        Filesystem_Info.Bytes_Per_Sector,
-                        Result);
-                     if Is_Error (Result) then
-                        return;
-                     end if;
-
-                     Was_New_Entry_Created := True;
-                     exit Parse_Directory_Loop;
-                  end if;
+                  Current_Free_Entry_Count := @ + 1;
                else
                   Current_Free_Entry_Count := 0;
                end if;
-            end loop Parse_Directory_Loop;
-         end Parse_Directory_Buffer;
 
-         Release_Sector
-           (Filesystem,
-            Current_Sector,
+               if Current_Free_Entry_Count = Total_Number_Of_Entries_Required
+               then
+                  Found_Required_Entries := True;
+
+                  Log_Debug
+                    ("Found "
+                     & Current_Free_Entry_Count'Image
+                     & " free directory entries starting at index "
+                     & First_Free_Entry_Index'Image,
+                     Logging_Tags_FAT);
+
+                  exit Parse_Directory_Loop;
+               end if;
+            end loop Parse_Directory_Loop;
+         end Search_Directory_Buffer;
+
+         Release_Block (Filesystem, Current_Block, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         exit Read_Sectors_Loop when Found_Required_Entries;
+
+         Current_Sector :=
+           @ + Sector_Index_T (Number_Of_Sectors_Within_This_Block);
+
+         Total_Entries_Parsed := @ + Number_Of_Directory_Entries_In_This_Block;
+
+         exit Read_Sectors_Loop when Current_Sector >= Last_Sector;
+      end loop Read_Sectors_Loop;
+
+      if not Found_Required_Entries then
+         Log_Error
+           ("Not enough free directory entries found in root directory.");
+         Result := No_Free_Entries;
+         return;
+      end if;
+
+      Current_Sector :=
+        Filesystem_Info.FAT12_16_Root_Directory_Sector
+        + Sector_Index_T (First_Free_Entry_Index / Entries_Per_Sector);
+
+      Total_Entries_Parsed :=
+        (First_Free_Entry_Index / Entries_Per_Sector) * Entries_Per_Sector;
+
+      Update_Sectors_Loop : loop
+         Get_Sector_Block_Number_And_Offset
+           (Current_Sector,
             Filesystem_Info.Bytes_Per_Sector,
+            Current_Block,
+            Sector_Offset_Within_Block,
             Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         if Was_New_Entry_Created then
-            Result := Success;
+         Read_Block_From_Filesystem
+           (Filesystem, Reading_Process, Current_Block, Block_Address, Result);
+         if Is_Error (Result) then
             return;
          end if;
 
-         --  Increment the current read sector.
-         Current_Sector := Current_Sector + 1;
-      end loop Read_Sectors_Loop;
+         Remaining_Sectors : constant Natural :=
+           Natural (Last_Sector - Current_Sector);
 
-      Result := No_Free_Entries;
+         Number_Of_Sectors_Within_This_Block : constant Natural :=
+           Natural'Min
+             (Remaining_Sectors,
+              (Block_Size - Natural (Sector_Offset_Within_Block))
+              / Filesystem_Info.Bytes_Per_Sector);
+
+         Number_Of_Directory_Entries_In_This_Block : constant Natural :=
+           Entries_Per_Sector * Number_Of_Sectors_Within_This_Block;
+
+         Update_Directory_Buffer : declare
+            Directory :
+              Directory_Index_T
+                (0 .. Number_Of_Directory_Entries_In_This_Block - 1)
+            with
+              Import,
+              Address   => Block_Address + Sector_Offset_Within_Block,
+              Alignment => 1;
+
+            LFN_Directory :
+              LFN_Directory_Index_T
+                (0 .. Number_Of_Directory_Entries_In_This_Block - 1)
+            with
+              Import,
+              Address   => Block_Address + Sector_Offset_Within_Block,
+              Alignment => 1;
+         begin
+            Update_Entry_Loop : loop
+               All_Required_Entries_Updated :=
+                 Current_Updated_Entry_Count
+                 = Total_Number_Of_Entries_Required;
+
+               exit Update_Entry_Loop when All_Required_Entries_Updated;
+
+               Next_Free_Entry_Index : constant Natural :=
+                 First_Free_Entry_Index + Current_Updated_Entry_Count;
+
+               --  Test whether the next entry we need to write is actually
+               --  within the current block.
+               Next_Entry_To_Write_Is_In_This_Block : constant Boolean :=
+                 Next_Free_Entry_Index
+                 in Total_Entries_Parsed
+                  ..
+                    Total_Entries_Parsed
+                    + Number_Of_Directory_Entries_In_This_Block
+                    - 1;
+
+               exit Update_Entry_Loop when
+                 not Next_Entry_To_Write_Is_In_This_Block;
+
+               Index_Within_Current_Block : constant Natural :=
+                 Next_Free_Entry_Index - Total_Entries_Parsed;
+
+               if Current_Updated_Entry_Count < Number_Of_LFN_Entries_Required
+               then
+                  Create_LFN_Directory_Entry
+                    (Filename,
+                     Number_Of_LFN_Entries_Required
+                     - Current_Updated_Entry_Count,
+                     Current_Updated_Entry_Count = 0,
+                     DOS_Checksum,
+                     LFN_Directory (Index_Within_Current_Block),
+                     Result);
+                  if Is_Error (Result) then
+                     Release_Block
+                       (Filesystem, Current_Block, Release_Block_Result);
+                     return;
+                  end if;
+
+                  Log_Debug
+                    ("Wrote LFN entry at:" & Index_Within_Current_Block'Image,
+                     Logging_Tags_FAT);
+               else
+                  Directory (Index_Within_Current_Block) :=
+                    (File_Name          => DOS_Filename,
+                     File_Ext           => DOS_Extension,
+                     Attributes         => (others => False),
+                     Reserved           => 0,
+                     Creation_Seconds   => 0,
+                     Creation_Time      => 0,
+                     Creation_Date      => 0,
+                     Last_Accessed_Date => 0,
+                     First_Cluster_High => 0,
+                     Last_Modified_Time => 0,
+                     Last_Modified_Date => 0,
+                     First_Cluster_Low  => 0,
+                     File_Size          => 0);
+
+                  Log_Debug
+                    ("Wrote DOS entry at:" & Index_Within_Current_Block'Image,
+                     Logging_Tags_FAT);
+               end if;
+
+               Current_Updated_Entry_Count := @ + 1;
+            end loop Update_Entry_Loop;
+
+            Write_Block_To_Filesystem
+              (Filesystem, Reading_Process, Current_Block, Result);
+            if Is_Error (Result) then
+               Release_Block (Filesystem, Current_Block, Release_Block_Result);
+               return;
+            end if;
+         end Update_Directory_Buffer;
+
+         Release_Block (Filesystem, Current_Block, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         exit Update_Sectors_Loop when All_Required_Entries_Updated;
+
+         Total_Entries_Parsed := @ + Number_Of_Directory_Entries_In_This_Block;
+
+         Current_Sector :=
+           @ + Sector_Index_T (Number_Of_Sectors_Within_This_Block);
+
+         exit Update_Sectors_Loop when Current_Sector >= Last_Sector;
+      end loop Update_Sectors_Loop;
+
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Create_File_In_Root_Directory_FAT16");
@@ -1018,7 +1037,7 @@ package body Filesystems.FAT.FAT16 is
          return;
       end if;
 
-      Log_Error
+      Log_Debug
         ("Found free FAT16 cluster: " & New_Cluster'Image, Logging_Tags_FAT);
 
       --  Mark the newly allocated cluster as end-of-chain in the FAT.
@@ -1034,7 +1053,7 @@ package body Filesystems.FAT.FAT16 is
          return;
       end if;
 
-      Log_Error
+      Log_Debug
         ("Allocated free FAT16 cluster: " & New_Cluster'Image,
          Logging_Tags_FAT);
 
