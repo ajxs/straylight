@@ -504,6 +504,13 @@ package body Filesystems.FAT.FAT16 is
       Current_Cluster :=
         Get_First_Cluster_From_Index_FAT16 (Parent_Node.all.Index);
 
+      if Current_Cluster = 0 then
+         Log_Debug
+           ("Directory has no clusters allocated to it.", Logging_Tags_FAT);
+         Result := No_Free_Entries;
+         return;
+      end if;
+
       Follow_Cluster_Chain_Loop : loop
          First_Sector_Of_Cluster : constant Sector_Index_T :=
            Get_First_Sector_Of_Cluster
@@ -581,6 +588,27 @@ package body Filesystems.FAT.FAT16 is
             Result);
          if Is_Error (Result) then
             return;
+         end if;
+
+         if Is_Cluster_End_Of_Chain
+              (Unsigned_32 (Next_Cluster_In_Chain), Filesystem_Info.FAT_Type)
+         then
+            Log_Debug
+              ("Reached end of cluster chain while scanning for "
+               & "free directory entries. Allocating next cluster.",
+               Logging_Tags_FAT);
+
+            Extend_Cluster_Chain_FAT16
+              (Filesystem,
+               Reading_Process,
+               Filesystem_Info,
+               Current_Cluster,
+               Next_Cluster_In_Chain,
+               Result,
+               Zero_New_Cluster => True);
+            if Is_Error (Result) then
+               return;
+            end if;
          end if;
 
          --  Check for end of cluster chain.
@@ -1451,9 +1479,6 @@ package body Filesystems.FAT.FAT16 is
          return;
       end if;
 
-      Log_Debug
-        ("Found free FAT16 cluster: " & New_Cluster'Image, Logging_Tags_FAT);
-
       --  Mark the newly allocated cluster as end-of-chain in the FAT.
       Write_Table_Entry_FAT16
         (Filesystem,
@@ -1468,7 +1493,7 @@ package body Filesystems.FAT.FAT16 is
       end if;
 
       Log_Debug
-        ("Allocated free FAT16 cluster: " & New_Cluster'Image,
+        ("Allocated new FAT16 cluster: " & New_Cluster'Image,
          Logging_Tags_FAT);
 
       Result := Success;
@@ -1480,12 +1505,17 @@ package body Filesystems.FAT.FAT16 is
    end Allocate_Cluster_FAT16;
 
    procedure Extend_Cluster_Chain_FAT16
-     (Filesystem      : Filesystem_Access;
-      Writing_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Cluster         : Unsigned_16;
-      New_Cluster     : out Unsigned_16;
-      Result          : out Function_Result) is
+     (Filesystem       : Filesystem_Access;
+      Writing_Process  : in out Process_Control_Block_T;
+      Filesystem_Info  : FAT_Filesystem_Info_T;
+      Cluster          : Unsigned_16;
+      New_Cluster      : out Unsigned_16;
+      Result           : out Function_Result;
+      Zero_New_Cluster : Boolean := False)
+   is
+      Current_Block              : Block_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
    begin
       Allocate_Cluster_FAT16
         (Filesystem, Writing_Process, Filesystem_Info, New_Cluster, Result);
@@ -1502,6 +1532,46 @@ package body Filesystems.FAT.FAT16 is
          Result);
       if Is_Error (Result) then
          return;
+      end if;
+
+      if Zero_New_Cluster then
+         First_Sector_Of_Allocated_Cluster : constant Sector_Index_T :=
+           Get_First_Sector_Of_Cluster
+             (Unsigned_32 (New_Cluster),
+              Filesystem_Info.Sectors_Per_Cluster,
+              Filesystem_Info.First_Data_Sector);
+
+         Get_Sector_Block_Number_And_Offset
+           (First_Sector_Of_Allocated_Cluster,
+            Filesystem_Info.Bytes_Per_Sector,
+            Current_Block,
+            Sector_Offset_Within_Block,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Read_Block_From_Filesystem
+           (Filesystem, Writing_Process, Current_Block, Block_Address, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Set
+           (Block_Address + Sector_Offset_Within_Block,
+            0,
+            Filesystem_Info.Bytes_Per_Sector);
+
+         Write_Block_To_Filesystem
+           (Filesystem, Writing_Process, Current_Block, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Release_Block (Filesystem, Current_Block, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
       end if;
 
       Result := Success;

@@ -91,11 +91,12 @@ private
       Result          : out Function_Result);
 
    procedure Extend_Cluster_Chain_FAT16
-     (Filesystem      : Filesystem_Access;
-      Writing_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Cluster         : Unsigned_16;
-      New_Cluster     : out Unsigned_16;
-      Result          : out Function_Result);
+     (Filesystem       : Filesystem_Access;
+      Writing_Process  : in out Process_Control_Block_T;
+      Filesystem_Info  : FAT_Filesystem_Info_T;
+      Cluster          : Unsigned_16;
+      New_Cluster      : out Unsigned_16;
+      Result           : out Function_Result;
+      Zero_New_Cluster : Boolean := False);
 
 end Filesystems.FAT.FAT16;
