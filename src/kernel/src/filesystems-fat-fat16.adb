@@ -183,24 +183,22 @@ package body Filesystems.FAT.FAT16 is
          Number_Of_Directory_Entries_In_This_Block : constant Natural :=
            Entries_Per_Sector * Number_Of_Sectors_Within_This_Block;
 
-         Search_Directory_Buffer : declare
-            Directory :
-              Directory_Index_T
-                (0 .. Number_Of_Directory_Entries_In_This_Block - 1)
-            with
-              Import,
-              Address   => Block_Address + Sector_Offset_Within_Block,
-              Alignment => 1;
-         begin
-            Scan_Directory_For_Unused_Entries
-              (Directory,
-               Total_Number_Of_Entries_Required,
-               Total_Entries_Parsed,
-               Current_Free_Entry_Count,
-               Found_Required_Entries,
-               First_Free_Entry_Index,
-               Scan_Directory_Result);
-         end Search_Directory_Buffer;
+         Directory :
+           Directory_Index_T
+             (0 .. Number_Of_Directory_Entries_In_This_Block - 1)
+         with
+           Import,
+           Address   => Block_Address + Sector_Offset_Within_Block,
+           Alignment => 1;
+
+         Scan_Directory_For_Unused_Entries
+           (Directory,
+            Total_Number_Of_Entries_Required,
+            Total_Entries_Parsed,
+            Current_Free_Entry_Count,
+            Found_Required_Entries,
+            First_Free_Entry_Index,
+            Scan_Directory_Result);
 
          Release_Block (Filesystem, Current_Block, Result);
          if Is_Error (Result) then
@@ -573,11 +571,6 @@ package body Filesystems.FAT.FAT16 is
             exit Follow_Cluster_Chain_Loop when Found_Required_Entries;
          end loop Read_Sectors_Loop;
 
-         --  Check for end of cluster chain.
-         exit Follow_Cluster_Chain_Loop when
-           Is_Cluster_End_Of_Chain
-             (Unsigned_32 (Current_Cluster), Filesystem_Info.FAT_Type);
-
          --  Read the next cluster in the FAT chain.
          Get_FAT16_Entry
            (Filesystem,
@@ -589,6 +582,11 @@ package body Filesystems.FAT.FAT16 is
          if Is_Error (Result) then
             return;
          end if;
+
+         --  Check for end of cluster chain.
+         exit Follow_Cluster_Chain_Loop when
+           Is_Cluster_End_Of_Chain
+             (Unsigned_32 (Next_Cluster_In_Chain), Filesystem_Info.FAT_Type);
 
          Current_Cluster := Next_Cluster_In_Chain;
       end loop Follow_Cluster_Chain_Loop;
@@ -745,11 +743,6 @@ package body Filesystems.FAT.FAT16 is
             exit Update_Cluster_Chain_Loop when All_Required_Entries_Updated;
          end loop Update_Sectors_Loop;
 
-         --  Check for end of cluster chain.
-         exit Update_Cluster_Chain_Loop when
-           Is_Cluster_End_Of_Chain
-             (Unsigned_32 (Current_Cluster), Filesystem_Info.FAT_Type);
-
          --  Read the next cluster in the FAT chain.
          Get_FAT16_Entry
            (Filesystem,
@@ -761,6 +754,11 @@ package body Filesystems.FAT.FAT16 is
          if Is_Error (Result) then
             return;
          end if;
+
+         --  Check for end of cluster chain.
+         exit Update_Cluster_Chain_Loop when
+           Is_Cluster_End_Of_Chain
+             (Unsigned_32 (Next_Cluster_In_Chain), Filesystem_Info.FAT_Type);
 
          Current_Cluster := Next_Cluster_In_Chain;
       end loop Update_Cluster_Chain_Loop;
@@ -976,26 +974,24 @@ package body Filesystems.FAT.FAT16 is
                return;
             end if;
 
-            Parse_Directory_Buffer : declare
-               Directory : Directory_Index_T (1 .. Directory_Entries_In_Sector)
-               with
-                 Import,
-                 Address   => Block_Address + Sector_Offset_Within_Block,
-                 Alignment => 1;
-            begin
-               Search_FAT_Directory_For_File
-                 (Filesystem,
-                  Directory,
-                  Filename,
-                  Parent_Node,
-                  Entry_Long_Filename,
-                  Entry_Long_Filename_Length,
-                  Entry_Long_Filename_Checksum,
-                  Checksum_Valid,
-                  Filesystem_Node,
-                  Last_Entry_Reached,
-                  Search_Result);
-            end Parse_Directory_Buffer;
+            Directory : Directory_Index_T (1 .. Directory_Entries_In_Sector)
+            with
+              Import,
+              Address   => Block_Address + Sector_Offset_Within_Block,
+              Alignment => 1;
+
+            Search_FAT_Directory_For_File
+              (Filesystem,
+               Directory,
+               Filename,
+               Parent_Node,
+               Entry_Long_Filename,
+               Entry_Long_Filename_Length,
+               Entry_Long_Filename_Checksum,
+               Checksum_Valid,
+               Filesystem_Node,
+               Last_Entry_Reached,
+               Search_Result);
 
             Release_Block (Filesystem, Current_Block, Result);
             if Is_Error (Result) then
@@ -1112,27 +1108,24 @@ package body Filesystems.FAT.FAT16 is
            Get_Buffer_Max_Directory_Entry_Count
              (Sectors_Within_This_Block * Filesystem_Info.Bytes_Per_Sector);
 
-         Parse_Directory_Buffer : declare
-            Directory :
-              Directory_Index_T (1 .. Directory_Entries_In_This_Block)
-            with
-              Import,
-              Address   => Block_Address + Sector_Offset_Within_Block,
-              Alignment => 1;
-         begin
-            Search_FAT_Directory_For_File
-              (Filesystem,
-               Directory,
-               Filename,
-               Parent_Node,
-               Entry_Long_Filename,
-               Entry_Long_Filename_Length,
-               Entry_Long_Filename_Checksum,
-               Checksum_Valid,
-               Filesystem_Node,
-               Last_Entry_Reached,
-               Search_Result);
-         end Parse_Directory_Buffer;
+         Directory : Directory_Index_T (1 .. Directory_Entries_In_This_Block)
+         with
+           Import,
+           Address   => Block_Address + Sector_Offset_Within_Block,
+           Alignment => 1;
+
+         Search_FAT_Directory_For_File
+           (Filesystem,
+            Directory,
+            Filename,
+            Parent_Node,
+            Entry_Long_Filename,
+            Entry_Long_Filename_Length,
+            Entry_Long_Filename_Checksum,
+            Checksum_Valid,
+            Filesystem_Node,
+            Last_Entry_Reached,
+            Search_Result);
 
          Release_Block (Filesystem, Current_Block, Result);
          if Is_Error (Result) then
@@ -1263,19 +1256,17 @@ package body Filesystems.FAT.FAT16 is
       Number_Of_Entries_Within_Sector : constant Natural :=
         Natural (Filesystem_Info.Bytes_Per_Sector / 2);
 
-      declare
-         --  Despite the fact that we're loading an entire block, since the
-         --  filesystem reasons about its layout in terms of variable-size
-         --  'sectors' we only want to work with a single sector, since we
-         --  can't guarantee its size.
-         FAT16_Table : FAT16_Table_T (0 .. Number_Of_Entries_Within_Sector - 1)
-         with
-           Import,
-           Alignment => 1,
-           Address   => Block_Address + Sector_Offset_Within_Block;
-      begin
-         FAT_Entry := FAT16_Table (Cluster_Index_Within_Sector);
-      end;
+      --  Despite the fact that we're loading an entire block, since the
+      --  filesystem reasons about its layout in terms of variable-size
+      --  'sectors' we only want to work with a single sector, since we
+      --  can't guarantee its size.
+      FAT16_Table : FAT16_Table_T (0 .. Number_Of_Entries_Within_Sector - 1)
+      with
+        Import,
+        Alignment => 1,
+        Address   => Block_Address + Sector_Offset_Within_Block;
+
+      FAT_Entry := FAT16_Table (Cluster_Index_Within_Sector);
 
       --  Result set by this call.
       Release_Block (Filesystem, Block_Number, Result);
@@ -1323,16 +1314,13 @@ package body Filesystems.FAT.FAT16 is
             return;
          end if;
 
-         declare
-            FAT16_Table :
-              FAT16_Table_T (0 .. Number_Of_Entries_Within_Sector - 1)
-            with
-              Import,
-              Alignment => 1,
-              Address   => Block_Address + Sector_Offset_Within_Block;
-         begin
-            FAT16_Table (Cluster_Index_Within_Sector) := FAT_Entry;
-         end;
+         FAT16_Table : FAT16_Table_T (0 .. Number_Of_Entries_Within_Sector - 1)
+         with
+           Import,
+           Alignment => 1,
+           Address   => Block_Address + Sector_Offset_Within_Block;
+
+         FAT16_Table (Cluster_Index_Within_Sector) := FAT_Entry;
 
          Write_Block_To_Filesystem
            (Filesystem, Writing_Process, Block_Number, Result);
@@ -1396,53 +1384,48 @@ package body Filesystems.FAT.FAT16 is
          end if;
 
          --  Check all of the FAT entries in the sector for a free cluster.
-         declare
-            --  If the current sector is the starting sector, we need to start
-            --  checking from index 2, rather than from the index 0, which
-            --  contains reserved entries.
-            Start_Index : constant Integer :=
-              (if Sector_Number = Filesystem_Info.First_FAT_Sector
-               then 2
-               else 0);
+         --  If the current sector is the starting sector, we need to start
+         --  checking from index 2, rather than from the index 0, which
+         --  contains reserved entries.
+         Start_Index : constant Integer :=
+           (if Sector_Number = Filesystem_Info.First_FAT_Sector then 2 else 0);
 
-            FAT16_Table_Sector : FAT16_Table_T (0 .. Clusters_Per_Sector - 1)
-            with
-              Import,
-              Alignment => 1,
-              Address   => Block_Address + Sector_Offset_Within_Block;
-         begin
-            Check_Cluster_Loop : for Current_Cluster in
-              Start_Index .. Clusters_Per_Sector - 1
-            loop
-               if Is_Cluster_Free
-                    (Unsigned_32 (FAT16_Table_Sector (Current_Cluster)))
-               then
-                  Found_Free_Cluster := True;
-                  Free_Cluster :=
-                    Unsigned_16
-                      (Sector_Number - Filesystem_Info.First_FAT_Sector)
-                    * Unsigned_16 (Clusters_Per_Sector)
-                    + Unsigned_16 (Current_Cluster);
+         FAT16_Table_Sector : FAT16_Table_T (0 .. Clusters_Per_Sector - 1)
+         with
+           Import,
+           Alignment => 1,
+           Address   => Block_Address + Sector_Offset_Within_Block;
 
-                  exit Check_Cluster_Loop;
-               end if;
-            end loop Check_Cluster_Loop;
+         Check_Cluster_Loop : for Current_Cluster in
+           Start_Index .. Clusters_Per_Sector - 1
+         loop
+            if Is_Cluster_Free
+                 (Unsigned_32 (FAT16_Table_Sector (Current_Cluster)))
+            then
+               Found_Free_Cluster := True;
+               Free_Cluster :=
+                 Unsigned_16 (Sector_Number - Filesystem_Info.First_FAT_Sector)
+                 * Unsigned_16 (Clusters_Per_Sector)
+                 + Unsigned_16 (Current_Cluster);
 
-            Release_Block (Filesystem, Current_Block, Result);
-            if Is_Error (Result) then
-               Free_Cluster := 0;
-               return;
+               exit Check_Cluster_Loop;
             end if;
+         end loop Check_Cluster_Loop;
 
-            if Found_Free_Cluster then
-               Log_Debug
-                 ("Found free FAT16 cluster: " & Free_Cluster'Image,
-                  Logging_Tags_FAT);
+         Release_Block (Filesystem, Current_Block, Result);
+         if Is_Error (Result) then
+            Free_Cluster := 0;
+            return;
+         end if;
 
-               Result := Success;
-               return;
-            end if;
-         end;
+         if Found_Free_Cluster then
+            Log_Debug
+              ("Found free FAT16 cluster: " & Free_Cluster'Image,
+               Logging_Tags_FAT);
+
+            Result := Success;
+            return;
+         end if;
       end loop Read_Sectors_Loop;
 
       Free_Cluster := 0;
