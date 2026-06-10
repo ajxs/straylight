@@ -253,6 +253,9 @@ package body Filesystems.FAT.FAT16 is
       Sector_Offset_Within_Block : Storage_Offset := 0;
       Current_Block              : Block_Index_T := 0;
 
+      DOS_Entry_Sector          : Sector_Index_T := 0;
+      DOS_Entry_Index_In_Sector : Natural := 0;
+
       First_Free_Entry_Index : Natural := 0;
 
       Current_Updated_Entry_Count  : Natural := 0;
@@ -401,6 +404,17 @@ package body Filesystems.FAT.FAT16 is
                      First_Cluster_Low  => 0,
                      File_Size          => 0);
 
+                  --  Save the sector index of the newly created DOS directory
+                  --  entry, and its index within that sector. These are used
+                  --  to create the filesystem node index for this entry.
+                  DOS_Entry_Sector :=
+                    Current_Sector
+                    + Sector_Index_T
+                        (Index_Within_Current_Block / Entries_Per_Sector);
+
+                  DOS_Entry_Index_In_Sector :=
+                    (Index_Within_Current_Block mod Entries_Per_Sector);
+
                   Log_Debug
                     ("Wrote DOS entry at:" & Index_Within_Current_Block'Image,
                      Logging_Tags_FAT);
@@ -441,7 +455,8 @@ package body Filesystems.FAT.FAT16 is
          Size          => 0,
          Data_Location => 0,
          Index         =>
-           Get_Directory_Entry_Node_Index (0, First_Free_Entry_Index),
+           Get_Directory_Entry_Node_Index
+             (Unsigned_32 (DOS_Entry_Sector), DOS_Entry_Index_In_Sector),
          Parent_Index  => Parent_Node.all.Index);
       if Is_Error (Result) then
          New_Node := null;
@@ -471,6 +486,9 @@ package body Filesystems.FAT.FAT16 is
       Current_Cluster       : Unsigned_16 := 0;
       Next_Cluster_In_Chain : Unsigned_16 := 0;
 
+      DOS_Entry_Sector          : Sector_Index_T := 0;
+      DOS_Entry_Index_In_Sector : Natural := 0;
+
       Block_Address              : Virtual_Address_T := Null_Address;
       Sector_Offset_Within_Block : Storage_Offset := 0;
       Current_Block              : Block_Index_T := 0;
@@ -492,8 +510,7 @@ package body Filesystems.FAT.FAT16 is
         Number_Of_LFN_Entries_Required + 1;
 
       Directory_Entries_In_Sector : constant Natural :=
-        Get_Buffer_Max_Directory_Entry_Count
-          (Filesystem_Info.Bytes_Per_Sector);
+        Filesystem_Info.Bytes_Per_Sector / 32;
 
       --  Perform an initial first pass scan of all the clusters/sectors in
       --  the directory to find the required number of consecutive free
@@ -501,8 +518,7 @@ package body Filesystems.FAT.FAT16 is
       --  This two-pass implementation is required because of the possibility
       --  that the consecutive free entries may span across multiple
       --  sectors/clusters.
-      Current_Cluster :=
-        Get_First_Cluster_From_Index_FAT16 (Parent_Node.all.Index);
+      Current_Cluster := Unsigned_16 (Parent_Node.all.Data_Location);
 
       if Current_Cluster = 0 then
          Log_Debug
@@ -627,8 +643,7 @@ package body Filesystems.FAT.FAT16 is
 
       --  We now have the start index of the free directory entries to update.
       --  perform a second pass to update all the required clusters/sectors.
-      Current_Cluster :=
-        Get_First_Cluster_From_Index_FAT16 (Parent_Node.all.Index);
+      Current_Cluster := Unsigned_16 (Parent_Node.all.Data_Location);
 
       Total_Entries_Parsed := 0;
 
@@ -744,6 +759,10 @@ package body Filesystems.FAT.FAT16 is
                         First_Cluster_Low  => 0,
                         File_Size          => 0);
 
+                     DOS_Entry_Sector := Current_Sector;
+
+                     DOS_Entry_Index_In_Sector := Index_Within_Curr_Sector;
+
                      Log_Debug
                        ("Wrote DOS entry at:" & Index_Within_Curr_Sector'Image,
                         Logging_Tags_FAT);
@@ -800,7 +819,8 @@ package body Filesystems.FAT.FAT16 is
          Size          => 0,
          Data_Location => 0,
          Index         =>
-           Get_Directory_Entry_Node_Index (0, First_Free_Entry_Index),
+           Get_Directory_Entry_Node_Index
+             (Unsigned_32 (DOS_Entry_Sector), DOS_Entry_Index_In_Sector),
          Parent_Index  => Parent_Node.all.Index);
       if Is_Error (Result) then
          New_Node := null;
@@ -960,11 +980,9 @@ package body Filesystems.FAT.FAT16 is
       Log_Debug ("Finding file in FAT16 directory", Logging_Tags_FAT);
 
       Directory_Entries_In_Sector : constant Natural :=
-        Get_Buffer_Max_Directory_Entry_Count
-          (Filesystem_Info.Bytes_Per_Sector);
+        Filesystem_Info.Bytes_Per_Sector / 32;
 
-      Current_Cluster :=
-        Get_First_Cluster_From_Index_FAT16 (Parent_Node.all.Index);
+      Current_Cluster := Unsigned_16 (Parent_Node.all.Data_Location);
 
       Follow_Cluster_Chain_Loop : loop
          First_Sector_Of_Cluster : constant Sector_Index_T :=
@@ -1002,7 +1020,8 @@ package body Filesystems.FAT.FAT16 is
                return;
             end if;
 
-            Directory : Directory_Index_T (1 .. Directory_Entries_In_Sector)
+            Directory :
+              Directory_Index_T (0 .. Directory_Entries_In_Sector - 1)
             with
               Import,
               Address   => Block_Address + Sector_Offset_Within_Block,
@@ -1010,9 +1029,11 @@ package body Filesystems.FAT.FAT16 is
 
             Search_FAT_Directory_For_File
               (Filesystem,
+               Filesystem_Info,
                Directory,
                Filename,
                Parent_Node,
+               Current_Sector,
                Entry_Long_Filename,
                Entry_Long_Filename_Length,
                Entry_Long_Filename_Checksum,
@@ -1133,10 +1154,10 @@ package body Filesystems.FAT.FAT16 is
               Remaining_Sectors);
 
          Directory_Entries_In_This_Block : constant Natural :=
-           Get_Buffer_Max_Directory_Entry_Count
-             (Sectors_Within_This_Block * Filesystem_Info.Bytes_Per_Sector);
+           (Sectors_Within_This_Block * Filesystem_Info.Bytes_Per_Sector) / 32;
 
-         Directory : Directory_Index_T (1 .. Directory_Entries_In_This_Block)
+         Directory :
+           Directory_Index_T (0 .. Directory_Entries_In_This_Block - 1)
          with
            Import,
            Address   => Block_Address + Sector_Offset_Within_Block,
@@ -1144,9 +1165,11 @@ package body Filesystems.FAT.FAT16 is
 
          Search_FAT_Directory_For_File
            (Filesystem,
+            Filesystem_Info,
             Directory,
             Filename,
             Parent_Node,
+            Current_Sector,
             Entry_Long_Filename,
             Entry_Long_Filename_Length,
             Entry_Long_Filename_Checksum,
@@ -1576,15 +1599,5 @@ package body Filesystems.FAT.FAT16 is
 
       Result := Success;
    end Extend_Cluster_Chain_FAT16;
-
-   function Get_First_Cluster_From_Index_FAT16
-     (Index : Filesystem_Node_Index_T) return Unsigned_16 is
-   begin
-      return Unsigned_16 (Shift_Right (Index, 32));
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_First_Cluster_From_Index_FAT16");
-         return 0;
-   end Get_First_Cluster_From_Index_FAT16;
 
 end Filesystems.FAT.FAT16;

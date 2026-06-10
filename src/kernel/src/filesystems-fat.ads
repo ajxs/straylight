@@ -416,9 +416,11 @@ private
 
    procedure Search_FAT_Directory_For_File
      (Filesystem                   : Filesystem_Access;
+      Filesystem_Info              : FAT_Filesystem_Info_T;
       Directory                    : Directory_Index_T;
       Filename                     : Filesystem_Path_T;
       Parent_Node                  : Filesystem_Node_Access;
+      Directory_Starting_Sector    : Sector_Index_T;
       Entry_Long_Filename          : in out Wide_String;
       Entry_Long_Filename_Length   : in out Natural;
       Entry_Long_Filename_Checksum : in out Unsigned_8;
@@ -444,9 +446,6 @@ private
 
    procedure Print_FAT_Filesystem_Info
      (FAT_Filesystem_Info : FAT_Filesystem_Info_T);
-
-   function Get_Buffer_Max_Directory_Entry_Count
-     (Buffer_Size : Natural) return Natural;
 
    procedure Read_FAT_Entry
      (Filesystem      : Filesystem_Access;

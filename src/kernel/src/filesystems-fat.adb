@@ -139,21 +139,6 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Find_File;
 
-   pragma
-     Warnings
-       (Off, "pragma Restrictions (No_Exception_Propagation) in effect");
-   function Get_Buffer_Max_Directory_Entry_Count
-     (Buffer_Size : Natural) return Natural is
-   begin
-      return Buffer_Size / 32;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Buffer_Max_Directory_Entry_Count");
-         return 0;
-   end Get_Buffer_Max_Directory_Entry_Count;
-   pragma
-     Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
-
    procedure Populate_Filesystem_Meta_Info
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -1076,9 +1061,11 @@ package body Filesystems.FAT is
 
    procedure Search_FAT_Directory_For_File
      (Filesystem                   : Filesystem_Access;
+      Filesystem_Info              : FAT_Filesystem_Info_T;
       Directory                    : Directory_Index_T;
       Filename                     : Filesystem_Path_T;
       Parent_Node                  : Filesystem_Node_Access;
+      Directory_Starting_Sector    : Sector_Index_T;
       Entry_Long_Filename          : in out Wide_String;
       Entry_Long_Filename_Length   : in out Natural;
       Entry_Long_Filename_Checksum : in out Unsigned_8;
@@ -1107,7 +1094,7 @@ package body Filesystems.FAT is
       --  directory entry clusters.
       Last_Entry_Reached := False;
 
-      for Dir_Idx in 1 .. Directory'Length loop
+      for Dir_Idx in Directory'Range loop
          Log_Debug
            ("Scanning directory entry: " & Dir_Idx'Image, Logging_Tags_FAT);
 
@@ -1214,6 +1201,19 @@ package body Filesystems.FAT is
                end if;
 
                if Match_Found then
+                  --  Calculate the sector index of the matching directory
+                  --  entry, and its index within that sector. These are used
+                  --  to create the filesystem node index for this entry.
+                  Entries_Per_Sector : constant Natural :=
+                    Filesystem_Info.Bytes_Per_Sector / 32;
+
+                  Current_Sector : constant Sector_Index_T :=
+                    Directory_Starting_Sector
+                    + Sector_Index_T (Dir_Idx / Entries_Per_Sector);
+
+                  Index_Within_Sector : constant Natural :=
+                    (Dir_Idx mod Entries_Per_Sector);
+
                   Log_Debug
                     ("Found matching directory entry.", Logging_Tags_FAT);
 
@@ -1231,7 +1231,8 @@ package body Filesystems.FAT is
                        Unsigned_64 (Directory (Dir_Idx).File_Size),
                      Data_Location => Unsigned_64 (First_Cluster),
                      Index         =>
-                       Get_Directory_Entry_Node_Index (First_Cluster, Dir_Idx),
+                       Get_Directory_Entry_Node_Index
+                         (Unsigned_32 (Current_Sector), Index_Within_Sector),
                      Parent_Index  => Parent_Node.all.Index);
                   if Is_Error (Result) then
                      Filesystem_Node := null;

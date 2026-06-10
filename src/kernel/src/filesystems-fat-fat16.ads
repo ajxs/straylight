@@ -72,9 +72,6 @@ private
       Free_Cluster    : out Unsigned_16;
       Result          : out Function_Result);
 
-   function Get_First_Cluster_From_Index_FAT16
-     (Index : Filesystem_Node_Index_T) return Unsigned_16;
-
    procedure Write_Table_Entry_FAT16
      (Filesystem      : Filesystem_Access;
       Writing_Process : in out Process_Control_Block_T;
