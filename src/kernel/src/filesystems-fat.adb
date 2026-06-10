@@ -10,135 +10,6 @@ with Filesystems.FAT.FAT16;         use Filesystems.FAT.FAT16;
 with Memory.Kernel;                 use Memory.Kernel;
 
 package body Filesystems.FAT is
-   procedure Create_File
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      New_Node        : out Filesystem_Node_Access;
-      Result          : out Function_Result)
-   is
-      Existing_File : Filesystem_Node_Access := null;
-   begin
-      --  The parent node should never be null, because the filesystem should
-      --  always be mounted, and have a parent in the root filesystem.
-      Validate_Filesystem_And_Node
-        (Filesystem, Parent_Node, Filesystem_Type_FAT, Result);
-      if Is_Error (Result) then
-         New_Node := null;
-         return;
-      end if;
-
-      --  Ensure that the file doesn't already exist.
-      Find_File
-        (Filesystem,
-         Reading_Process,
-         Filename,
-         Parent_Node,
-         Existing_File,
-         Result);
-      if Is_Error (Result) then
-         New_Node := null;
-         return;
-      elsif Existing_File /= null then
-         Log_Debug
-           ("File already exists: '" & Filename & "'", Logging_Tags_FAT);
-         New_Node := null;
-         Result := Invalid_Filename;
-         return;
-      end if;
-
-      Log_Debug ("Creating file: '" & Filename & "'", Logging_Tags_FAT);
-
-      declare
-         Filesystem_Info : FAT_Filesystem_Info_T
-         with
-           Import,
-           Alignment => 1,
-           Address   => Filesystem.all.Filesystem_Meta_Info_Address;
-      begin
-         case Filesystem_Info.FAT_Type is
-            when FAT_Type_FAT16 =>
-               Create_File_FAT16
-                 (Filesystem,
-                  Reading_Process,
-                  Filesystem_Info,
-                  Filename,
-                  Parent_Node,
-                  New_Node,
-                  Result);
-
-            when others         =>
-               Log_Error ("FAT type not supported", Logging_Tags_FAT);
-               New_Node := null;
-               Result := Not_Supported;
-         end case;
-      end;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_File", Logging_Tags_FAT);
-         New_Node := null;
-         Result := Constraint_Exception;
-   end Create_File;
-
-   procedure Find_File
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Filename        : Filesystem_Path_T;
-      Parent_Node     : Filesystem_Node_Access;
-      Found_Node      : out Filesystem_Node_Access;
-      Result          : out Function_Result) is
-   begin
-      --  The parent node should never be null, because the filesystem should
-      --  always be mounted, and have a parent in the root filesystem.
-      Validate_Filesystem_And_Node
-        (Filesystem, Parent_Node, Filesystem_Type_FAT, Result);
-      if Is_Error (Result) then
-         Found_Node := null;
-         return;
-      end if;
-
-      Log_Debug ("Finding file: '" & Filename & "'", Logging_Tags_FAT);
-
-      if Filesystem.all.Filesystem_Meta_Info_Address = Null_Address then
-         Populate_Filesystem_Meta_Info (Filesystem, Reading_Process, Result);
-         if Is_Error (Result) then
-            Found_Node := null;
-            return;
-         end if;
-      end if;
-
-      declare
-         Filesystem_Info : FAT_Filesystem_Info_T
-         with
-           Import,
-           Alignment => 1,
-           Address   => Filesystem.all.Filesystem_Meta_Info_Address;
-      begin
-         case Filesystem_Info.FAT_Type is
-            when FAT_Type_FAT16 =>
-               Find_File_FAT16
-                 (Filesystem,
-                  Reading_Process,
-                  Filesystem_Info,
-                  Filename,
-                  Parent_Node,
-                  Found_Node,
-                  Result);
-
-            when others         =>
-               Log_Error ("FAT type not supported", Logging_Tags_FAT);
-               Found_Node := null;
-               Result := Not_Supported;
-         end case;
-      end;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_File", Logging_Tags_FAT);
-         Found_Node := null;
-         Result := Constraint_Exception;
-   end Find_File;
-
    procedure Populate_Filesystem_Meta_Info
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -207,6 +78,152 @@ package body Filesystems.FAT is
          Log_Error ("Constraint_Error: Populate_Filesystem_Meta_Info");
          Result := Constraint_Exception;
    end Populate_Filesystem_Meta_Info;
+
+   procedure Populate_Filesystem_Meta_Info_If_Needed
+     (Filesystem      : Filesystem_Access;
+      Reading_Process : in out Process_Control_Block_T;
+      Result          : out Function_Result) is
+   begin
+      if Filesystem.all.Filesystem_Meta_Info_Address = Null_Address then
+         Populate_Filesystem_Meta_Info (Filesystem, Reading_Process, Result);
+      else
+         Result := Success;
+      end if;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Populate_Filesystem_Meta_Info_If_Needed",
+            Logging_Tags_FAT);
+         Result := Constraint_Exception;
+   end Populate_Filesystem_Meta_Info_If_Needed;
+
+   procedure Create_File
+     (Filesystem      : Filesystem_Access;
+      Reading_Process : in out Process_Control_Block_T;
+      Filename        : Filesystem_Path_T;
+      Parent_Node     : Filesystem_Node_Access;
+      New_Node        : out Filesystem_Node_Access;
+      Result          : out Function_Result)
+   is
+      Existing_File : Filesystem_Node_Access := null;
+   begin
+      --  The parent node should never be null, because the filesystem should
+      --  always be mounted, and have a parent in the root filesystem.
+      Validate_Filesystem_And_Node
+        (Filesystem, Parent_Node, Filesystem_Type_FAT, Result);
+      if Is_Error (Result) then
+         New_Node := null;
+         return;
+      end if;
+
+      --  Ensure that the file doesn't already exist.
+      --  This call will also populate the filesystem meta info if it hasn't
+      --  already been read.
+      Find_File
+        (Filesystem,
+         Reading_Process,
+         Filename,
+         Parent_Node,
+         Existing_File,
+         Result);
+      if Is_Error (Result) then
+         New_Node := null;
+         return;
+      elsif Existing_File /= null then
+         Log_Debug
+           ("File already exists: '" & Filename & "'", Logging_Tags_FAT);
+         New_Node := null;
+         Result := Invalid_Filename;
+         return;
+      end if;
+
+      Log_Debug ("Creating file: '" & Filename & "'", Logging_Tags_FAT);
+
+      Filesystem_Info : FAT_Filesystem_Info_T
+      with
+        Import,
+        Alignment => 1,
+        Address   => Filesystem.all.Filesystem_Meta_Info_Address;
+
+      case Filesystem_Info.FAT_Type is
+         when FAT_Type_FAT16 =>
+            Create_File_FAT16
+              (Filesystem,
+               Reading_Process,
+               Filesystem_Info,
+               Filename,
+               Parent_Node,
+               New_Node,
+               Result);
+
+         when others         =>
+            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            New_Node := null;
+            Result := Not_Supported;
+      end case;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Create_File", Logging_Tags_FAT);
+         New_Node := null;
+         Result := Constraint_Exception;
+   end Create_File;
+
+   procedure Find_File
+     (Filesystem      : Filesystem_Access;
+      Reading_Process : in out Process_Control_Block_T;
+      Filename        : Filesystem_Path_T;
+      Parent_Node     : Filesystem_Node_Access;
+      Found_Node      : out Filesystem_Node_Access;
+      Result          : out Function_Result) is
+   begin
+      --  The parent node should never be null, because the filesystem should
+      --  always be mounted, and have a parent in the root filesystem.
+      Validate_Filesystem_And_Node
+        (Filesystem, Parent_Node, Filesystem_Type_FAT, Result);
+      if Is_Error (Result) then
+         Found_Node := null;
+         return;
+      end if;
+
+      Log_Debug ("Finding file: '" & Filename & "'", Logging_Tags_FAT);
+
+      Populate_Filesystem_Meta_Info_If_Needed
+        (Filesystem, Reading_Process, Result);
+      if Is_Error (Result) then
+         Found_Node := null;
+         return;
+      end if;
+
+      declare
+         Filesystem_Info : FAT_Filesystem_Info_T
+         with
+           Import,
+           Alignment => 1,
+           Address   => Filesystem.all.Filesystem_Meta_Info_Address;
+      begin
+         case Filesystem_Info.FAT_Type is
+            when FAT_Type_FAT16 =>
+               Find_File_FAT16
+                 (Filesystem,
+                  Reading_Process,
+                  Filesystem_Info,
+                  Filename,
+                  Parent_Node,
+                  Found_Node,
+                  Result);
+
+            when others         =>
+               Log_Error ("FAT type not supported", Logging_Tags_FAT);
+               Found_Node := null;
+               Result := Not_Supported;
+         end case;
+      end;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Find_File", Logging_Tags_FAT);
+         Found_Node := null;
+         Result := Constraint_Exception;
+   end Find_File;
 
    function Is_Cluster_Bad
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean is
@@ -712,34 +729,31 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      if Filesystem.all.Filesystem_Meta_Info_Address = Null_Address then
-         Populate_Filesystem_Meta_Info (Filesystem, Reading_Process, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
+      Populate_Filesystem_Meta_Info_If_Needed
+        (Filesystem, Reading_Process, Result);
+      if Is_Error (Result) then
+         return;
       end if;
 
-      declare
-         Filesystem_Info : FAT_Filesystem_Info_T
-         with
-           Import,
-           Alignment => 1,
-           Address   => Filesystem.all.Filesystem_Meta_Info_Address;
-      begin
-         Read_File_Clusters
-           (Filesystem,
-            Filesystem_Info,
-            Reading_Process,
-            Filesystem_Node,
-            Buffer_Address,
-            Start_Offset,
-            Bytes_To_Read,
-            Bytes_Read,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-      end;
+      Filesystem_Info : FAT_Filesystem_Info_T
+      with
+        Import,
+        Alignment => 1,
+        Address   => Filesystem.all.Filesystem_Meta_Info_Address;
+
+      Read_File_Clusters
+        (Filesystem,
+         Filesystem_Info,
+         Reading_Process,
+         Filesystem_Node,
+         Buffer_Address,
+         Start_Offset,
+         Bytes_To_Read,
+         Bytes_Read,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Result := Success;
    exception
@@ -1044,19 +1058,62 @@ package body Filesystems.FAT is
       Start_Offset    : Unsigned_64;
       Bytes_To_Write  : Natural;
       Bytes_Written   : out Natural;
-      Result          : out Function_Result) is
+      Result          : out Function_Result)
+   is
+      Directory_Entry : FAT_Directory_Entry_T;
+      pragma Unreferenced (Buffer_Address, Start_Offset, Bytes_To_Write);
    begin
-      pragma
-        Unreferenced
-          (Filesystem,
-           Writing_Process,
-           Filesystem_Node,
-           Buffer_Address,
-           Start_Offset,
-           Bytes_To_Write);
+      Bytes_Written := 0;
+
+      Validate_Filesystem_And_Node
+        (Filesystem, Filesystem_Node, Filesystem_Type_FAT, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Populate_Filesystem_Meta_Info_If_Needed
+        (Filesystem, Writing_Process, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Filesystem_Info : FAT_Filesystem_Info_T
+      with
+        Import,
+        Alignment => 1,
+        Address   => Filesystem.all.Filesystem_Meta_Info_Address;
+
+      Get_Filesystem_Node_Directory_Entry
+        (Filesystem,
+         Writing_Process,
+         Filesystem_Info,
+         Filesystem_Node,
+         Directory_Entry,
+         Result);
+      if Is_Error (Result) then
+         Bytes_Written := 0;
+         return;
+      end if;
+
+      Write_Filesystem_Node_Directory_Entry
+        (Filesystem,
+         Writing_Process,
+         Filesystem_Info,
+         Filesystem_Node,
+         Directory_Entry,
+         Result);
+      if Is_Error (Result) then
+         Bytes_Written := 0;
+         return;
+      end if;
 
       Bytes_Written := 0;
       Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Write_File");
+         Bytes_Written := 0;
+         Result := Constraint_Exception;
    end Write_File;
 
    procedure Search_FAT_Directory_For_File
@@ -1260,5 +1317,159 @@ package body Filesystems.FAT is
          Log_Error ("Constraint_Error: Search_FAT_Directory_For_File");
          Result := Constraint_Exception;
    end Search_FAT_Directory_For_File;
+
+   procedure Get_Directory_Entry_Sector_And_Index
+     (Filesystem_Node     : Filesystem_Node_Access;
+      Sector_Number       : out Sector_Index_T;
+      Index_Within_Sector : out Natural;
+      Result              : out Function_Result) is
+   begin
+      if Filesystem_Node = null then
+         Log_Error ("Filesystem node is null.", Logging_Tags_FAT);
+         Sector_Number := 0;
+         Index_Within_Sector := 0;
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Sector_Number :=
+        Sector_Index_T (Shift_Right (Filesystem_Node.all.Index, 32));
+
+      Index_Within_Sector :=
+        Natural (Filesystem_Node.all.Index and 16#FFFF_FFFF#);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Get_Directory_Entry_Sector_And_Index");
+         Sector_Number := 0;
+         Index_Within_Sector := 0;
+         Result := Constraint_Exception;
+   end Get_Directory_Entry_Sector_And_Index;
+
+   procedure Get_Filesystem_Node_Directory_Entry
+     (Filesystem      : Filesystem_Access;
+      Calling_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      Directory_Entry : out FAT_Directory_Entry_T;
+      Result          : out Function_Result)
+   is
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Block_Number               : Block_Index_T := 0;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+
+      Directory_Entry_Sector              : Sector_Index_T := 0;
+      Directory_Entry_Index_Within_Sector : Natural := 0;
+   begin
+      Directory_Entry :=
+        (File_Name        => "        ",
+         File_Ext         => "   ",
+         Attributes       => (others => False),
+         Reserved         => 0,
+         Creation_Seconds => 0,
+         File_Size        => 0,
+         others           => 0);
+
+      --  This all also validates the filesystem node entry is non-null.
+      Get_Directory_Entry_Sector_And_Index
+        (Filesystem_Node,
+         Directory_Entry_Sector,
+         Directory_Entry_Index_Within_Sector,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Get_Sector_Block_Number_And_Offset
+        (Directory_Entry_Sector,
+         Filesystem_Info.Bytes_Per_Sector,
+         Block_Number,
+         Sector_Offset_Within_Block,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Read_Block_From_Filesystem
+        (Filesystem, Calling_Process, Block_Number, Block_Address, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Copy
+        (Directory_Entry'Address,
+         Block_Address
+         + Sector_Offset_Within_Block
+         + Storage_Offset (Directory_Entry_Index_Within_Sector * 32),
+         32);
+
+      Release_Block (Filesystem, Block_Number, Result);
+
+      pragma Warnings (Off, "No_Exception_Propagation");
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Get_Filesystem_Node_Directory_Entry");
+         Result := Constraint_Exception;
+   end Get_Filesystem_Node_Directory_Entry;
+   pragma Warnings (On, "No_Exception_Propagation");
+
+   procedure Write_Filesystem_Node_Directory_Entry
+     (Filesystem              : Filesystem_Access;
+      Calling_Process         : in out Process_Control_Block_T;
+      Filesystem_Info         : FAT_Filesystem_Info_T;
+      Filesystem_Node         : Filesystem_Node_Access;
+      Updated_Directory_Entry : FAT_Directory_Entry_T;
+      Result                  : out Function_Result)
+   is
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Block_Number               : Block_Index_T := 0;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+
+      Directory_Entry_Sector              : Sector_Index_T := 0;
+      Directory_Entry_Index_Within_Sector : Natural := 0;
+   begin
+      --  This all also validates the filesystem node entry is non-null.
+      Get_Directory_Entry_Sector_And_Index
+        (Filesystem_Node,
+         Directory_Entry_Sector,
+         Directory_Entry_Index_Within_Sector,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Get_Sector_Block_Number_And_Offset
+        (Directory_Entry_Sector,
+         Filesystem_Info.Bytes_Per_Sector,
+         Block_Number,
+         Sector_Offset_Within_Block,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Read_Block_From_Filesystem
+        (Filesystem, Calling_Process, Block_Number, Block_Address, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Copy
+        (Block_Address
+         + Sector_Offset_Within_Block
+         + Storage_Offset (Directory_Entry_Index_Within_Sector * 32),
+         Updated_Directory_Entry'Address,
+         32);
+
+      Release_Block (Filesystem, Block_Number, Result);
+
+      pragma Warnings (Off, "No_Exception_Propagation");
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Write_Filesystem_Node_Directory_Entry");
+         Result := Constraint_Exception;
+   end Write_Filesystem_Node_Directory_Entry;
+   pragma Warnings (On, "No_Exception_Propagation");
 
 end Filesystems.FAT;

@@ -478,11 +478,6 @@ private
    function Get_Node_Type_From_Directory_Entry
      (Dir_Entry : FAT_Directory_Entry_T) return Filesystem_Node_Type_T;
 
-   procedure Populate_Filesystem_Meta_Info
-     (Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Result          : out Function_Result);
-
    procedure Read_File_Clusters
      (Filesystem      : Filesystem_Access;
       Filesystem_Info : FAT_Filesystem_Info_T;
@@ -506,5 +501,27 @@ private
       FAT_Filename_Length  : Natural;
       Filesystem_Node_Name : out Filesystem_Node_Name_T;
       Result               : out Function_Result);
+
+   procedure Get_Directory_Entry_Sector_And_Index
+     (Filesystem_Node     : Filesystem_Node_Access;
+      Sector_Number       : out Sector_Index_T;
+      Index_Within_Sector : out Natural;
+      Result              : out Function_Result);
+
+   procedure Get_Filesystem_Node_Directory_Entry
+     (Filesystem      : Filesystem_Access;
+      Calling_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      Directory_Entry : out FAT_Directory_Entry_T;
+      Result          : out Function_Result);
+
+   procedure Write_Filesystem_Node_Directory_Entry
+     (Filesystem              : Filesystem_Access;
+      Calling_Process         : in out Process_Control_Block_T;
+      Filesystem_Info         : FAT_Filesystem_Info_T;
+      Filesystem_Node         : Filesystem_Node_Access;
+      Updated_Directory_Entry : FAT_Directory_Entry_T;
+      Result                  : out Function_Result);
 
 end Filesystems.FAT;
