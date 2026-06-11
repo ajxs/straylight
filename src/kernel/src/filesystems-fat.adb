@@ -415,100 +415,6 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Parse_Boot_Sector;
 
-   procedure Read_Cluster_Into_Buffer
-     (Filesystem             : Filesystem_Access;
-      Reading_Process        : in out Process_Control_Block_T;
-      Filesystem_Info        : FAT_Filesystem_Info_T;
-      Cluster                : Unsigned_32;
-      Buffer_Virtual_Address : Virtual_Address_T;
-      Result                 : out Function_Result)
-   is
-      Destination_Virtual_Address : Virtual_Address_T :=
-        Buffer_Virtual_Address;
-
-      Current_Block              : Block_Index_T := 0;
-      Current_Sector             : Sector_Index_T := 0;
-      Block_Address              : Virtual_Address_T := Null_Address;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
-   begin
-      if Cluster < 2 then
-         Log_Error
-           ("Invalid cluster number: " & Cluster'Image, Logging_Tags_FAT);
-         Result := Invalid_Argument;
-         return;
-      end if;
-
-      Log_Debug ("Reading cluster: " & Cluster'Image, Logging_Tags_FAT);
-
-      Current_Sector :=
-        Get_First_Sector_Of_Cluster
-          (Cluster,
-           Filesystem_Info.Sectors_Per_Cluster,
-           Filesystem_Info.First_Data_Sector);
-
-      Last_Sector : constant Sector_Index_T :=
-        Current_Sector + Sector_Index_T (Filesystem_Info.Sectors_Per_Cluster);
-
-      Read_Sectors_Loop : loop
-         Get_Sector_Block_Number_And_Offset
-           (Current_Sector,
-            Filesystem_Info.Bytes_Per_Sector,
-            Current_Block,
-            Sector_Offset_Within_Block,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Read_Block_From_Filesystem
-           (Filesystem, Reading_Process, Current_Block, Block_Address, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Remaining_Sectors : constant Natural :=
-           Natural (Last_Sector - Current_Sector);
-
-         --  We need to take into account that the starting sector of the root
-         --  directory may not be block-aligned. e.g.
-         --  If the root directory starts at sector 33, and the sector size is
-         --  512 bytes and the block size is 4096 bytes, then the first block
-         --  read will contain sectors 33 - 40 (7 sectors), and the directory
-         --  entries for the root directory will start at an offset of 512
-         --  bytes into that block.
-         Sectors_Within_This_Block : constant Natural :=
-           Natural'Min
-             (Natural (Block_Size - Sector_Offset_Within_Block)
-              / Filesystem_Info.Bytes_Per_Sector,
-              Remaining_Sectors);
-
-         Bytes_In_This_Block : constant Natural :=
-           Sectors_Within_This_Block * Filesystem_Info.Bytes_Per_Sector;
-
-         Copy
-           (Destination_Virtual_Address,
-            Block_Address + Sector_Offset_Within_Block,
-            Bytes_In_This_Block);
-
-         Destination_Virtual_Address :=
-           Destination_Virtual_Address + Storage_Offset (Bytes_In_This_Block);
-
-         Release_Block (Filesystem, Current_Block, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Current_Sector :=
-           Current_Sector + Sector_Index_T (Sectors_Within_This_Block);
-
-         exit Read_Sectors_Loop when Current_Sector >= Last_Sector;
-      end loop Read_Sectors_Loop;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Cluster_Into_Buffer");
-         Result := Constraint_Exception;
-   end Read_Cluster_Into_Buffer;
-
    procedure Read_FAT_Entry
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -670,7 +576,7 @@ package body Filesystems.FAT is
         Alignment => 1,
         Address   => Filesystem.all.Filesystem_Meta_Info_Address;
 
-      Read_File_Clusters
+      Read_File_Data
         (Filesystem,
          Filesystem_Info,
          Reading_Process,
@@ -712,164 +618,6 @@ package body Filesystems.FAT is
          First_Cluster := 0;
          Result := Constraint_Exception;
    end Get_First_File_Cluster_From_Filesystem_Node;
-
-   procedure Read_File_Clusters
-     (Filesystem      : Filesystem_Access;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Reading_Process : in out Process_Control_Block_T;
-      Filesystem_Node : Filesystem_Node_Access;
-      Buffer_Address  : Virtual_Address_T;
-      Start_Offset    : Unsigned_64;
-      Bytes_To_Read   : Natural;
-      Bytes_Read      : out Natural;
-      Result          : out Function_Result)
-   is
-      Cluster_Buffer_Address : Virtual_Address_T := Null_Address;
-
-      --  An alternative 'result' for freeing the allocated buffer, so that
-      --  we don't overwrite the main result variable.
-      Free_Buffer_Result : Function_Result := Unset;
-
-      Cluster_Size                  : Natural := 0;
-      Starting_Cluster_Chain_Length : Natural := 0;
-
-      Current_Read_Cluster  : Unsigned_32 := 0;
-      Next_Cluster_In_Chain : Unsigned_32 := 0;
-
-      Current_Offset       : Unsigned_64 := Start_Offset;
-      Actual_Bytes_To_Read : Natural := Bytes_To_Read;
-   begin
-      Bytes_Read := 0;
-
-      Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read
-        (Filesystem_Node,
-         Start_Offset,
-         Bytes_To_Read,
-         Actual_Bytes_To_Read,
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      --  Allocate a buffer to hold each cluster we need to read.
-      Cluster_Size :=
-        Filesystem_Info.Sectors_Per_Cluster * Filesystem_Info.Bytes_Per_Sector;
-
-      Get_First_File_Cluster_From_Filesystem_Node
-        (Filesystem_Node, Current_Read_Cluster, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Allocate_Kernel_Memory (Cluster_Size, Cluster_Buffer_Address, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      --  Follow the file's cluster chain until we get to the file descriptor's
-      --  current offset. From there we can start reading the required data.
-      Starting_Cluster_Chain_Length :=
-        Natural (Start_Offset / Unsigned_64 (Cluster_Size));
-
-      if Starting_Cluster_Chain_Length > 0 then
-         Log_Debug ("Reading starting cluster chain...", Logging_Tags_FAT);
-
-         for I in 1 .. Starting_Cluster_Chain_Length loop
-            --  Check for the premature end of the cluster chain.
-            if Is_Cluster_End_Of_Chain
-                 (Current_Read_Cluster, Filesystem_Info.FAT_Type)
-            then
-               Log_Debug ("End of cluster chain reached.", Logging_Tags_FAT);
-               exit;
-            end if;
-
-            Read_FAT_Entry
-              (Filesystem,
-               Reading_Process,
-               Filesystem_Info,
-               Current_Read_Cluster,
-               Next_Cluster_In_Chain,
-               Result);
-            if Is_Error (Result) then
-               goto Free_Read_File_Buffer;
-            end if;
-
-            Current_Read_Cluster := Next_Cluster_In_Chain;
-         end loop;
-      end if;
-
-      --  Read each of the required clusters into the buffer, copying out
-      --  the necessary bytes from each cluster until the requested
-      --  number of bytes have been read.
-      loop
-         Bytes_Left_To_Read : constant Natural :=
-           Actual_Bytes_To_Read - Bytes_Read;
-
-         Offset_Within_Cluster : constant Natural :=
-           Natural (Current_Offset mod Unsigned_64 (Cluster_Size));
-
-         --  Truncate the number of bytes to copy within this cluster
-         --  if it exceeds the cluster size.
-         Bytes_To_Copy_From_Cluster : constant Natural :=
-           (if Offset_Within_Cluster + Bytes_Left_To_Read > Cluster_Size
-            then Cluster_Size - Offset_Within_Cluster
-            else Bytes_Left_To_Read);
-
-         Read_Cluster_Into_Buffer
-           (Filesystem,
-            Reading_Process,
-            Filesystem_Info,
-            Current_Read_Cluster,
-            Cluster_Buffer_Address,
-            Result);
-         if Is_Error (Result) then
-            goto Free_Read_File_Buffer;
-         end if;
-
-         --  Copy the required bytes from the cluster into the buffer.
-         Copy
-           (Buffer_Address + Storage_Offset (Bytes_Read),
-            Cluster_Buffer_Address + Storage_Offset (Offset_Within_Cluster),
-            Bytes_To_Copy_From_Cluster);
-
-         --  If we've read all the bytes we need to, exit.
-         Bytes_Read := Bytes_Read + Bytes_To_Copy_From_Cluster;
-         if Bytes_Read = Actual_Bytes_To_Read then
-            exit;
-         end if;
-
-         Current_Offset :=
-           Current_Offset + Unsigned_64 (Bytes_To_Copy_From_Cluster);
-
-         --  Check for the premature end of cluster chain.
-         if Is_Cluster_End_Of_Chain
-              (Current_Read_Cluster, Filesystem_Info.FAT_Type)
-         then
-            Log_Debug ("End of cluster chain reached.", Logging_Tags_FAT);
-            exit;
-         end if;
-
-         Read_FAT_Entry
-           (Filesystem,
-            Reading_Process,
-            Filesystem_Info,
-            Current_Read_Cluster,
-            Next_Cluster_In_Chain,
-            Result);
-         if Is_Error (Result) then
-            goto Free_Read_File_Buffer;
-         end if;
-
-         Current_Read_Cluster := Next_Cluster_In_Chain;
-      end loop;
-
-      <<Free_Read_File_Buffer>>
-      Free_Kernel_Memory (Cluster_Buffer_Address, Free_Buffer_Result);
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_File_Clusters");
-         Result := Constraint_Exception;
-   end Read_File_Clusters;
 
    procedure Validate_FAT_Filesystem
      (Boot_Sector : Boot_Sector_T; Result : out Function_Result) is
@@ -1400,5 +1148,167 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Write_Filesystem_Node_Directory_Entry;
    pragma Warnings (On, "No_Exception_Propagation");
+
+   procedure Read_File_Data
+     (Filesystem      : Filesystem_Access;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Reading_Process : in out Process_Control_Block_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      Buffer_Address  : Virtual_Address_T;
+      Start_Offset    : Unsigned_64;
+      Bytes_To_Read   : Natural;
+      Bytes_Read      : out Natural;
+      Result          : out Function_Result)
+   is
+      Current_Cluster       : Unsigned_32 := 0;
+      Next_Cluster_In_Chain : Unsigned_32 := 0;
+      Clusters_Scanned      : Natural := 0;
+
+      Current_Sector             : Sector_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Block_Number               : Block_Index_T := 0;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+
+      Current_Offset       : Unsigned_64 := Start_Offset;
+      Actual_Bytes_To_Read : Natural := Bytes_To_Read;
+   begin
+      Bytes_Read := 0;
+
+      Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read
+        (Filesystem_Node,
+         Start_Offset,
+         Bytes_To_Read,
+         Actual_Bytes_To_Read,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      if Actual_Bytes_To_Read = 0 then
+         Result := Success;
+         return;
+      end if;
+
+      Get_First_File_Cluster_From_Filesystem_Node
+        (Filesystem_Node, Current_Cluster, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Cluster_Size_In_Bytes : constant Natural :=
+        Filesystem_Info.Sectors_Per_Cluster * Filesystem_Info.Bytes_Per_Sector;
+
+      Read_Clusters_Loop : loop
+         exit Read_Clusters_Loop when
+           Is_Cluster_End_Of_Chain (Current_Cluster, Filesystem_Info.FAT_Type)
+           or else Is_Cluster_Bad (Current_Cluster, Filesystem_Info.FAT_Type)
+           or else Is_Cluster_Free (Current_Cluster);
+
+         Cluster_Bytes_Upper_Bound : constant Natural :=
+           (Clusters_Scanned + 1) * Cluster_Size_In_Bytes;
+
+         Data_Is_Within_Current_Cluster : constant Boolean :=
+           Current_Offset < Unsigned_64 (Cluster_Bytes_Upper_Bound);
+
+         if Data_Is_Within_Current_Cluster then
+            First_Sector_Of_Block : constant Sector_Index_T :=
+              Get_First_Sector_Of_Cluster
+                (Current_Cluster,
+                 Filesystem_Info.Sectors_Per_Cluster,
+                 Filesystem_Info.First_Data_Sector);
+
+            --  Calculate the first sector index within this cluster with data
+            --  that we need to read.
+            Offset_Within_Cluster : constant Natural :=
+              Natural (Current_Offset mod Unsigned_64 (Cluster_Size_In_Bytes));
+
+            Start_Sector_Within_Cluster : constant Natural :=
+              Offset_Within_Cluster / Filesystem_Info.Bytes_Per_Sector;
+
+            Read_Sectors_Loop : for I in
+              Start_Sector_Within_Cluster
+              .. Filesystem_Info.Sectors_Per_Cluster - 1
+            loop
+               Current_Sector := First_Sector_Of_Block + Sector_Index_T (I);
+
+               Get_Sector_Block_Number_And_Offset
+                 (Current_Sector,
+                  Filesystem_Info.Bytes_Per_Sector,
+                  Block_Number,
+                  Sector_Offset_Within_Block,
+                  Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
+               Read_Block_From_Filesystem
+                 (Filesystem,
+                  Reading_Process,
+                  Block_Number,
+                  Block_Address,
+                  Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
+               --  Calculate the offset within this sector to copy from.
+               Offset_Within_Sector : constant Natural :=
+                 Natural
+                   (Current_Offset
+                    mod Unsigned_64 (Filesystem_Info.Bytes_Per_Sector));
+
+               Bytes_Left_To_Read : constant Natural :=
+                 Actual_Bytes_To_Read - Bytes_Read;
+
+               --  Truncate the number of bytes to copy within this sector
+               --  if it exceeds the sector size.
+               Bytes_To_Copy_From_Sector : constant Natural :=
+                 (if Offset_Within_Sector + Bytes_Left_To_Read
+                    > Filesystem_Info.Bytes_Per_Sector
+                  then Filesystem_Info.Bytes_Per_Sector - Offset_Within_Sector
+                  else Bytes_Left_To_Read);
+
+               Copy
+                 (Buffer_Address + Storage_Offset (Bytes_Read),
+                  Block_Address
+                  + Sector_Offset_Within_Block
+                  + Storage_Offset (Offset_Within_Sector),
+                  Bytes_To_Copy_From_Sector);
+
+               Release_Block (Filesystem, Block_Number, Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
+               Bytes_Read := Bytes_Read + Bytes_To_Copy_From_Sector;
+
+               exit Read_Clusters_Loop when Bytes_Read = Actual_Bytes_To_Read;
+
+               Current_Offset :=
+                 Current_Offset + Unsigned_64 (Bytes_To_Copy_From_Sector);
+            end loop Read_Sectors_Loop;
+         end if;
+
+         Read_FAT_Entry
+           (Filesystem,
+            Reading_Process,
+            Filesystem_Info,
+            Current_Cluster,
+            Next_Cluster_In_Chain,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Current_Cluster := Next_Cluster_In_Chain;
+         Clusters_Scanned := Clusters_Scanned + 1;
+      end loop Read_Clusters_Loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Read_File_Data");
+         Result := Constraint_Exception;
+   end Read_File_Data;
 
 end Filesystems.FAT;

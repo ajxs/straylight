@@ -473,14 +473,6 @@ private
       FAT_Entry       : out Unsigned_32;
       Result          : out Function_Result);
 
-   procedure Read_Cluster_Into_Buffer
-     (Filesystem             : Filesystem_Access;
-      Reading_Process        : in out Process_Control_Block_T;
-      Filesystem_Info        : FAT_Filesystem_Info_T;
-      Cluster                : Unsigned_32;
-      Buffer_Virtual_Address : Virtual_Address_T;
-      Result                 : out Function_Result);
-
    --  Combine the two 16-bit halves of the cluster.
    function Get_First_Cluster_Of_Dir_Entry
      (Dir_Entry : FAT_Directory_Entry_T) return Unsigned_32
@@ -499,7 +491,7 @@ private
        then Filesystem_Node_Type_Directory
        else Filesystem_Node_Type_File);
 
-   procedure Read_File_Clusters
+   procedure Read_File_Data
      (Filesystem      : Filesystem_Access;
       Filesystem_Info : FAT_Filesystem_Info_T;
       Reading_Process : in out Process_Control_Block_T;
