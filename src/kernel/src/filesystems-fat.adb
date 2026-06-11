@@ -225,34 +225,6 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Find_File;
 
-   function Is_Cluster_Bad
-     (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean is
-   begin
-      if FAT_Type = FAT_Type_FAT12 then
-         return Cluster = Cluster_Marker_Bad_FAT12;
-      elsif FAT_Type = FAT_Type_FAT16 then
-         return Cluster = Cluster_Marker_Bad_FAT16;
-      elsif FAT_Type = FAT_Type_FAT32 then
-         return Cluster = Cluster_Marker_Bad_FAT32;
-      end if;
-
-      return False;
-   end Is_Cluster_Bad;
-
-   function Is_Cluster_End_Of_Chain
-     (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean is
-   begin
-      if FAT_Type = FAT_Type_FAT12 then
-         return Cluster >= Cluster_Marker_EOC_FAT12;
-      elsif FAT_Type = FAT_Type_FAT16 then
-         return Cluster >= Cluster_Marker_EOC_FAT16;
-      elsif FAT_Type = FAT_Type_FAT32 then
-         return Cluster >= Cluster_Marker_EOC_FAT32;
-      end if;
-
-      return True;
-   end Is_Cluster_End_Of_Chain;
-
    procedure Parse_DOS_Directory_Entry
      (Dir_Entry       : FAT_Directory_Entry_T;
       Filename        : out Wide_String;
@@ -305,53 +277,6 @@ package body Filesystems.FAT is
            ("Constraint_Error: Parse_DOS_Directory_Entry", Logging_Tags_FAT);
          Result := Unhandled_Exception;
    end Parse_DOS_Directory_Entry;
-
-   function Get_Node_Type_From_Directory_Entry
-     (Dir_Entry : FAT_Directory_Entry_T) return Filesystem_Node_Type_T is
-   begin
-      if Dir_Entry.Attributes.Directory then
-         return Filesystem_Node_Type_Directory;
-      end if;
-
-      return Filesystem_Node_Type_File;
-   end Get_Node_Type_From_Directory_Entry;
-
-   function Get_Filesystem_Type (Total_Clusters : Natural) return FAT_Type_T is
-   begin
-      if Total_Clusters < 4085 then
-         return FAT_Type_FAT12;
-      elsif Total_Clusters < 65525 then
-         return FAT_Type_FAT16;
-      elsif Total_Clusters < 268_435_445 then
-         return FAT_Type_FAT32;
-      end if;
-
-      return FAT_Type_ExFAT;
-   end Get_Filesystem_Type;
-
-   procedure Get_Root_Directory_Sector_Count
-     (Boot_Sector               : Boot_Sector_T;
-      Sectors_In_Root_Directory : out Natural;
-      Result                    : out Function_Result) is
-   begin
-      Root_Entry_Size : constant Unsigned_32 :=
-        Unsigned_32 (Boot_Sector.BPB.Root_Entry_Count) * 32;
-
-      Total_Size : constant Unsigned_32 :=
-        Root_Entry_Size + Unsigned_32 (Boot_Sector.BPB.Bytes_Per_Sector) - 1;
-
-      Sectors_In_Root_Directory :=
-        Natural (Total_Size / Unsigned_32 (Boot_Sector.BPB.Bytes_Per_Sector));
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Get_Root_Directory_Sector_Count",
-            Logging_Tags_FAT);
-         Sectors_In_Root_Directory := 0;
-         Result := Constraint_Exception;
-   end Get_Root_Directory_Sector_Count;
 
    procedure Print_FAT_Filesystem_Info
      (FAT_Filesystem_Info : FAT_Filesystem_Info_T) is
@@ -425,11 +350,14 @@ package body Filesystems.FAT is
       Filesystem_Info.Total_Sectors_In_All_FAT_Tables :=
         Filesystem_Info.FAT_Table_Count * Filesystem_Info.Sectors_In_FAT_Table;
 
-      Get_Root_Directory_Sector_Count
-        (Boot_Sector, Filesystem_Info.Sectors_In_Root_Directory, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
+      Root_Entry_Size : constant Unsigned_32 :=
+        Unsigned_32 (Boot_Sector.BPB.Root_Entry_Count) * 32;
+
+      Total_Size : constant Unsigned_32 :=
+        Root_Entry_Size + Unsigned_32 (Boot_Sector.BPB.Bytes_Per_Sector) - 1;
+
+      Filesystem_Info.Sectors_In_Root_Directory :=
+        Natural (Total_Size / Unsigned_32 (Boot_Sector.BPB.Bytes_Per_Sector));
 
       --  Calculate the total number of 'overhead' sectors that are taken up
       --  by the reserved sectors, FAT tables, and root directory, which are
@@ -480,6 +408,7 @@ package body Filesystems.FAT is
         Filesystem_Info.First_Data_Sector
         - Sector_Index_T (Filesystem_Info.Sectors_In_Root_Directory);
 
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Parse_Boot_Sector");

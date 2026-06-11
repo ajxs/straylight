@@ -284,7 +284,8 @@ private
        File_Size          at 0 range 224 .. 255;
      end record;
 
-   type Directory_Index_T is array (Natural range <>) of FAT_Directory_Entry_T
+   type Directory_Index_T is
+     array (Natural range 0 .. <>) of FAT_Directory_Entry_T
    with Convention => C, Pack;
 
    ----------------------------------------------------------------------------
@@ -349,7 +350,7 @@ private
      end record;
 
    type LFN_Directory_Index_T is
-     array (Natural range <>) of Long_File_Name_Directory_Entry
+     array (Natural range 0 .. <>) of Long_File_Name_Directory_Entry
    with Convention => C, Pack;
 
    function Is_Last_Directory_Entry
@@ -376,14 +377,36 @@ private
        and then Dir_Entry.Attributes.Volume_Label)
    with Pure_Function, Inline;
 
-   function Get_Filesystem_Type (Total_Clusters : Natural) return FAT_Type_T;
+   function Get_Filesystem_Type (Total_Clusters : Natural) return FAT_Type_T
+   is (if Total_Clusters < 4085
+       then FAT_Type_FAT12
+       elsif Total_Clusters < 65525
+       then FAT_Type_FAT16
+       elsif Total_Clusters < 268_435_445
+       then FAT_Type_FAT32
+       else FAT_Type_ExFAT)
+   with Pure_Function, Inline;
 
    function Is_Cluster_End_Of_Chain
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean
+   is (if FAT_Type = FAT_Type_FAT12
+       then Cluster >= Cluster_Marker_EOC_FAT12
+       elsif FAT_Type = FAT_Type_FAT16
+       then Cluster >= Cluster_Marker_EOC_FAT16
+       elsif FAT_Type = FAT_Type_FAT32
+       then Cluster >= Cluster_Marker_EOC_FAT32
+       else True)
    with Pure_Function, Inline;
 
    function Is_Cluster_Bad
      (Cluster : Unsigned_32; FAT_Type : FAT_Type_T) return Boolean
+   is (if FAT_Type = FAT_Type_FAT12
+       then Cluster = Cluster_Marker_Bad_FAT12
+       elsif FAT_Type = FAT_Type_FAT16
+       then Cluster = Cluster_Marker_Bad_FAT16
+       elsif FAT_Type = FAT_Type_FAT32
+       then Cluster = Cluster_Marker_Bad_FAT32
+       else False)
    with Pure_Function, Inline;
 
    function Is_Cluster_Free (Cluster : Unsigned_32) return Boolean
@@ -403,11 +426,6 @@ private
      (Filesystem_Node : Filesystem_Node_Access;
       First_Cluster   : out Unsigned_32;
       Result          : out Function_Result);
-
-   procedure Get_Root_Directory_Sector_Count
-     (Boot_Sector               : Boot_Sector_T;
-      Sectors_In_Root_Directory : out Natural;
-      Result                    : out Function_Result);
 
    procedure Parse_Boot_Sector
      (Boot_Sector     : Boot_Sector_T;
@@ -470,13 +488,16 @@ private
        or Shift_Left (Unsigned_32 (Dir_Entry.First_Cluster_High), 16));
 
    function Get_Directory_Entry_Node_Index
-     (First_Cluster : Unsigned_32; Directory_Index : Natural)
+     (Directory_Entry_Sector : Unsigned_32; Index_Within_Sector : Natural)
       return Filesystem_Node_Index_T
-   is (Shift_Left (Unsigned_64 (First_Cluster), 32)
-       + Unsigned_64 (Directory_Index));
+   is (Shift_Left (Unsigned_64 (Directory_Entry_Sector), 32)
+       + Unsigned_64 (Index_Within_Sector));
 
    function Get_Node_Type_From_Directory_Entry
-     (Dir_Entry : FAT_Directory_Entry_T) return Filesystem_Node_Type_T;
+     (Dir_Entry : FAT_Directory_Entry_T) return Filesystem_Node_Type_T
+   is (if Dir_Entry.Attributes.Directory
+       then Filesystem_Node_Type_Directory
+       else Filesystem_Node_Type_File);
 
    procedure Read_File_Clusters
      (Filesystem      : Filesystem_Access;
