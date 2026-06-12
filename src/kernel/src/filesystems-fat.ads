@@ -422,11 +422,6 @@ private
        + Sector_Index_T (First_Data_Sector))
    with Inline, Pure_Function;
 
-   procedure Get_First_File_Cluster_From_Filesystem_Node
-     (Filesystem_Node : Filesystem_Node_Access;
-      First_Cluster   : out Unsigned_32;
-      Result          : out Function_Result);
-
    procedure Parse_Boot_Sector
      (Boot_Sector     : Boot_Sector_T;
       Filesystem_Info : out FAT_Filesystem_Info_T;
