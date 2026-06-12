@@ -5,8 +5,9 @@
 
 with Locks.Sleeplocks; use Locks.Sleeplocks;
 
-private package Filesystems.Block_Cache is
-   pragma Preelaborate;
+private package Filesystems.Block_Cache
+  with Preelaborate
+is
 
    procedure Read_Block_From_Filesystem
      (Filesystem           : Filesystem_Access;

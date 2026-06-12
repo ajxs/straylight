@@ -7,8 +7,9 @@ with Ada.Unchecked_Conversion;
 
 with Filesystems; use Filesystems;
 
-private package System_Calls.Files is
-   pragma Preelaborate;
+private package System_Calls.Files
+  with Preelaborate
+is
 
    procedure Handle_Close_File_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result);

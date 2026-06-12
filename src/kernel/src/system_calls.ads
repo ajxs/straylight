@@ -10,8 +10,9 @@ with Function_Results; use Function_Results;
 with Logging;          use Logging;
 with Processes;        use Processes;
 
-package System_Calls is
-   pragma Preelaborate;
+package System_Calls
+  with Preelaborate
+is
 
    Syscall_Exit_Process    : constant := 5446_0000;
    Syscall_Yield_Process   : constant := 5446_0001;

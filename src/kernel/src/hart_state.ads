@@ -5,8 +5,9 @@
 
 with Processes; use Processes;
 
-package Hart_State is
-   pragma Preelaborate;
+package Hart_State
+  with Preelaborate
+is
 
    Maximum_Harts : constant := 8;
    subtype Hart_Index_T is Natural range 0 .. (Maximum_Harts - 1);

@@ -3,8 +3,9 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package RISCV.Interrupts is
-   pragma Preelaborate;
+package RISCV.Interrupts
+  with Preelaborate
+is
 
    procedure Disable_Supervisor_Interrupts
    with

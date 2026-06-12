@@ -13,8 +13,9 @@ with Memory;    use Memory;
 with Memory.Allocators;
 with Processes; use Processes;
 
-package Devices is
-   pragma Preelaborate;
+package Devices
+  with Preelaborate
+is
 
    --  Describes the 'class' of the device, which is used to determine
    --  which driver should be used to operate the device.

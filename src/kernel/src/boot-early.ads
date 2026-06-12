@@ -18,7 +18,9 @@ with RISCV.Paging;     use RISCV.Paging;
 --  mapped.
 -------------------------------------------------------------------------------
 
-private package Boot.Early is
+private package Boot.Early
+  with Preelaborate
+is
    function Initialise_Boot_Page_Tables
      (DTB_Address : Physical_Address_T) return Unsigned_64
    with

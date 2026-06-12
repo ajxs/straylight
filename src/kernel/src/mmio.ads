@@ -12,8 +12,9 @@ with System;
 --  memory-mapped addresses, useful for interacting with system peripherals.
 -------------------------------------------------------------------------------
 
-package MMIO is
-   pragma Preelaborate;
+package MMIO
+  with Preelaborate
+is
 
    ----------------------------------------------------------------------------
    --  This function reads a byte from a memory address.

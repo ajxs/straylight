@@ -5,9 +5,9 @@
 
 with System;
 
-package Filesystems.FAT is
-   pragma Preelaborate;
-
+package Filesystems.FAT
+  with Preelaborate
+is
    --  Note the difference in nomenclature: Find_File locates a 'file' by its
    --  'filename', whereas the higher-level filesystem methods operate on the
    --  full file 'path'.

@@ -19,8 +19,9 @@ with Logging;          use Logging;
 --  the amount of fragmentation resulting from this design is manageable.
 -------------------------------------------------------------------------------
 
-package Memory.Allocators.Heap is
-   pragma Preelaborate;
+package Memory.Allocators.Heap
+  with Preelaborate
+is
 
    Max_Free_Regions : constant := 1024;
 

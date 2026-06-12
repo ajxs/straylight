@@ -4,8 +4,9 @@
 -------------------------------------------------------------------------------
 with Function_Results; use Function_Results;
 
-package Devices.PLIC is
-   pragma Preelaborate;
+package Devices.PLIC
+  with Preelaborate
+is
 
    function Claim_Supervisor_Interrupt
      (Device : in out Device_T; Context : Natural) return Unsigned_32;

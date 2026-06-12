@@ -5,8 +5,9 @@
 
 with RISCV.Paging; use RISCV.Paging;
 
-private package Memory.Virtual.Paging is
-   pragma Preelaborate;
+private package Memory.Virtual.Paging
+  with Preelaborate
+is
 
    procedure Map
      (Base_Page_Table_Address : Physical_Address_T;

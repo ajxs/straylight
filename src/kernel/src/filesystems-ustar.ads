@@ -3,8 +3,9 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package Filesystems.UStar is
-   pragma Preelaborate;
+package Filesystems.UStar
+  with Preelaborate
+is
 
    procedure Find_File
      (Filesystem      : Filesystem_Access;

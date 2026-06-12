@@ -32,8 +32,9 @@ with Filesystems;      use Filesystems;
 --
 -------------------------------------------------------------------------------
 
-package Devices.Ramdisk is
-   pragma Preelaborate;
+package Devices.Ramdisk
+  with Preelaborate
+is
 
    procedure Read_Sector
      (Device               : in out Device_T;

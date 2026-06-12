@@ -11,8 +11,9 @@ with Logging;    use Logging;
 with Memory;     use Memory;
 with Processes;  use Processes;
 
-package Boot is
-   pragma Preelaborate;
+package Boot
+  with Preelaborate
+is
    ----------------------------------------------------------------------------
    --  Main Ada entry point for the kernel.
    --  This procedure is jumped to from the boot assembly code, once the

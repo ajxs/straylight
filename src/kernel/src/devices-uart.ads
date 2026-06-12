@@ -12,8 +12,9 @@ with MMIO;             use MMIO;
 --  Contains functionality for interfacing with the serial hardware.
 -------------------------------------------------------------------------------
 
-package Devices.UART is
-   pragma Preelaborate;
+package Devices.UART
+  with Preelaborate
+is
 
    ----------------------------------------------------------------------------
    --  The maximum supported baud rate.

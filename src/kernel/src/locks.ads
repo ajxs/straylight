@@ -5,8 +5,9 @@
 
 with Interfaces; use Interfaces;
 
-package Locks is
-   pragma Preelaborate;
+package Locks
+  with Preelaborate
+is
 
    No_Hart_Id : constant Natural := Natural'Last;
 

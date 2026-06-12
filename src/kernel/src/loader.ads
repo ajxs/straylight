@@ -12,8 +12,9 @@ with Logging;          use Logging;
 with Memory.Virtual;   use Memory.Virtual;
 with Processes;        use Processes;
 
-package Loader is
-   pragma Preelaborate;
+package Loader
+  with Preelaborate
+is
 
    procedure Load_New_Process_From_Filesystem
      (Loading_Process : in out Process_Control_Block_T;

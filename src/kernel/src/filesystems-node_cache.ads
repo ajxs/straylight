@@ -1,6 +1,6 @@
-private package Filesystems.Node_Cache is
-   pragma Preelaborate;
-
+private package Filesystems.Node_Cache
+  with Preelaborate
+is
    procedure Find_Filesystem_Node_In_Cache
      (Filesystem   : Filesystem_Access;
       Parent_Index : Unsigned_64;

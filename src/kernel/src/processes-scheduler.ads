@@ -3,8 +3,9 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package Processes.Scheduler is
-   pragma Preelaborate;
+package Processes.Scheduler
+  with Preelaborate
+is
 
    procedure Run (New_Prev_Process_State : Process_Status_T := Process_Ready);
 

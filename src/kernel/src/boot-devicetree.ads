@@ -3,8 +3,9 @@ with System.Storage_Elements; use System.Storage_Elements;
 with Function_Results; use Function_Results;
 with Utilities;        use Utilities;
 
-package Boot.Devicetree is
-   pragma Preelaborate;
+package Boot.Devicetree
+  with Preelaborate
+is
 
    procedure Parse_Devicetree
      (DTB_Address : Address; Result : out Function_Result);

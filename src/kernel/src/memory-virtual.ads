@@ -7,8 +7,9 @@ with Function_Results; use Function_Results;
 with Locks;            use Locks;
 with Logging;          use Logging;
 
-package Memory.Virtual is
-   pragma Preelaborate;
+package Memory.Virtual
+  with Preelaborate
+is
 
    ----------------------------------------------------------------------------
    --  Initialise the kernel's virtual address space.

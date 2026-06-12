@@ -12,8 +12,9 @@ with Logging;          use Logging;
 --  physical memory in the system.
 -------------------------------------------------------------------------------
 
-package Memory.Physical is
-   pragma Preelaborate;
+package Memory.Physical
+  with Preelaborate
+is
 
    procedure Allocate_Physical_Memory
      (Required_Size     : Positive;

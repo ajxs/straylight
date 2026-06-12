@@ -5,8 +5,9 @@
 
 with Function_Results; use Function_Results;
 
-package Devices.Virtio is
-   pragma Preelaborate;
+package Devices.Virtio
+  with Preelaborate
+is
 
    procedure Initialise_MMIO_Device
      (Device : in out Device_T; Result : out Function_Result);

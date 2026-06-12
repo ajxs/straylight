@@ -5,8 +5,9 @@
 
 with Processes; use Processes;
 
-package Locks.Sleeplocks is
-   pragma Preelaborate;
+package Locks.Sleeplocks
+  with Preelaborate
+is
 
    type Sleeplock_T is record
       Locked     : aliased Unsigned_8 := 0;

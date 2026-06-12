@@ -1,6 +1,6 @@
-private package Filesystems.FAT.FAT16 is
-   pragma Preelaborate;
-
+private package Filesystems.FAT.FAT16
+  with Preelaborate
+is
    procedure Create_File_FAT16
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;

@@ -3,8 +3,9 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package Memory.Allocators is
-   pragma Preelaborate;
+package Memory.Allocators
+  with Preelaborate
+is
 
    type Memory_Allocation_Result is record
       Virtual_Address  : Virtual_Address_T := System.Null_Address;

@@ -16,8 +16,9 @@ with Memory;           use Memory;
 with Processes;        use Processes;
 with Utilities;        use Utilities;
 
-package Filesystems is
-   pragma Preelaborate;
+package Filesystems
+  with Preelaborate
+is
 
    Block_Size : constant := 16#1000#;
 

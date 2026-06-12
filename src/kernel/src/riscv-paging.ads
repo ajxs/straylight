@@ -7,8 +7,9 @@ with Ada.Unchecked_Conversion;
 
 with Memory; use Memory;
 
-package RISCV.Paging is
-   pragma Preelaborate;
+package RISCV.Paging
+  with Preelaborate
+is
 
    --  The physical size of small pages in the system.
    Small_Page_Size : constant := 16#1000#;

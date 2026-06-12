@@ -7,8 +7,9 @@ with Interfaces;              use Interfaces;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-package Memory is
-   pragma Preelaborate;
+package Memory
+  with Preelaborate
+is
 
    --  The virtual/physical addresses are declared as separate, incompatible
    --  types so that the compiler will prevent any mixing of the two.

@@ -5,8 +5,9 @@
 
 with Interfaces; use Interfaces;
 
-package Utilities is
-   pragma Preelaborate;
+package Utilities
+  with Preelaborate
+is
 
    --  Numerous kernel structures include strings, which require them to be
    --  defined with fixed-bounds. Unfortunately this means that these string

@@ -4,8 +4,9 @@ with Memory.Allocators;      use Memory.Allocators;
 with Memory.Allocators.Heap; use Memory.Allocators.Heap;
 with Memory.Allocators.Page; use Memory.Allocators.Page;
 
-package Memory.Kernel is
-   pragma Preelaborate;
+package Memory.Kernel
+  with Preelaborate
+is
 
    --  Allocates kernel heap memory, returning both the virtual and physical
    --  addresses of the allocated region.

@@ -3,8 +3,9 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package RISCV.SBI is
-   pragma Preelaborate;
+package RISCV.SBI
+  with Preelaborate
+is
 
    type SBI_Result_T is record
       Error : Integer_32;

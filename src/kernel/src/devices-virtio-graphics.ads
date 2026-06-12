@@ -3,8 +3,9 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package Devices.Virtio.Graphics is
-   pragma Preelaborate;
+package Devices.Virtio.Graphics
+  with Preelaborate
+is
 
    procedure Created_2d_Resource
      (Reading_Process : in out Process_Control_Block_T;

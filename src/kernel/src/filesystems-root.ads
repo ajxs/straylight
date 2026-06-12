@@ -9,8 +9,9 @@
 --  devices, such as mounted filesystems and devices.
 -------------------------------------------------------------------------------
 
-package Filesystems.Root is
-   pragma Preelaborate;
+package Filesystems.Root
+  with Preelaborate
+is
 
    procedure Add_Filesystem_Node_To_Root_Filesystem
      (Filesystem         : Filesystem_Access;

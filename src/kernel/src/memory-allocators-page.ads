@@ -8,8 +8,9 @@ with Locks;            use Locks;
 with Logging;          use Logging;
 with RISCV.Paging;     use RISCV.Paging;
 
-package Memory.Allocators.Page is
-   pragma Preelaborate;
+package Memory.Allocators.Page
+  with Preelaborate
+is
 
    Page_Pool_Region_Size : constant := 1024;
 

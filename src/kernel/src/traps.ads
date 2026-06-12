@@ -13,8 +13,9 @@ with Processes; use Processes;
 --  This package contains definitions related to handling traps.
 -------------------------------------------------------------------------------
 
-package Traps is
-   pragma Preelaborate;
+package Traps
+  with Preelaborate
+is
 
    procedure Handle_Supervisor_Mode_Trap
      (Trapping_Process_Addr : Virtual_Address_T;

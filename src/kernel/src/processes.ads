@@ -16,8 +16,9 @@ with Memory.Allocators.Heap; use Memory.Allocators.Heap;
 with Memory.Virtual;         use Memory.Virtual;
 with RISCV;
 
-package Processes is
-   pragma Preelaborate;
+package Processes
+  with Preelaborate
+is
 
    type Process_Id_T is new Natural;
 

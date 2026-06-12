@@ -4,8 +4,9 @@ with Function_Results; use Function_Results;
 with Logging;          use Logging;
 with Memory;           use Memory;
 
-package Graphics is
-   pragma Preelaborate;
+package Graphics
+  with Preelaborate
+is
 
    subtype Colour_T is Unsigned_32;
 

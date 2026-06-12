@@ -5,8 +5,9 @@
 
 with Locks; use Locks;
 
-package Logging is
-   pragma Preelaborate;
+package Logging
+  with Preelaborate
+is
 
    type Log_Tag_T is
      (Log_Tag_Allocator,
