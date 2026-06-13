@@ -413,6 +413,14 @@ private
    is (Cluster = 0)
    with Pure_Function, Inline;
 
+   function Get_EOC_Marker (FAT_Type : FAT_Type_T) return Unsigned_32
+   is (if FAT_Type = FAT_Type_FAT12
+       then Cluster_Marker_EOC_FAT12
+       elsif FAT_Type = FAT_Type_FAT16
+       then Cluster_Marker_EOC_FAT16
+       else Cluster_Marker_EOC_FAT32)
+   with Pure_Function, Inline;
+
    function Get_First_Sector_Of_Cluster
      (Cluster             : Unsigned_32;
       Sectors_Per_Cluster : Natural;
@@ -466,6 +474,21 @@ private
       Filesystem_Info : FAT_Filesystem_Info_T;
       Cluster         : Unsigned_32;
       FAT_Entry       : out Unsigned_32;
+      Result          : out Function_Result);
+
+   procedure Write_FAT_Entry
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Cluster         : Unsigned_32;
+      FAT_Entry       : Unsigned_32;
+      Result          : out Function_Result);
+
+   procedure Find_Free_Cluster
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Free_Cluster    : out Unsigned_32;
       Result          : out Function_Result);
 
    --  Combine the two 16-bit halves of the cluster.
@@ -531,5 +554,21 @@ private
       Filesystem_Node         : Filesystem_Node_Access;
       Updated_Directory_Entry : FAT_Directory_Entry_T;
       Result                  : out Function_Result);
+
+   procedure Allocate_Cluster
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      New_Cluster     : out Unsigned_32;
+      Result          : out Function_Result);
+
+   procedure Extend_Cluster_Chain
+     (Filesystem       : Filesystem_Access;
+      Writing_Process  : in out Process_Control_Block_T;
+      Filesystem_Info  : FAT_Filesystem_Info_T;
+      Cluster          : Unsigned_32;
+      New_Cluster      : out Unsigned_32;
+      Result           : out Function_Result;
+      Zero_New_Cluster : Boolean := False);
 
 end Filesystems.FAT;

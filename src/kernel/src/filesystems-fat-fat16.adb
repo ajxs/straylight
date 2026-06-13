@@ -595,7 +595,7 @@ package body Filesystems.FAT.FAT16 is
          end loop Read_Sectors_Loop;
 
          --  Read the next cluster in the FAT chain.
-         Get_FAT16_Entry
+         Read_FAT16_Entry
            (Filesystem,
             Reading_Process,
             Filesystem_Info,
@@ -614,12 +614,12 @@ package body Filesystems.FAT.FAT16 is
                & "free directory entries. Allocating next cluster.",
                Logging_Tags_FAT);
 
-            Extend_Cluster_Chain_FAT16
+            Extend_Cluster_Chain
               (Filesystem,
                Reading_Process,
                Filesystem_Info,
-               Current_Cluster,
-               Next_Cluster_In_Chain,
+               Unsigned_32 (Current_Cluster),
+               Unsigned_32 (Next_Cluster_In_Chain),
                Result,
                Zero_New_Cluster => True);
             if Is_Error (Result) then
@@ -791,7 +791,7 @@ package body Filesystems.FAT.FAT16 is
          end loop Update_Sectors_Loop;
 
          --  Read the next cluster in the FAT chain.
-         Get_FAT16_Entry
+         Read_FAT16_Entry
            (Filesystem,
             Reading_Process,
             Filesystem_Info,
@@ -1067,7 +1067,7 @@ package body Filesystems.FAT.FAT16 is
              (Unsigned_32 (Current_Cluster), Filesystem_Info.FAT_Type);
 
          --  Read the next cluster in the FAT chain.
-         Get_FAT16_Entry
+         Read_FAT16_Entry
            (Filesystem,
             Reading_Process,
             Filesystem_Info,
@@ -1267,7 +1267,7 @@ package body Filesystems.FAT.FAT16 is
          Result := Constraint_Exception;
    end Get_FAT16_Table_Entry_Sector_Number;
 
-   procedure Get_FAT16_Entry
+   procedure Read_FAT16_Entry
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
@@ -1323,12 +1323,12 @@ package body Filesystems.FAT.FAT16 is
       Release_Block (Filesystem, Block_Number, Result);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_FAT16_Entry");
+         Log_Error ("Constraint_Error: Read_FAT16_Entry");
          FAT_Entry := 0;
          Result := Constraint_Exception;
-   end Get_FAT16_Entry;
+   end Read_FAT16_Entry;
 
-   procedure Write_Table_Entry_FAT16
+   procedure Write_FAT16_Entry
      (Filesystem      : Filesystem_Access;
       Writing_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
@@ -1384,9 +1384,9 @@ package body Filesystems.FAT.FAT16 is
       end loop;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_Table_Entry_FAT16");
+         Log_Error ("Constraint_Error: Write_FAT16_Entry");
          Result := Constraint_Exception;
-   end Write_Table_Entry_FAT16;
+   end Write_FAT16_Entry;
 
    procedure Find_Free_Cluster_FAT16
      (Filesystem      : Filesystem_Access;
@@ -1487,117 +1487,5 @@ package body Filesystems.FAT.FAT16 is
          Free_Cluster := 0;
          Result := Constraint_Exception;
    end Find_Free_Cluster_FAT16;
-
-   procedure Allocate_Cluster_FAT16
-     (Filesystem      : Filesystem_Access;
-      Writing_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      New_Cluster     : out Unsigned_16;
-      Result          : out Function_Result) is
-   begin
-      Find_Free_Cluster_FAT16
-        (Filesystem, Writing_Process, Filesystem_Info, New_Cluster, Result);
-      if Is_Error (Result) then
-         New_Cluster := 0;
-         return;
-      end if;
-
-      --  Mark the newly allocated cluster as end-of-chain in the FAT.
-      Write_Table_Entry_FAT16
-        (Filesystem,
-         Writing_Process,
-         Filesystem_Info,
-         New_Cluster,
-         Cluster_Marker_EOC_FAT16,
-         Result);
-      if Is_Error (Result) then
-         New_Cluster := 0;
-         return;
-      end if;
-
-      Log_Debug
-        ("Allocated new FAT16 cluster: " & New_Cluster'Image,
-         Logging_Tags_FAT);
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Cluster_FAT16");
-         New_Cluster := 0;
-         Result := Constraint_Exception;
-   end Allocate_Cluster_FAT16;
-
-   procedure Extend_Cluster_Chain_FAT16
-     (Filesystem       : Filesystem_Access;
-      Writing_Process  : in out Process_Control_Block_T;
-      Filesystem_Info  : FAT_Filesystem_Info_T;
-      Cluster          : Unsigned_16;
-      New_Cluster      : out Unsigned_16;
-      Result           : out Function_Result;
-      Zero_New_Cluster : Boolean := False)
-   is
-      Current_Block              : Block_Index_T := 0;
-      Block_Address              : Virtual_Address_T := Null_Address;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
-   begin
-      Allocate_Cluster_FAT16
-        (Filesystem, Writing_Process, Filesystem_Info, New_Cluster, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Write_Table_Entry_FAT16
-        (Filesystem,
-         Writing_Process,
-         Filesystem_Info,
-         Cluster,
-         New_Cluster,
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      if Zero_New_Cluster then
-         First_Sector_Of_Allocated_Cluster : constant Sector_Index_T :=
-           Get_First_Sector_Of_Cluster
-             (Unsigned_32 (New_Cluster),
-              Filesystem_Info.Sectors_Per_Cluster,
-              Filesystem_Info.First_Data_Sector);
-
-         Get_Sector_Block_Number_And_Offset
-           (First_Sector_Of_Allocated_Cluster,
-            Filesystem_Info.Bytes_Per_Sector,
-            Current_Block,
-            Sector_Offset_Within_Block,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Read_Block_From_Filesystem
-           (Filesystem, Writing_Process, Current_Block, Block_Address, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Set
-           (Block_Address + Sector_Offset_Within_Block,
-            0,
-            Filesystem_Info.Bytes_Per_Sector);
-
-         Write_Block_To_Filesystem
-           (Filesystem, Writing_Process, Current_Block, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Release_Block (Filesystem, Current_Block, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-      end if;
-
-      Result := Success;
-   end Extend_Cluster_Chain_FAT16;
 
 end Filesystems.FAT.FAT16;

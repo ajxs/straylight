@@ -19,12 +19,27 @@ is
       Found_Node      : out Filesystem_Node_Access;
       Result          : out Function_Result);
 
-   procedure Get_FAT16_Entry
+   procedure Read_FAT16_Entry
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
       Cluster         : Unsigned_16;
       FAT_Entry       : out Unsigned_16;
+      Result          : out Function_Result);
+
+   procedure Write_FAT16_Entry
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Cluster         : Unsigned_16;
+      FAT_Entry       : Unsigned_16;
+      Result          : out Function_Result);
+
+   procedure Find_Free_Cluster_FAT16
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Free_Cluster    : out Unsigned_16;
       Result          : out Function_Result);
 
 private
@@ -64,36 +79,5 @@ private
    --  It's best to use 'Unsigned_16' for the cluster numbers in FAT16,
    --  since this type will never change.
    type FAT16_Table_T is array (Natural range <>) of Unsigned_16 with Pack;
-
-   procedure Find_Free_Cluster_FAT16
-     (Filesystem      : Filesystem_Access;
-      Writing_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Free_Cluster    : out Unsigned_16;
-      Result          : out Function_Result);
-
-   procedure Write_Table_Entry_FAT16
-     (Filesystem      : Filesystem_Access;
-      Writing_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      Cluster         : Unsigned_16;
-      FAT_Entry       : Unsigned_16;
-      Result          : out Function_Result);
-
-   procedure Allocate_Cluster_FAT16
-     (Filesystem      : Filesystem_Access;
-      Writing_Process : in out Process_Control_Block_T;
-      Filesystem_Info : FAT_Filesystem_Info_T;
-      New_Cluster     : out Unsigned_16;
-      Result          : out Function_Result);
-
-   procedure Extend_Cluster_Chain_FAT16
-     (Filesystem       : Filesystem_Access;
-      Writing_Process  : in out Process_Control_Block_T;
-      Filesystem_Info  : FAT_Filesystem_Info_T;
-      Cluster          : Unsigned_16;
-      New_Cluster      : out Unsigned_16;
-      Result           : out Function_Result;
-      Zero_New_Cluster : Boolean := False);
 
 end Filesystems.FAT.FAT16;

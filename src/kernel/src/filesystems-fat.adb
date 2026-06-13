@@ -433,7 +433,7 @@ package body Filesystems.FAT is
    begin
       case Filesystem_Info.FAT_Type is
          when FAT_Type_FAT16 =>
-            Get_FAT16_Entry
+            Read_FAT16_Entry
               (Filesystem,
                Reading_Process,
                Filesystem_Info,
@@ -453,6 +453,34 @@ package body Filesystems.FAT is
          Log_Error ("Constraint_Error: Read_FAT_Entry");
          Result := Constraint_Exception;
    end Read_FAT_Entry;
+
+   procedure Write_FAT_Entry
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Cluster         : Unsigned_32;
+      FAT_Entry       : Unsigned_32;
+      Result          : out Function_Result) is
+   begin
+      case Filesystem_Info.FAT_Type is
+         when FAT_Type_FAT16 =>
+            Write_FAT16_Entry
+              (Filesystem,
+               Writing_Process,
+               Filesystem_Info,
+               Unsigned_16 (Cluster),
+               Unsigned_16 (FAT_Entry),
+               Result);
+
+         when others         =>
+            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            Result := Not_Supported;
+      end case;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Write_FAT_Entry");
+         Result := Constraint_Exception;
+   end Write_FAT_Entry;
 
    procedure Parse_LFN_Directory_Entry
      (Dir_Entry       : FAT_Directory_Entry_T;
@@ -1311,5 +1339,145 @@ package body Filesystems.FAT is
          Log_Error ("Constraint_Error: Read_File_Data");
          Result := Constraint_Exception;
    end Read_File_Data;
+
+   procedure Extend_Cluster_Chain
+     (Filesystem       : Filesystem_Access;
+      Writing_Process  : in out Process_Control_Block_T;
+      Filesystem_Info  : FAT_Filesystem_Info_T;
+      Cluster          : Unsigned_32;
+      New_Cluster      : out Unsigned_32;
+      Result           : out Function_Result;
+      Zero_New_Cluster : Boolean := False)
+   is
+      Current_Block              : Block_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+   begin
+      Allocate_Cluster
+        (Filesystem, Writing_Process, Filesystem_Info, New_Cluster, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Write_FAT_Entry
+        (Filesystem,
+         Writing_Process,
+         Filesystem_Info,
+         Cluster,
+         New_Cluster,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      if Zero_New_Cluster then
+         First_Sector_Of_Allocated_Cluster : constant Sector_Index_T :=
+           Get_First_Sector_Of_Cluster
+             (New_Cluster,
+              Filesystem_Info.Sectors_Per_Cluster,
+              Filesystem_Info.First_Data_Sector);
+
+         Get_Sector_Block_Number_And_Offset
+           (First_Sector_Of_Allocated_Cluster,
+            Filesystem_Info.Bytes_Per_Sector,
+            Current_Block,
+            Sector_Offset_Within_Block,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Read_Block_From_Filesystem
+           (Filesystem, Writing_Process, Current_Block, Block_Address, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Set
+           (Block_Address + Sector_Offset_Within_Block,
+            0,
+            Filesystem_Info.Bytes_Per_Sector);
+
+         Write_Block_To_Filesystem
+           (Filesystem, Writing_Process, Current_Block, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Release_Block (Filesystem, Current_Block, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+      end if;
+
+      Result := Success;
+   end Extend_Cluster_Chain;
+
+   procedure Find_Free_Cluster
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Free_Cluster    : out Unsigned_32;
+      Result          : out Function_Result)
+   is
+      FAT16_Free_Cluster : Unsigned_16 := 0;
+   begin
+      case Filesystem_Info.FAT_Type is
+         when FAT_Type_FAT16 =>
+            Find_Free_Cluster_FAT16
+              (Filesystem,
+               Writing_Process,
+               Filesystem_Info,
+               FAT16_Free_Cluster,
+               Result);
+
+            Free_Cluster := Unsigned_32 (FAT16_Free_Cluster);
+
+         when others         =>
+            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            Result := Not_Supported;
+      end case;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Find_Free_Cluster");
+         Result := Constraint_Exception;
+   end Find_Free_Cluster;
+
+   procedure Allocate_Cluster
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      New_Cluster     : out Unsigned_32;
+      Result          : out Function_Result) is
+   begin
+      Find_Free_Cluster
+        (Filesystem, Writing_Process, Filesystem_Info, New_Cluster, Result);
+      if Is_Error (Result) then
+         New_Cluster := 0;
+         return;
+      end if;
+
+      --  Mark the newly allocated cluster as end-of-chain in the FAT.
+      Write_FAT_Entry
+        (Filesystem,
+         Writing_Process,
+         Filesystem_Info,
+         New_Cluster,
+         Get_EOC_Marker (Filesystem_Info.FAT_Type),
+         Result);
+      if Is_Error (Result) then
+         New_Cluster := 0;
+         return;
+      end if;
+
+      Log_Debug
+        ("Allocated new cluster: " & New_Cluster'Image, Logging_Tags_FAT);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Allocate_Cluster");
+         Result := Constraint_Exception;
+   end Allocate_Cluster;
 
 end Filesystems.FAT;

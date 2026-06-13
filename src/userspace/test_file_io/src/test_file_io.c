@@ -39,5 +39,15 @@ int main()
 		return EXIT_FAILURE;
 	}
 
+	FILE *new_file_with_long_name =
+	    fopen("/Devices/Disk/Programs/"
+	          "nonexistent_file_with_really_long_and__silly_name.txt",
+	          "w+");
+	if (new_file_with_long_name == NULL)
+	{
+		print_to_serial("Failed to create file!\n");
+		return EXIT_FAILURE;
+	}
+
 	return EXIT_SUCCESS;
 }
