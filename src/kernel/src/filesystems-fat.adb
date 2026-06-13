@@ -750,9 +750,21 @@ package body Filesystems.FAT is
       Result          : out Function_Result)
    is
       Directory_Entry : FAT_Directory_Entry_T;
-      pragma Unreferenced (Buffer_Address, Start_Offset, Bytes_To_Write);
+
+      Start_Cluster : Unsigned_32 := 0;
    begin
       Bytes_Written := 0;
+
+      if Start_Offset + Unsigned_64 (Bytes_To_Write)
+        > Unsigned_64 (Unsigned_32'Last)
+      then
+         Log_Error
+           ("File size after write would exceed maximum supported size.",
+            Logging_Tags_FAT);
+
+         Result := Not_Supported;
+         return;
+      end if;
 
       Validate_Filesystem_And_Node
         (Filesystem, Filesystem_Node, Filesystem_Type_FAT, Result);
@@ -772,6 +784,9 @@ package body Filesystems.FAT is
         Alignment => 1,
         Address   => Filesystem.all.Filesystem_Meta_Info_Address;
 
+      --  Read the file's FAT directory entry, which we'll need to update with
+      --  the new file size and starting cluster (if we need to allocate a new
+      --  cluster for an empty file).
       Get_Filesystem_Node_Directory_Entry
         (Filesystem,
          Writing_Process,
@@ -783,6 +798,60 @@ package body Filesystems.FAT is
          Bytes_Written := 0;
          return;
       end if;
+
+      Start_Cluster := Unsigned_32 (Filesystem_Node.all.Data_Location);
+
+      --  If the file doesn't have any clusters allocated yet, then we need to
+      --  allocate the first cluster before we can write any data.
+      if Is_Cluster_Free (Start_Cluster) then
+         Allocate_Cluster
+           (Filesystem,
+            Writing_Process,
+            Filesystem_Info,
+            Start_Cluster,
+            Result);
+         if Is_Error (Result) then
+            Bytes_Written := 0;
+            return;
+         end if;
+
+         Log_Debug
+           ("Allocated first cluster for file: " & Start_Cluster'Image,
+            Logging_Tags_FAT);
+
+         --  Update the file directory entry with the allocated cluster.
+         Directory_Entry.First_Cluster_Low :=
+           Unsigned_16 (Start_Cluster and 16#FFFF#);
+
+         Directory_Entry.First_Cluster_High :=
+           Unsigned_16 (Shift_Right (Start_Cluster, 16) and 16#FFFF#);
+
+         Filesystem_Node.all.Data_Location := Unsigned_64 (Start_Cluster);
+      end if;
+
+      Write_File_Data
+        (Filesystem,
+         Filesystem_Info,
+         Writing_Process,
+         Filesystem_Node,
+         Buffer_Address,
+         Start_Offset,
+         Bytes_To_Write,
+         Bytes_Written,
+         Result);
+      if Is_Error (Result) then
+         Bytes_Written := 0;
+         return;
+      end if;
+
+      New_File_Size : constant Unsigned_32 :=
+        Unsigned_32'Max
+          (Unsigned_32 (Filesystem_Node.all.Size),
+           Unsigned_32 (Start_Offset + Unsigned_64 (Bytes_Written)));
+
+      Directory_Entry.File_Size := New_File_Size;
+      Filesystem_Node.all.Size := Unsigned_64 (New_File_Size);
+      --  @TODO: Update file modification timestamp in directory entry.
 
       Write_Filesystem_Node_Directory_Entry
         (Filesystem,
@@ -796,7 +865,6 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Bytes_Written := 0;
       Result := Success;
    exception
       when Constraint_Error =>
@@ -1377,37 +1445,45 @@ package body Filesystems.FAT is
               Filesystem_Info.Sectors_Per_Cluster,
               Filesystem_Info.First_Data_Sector);
 
-         Get_Sector_Block_Number_And_Offset
-           (First_Sector_Of_Allocated_Cluster,
-            Filesystem_Info.Bytes_Per_Sector,
-            Current_Block,
-            Sector_Offset_Within_Block,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
+         Zero_Cluster_Loop : for I in
+           0 .. Filesystem_Info.Sectors_Per_Cluster - 1
+         loop
+            Get_Sector_Block_Number_And_Offset
+              (First_Sector_Of_Allocated_Cluster + Sector_Index_T (I),
+               Filesystem_Info.Bytes_Per_Sector,
+               Current_Block,
+               Sector_Offset_Within_Block,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
 
-         Read_Block_From_Filesystem
-           (Filesystem, Writing_Process, Current_Block, Block_Address, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
+            Read_Block_From_Filesystem
+              (Filesystem,
+               Writing_Process,
+               Current_Block,
+               Block_Address,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
 
-         Set
-           (Block_Address + Sector_Offset_Within_Block,
-            0,
-            Filesystem_Info.Bytes_Per_Sector);
+            Set
+              (Block_Address + Sector_Offset_Within_Block,
+               0,
+               Filesystem_Info.Bytes_Per_Sector);
 
-         Write_Block_To_Filesystem
-           (Filesystem, Writing_Process, Current_Block, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
+            Write_Block_To_Filesystem
+              (Filesystem, Writing_Process, Current_Block, Result);
+            if Is_Error (Result) then
+               return;
+            end if;
 
-         Release_Block (Filesystem, Current_Block, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
+            Release_Block (Filesystem, Current_Block, Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+         end loop Zero_Cluster_Loop;
       end if;
 
       Result := Success;
@@ -1479,5 +1555,181 @@ package body Filesystems.FAT is
          Log_Error ("Constraint_Error: Allocate_Cluster");
          Result := Constraint_Exception;
    end Allocate_Cluster;
+
+   procedure Write_File_Data
+     (Filesystem      : Filesystem_Access;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      Buffer_Address  : Virtual_Address_T;
+      Start_Offset    : Unsigned_64;
+      Bytes_To_Write  : Natural;
+      Bytes_Written   : out Natural;
+      Result          : out Function_Result)
+   is
+      Current_Cluster       : Unsigned_32 := 0;
+      Next_Cluster_In_Chain : Unsigned_32 := 0;
+      Clusters_Scanned      : Natural := 0;
+
+      Current_Sector             : Sector_Index_T := 0;
+      Block_Address              : Virtual_Address_T := Null_Address;
+      Block_Number               : Block_Index_T := 0;
+      Sector_Offset_Within_Block : Storage_Offset := 0;
+
+      Current_Offset : Unsigned_64 := Start_Offset;
+   begin
+      Bytes_Written := 0;
+
+      --  This conversion won't overflow, since all FAT filesystem nodes are
+      --  guaranteed to have at-most a 32-bit Data_Location field value.
+      Current_Cluster := Unsigned_32 (Filesystem_Node.all.Data_Location);
+
+      Cluster_Size_In_Bytes : constant Natural :=
+        Filesystem_Info.Sectors_Per_Cluster * Filesystem_Info.Bytes_Per_Sector;
+
+      Follow_Cluster_Chain_Loop : loop
+         if Is_Cluster_Bad (Current_Cluster, Filesystem_Info.FAT_Type)
+           or else Is_Cluster_Free (Current_Cluster)
+         then
+            Log_Error
+              ("Invalid cluster in file's cluster chain.", Logging_Tags_FAT);
+
+            Result := Invalid_Filesystem;
+            return;
+         end if;
+
+         Cluster_Bytes_Upper_Bound : constant Unsigned_64 :=
+           Unsigned_64 ((Clusters_Scanned + 1) * Cluster_Size_In_Bytes);
+
+         --  Determine whether this cluster needs to be written to.
+         Cluster_Needs_To_Be_Written : constant Boolean :=
+           Current_Offset < Cluster_Bytes_Upper_Bound;
+
+         if Cluster_Needs_To_Be_Written then
+            First_Sector_Of_Cluster : constant Sector_Index_T :=
+              Get_First_Sector_Of_Cluster
+                (Current_Cluster,
+                 Filesystem_Info.Sectors_Per_Cluster,
+                 Filesystem_Info.First_Data_Sector);
+
+            --  Calculate the first sector within this cluster that has data
+            --  that we need to write.
+            Offset_Within_Cluster : constant Natural :=
+              Natural (Current_Offset mod Unsigned_64 (Cluster_Size_In_Bytes));
+
+            Start_Sector_Within_Cluster : constant Natural :=
+              Offset_Within_Cluster / Filesystem_Info.Bytes_Per_Sector;
+
+            Read_Sectors_Loop : for I in
+              Start_Sector_Within_Cluster
+              .. Filesystem_Info.Sectors_Per_Cluster - 1
+            loop
+               Current_Sector := First_Sector_Of_Cluster + Sector_Index_T (I);
+
+               Get_Sector_Block_Number_And_Offset
+                 (Current_Sector,
+                  Filesystem_Info.Bytes_Per_Sector,
+                  Block_Number,
+                  Sector_Offset_Within_Block,
+                  Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
+               Read_Block_From_Filesystem
+                 (Filesystem,
+                  Writing_Process,
+                  Block_Number,
+                  Block_Address,
+                  Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
+               --  Calculate the offset within this sector to copy from.
+               Offset_Within_Sector : constant Natural :=
+                 Natural
+                   (Current_Offset
+                    mod Unsigned_64 (Filesystem_Info.Bytes_Per_Sector));
+
+               Bytes_Left_To_Write : constant Natural :=
+                 Bytes_To_Write - Bytes_Written;
+
+               --  Truncate the number of bytes to write to this sector
+               --  if it exceeds the sector size.
+               Bytes_To_Copy_To_Sector : constant Natural :=
+                 (if Offset_Within_Sector + Bytes_Left_To_Write
+                    > Filesystem_Info.Bytes_Per_Sector
+                  then Filesystem_Info.Bytes_Per_Sector - Offset_Within_Sector
+                  else Bytes_Left_To_Write);
+
+               --  Write the data to this sector from the caller's buffer.
+               Copy
+                 (Block_Address
+                  + Sector_Offset_Within_Block
+                  + Storage_Offset (Offset_Within_Sector),
+                  Buffer_Address + Storage_Offset (Bytes_Written),
+                  Bytes_To_Copy_To_Sector);
+
+               Write_Block_To_Filesystem
+                 (Filesystem, Writing_Process, Block_Number, Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
+               Release_Block (Filesystem, Block_Number, Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
+               Bytes_Written := Bytes_Written + Bytes_To_Copy_To_Sector;
+
+               exit Follow_Cluster_Chain_Loop when
+                 Bytes_Written = Bytes_To_Write;
+
+               Current_Offset :=
+                 Current_Offset + Unsigned_64 (Bytes_To_Copy_To_Sector);
+            end loop Read_Sectors_Loop;
+         end if;
+
+         Read_FAT_Entry
+           (Filesystem,
+            Writing_Process,
+            Filesystem_Info,
+            Current_Cluster,
+            Next_Cluster_In_Chain,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         if Is_Cluster_End_Of_Chain
+              (Next_Cluster_In_Chain, Filesystem_Info.FAT_Type)
+         then
+            --  Allocate next cluster.
+            Extend_Cluster_Chain
+              (Filesystem,
+               Writing_Process,
+               Filesystem_Info,
+               Current_Cluster,
+               Next_Cluster_In_Chain,
+               Result,
+               True);
+            if Is_Error (Result) then
+               return;
+            end if;
+         end if;
+
+         Current_Cluster := Next_Cluster_In_Chain;
+         Clusters_Scanned := Clusters_Scanned + 1;
+      end loop Follow_Cluster_Chain_Loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Write_File_Data");
+         Bytes_Written := 0;
+         Result := Constraint_Exception;
+   end Write_File_Data;
 
 end Filesystems.FAT;

@@ -571,4 +571,15 @@ private
       Result           : out Function_Result;
       Zero_New_Cluster : Boolean := False);
 
+   procedure Write_File_Data
+     (Filesystem      : Filesystem_Access;
+      Filesystem_Info : FAT_Filesystem_Info_T;
+      Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      Buffer_Address  : Virtual_Address_T;
+      Start_Offset    : Unsigned_64;
+      Bytes_To_Write  : Natural;
+      Bytes_Written   : out Natural;
+      Result          : out Function_Result);
+
 end Filesystems.FAT;
