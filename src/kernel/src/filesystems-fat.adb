@@ -10,6 +10,25 @@ with Filesystems.FAT.FAT16;         use Filesystems.FAT.FAT16;
 with Memory.Kernel;                 use Memory.Kernel;
 
 package body Filesystems.FAT is
+   procedure Parse_And_Validate_Boot_Sector
+     (Boot_Sector         : aliased Boot_Sector_T;
+      FAT_Filesystem_Info : out FAT_Filesystem_Info_T;
+      Result              : out Function_Result) is
+   begin
+      Validate_FAT_Filesystem (Boot_Sector, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      --  Parse the boot sector to populate the filesystem meta info.
+      Parse_Boot_Sector (Boot_Sector, FAT_Filesystem_Info, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Result := Success;
+   end Parse_And_Validate_Boot_Sector;
+
    procedure Populate_Filesystem_Meta_Info
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -17,9 +36,7 @@ package body Filesystems.FAT is
    is
       Block_Address : Virtual_Address_T := Null_Address;
 
-      --  A separate 'result' for releasing the block, so that we don't
-      --  overwrite the main result variable if releasing the block fails.
-      Block_Release_Result : Function_Result := Unset;
+      Parse_And_Validate_Result : Function_Result := Unset;
    begin
       Filesystem.all.Filesystem_Meta_Info_Size :=
         FAT_Filesystem_Info_T'Size / 8;
@@ -43,36 +60,27 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      declare
-         FAT_Filesystem_Info : FAT_Filesystem_Info_T
-         with
-           Import,
-           Alignment => 1,
-           Address   => Filesystem.all.Filesystem_Meta_Info_Address;
+      FAT_Filesystem_Info : FAT_Filesystem_Info_T
+      with
+        Import,
+        Alignment => 1,
+        Address   => Filesystem.all.Filesystem_Meta_Info_Address;
 
-         Boot_Sector : aliased Boot_Sector_T
-         with Import, Alignment => 1, Address => Block_Address;
+      Boot_Sector : aliased Boot_Sector_T
+      with Import, Alignment => 1, Address => Block_Address;
 
-      begin
-         Validate_FAT_Filesystem (Boot_Sector, Result);
-         if Is_Error (Result) then
-            goto Release_Block_And_Exit;
-         end if;
+      Parse_And_Validate_Boot_Sector
+        (Boot_Sector, FAT_Filesystem_Info, Parse_And_Validate_Result);
 
-         --  Parse the boot sector to populate the filesystem meta info.
-         Parse_Boot_Sector (Boot_Sector, FAT_Filesystem_Info, Result);
-         if Is_Error (Result) then
-            goto Release_Block_And_Exit;
-         end if;
-
-         Print_FAT_Filesystem_Info (FAT_Filesystem_Info);
-      end;
-
-      <<Release_Block_And_Exit>>
-      Release_Block (Filesystem, 0, Block_Release_Result);
-      if Is_Error (Block_Release_Result) then
-         Result := Block_Release_Result;
+      Release_Block (Filesystem, 0, Result);
+      if Is_Error (Result) then
+         return;
+      elsif Is_Error (Parse_And_Validate_Result) then
+         Result := Parse_And_Validate_Result;
+         return;
       end if;
+
+      Print_FAT_Filesystem_Info (FAT_Filesystem_Info);
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Populate_Filesystem_Meta_Info");
@@ -194,30 +202,28 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      declare
-         Filesystem_Info : FAT_Filesystem_Info_T
-         with
-           Import,
-           Alignment => 1,
-           Address   => Filesystem.all.Filesystem_Meta_Info_Address;
-      begin
-         case Filesystem_Info.FAT_Type is
-            when FAT_Type_FAT16 =>
-               Find_File_FAT16
-                 (Filesystem,
-                  Reading_Process,
-                  Filesystem_Info,
-                  Filename,
-                  Parent_Node,
-                  Found_Node,
-                  Result);
+      Filesystem_Info : FAT_Filesystem_Info_T
+      with
+        Import,
+        Alignment => 1,
+        Address   => Filesystem.all.Filesystem_Meta_Info_Address;
 
-            when others         =>
-               Log_Error ("FAT type not supported", Logging_Tags_FAT);
-               Found_Node := null;
-               Result := Not_Supported;
-         end case;
-      end;
+      case Filesystem_Info.FAT_Type is
+         when FAT_Type_FAT16 =>
+            Find_File_FAT16
+              (Filesystem,
+               Reading_Process,
+               Filesystem_Info,
+               Filename,
+               Parent_Node,
+               Found_Node,
+               Result);
+
+         when others         =>
+            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            Found_Node := null;
+            Result := Not_Supported;
+      end case;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Find_File", Logging_Tags_FAT);
