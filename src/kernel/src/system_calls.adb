@@ -27,28 +27,26 @@ package body System_Calls is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
+      Minimum_Allocation_Size : constant Natural := 1;
+
       Allocation_Result    : Memory.Allocators.Memory_Allocation_Result;
       Allocation_Size      : Natural := 0;
       Allocation_Alignment : Natural := 1;
    begin
-      Allocation_Size := Natural (Trap_Context.Gp_Registers (a1));
-      if Allocation_Size = 0 then
-         Log_Error ("Allocation size is zero");
-
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_Invalid_Argument);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
+      --  If an allocation size of 0 is requested by userspace, allocate the
+      --  minimum allocation size instead, rather than returning an error, or
+      --  returning a null pointer.
+      --  This minimises the amount of edge-cases the kernel needs to handle.
+      Allocation_Size :=
+        Natural'Max
+          (Minimum_Allocation_Size, Natural (Trap_Context.Gp_Registers (a1)));
 
       Allocation_Alignment := Natural (Trap_Context.Gp_Registers (a2));
       if Allocation_Alignment < 1 then
          Log_Error ("Invalid allocation alignment");
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_Invalid_Argument);
+           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -75,7 +73,7 @@ package body System_Calls is
          Log_Error ("Error allocating memory: " & Result'Image);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_No_Memory);
+           Syscall_Error_Result_To_Unsigned_64 (-ENOMEM);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -122,7 +120,8 @@ package body System_Calls is
       Process.Heap.Free (Address_To_Free, Result);
       if Is_Error (Result) then
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
+
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
@@ -166,7 +165,7 @@ package body System_Calls is
          Log_Error ("Invalid non-userspace address range", Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -176,8 +175,7 @@ package body System_Calls is
            ("Invalid string length: " & String_Length'Image, Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_Invalid_Argument);
+           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -235,7 +233,7 @@ package body System_Calls is
          Log_Error ("Invalid non-userspace address range", Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -244,8 +242,7 @@ package body System_Calls is
          Log_Error ("String length exceeds maximum length", Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_Invalid_Argument);
+           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -395,7 +392,7 @@ package body System_Calls is
          Log_Error ("Invalid non-userspace address range", Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;

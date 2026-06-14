@@ -11,6 +11,8 @@
 
 #define FREAD_BUFFER_SIZE 4096
 
+#define EOF (-1)
+
 typedef struct
 {
 	uint64_t file_handle_id;

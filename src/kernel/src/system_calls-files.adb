@@ -38,8 +38,7 @@ package body System_Calls.Files is
          Log_Error ("Invalid file open mode");
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_Invalid_Argument);
+           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -50,7 +49,7 @@ package body System_Calls.Files is
          Log_Error ("Invalid non-userspace address range");
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -61,8 +60,7 @@ package body System_Calls.Files is
             Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_Invalid_Argument);
+           Syscall_Error_Result_To_Unsigned_64 (-ENAMETOOLONG);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -86,8 +84,7 @@ package body System_Calls.Files is
             Log_Error ("File not found");
 
             Trap_Context.Gp_Registers (a0) :=
-              Syscall_Error_Result_To_Unsigned_64
-                (Syscall_Error_File_Not_Found);
+              Syscall_Error_Result_To_Unsigned_64 (-ENOENT);
 
             goto Syscall_Unsuccessful_No_Kernel_Error;
          elsif Is_Error (Result) then
@@ -136,8 +133,7 @@ package body System_Calls.Files is
          Log_Error ("File handle not found");
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_File_Handle_Not_Found);
+           Syscall_Error_Result_To_Unsigned_64 (-EBADF);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       elsif Is_Error (Result) then
@@ -202,7 +198,7 @@ package body System_Calls.Files is
          Log_Error ("Invalid non-userspace address range");
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -213,8 +209,7 @@ package body System_Calls.Files is
          Log_Error ("Error finding file handle: " & Result'Image);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_File_Handle_Not_Found);
+           Syscall_Error_Result_To_Unsigned_64 (-EBADF);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -267,8 +262,7 @@ package body System_Calls.Files is
          Log_Error ("Error finding file handle: " & Result'Image);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_File_Handle_Not_Found);
+           Syscall_Error_Result_To_Unsigned_64 (-EBADF);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -327,7 +321,7 @@ package body System_Calls.Files is
          Log_Error ("Invalid non-userspace address range");
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (Syscall_Error_Invalid_Address);
+           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
@@ -338,8 +332,7 @@ package body System_Calls.Files is
          Log_Error ("Error finding file handle: " & Result'Image);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64
-             (Syscall_Error_File_Handle_Not_Found);
+           Syscall_Error_Result_To_Unsigned_64 (-EBADF);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;

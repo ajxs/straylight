@@ -63,13 +63,76 @@ private
 
    type Syscall_Error_Result_T is new Integer with Convention => C, Size => 64;
 
-   Syscall_Error_Invalid_Argument      : constant Syscall_Error_Result_T := -1;
-   Syscall_Error_Invalid_Address       : constant Syscall_Error_Result_T := -2;
-   Syscall_Error_No_Memory             : constant Syscall_Error_Result_T := -3;
-   Syscall_Error_File_Not_Found        : constant Syscall_Error_Result_T := -4;
-   Syscall_Error_File_Handle_Not_Found : constant Syscall_Error_Result_T := -5;
-   Syscall_Error_Other                 : constant Syscall_Error_Result_T :=
-     -99;
+   --  Operation not permitted.
+   EPERM        : constant Syscall_Error_Result_T := 1;
+   --  No such file or directory.
+   ENOENT       : constant Syscall_Error_Result_T := 2;
+   --  No such process.
+   ESRCH        : constant Syscall_Error_Result_T := 3;
+   --  Interrupted system call.
+   EINTR        : constant Syscall_Error_Result_T := 4;
+   --  I/O error.
+   EIO          : constant Syscall_Error_Result_T := 5;
+   --  No such device or address.
+   ENXIO        : constant Syscall_Error_Result_T := 6;
+   --  Argument list too long.
+   E2BIG        : constant Syscall_Error_Result_T := 7;
+   --  Exec format error.
+   ENOEXEC      : constant Syscall_Error_Result_T := 8;
+   --  Bad file number.
+   EBADF        : constant Syscall_Error_Result_T := 9;
+   --  No child processes.
+   ECHILD       : constant Syscall_Error_Result_T := 10;
+   --  Try again.
+   EAGAIN       : constant Syscall_Error_Result_T := 11;
+   --  Out of memory.
+   ENOMEM       : constant Syscall_Error_Result_T := 12;
+   --  Permission denied.
+   EACCES       : constant Syscall_Error_Result_T := 13;
+   --  Bad address.
+   EFAULT       : constant Syscall_Error_Result_T := 14;
+   --  Block device required.
+   ENOTBLK      : constant Syscall_Error_Result_T := 15;
+   --  Device or resource busy.
+   EBUSY        : constant Syscall_Error_Result_T := 16;
+   --  File exists.
+   EEXIST       : constant Syscall_Error_Result_T := 17;
+   --  Cross-device link.
+   EXDEV        : constant Syscall_Error_Result_T := 18;
+   --  No such device.
+   ENODEV       : constant Syscall_Error_Result_T := 19;
+   --  Not a directory.
+   ENOTDIR      : constant Syscall_Error_Result_T := 20;
+   --  Is a directory.
+   EISDIR       : constant Syscall_Error_Result_T := 21;
+   --  Invalid argument.
+   EINVAL       : constant Syscall_Error_Result_T := 22;
+   --  File table overflow.
+   ENFILE       : constant Syscall_Error_Result_T := 23;
+   --  Too many open files.
+   EMFILE       : constant Syscall_Error_Result_T := 24;
+   --  Not a typewriter.
+   ENOTTY       : constant Syscall_Error_Result_T := 25;
+   --  Text file busy.
+   ETXTBSY      : constant Syscall_Error_Result_T := 26;
+   --  File too large.
+   EFBIG        : constant Syscall_Error_Result_T := 27;
+   --  No space left on device.
+   ENOSPC       : constant Syscall_Error_Result_T := 28;
+   --  Illegal seek.
+   ESPIPE       : constant Syscall_Error_Result_T := 29;
+   --  Read-only file system.
+   EROFS        : constant Syscall_Error_Result_T := 30;
+   --  Too many links.
+   EMLINK       : constant Syscall_Error_Result_T := 31;
+   --  Broken pipe.
+   EPIPE        : constant Syscall_Error_Result_T := 32;
+   --  Math argument out of domain of func.
+   EDOM         : constant Syscall_Error_Result_T := 33;
+   --  Math result not representable.
+   ERANGE       : constant Syscall_Error_Result_T := 34;
+   --  File name too long.
+   ENAMETOOLONG : constant Syscall_Error_Result_T := 35;
 
    function Syscall_Error_Result_To_Unsigned_64 is new
      Ada.Unchecked_Conversion

@@ -10,8 +10,8 @@ int fclose(FILE *stream)
 	                                            stream->file_handle_id);
 	if (is_syscall_result_error(result))
 	{
-		errno = result;
-		return -1;
+		errno = -result;
+		return EOF;
 	}
 
 	free(stream->buffer_address);
@@ -66,7 +66,7 @@ FILE *fopen(const char *restrict file_path, const char *restrict mode)
 	                               filename_length, open_mode_flags);
 	if (is_syscall_result_error(result))
 	{
-		errno = result;
+		errno = -result;
 
 		return NULL;
 	}
@@ -127,7 +127,7 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 			    stream->buffer_address, FREAD_BUFFER_SIZE);
 			if (is_syscall_result_error(read_result))
 			{
-				errno = read_result;
+				errno = -read_result;
 				return 0;
 			}
 
@@ -184,7 +184,7 @@ int fseek(FILE *stream, long offset, int whence)
 	    STRAYLIGHT_SYSCALL_FILE_SEEK, stream->file_handle_id, offset, whence);
 	if (is_syscall_result_error(result))
 	{
-		errno = result;
+		errno = -result;
 		return -1;
 	}
 
@@ -216,7 +216,7 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream)
 		    (uint64_t)buffer + total_bytes_written, current_bytes_to_write);
 		if (is_syscall_result_error(write_result))
 		{
-			errno = write_result;
+			errno = -write_result;
 			return total_bytes_written / size;
 		}
 

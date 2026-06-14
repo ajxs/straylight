@@ -10,7 +10,7 @@ void *malloc(size_t size)
 	    straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_ALLOCATE_MEMORY, size, 1);
 	if (is_syscall_result_error(result))
 	{
-		errno = result;
+		errno = -result;
 
 		return NULL;
 	}
@@ -24,7 +24,7 @@ void free(void *ptr)
 	    straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_FREE_MEMORY, ptr);
 	if (is_syscall_result_error(result))
 	{
-		errno = result;
+		errno = -result;
 	}
 }
 
