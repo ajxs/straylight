@@ -1222,13 +1222,9 @@ package body Filesystems.FAT is
          Updated_Directory_Entry'Address,
          32);
 
-      Write_Block_To_Filesystem
+      --  Result set by this call.
+      Write_Block_To_Filesystem_And_Release
         (Filesystem, Calling_Process, Block_Number, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Release_Block (Filesystem, Block_Number, Result);
 
       pragma Warnings (Off, "No_Exception_Propagation");
    exception
@@ -1473,13 +1469,8 @@ package body Filesystems.FAT is
                0,
                Filesystem_Info.Bytes_Per_Sector);
 
-            Write_Block_To_Filesystem
+            Write_Block_To_Filesystem_And_Release
               (Filesystem, Writing_Process, Current_Block, Result);
-            if Is_Error (Result) then
-               return;
-            end if;
-
-            Release_Block (Filesystem, Current_Block, Result);
             if Is_Error (Result) then
                return;
             end if;
@@ -1671,13 +1662,8 @@ package body Filesystems.FAT is
                   Buffer_Address + Storage_Offset (Bytes_Written),
                   Bytes_To_Copy_To_Sector);
 
-               Write_Block_To_Filesystem
+               Write_Block_To_Filesystem_And_Release
                  (Filesystem, Writing_Process, Block_Number, Result);
-               if Is_Error (Result) then
-                  return;
-               end if;
-
-               Release_Block (Filesystem, Block_Number, Result);
                if Is_Error (Result) then
                   return;
                end if;

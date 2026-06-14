@@ -8,7 +8,6 @@ with Locks.Sleeplocks; use Locks.Sleeplocks;
 private package Filesystems.Block_Cache
   with Preelaborate
 is
-
    procedure Read_Block_From_Filesystem
      (Filesystem           : Filesystem_Access;
       Reading_Process      : in out Process_Control_Block_T;
@@ -28,6 +27,13 @@ is
       Block_Number           : Block_Index_T;
       Result                 : out Function_Result;
       Invalidate_Cache_Entry : Boolean := False);
+
+   --  This procedure requires that the caller holds the block being written.
+   procedure Write_Block_To_Filesystem_And_Release
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Block_Number    : Block_Index_T;
+      Result          : out Function_Result);
 
    --  The block cache entries don't require an individual spinlock.
    --  The block cache as a whole is protected by a single spinlock. No

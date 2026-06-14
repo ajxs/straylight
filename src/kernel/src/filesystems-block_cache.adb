@@ -585,4 +585,21 @@ package body Filesystems.Block_Cache is
          Result := Constraint_Exception;
    end Write_Block_To_Filesystem;
 
+   procedure Write_Block_To_Filesystem_And_Release
+     (Filesystem      : Filesystem_Access;
+      Writing_Process : in out Process_Control_Block_T;
+      Block_Number    : Block_Index_T;
+      Result          : out Function_Result)
+   is
+      Write_Result, Release_Result : Function_Result := Unset;
+   begin
+      Write_Block_To_Filesystem
+        (Filesystem, Writing_Process, Block_Number, Write_Result);
+
+      Release_Block (Filesystem, Block_Number, Release_Result);
+
+      Result :=
+        (if Is_Error (Write_Result) then Write_Result else Release_Result);
+   end Write_Block_To_Filesystem_And_Release;
+
 end Filesystems.Block_Cache;

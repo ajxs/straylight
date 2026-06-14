@@ -771,15 +771,8 @@ package body Filesystems.FAT.FAT16 is
                   Current_Updated_Entry_Count := @ + 1;
                end loop Update_Entry_Loop;
 
-               Write_Block_To_Filesystem
+               Write_Block_To_Filesystem_And_Release
                  (Filesystem, Reading_Process, Current_Block, Result);
-               if Is_Error (Result) then
-                  Release_Block
-                    (Filesystem, Current_Block, Release_Block_Result);
-                  return;
-               end if;
-
-               Release_Block (Filesystem, Current_Block, Result);
                if Is_Error (Result) then
                   return;
                end if;
@@ -1373,14 +1366,11 @@ package body Filesystems.FAT.FAT16 is
 
          FAT16_Table (Cluster_Index_Within_Sector) := FAT_Entry;
 
-         Write_Block_To_Filesystem
+         Write_Block_To_Filesystem_And_Release
            (Filesystem, Writing_Process, Block_Number, Result);
          if Is_Error (Result) then
             return;
          end if;
-
-         --  Result set by this call.
-         Release_Block (Filesystem, Block_Number, Result);
       end loop;
    exception
       when Constraint_Error =>
