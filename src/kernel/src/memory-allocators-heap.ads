@@ -148,9 +148,6 @@ private
    function Find_Unused_Free_Region_Entry
      (Memory_Heap : in out Memory_Heap_T) return Free_Region_Access;
 
-   procedure Initialise_Allocated_Region_Header
-     (Region_Address : Address; Size : Storage_Offset);
-
    function Is_Valid_Allocation_Header
      (Header : Allocation_Header_T) return Boolean
    is (Header.Identity = Allocation_Header_Magic_Number);
@@ -164,12 +161,6 @@ private
       Virtual_Address : Virtual_Address_T;
       Found_Index     : out Heap_Memory_Region_Index_T;
       Found           : out Boolean);
-
-   procedure Find_Region_By_Physical_Address
-     (Memory_Heap      : Memory_Heap_T;
-      Physical_Address : Physical_Address_T;
-      Found_Index      : out Heap_Memory_Region_Index_T;
-      Found            : out Boolean);
 
    function Is_Virtual_Address_Within_Memory_Region
      (Memory_Region   : Heap_Memory_Region_T;

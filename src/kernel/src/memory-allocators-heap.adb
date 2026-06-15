@@ -146,8 +146,14 @@ package body Memory.Allocators.Heap is
       end if;
 
       --  Set the allocation header for the newly allocated address.
-      Initialise_Allocated_Region_Header
-        (Region_Allocation_Result.Virtual_Address, Storage_Offset (Size));
+      New_Header : Allocation_Header_T
+      with
+        Import,
+        Alignment => 1,
+        Address   => Region_Allocation_Result.Virtual_Address;
+
+      New_Header.Identity := Allocation_Header_Magic_Number;
+      New_Header.Size := Storage_Offset (Size);
 
       --  Note that this takes alignment into account.
       --  It's the final address that's aligned, not the start of the region.
@@ -209,10 +215,17 @@ package body Memory.Allocators.Heap is
       --  The alignment offset needs to factor in the size of the allocation
       --  header, since it's the final allocated address that needs to be
       --  aligned, not the address of the allocation header.
-      return
-        Alignment
-        - Storage_Offset (Masked_Address + (Allocation_Header_T'Size / 8))
-          mod Alignment;
+      --  This is effectively calculating the number of bytes necessary to
+      --  align the address of the allocation header plus the size of the
+      --  header to the desired alignment.
+      --  It will always get a number between 0 and (Alignment - 1) inclusive.
+      Modulo : constant Storage_Offset :=
+        Storage_Offset (Masked_Address + (Allocation_Header_T'Size / 8))
+        mod Alignment;
+
+      --  If the modulo is 0, the start address is already aligned, and no
+      --  offset is necessary.
+      return (if Modulo = 0 then 0 else Alignment - Modulo);
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Calculate_Region_Alignment_Offset");
@@ -223,27 +236,21 @@ package body Memory.Allocators.Heap is
    is
       Curr_Region : Free_Region_Access := Memory_Heap.Free_Regions_Head;
       Prev_Region : Free_Region_Access := null;
-
-      End_Virtual_Address  : Virtual_Address_T := Null_Address;
-      End_Physical_Address : Physical_Address_T := Null_Physical_Address;
-
-      Matched : Boolean := False;
    begin
-      while Curr_Region /= null and then Curr_Region.all.Entry_Used loop
-         if Prev_Region /= null and then Curr_Region.all.Entry_Used then
-            End_Virtual_Address :=
+      while Curr_Region /= null loop
+         if Prev_Region /= null then
+            End_Virtual_Address : constant Virtual_Address_T :=
               Prev_Region.all.Virtual_Address + Prev_Region.all.Size;
 
-            End_Physical_Address :=
+            End_Physical_Address : constant Physical_Address_T :=
               Prev_Region.all.Physical_Address + Prev_Region.all.Size;
 
-            Matched :=
+            Matched : constant Boolean :=
               Curr_Region.all.Virtual_Address = End_Virtual_Address
               and then Curr_Region.all.Physical_Address = End_Physical_Address;
 
             if Matched then
-               Prev_Region.all.Size :=
-                 Prev_Region.all.Size + Curr_Region.all.Size;
+               Prev_Region.all.Size := @ + Curr_Region.all.Size;
                Prev_Region.all.Next_Region := Curr_Region.all.Next_Region;
 
                Curr_Region.all.Entry_Used := False;
@@ -252,6 +259,8 @@ package body Memory.Allocators.Heap is
                --  coalescing from its previous region.
                Prev_Region := Curr_Region;
             end if;
+         else
+            Prev_Region := Curr_Region;
          end if;
 
          Curr_Region := Curr_Region.all.Next_Region;
@@ -288,7 +297,7 @@ package body Memory.Allocators.Heap is
          end if;
 
          --  This logging statement is given its own special tag because of the
-         --  performance massive cost to logging the comparison of each region.
+         --  massive performance cost to logging the comparison of each region.
          Log_Debug
            ("Testing free region:"
             & ASCII.LF
@@ -394,10 +403,14 @@ package body Memory.Allocators.Heap is
 
                Inserted_Entry.all.Entry_Used := True;
                Inserted_Entry.all.Virtual_Address :=
-                 Curr_Region.all.Virtual_Address + Alignment_Offset + Size;
+                 Curr_Region.all.Virtual_Address
+                 + Alignment_Offset
+                 + Real_Allocation_Size;
 
                Inserted_Entry.all.Physical_Address :=
-                 Curr_Region.all.Physical_Address + Alignment_Offset + Size;
+                 Curr_Region.all.Physical_Address
+                 + Alignment_Offset
+                 + Real_Allocation_Size;
 
                Inserted_Entry.all.Size := Remaining_Size;
 
@@ -427,34 +440,6 @@ package body Memory.Allocators.Heap is
          Result := Constraint_Exception;
    end Find_And_Allocate_Free_Region;
 
-   procedure Find_Region_By_Physical_Address
-     (Memory_Heap      : Memory_Heap_T;
-      Physical_Address : Physical_Address_T;
-      Found_Index      : out Heap_Memory_Region_Index_T;
-      Found            : out Boolean)
-   is
-      Curr_Index : Heap_Memory_Region_Index_T := Null_Memory_Region_Index;
-   begin
-      Curr_Index := Memory_Heap.Memory_Regions_Head;
-      while Curr_Index /= Null_Memory_Region_Index loop
-         if Is_Physical_Address_within_Memory_Region
-              (Memory_Heap.Memory_Regions (Curr_Index), Physical_Address)
-         then
-            Found_Index := Curr_Index;
-            Found := True;
-
-            return;
-         end if;
-
-         Curr_Index := Memory_Heap.Memory_Regions (Curr_Index).Next_Region;
-      end loop;
-
-      Found := False;
-   exception
-      when Constraint_Error =>
-         Found_Index := Null_Memory_Region_Index;
-   end Find_Region_By_Physical_Address;
-
    procedure Find_Region_By_Virtual_Address
      (Memory_Heap     : Memory_Heap_T;
       Virtual_Address : Address;
@@ -463,6 +448,8 @@ package body Memory.Allocators.Heap is
    is
       Curr_Index : Heap_Memory_Region_Index_T := Null_Memory_Region_Index;
    begin
+      Found_Index := Null_Memory_Region_Index;
+
       Curr_Index := Memory_Heap.Memory_Regions_Head;
       while Curr_Index /= Null_Memory_Region_Index loop
          if Is_Virtual_Address_Within_Memory_Region
@@ -526,18 +513,19 @@ package body Memory.Allocators.Heap is
         - Storage_Offset (Allocation_Header_T'Size / 8);
 
       --  Read the allocation header to determine the size of the allocation.
-      Read_Header : declare
-         Header : Allocation_Header_T
-         with Import, Alignment => 1, Address => Region_Virtual_Address;
-      begin
-         if not Is_Valid_Allocation_Header (Header) then
-            Result := Address_Not_In_Heap;
-            return;
-         end if;
+      Header : Allocation_Header_T
+      with Import, Alignment => 1, Address => Region_Virtual_Address;
 
-         --  It's important to take the header size into account!
-         Region_Size := Header.Size + (Allocation_Header_T'Size / 8);
-      end Read_Header;
+      if not Is_Valid_Allocation_Header (Header) then
+         Result := Address_Not_In_Heap;
+         return;
+      end if;
+
+      --  It's important to take the header size into account!
+      Region_Size := Header.Size + (Allocation_Header_T'Size / 8);
+
+      --  Clear the identity field.
+      Header.Identity := 0;
 
       --  Find the memory region in this heap that contains the specified
       --  virtual address.
@@ -605,16 +593,6 @@ package body Memory.Allocators.Heap is
       Release_Spinlock (Memory_Heap.Spinlock);
    end Free;
 
-   procedure Initialise_Allocated_Region_Header
-     (Region_Address : Address; Size : Storage_Offset)
-   is
-      New_Header : Allocation_Header_T
-      with Import, Alignment => 1, Address => Region_Address;
-   begin
-      New_Header.Identity := Allocation_Header_Magic_Number;
-      New_Header.Size := Size;
-   end Initialise_Allocated_Region_Header;
-
    procedure Insert_Free_Region
      (Memory_Heap      : in out Memory_Heap_T;
       Virtual_Address  : Virtual_Address_T;
@@ -627,6 +605,8 @@ package body Memory.Allocators.Heap is
 
       Curr_Region : Free_Region_Access := null;
       Prev_Region : Free_Region_Access := null;
+
+      Inserted_New_Region : Boolean := False;
    begin
       Log_Debug
         ("Inserting free region:"
@@ -653,6 +633,7 @@ package body Memory.Allocators.Heap is
       New_Entry.all.Physical_Address := Physical_Address;
       New_Entry.all.Entry_Used := True;
       New_Entry.all.Size := Size;
+      New_Entry.all.Next_Region := null;
 
       --  If the region list head is empty, assign the new entry node
       --  as the head node.
@@ -685,13 +666,20 @@ package body Memory.Allocators.Heap is
                Memory_Heap.Free_Regions_Head := New_Entry;
             end if;
 
-            Result := Success;
-            return;
+            Inserted_New_Region := True;
+            exit;
          end if;
 
          Prev_Region := Curr_Region;
          Curr_Region := Curr_Region.all.Next_Region;
       end loop;
+
+      if not Inserted_New_Region then
+         --  If we iterated through the entire list and didn't find a region
+         --  with a higher offset, this means the new region belongs at the end
+         --  of the list. Attach it to the end of the list.
+         Prev_Region.all.Next_Region := New_Entry;
+      end if;
 
       --  After inserting the new free region 'Coalesce' all of the free
       --  region entries. This will combine any adjacent regions into a single
