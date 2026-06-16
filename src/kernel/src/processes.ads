@@ -8,12 +8,11 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 with Interfaces;              use Interfaces;
 
-with Function_Results;       use Function_Results;
-with Locks;                  use Locks;
-with Logging;                use Logging;
-with Memory;                 use Memory;
-with Memory.Allocators.Heap; use Memory.Allocators.Heap;
-with Memory.Virtual;         use Memory.Virtual;
+with Function_Results; use Function_Results;
+with Locks;            use Locks;
+with Logging;          use Logging;
+with Memory;           use Memory;
+with Memory.Virtual;   use Memory.Virtual;
 with RISCV;
 
 package Processes
@@ -63,6 +62,17 @@ is
 
    subtype Blocking_Channel_T is Unsigned_64;
 
+   type Userspace_Heap_Allocation_T is record
+      Phys_Addr  : Physical_Address_T := Null_Physical_Address;
+      Virt_Addr  : Virtual_Address_T := Null_Address;
+      Size       : Storage_Offset := 0;
+      Entry_Used : Boolean := False;
+   end record;
+
+   --  The userspace heap is a fixed-size array of allocated regions.
+   type Userspace_Heap_Allocation_List is
+     array (Natural range <>) of Userspace_Heap_Allocation_T;
+
    ----------------------------------------------------------------------------
    --  System Process Control Block type.
    --  Represents a system process.
@@ -89,7 +99,8 @@ is
 
       Process_Entry_Point : Virtual_Address_T := Null_Address;
 
-      Heap     : Memory_Heap_T;
+      Userspace_Heap : Userspace_Heap_Allocation_List (0 .. 7);
+
       Spinlock : Spinlock_T;
 
       Next_File_Handle_Id : Unsigned_64 := 1;

@@ -3,140 +3,18 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with System;                  use System;
-with System.Storage_Elements; use System.Storage_Elements;
+with System; use System;
 
 with Devices;
 with Devices.UART;
 with Devices.Virtio.Graphics;
 with Memory;             use Memory;
-with Memory.Allocators;
 with RISCV;              use RISCV;
 with Processes.Scheduler;
 with Hart_State;         use Hart_State;
 with System_Calls.Files; use System_Calls.Files;
 
 package body System_Calls is
-   procedure Handle_Allocate_Memory_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result)
-   is
-      Trap_Context : Process_Context_T
-      with
-        Import,
-        Convention => C,
-        Alignment  => 1,
-        Address    => Process.Trap_Context_Addr;
-
-      Minimum_Allocation_Size : constant Natural := 1;
-
-      Allocation_Result    : Memory.Allocators.Memory_Allocation_Result;
-      Allocation_Size      : Natural := 0;
-      Allocation_Alignment : Natural := 1;
-   begin
-      --  If an allocation size of 0 is requested by userspace, allocate the
-      --  minimum allocation size instead, rather than returning an error, or
-      --  returning a null pointer.
-      --  This minimises the amount of edge-cases the kernel needs to handle.
-      Allocation_Size :=
-        Natural'Max
-          (Minimum_Allocation_Size, Natural (Trap_Context.Gp_Registers (a1)));
-
-      Allocation_Alignment := Natural (Trap_Context.Gp_Registers (a2));
-      if Allocation_Alignment < 1 then
-         Log_Error ("Invalid allocation alignment");
-
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
-
-      Log_Debug
-        ("User Mode Syscall: Allocate Memory:"
-         & ASCII.LF
-         & "  PID:       "
-         & Process.Process_Id'Image
-         & ASCII.LF
-         & "  Size:      "
-         & Allocation_Size'Image
-         & ASCII.LF
-         & "  Alignment: "
-         & Allocation_Alignment'Image,
-         Logging_Tags);
-
-      Process.Heap.Allocate
-        (Allocation_Size,
-         Allocation_Result,
-         Result,
-         Storage_Offset (Allocation_Alignment));
-      if Is_Error (Result) then
-         Log_Error ("Error allocating memory: " & Result'Image);
-
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-ENOMEM);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
-
-      Trap_Context.Gp_Registers (a0) :=
-        Address_To_Unsigned_64 (Allocation_Result.Virtual_Address);
-      Result := Success;
-      return;
-
-      <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Result := Syscall_Unsuccessful_Without_Kernel_Error;
-   exception
-      when Constraint_Error =>
-         Log_Debug
-           ("Constraint_Error: Handle_Allocate_Memory_Syscall", Logging_Tags);
-         Result := Constraint_Exception;
-   end Handle_Allocate_Memory_Syscall;
-
-   procedure Handle_Free_Memory_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result)
-   is
-      Trap_Context : Process_Context_T
-      with
-        Import,
-        Convention => C,
-        Alignment  => 1,
-        Address    => Process.Trap_Context_Addr;
-
-      Address_To_Free : Virtual_Address_T := Null_Address;
-   begin
-      Address_To_Free :=
-        Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
-
-      Log_Debug
-        ("User Mode Syscall: Free Memory:"
-         & ASCII.LF
-         & "  PID:       "
-         & Process.Process_Id'Image
-         & ASCII.LF
-         & "  Address:   "
-         & Address_To_Free'Image,
-         Logging_Tags);
-
-      Process.Heap.Free (Address_To_Free, Result);
-      if Is_Error (Result) then
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
-
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
-      Result := Success;
-      return;
-
-      <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Result := Syscall_Unsuccessful_Without_Kernel_Error;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Free_Memory_Syscall");
-         Result := Constraint_Exception;
-   end Handle_Free_Memory_Syscall;
-
    procedure Handle_Logging_Syscall
      (Process   : in out Process_Control_Block_T;
       Log_Level : Log_Level_T;
@@ -320,12 +198,6 @@ package body System_Calls is
 
          when Syscall_Print_To_Serial    =>
             Handle_Print_To_Serial_Syscall (Process, Result);
-
-         when Syscall_Allocate_Memory    =>
-            Handle_Allocate_Memory_Syscall (Process, Result);
-
-         when Syscall_Free_Memory        =>
-            Handle_Free_Memory_Syscall (Process, Result);
 
          when Syscall_Open_File          =>
             Handle_Open_File_Syscall (Process, Result);

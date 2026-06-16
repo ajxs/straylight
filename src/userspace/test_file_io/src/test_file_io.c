@@ -14,40 +14,48 @@ int main()
 		exit(EXIT_FAILURE);
 	}
 
-	FILE *file = fopen("/Devices/Disk/test_file.txt", "r+");
-	if (file == NULL)
+	FILE *words_file = fopen("/Devices/Disk_B/seven_letter_words.txt", "r");
+	if (words_file == NULL)
 	{
 		print_to_serial("Failed to open file!\n");
 		return EXIT_FAILURE;
 	}
 
-	fread((void *)buffer, 1, 20, file);
-	((char *)buffer)[21] = '\0';
+	FILE *test_write_file = fopen("/Devices/Disk/test_file.txt", "r+");
+	if (test_write_file == NULL)
+	{
+		print_to_serial("Failed to open file!\n");
+		return EXIT_FAILURE;
+	}
 
-	print_to_serial((char *)buffer);
+	fseek(test_write_file, 0, SEEK_SET);
 
-	const char *string_to_write = "Hello from Straylight!";
-	const size_t string_length = strlen(string_to_write);
-	fwrite(string_to_write, 1, string_length, file);
+	for (int i = 0; i < 70; i++)
+	{
+		fread((void *)buffer, 1, 8, words_file);
+		((char *)buffer)[8] = '\0';
+
+		fwrite(buffer, 1, 8, test_write_file);
+	}
 
 	print_to_serial("Wrote to file!\n");
 
-	FILE *new_file = fopen("/Devices/Disk/nonexistent_file.txt", "w+");
-	if (new_file == NULL)
-	{
-		print_to_serial("Failed to create file!\n");
-		return EXIT_FAILURE;
-	}
+	// FILE *new_file = fopen("/Devices/Disk/nonexistent_file.txt", "w+");
+	// if (new_file == NULL)
+	// {
+	// 	print_to_serial("Failed to create file!\n");
+	// 	return EXIT_FAILURE;
+	// }
 
-	FILE *new_file_with_long_name =
-	    fopen("/Devices/Disk/Programs/"
-	          "nonexistent_file_with_really_long_and__silly_name.txt",
-	          "w+");
-	if (new_file_with_long_name == NULL)
-	{
-		print_to_serial("Failed to create file!\n");
-		return EXIT_FAILURE;
-	}
+	// FILE *new_file_with_long_name =
+	//     fopen("/Devices/Disk/Programs/"
+	//           "nonexistent_file_with_really_long_and__silly_name.txt",
+	//           "w+");
+	// if (new_file_with_long_name == NULL)
+	// {
+	// 	print_to_serial("Failed to create file!\n");
+	// 	return EXIT_FAILURE;
+	// }
 
 	return EXIT_SUCCESS;
 }

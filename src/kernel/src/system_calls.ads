@@ -13,13 +13,10 @@ with Processes;        use Processes;
 package System_Calls
   with Preelaborate
 is
-
    Syscall_Exit_Process    : constant := 5446_0000;
    Syscall_Yield_Process   : constant := 5446_0001;
    Syscall_Log_Debug       : constant := 5446_0002;
    Syscall_Log_Error       : constant := 5446_0003;
-   Syscall_Allocate_Memory : constant := 5446_0004;
-   Syscall_Free_Memory     : constant := 5446_0005;
    Syscall_Print_To_Serial : constant := 5446_0006;
 
    Syscall_Open_File  : constant := 5446_0107;
@@ -46,12 +43,6 @@ private
    with No_Return;
 
    procedure Handle_Process_Yield_Syscall;
-
-   procedure Handle_Allocate_Memory_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
-
-   procedure Handle_Free_Memory_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
    procedure Handle_Print_To_Serial_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result);

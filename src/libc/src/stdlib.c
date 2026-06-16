@@ -1,16 +1,28 @@
+#include "heap.h"
+#include "libc.h"
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <straylight_syscall.h>
 
-void *malloc(size_t size)
+extern Program_Heap program_heap;
+
+void *aligned_alloc(size_t alignment, size_t size)
 {
-	int64_t result =
-	    straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_ALLOCATE_MEMORY, size, 1);
-	if (is_syscall_result_error(result))
+	const bool alignment_is_power_of_2 = (alignment & (alignment - 1)) == 0;
+
+	if (alignment == 0 || !alignment_is_power_of_2)
 	{
-		errno = -result;
+		errno = EINVAL;
+
+		return NULL;
+	}
+
+	uintptr_t result = allocate_memory(&program_heap, size, alignment);
+	if (result == (uintptr_t)NULL)
+	{
+		errno = ENOMEM;
 
 		return NULL;
 	}
@@ -18,19 +30,24 @@ void *malloc(size_t size)
 	return (void *)result;
 }
 
-void free(void *ptr)
-{
-	int64_t result =
-	    straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_FREE_MEMORY, ptr);
-	if (is_syscall_result_error(result))
-	{
-		errno = -result;
-	}
-}
-
 void exit(int exit_code)
 {
 	straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_PROCESS_EXIT, exit_code);
 
 	__builtin_unreachable();
+}
+
+void free(void *ptr) { free_memory(&program_heap, (uintptr_t)ptr); }
+
+void *malloc(size_t size)
+{
+	uintptr_t result = allocate_memory(&program_heap, size, 1);
+	if (result == (uintptr_t)NULL)
+	{
+		errno = ENOMEM;
+
+		return NULL;
+	}
+
+	return (void *)result;
 }

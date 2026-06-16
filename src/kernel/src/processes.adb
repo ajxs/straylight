@@ -59,17 +59,6 @@ package body Processes is
          & Process_Heap_Physical_Address'Image,
          Logging_Tags);
 
-      New_Process.Heap.Add_Memory_Region_To_Heap
-        (Process_Heap_Virtual_Address,
-         Process_Heap_Physical_Address,
-         Process_Heap_Starting_Size,
-         Result);
-      if Is_Error (Result) then
-         Log_Error ("Error initialising process heap: " & Result'Image);
-         Result := Unhandled_Exception;
-         return;
-      end if;
-
       New_Process.Memory_Space.Map
         (Process_Heap_Virtual_Address,
          Process_Heap_Physical_Address,
@@ -81,6 +70,12 @@ package body Processes is
          Result := Unhandled_Exception;
          return;
       end if;
+
+      New_Process.Userspace_Heap (0) :=
+        (Virt_Addr  => Process_Heap_Virtual_Address,
+         Phys_Addr  => Process_Heap_Physical_Address,
+         Size       => Process_Heap_Starting_Size,
+         Entry_Used => True);
 
       Log_Debug ("Allocated new process heap.", Logging_Tags);
    exception
@@ -254,28 +249,19 @@ package body Processes is
    begin
       Log_Debug ("Freeing process heap physical memory...", Logging_Tags);
 
-      for Heap_Region of Process.Heap.Memory_Regions loop
-         if Heap_Region.Entry_Used then
-            Log_Debug
-              ("Freeing process heap region physical memory with address: "
-               & Heap_Region.Physical_Address'Image,
-               Logging_Tags);
-
-            Free_Physical_Memory (Heap_Region.Physical_Address, Result);
+      for I in Process.Userspace_Heap'Range loop
+         if Process.Userspace_Heap (I).Entry_Used then
+            Free_Physical_Memory
+              (Process.Userspace_Heap (I).Phys_Addr, Result);
             if Is_Error (Result) then
                return;
             end if;
-
-            Log_Debug ("Freed process heap region.", Logging_Tags);
          end if;
       end loop;
 
       Log_Debug ("Freed process heap physical memory.", Logging_Tags);
 
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Deallocate_Process_Heap");
-         Result := Constraint_Exception;
+      Result := Success;
    end Deallocate_Process_Heap;
 
    --  This procedure assumes that the process' spinlock is held.
