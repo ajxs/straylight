@@ -252,13 +252,54 @@ package body Loader is
 
    procedure Print_ELF_Header (ELF_Header : ELF.Elf64_File_Header_T) is
    begin
-      --  @TODO.
       Log_Debug
-        ("ELF Header: "
+        ("ELF Header:"
          & ASCII.LF
-         & "  Magic:          "
-         & ELF_Header.e_ident.Magic_Number,
+         & "  Class:          "
+         & ELF_Header.e_ident.File_Class'Image
+         & ASCII.LF
+         & "  Encoding:       "
+         & ELF_Header.e_ident.File_Encoding'Image
+         & ASCII.LF
+         & "  Version:        "
+         & ELF_Header.e_ident.File_Version'Image
+         & ASCII.LF
+         & "  ABI:            "
+         & ELF_Header.e_ident.File_ABI'Image
+         & ASCII.LF
+         & "  Type:           "
+         & ELF_Header.e_type'Image
+         & ASCII.LF
+         & "  Machine:        "
+         & ELF_Header.e_machine'Image
+         & ASCII.LF
+         & "  File Version:   "
+         & ELF_Header.e_version'Image
+         & ASCII.LF
+         & "  Entry Point:    "
+         & ELF_Header.e_entry'Image
+         & ASCII.LF
+         & "  Header Size:    "
+         & ELF_Header.e_ehsize'Image
+         & ASCII.LF
+         & "  Flags:          "
+         & ELF_Header.e_flags'Image
+         & ASCII.LF
+         & "  Section Headers Offset: "
+         & ELF_Header.e_shoff'Image
+         & ASCII.LF
+         & "  Section Header Size:    "
+         & ELF_Header.e_shentsize'Image
+         & ASCII.LF
+         & "  Section Header Count:   "
+         & ELF_Header.e_shnum'Image
+         & ASCII.LF
+         & "  Section Name Index:     "
+         & ELF_Header.e_shstrndx'Image,
          Logging_Tags);
+   exception
+      when Constraint_Error =>
+         null;
    end Print_ELF_Header;
 
    procedure Print_ELF_Header_Program_Header_Info
