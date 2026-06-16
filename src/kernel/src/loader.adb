@@ -120,11 +120,27 @@ package body Loader is
          if Program_Header.p_type = PT_LOAD then
             Log_Debug ("Allocating segment physical memory...", Logging_Tags);
 
+            --  Program_Header.p_vaddr specifies the virtual address at which
+            --  the loadable segment should be mapped.
+            --  If the segment isn't page-aligned, we need to calculate the
+            --  necessary offset to align the page.
+            --  This offset will be *subtracted* from p_vaddr to get the actual
+            --  address to map the segment to, and *added* to the address that
+            --  the executable file data is loaded/copied to so that the file
+            --  data lands at the correct address.
+            --  e.g. if p_vaddr is 0x1003, we need to map the segment at 0x1000
+            --  and load the file data at an offset of 3 bytes into the mapped
+            --  memory so that the correct data sits at the correct address.
+            Vaddr_Page_Align_Offset : constant Unsigned_64 :=
+              Program_Header.p_vaddr mod 16#1000#;
+
+            Total_Mapping_Size : constant Natural :=
+              Natural (Program_Header.p_memsz)
+              + Natural (Vaddr_Page_Align_Offset);
+
             --  Allocate physical memory for the segment.
             Allocate_Physical_Memory
-              (Natural (Program_Header.p_memsz),
-               Allocated_Physical_Address,
-               Result);
+              (Total_Mapping_Size, Allocated_Physical_Address, Result);
             if Is_Error (Result) then
                return;
             end if;
@@ -135,9 +151,11 @@ package body Loader is
 
             Region_Flags.User := True;
 
+            --  Subtract the page alignment offset from the virtual address so
+            --  that the segment mapping is correctly page-aligned.
             Current_Segment_Virtual_Address :=
-              Unsigned_64_To_Address (Program_Header.p_vaddr)
-              - Storage_Offset (Program_Header.p_offset);
+              Unsigned_64_To_Address
+                (Program_Header.p_vaddr - Vaddr_Page_Align_Offset);
 
             Log_Debug
               ("Mapping segment:"
@@ -152,7 +170,7 @@ package body Loader is
             New_Process.all.Memory_Space.Map
               (Current_Segment_Virtual_Address,
                Allocated_Physical_Address,
-               Memory_Region_Size (Program_Header.p_memsz),
+               Memory_Region_Size (Total_Mapping_Size),
                Region_Flags,
                Result);
             --  Error already printed.
@@ -169,8 +187,8 @@ package body Loader is
 
                Log_Debug ("Clearing segment memory...", Logging_Tags);
 
-               --  Clear the allocated memory.
-               Set (Region_Address, 0, Natural (Program_Header.p_memsz));
+               --  Clear the entire allocation, including alignment padding.
+               Set (Region_Address, 0, Total_Mapping_Size);
 
                --  If the segment has data, read this from the disk.
                if Program_Header.p_filesz > 0 then
@@ -183,11 +201,13 @@ package body Loader is
 
                   Bytes_To_Read := Natural (Program_Header.p_filesz);
 
-                  --  Read the data directly into the newly allocated memory.
+                  --  Add the page-alignment offset to the copy destination
+                  --  address so that the file data is loaded at the correct
+                  --  offset within the mapped memory region.
                   Read_File
                     (Loading_Process,
                      Executable_File,
-                     Region_Address,
+                     Region_Address + Storage_Offset (Vaddr_Page_Align_Offset),
                      Bytes_To_Read,
                      Bytes_Read,
                      Result);
