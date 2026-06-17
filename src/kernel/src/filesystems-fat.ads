@@ -48,7 +48,7 @@ is
       Result          : out Function_Result);
 
    procedure Truncate_File
-     (Reading_Process : in out Process_Control_Block_T;
+     (Writing_Process : in out Process_Control_Block_T;
       Filesystem_Node : Filesystem_Node_Access;
       New_Size        : Unsigned_64;
       Result          : out Function_Result);
