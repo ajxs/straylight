@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <straylight_syscall.h>
 
-extern Program_Heap program_heap;
-
 void *aligned_alloc(size_t alignment, size_t size)
 {
 	const bool alignment_is_power_of_2 = (alignment & (alignment - 1)) == 0;

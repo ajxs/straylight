@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define MAX_FREE_REGIONS 1024
+#define MAX_FREE_REGIONS 128
 
 #define NULL_REGION_INDEX UINT16_MAX
 

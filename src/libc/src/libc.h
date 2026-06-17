@@ -6,4 +6,6 @@
 #define USERSPACE_HEAP_ADDRESS 0xC00000000
 #define USERSPACE_HEAP_STARTING_SIZE 0x400000
 
+extern Program_Heap program_heap;
+
 #endif
