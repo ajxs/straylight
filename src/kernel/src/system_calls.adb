@@ -214,6 +214,9 @@ package body System_Calls is
          when Syscall_Close_File         =>
             Handle_Close_File_Syscall (Process, Result);
 
+         when Syscall_Truncate_File      =>
+            Handle_Truncate_File_Syscall (Process, Result);
+
          when Syscall_Update_Framebuffer =>
             Handle_Update_Framebuffer_Syscall (Process, Result);
 

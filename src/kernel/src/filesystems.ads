@@ -177,6 +177,12 @@ is
       New_Node : out Filesystem_Node_Access;
       Result   : out Function_Result);
 
+   procedure Truncate_File
+     (Process     : in out Process_Control_Block_T;
+      File_Handle : Process_File_Handle_Access;
+      New_Size    : Unsigned_64;
+      Result      : out Function_Result);
+
    procedure Close_File
      (File_Handle : Process_File_Handle_Access; Result : out Function_Result);
 

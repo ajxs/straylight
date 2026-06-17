@@ -1718,4 +1718,15 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Write_File_Data;
 
+   procedure Truncate_File
+     (Reading_Process : in out Process_Control_Block_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      New_Size        : Unsigned_64;
+      Result          : out Function_Result) is
+   begin
+      pragma Unreferenced (Reading_Process, New_Size, Filesystem_Node);
+
+      Result := Success;
+   end Truncate_File;
+
 end Filesystems.FAT;

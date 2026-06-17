@@ -19,11 +19,12 @@ is
    Syscall_Log_Error       : constant := 5446_0003;
    Syscall_Print_To_Serial : constant := 5446_0006;
 
-   Syscall_Open_File  : constant := 5446_0107;
-   Syscall_Read_File  : constant := 5446_0108;
-   Syscall_Seek_File  : constant := 5446_0109;
-   Syscall_Write_File : constant := 5446_0110;
-   Syscall_Close_File : constant := 5446_0111;
+   Syscall_Open_File     : constant := 5446_0107;
+   Syscall_Read_File     : constant := 5446_0108;
+   Syscall_Seek_File     : constant := 5446_0109;
+   Syscall_Write_File    : constant := 5446_0110;
+   Syscall_Close_File    : constant := 5446_0111;
+   Syscall_Truncate_File : constant := 5446_0112;
 
    Syscall_Update_Framebuffer : constant := 5446_0209;
 

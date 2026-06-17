@@ -868,8 +868,7 @@ package body Filesystems is
    is
       Parent_Path_Length : Integer := 0;
 
-      Parent_Filesystem : Filesystem_Access := null;
-      Parent_File_Node  : Filesystem_Node_Access := null;
+      Parent_File_Node : Filesystem_Node_Access := null;
    begin
       for I in reverse Path'Range loop
          if Path (I) = Filesystem_Node_Separator then
@@ -927,7 +926,7 @@ package body Filesystems is
       --  If the parent node is a mounted filesystem, then use its filesystem
       --  pointer as the parent filesystem. Otherwise, use the parent node's
       --  parent filesystem.
-      Parent_Filesystem :=
+      Parent_Filesystem : constant Filesystem_Access :=
         (if Parent_File_Node.all.Node_Type
            = Filesystem_Node_Type_Mounted_Filesystem
          then Parent_File_Node.all.Mounted_Filesystem
@@ -986,5 +985,59 @@ package body Filesystems is
          Sector_Offset_Within_Block := 0;
          Result := Constraint_Exception;
    end Get_Sector_Block_Number_And_Offset;
+
+   procedure Truncate_File
+     (Process     : in out Process_Control_Block_T;
+      File_Handle : Process_File_Handle_Access;
+      New_Size    : Unsigned_64;
+      Result      : out Function_Result) is
+   begin
+      if New_Size = File_Handle.all.File.all.Size then
+         Result := Success;
+         return;
+      end if;
+
+      if New_Size > File_Handle.all.File.all.Size then
+         Log_Error
+           ("Truncate_File: New size is greater than current file size",
+            Logging_Tags);
+
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if File_Handle.all.File.all.Node_Type /= Filesystem_Node_Type_File then
+         Log_Error
+           ("Truncate_File: Node type is not file: "
+            & File_Handle.all.File.all.Node_Type'Image,
+            Logging_Tags);
+
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      case File_Handle.all.File.all.Parent_Filesystem.all.Filesystem_Type is
+         when Filesystem_Type_FAT =>
+            Filesystems.FAT.Truncate_File
+              (Process, File_Handle.all.File, New_Size, Result);
+
+         when others              =>
+            Log_Error
+              ("Unsupported filesystem type: "
+               & File_Handle.all.File.all.Parent_Filesystem.all
+                   .Filesystem_Type'Image);
+            Result := Not_Supported;
+      end case;
+
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Truncate_File", Logging_Tags);
+         Result := Constraint_Exception;
+   end Truncate_File;
 
 end Filesystems;

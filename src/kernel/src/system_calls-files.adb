@@ -360,4 +360,47 @@ package body System_Calls.Files is
          Log_Error ("Constraint_Error: Handle_Write_File_Syscall");
          Result := Constraint_Exception;
    end Handle_Write_File_Syscall;
+
+   procedure Handle_Truncate_File_Syscall
+     (Process : in out Process_Control_Block_T; Result : out Function_Result)
+   is
+      Trap_Context : Process_Context_T
+      with
+        Import,
+        Convention => C,
+        Alignment  => 1,
+        Address    => Process.Trap_Context_Addr;
+
+      File_Handle_Id, New_End_Of_File : Unsigned_64 := 0;
+      File_Handle                     : Process_File_Handle_Access := null;
+   begin
+      Log_Debug ("User Mode Syscall: Truncate File", Logging_Tags);
+
+      File_Handle_Id := Trap_Context.Gp_Registers (a1);
+
+      Find_File_Handle
+        (Process.Process_Id, File_Handle_Id, File_Handle, Result);
+      if Is_Error (Result) then
+         Log_Error ("Error finding file handle: " & Result'Image);
+
+         Trap_Context.Gp_Registers (a0) :=
+           Syscall_Error_Result_To_Unsigned_64 (-EBADF);
+
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      New_End_Of_File := Trap_Context.Gp_Registers (a2);
+
+      Filesystems.Truncate_File
+        (Process, File_Handle, New_End_Of_File, Result);
+
+      Trap_Context.Gp_Registers (a0) := Unsigned_64 (0);
+      Result := Success;
+      return;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Handle_Truncate_File_Syscall");
+         Result := Constraint_Exception;
+   end Handle_Truncate_File_Syscall;
 end System_Calls.Files;
