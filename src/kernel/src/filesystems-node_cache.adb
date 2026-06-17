@@ -39,7 +39,7 @@ package body Filesystems.Node_Cache is
       Index              : Filesystem_Node_Index_T;
       Parent_Index       : Filesystem_Node_Index_T;
       Data_Location      : Unsigned_64;
-      Size               : Unsigned_64;
+      File_Size          : Unsigned_64;
       Node_Type          : Filesystem_Node_Type_T;
       Mounted_Device     : Device_Access;
       Mounted_Filesystem : Filesystem_Access)
@@ -64,7 +64,7 @@ package body Filesystems.Node_Cache is
          Parent_Index       => Parent_Index,
          Filename           => Null_Filesystem_Node_Name,
          Data_Location      => Data_Location,
-         Size               => Size,
+         File_Size          => File_Size,
          Node_Type          => Node_Type,
          Parent_Filesystem  => Parent_Filesystem,
          Mounted_Device     => Mounted_Device,
@@ -101,8 +101,9 @@ package body Filesystems.Node_Cache is
       Index              : Filesystem_Node_Index_T := 0;
       Parent_Index       : Filesystem_Node_Index_T := 0;
       Data_Location      : Unsigned_64 := 0;
-      Size               : Unsigned_64 := 0;
-      Node_Type          : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+      File_Size          : Unsigned_64 := 0;
+      Node_Type          : Filesystem_Node_Type_T :=
+        Filesystem_Node_Type_Regular_File;
       Mounted_Device     : Device_Access := null;
       Mounted_Filesystem : Filesystem_Access := null) is
    begin
@@ -115,7 +116,7 @@ package body Filesystems.Node_Cache is
          Index,
          Parent_Index,
          Data_Location,
-         Size,
+         File_Size,
          Node_Type,
          Mounted_Device,
          Mounted_Filesystem);

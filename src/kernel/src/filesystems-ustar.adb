@@ -99,7 +99,7 @@ package body Filesystems.UStar is
                   Result,
                   Index         => Sector_Number,
                   Data_Location => Sector_Number + 1,
-                  Size          => File_Size,
+                  File_Size     => File_Size,
                   Parent_Index  => Parent_Node.all.Index);
                if Is_Error (Result) then
                   Found_Node := null;

@@ -56,7 +56,7 @@ is
 
    type Filesystem_Node_Type_T is
      (Filesystem_Node_Type_None,
-      Filesystem_Node_Type_File,
+      Filesystem_Node_Type_Regular_File,
       Filesystem_Node_Type_Device,
       Filesystem_Node_Type_Directory,
       Filesystem_Node_Type_Mounted_Filesystem);
@@ -99,7 +99,7 @@ is
       --  root node of a mounted filesystem.
       --  @TODO: In the future it might make more sense to have separate nodes
       --  for the mount point and the root of the mounted filesystem.
-      Node_Type : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+      Node_Type : Filesystem_Node_Type_T := Filesystem_Node_Type_Regular_File;
 
       Mounted_Filesystem : Filesystem_Access := null;
       Mounted_Device     : Device_Access := null;
@@ -109,7 +109,7 @@ is
       --  It is used to instruct the filesystem on where to start reading the
       --  file's data.
       Data_Location : Unsigned_64 := 0;
-      Size          : Unsigned_64 := 0;
+      File_Size     : Unsigned_64 := 0;
 
       Handle_Count : Natural := 0;
    end record;

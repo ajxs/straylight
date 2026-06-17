@@ -16,8 +16,9 @@ is
       Index              : Filesystem_Node_Index_T := 0;
       Parent_Index       : Filesystem_Node_Index_T := 0;
       Data_Location      : Unsigned_64 := 0;
-      Size               : Unsigned_64 := 0;
-      Node_Type          : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+      File_Size          : Unsigned_64 := 0;
+      Node_Type          : Filesystem_Node_Type_T :=
+        Filesystem_Node_Type_Regular_File;
       Mounted_Device     : Device_Access := null;
       Mounted_Filesystem : Filesystem_Access := null);
 

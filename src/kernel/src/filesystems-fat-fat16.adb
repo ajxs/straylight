@@ -452,7 +452,7 @@ package body Filesystems.FAT.FAT16 is
          Filename,
          New_Node,
          Result,
-         Size          => 0,
+         File_Size     => 0,
          Data_Location => 0,
          Index         =>
            Get_Directory_Entry_Node_Index
@@ -809,7 +809,7 @@ package body Filesystems.FAT.FAT16 is
          Filename,
          New_Node,
          Result,
-         Size          => 0,
+         File_Size     => 0,
          Data_Location => 0,
          Index         =>
            Get_Directory_Entry_Node_Index

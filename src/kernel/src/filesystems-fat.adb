@@ -846,11 +846,11 @@ package body Filesystems.FAT is
 
       New_File_Size : constant Unsigned_32 :=
         Unsigned_32'Max
-          (Unsigned_32 (Filesystem_Node.all.Size),
+          (Unsigned_32 (Filesystem_Node.all.File_Size),
            Unsigned_32 (Start_Offset + Unsigned_64 (Bytes_Written)));
 
       Directory_Entry.File_Size := New_File_Size;
-      Filesystem_Node.all.Size := Unsigned_64 (New_File_Size);
+      Filesystem_Node.all.File_Size := Unsigned_64 (New_File_Size);
       --  @TODO: Update file modification timestamp in directory entry.
 
       Write_Filesystem_Node_Directory_Entry
@@ -1044,7 +1044,7 @@ package body Filesystems.FAT is
                      Filename,
                      Filesystem_Node,
                      Result,
-                     Size          =>
+                     File_Size     =>
                        Unsigned_64 (Directory (Dir_Idx).File_Size),
                      Data_Location => Unsigned_64 (First_Cluster),
                      Index         =>
@@ -1739,12 +1739,12 @@ package body Filesystems.FAT is
 
          Result := Invalid_Argument;
          return;
-      elsif New_Size = Filesystem_Node.all.Size then
+      elsif New_Size = Filesystem_Node.all.File_Size then
          --  If the new size is the same as the current size, then there's
          --  nothing to do.
          Result := Success;
          return;
-      elsif New_Size > Filesystem_Node.all.Size then
+      elsif New_Size > Filesystem_Node.all.File_Size then
          Log_Error
            ("New file size is greater than current file size.",
             Logging_Tags_FAT);
@@ -1895,7 +1895,7 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Filesystem_Node.all.Size := New_Size;
+      Filesystem_Node.all.File_Size := New_Size;
 
       Result := Success;
    exception

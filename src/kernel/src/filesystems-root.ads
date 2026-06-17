@@ -19,7 +19,8 @@ is
       Parent_Index       : Filesystem_Node_Index_T;
       New_Node_Index     : out Filesystem_Node_Index_T;
       Result             : out Function_Result;
-      Node_Type          : Filesystem_Node_Type_T := Filesystem_Node_Type_File;
+      Node_Type          : Filesystem_Node_Type_T :=
+        Filesystem_Node_Type_Regular_File;
       Mounted_Device     : Device_Access := null;
       Mounted_Filesystem : Filesystem_Access := null);
 
@@ -53,7 +54,7 @@ private
       Mounted_Device       : Device_Access := null;
       Mounted_Filesystem   : Filesystem_Access := null;
       Node_Type            : Filesystem_Node_Type_T :=
-        Filesystem_Node_Type_File;
+        Filesystem_Node_Type_Regular_File;
       Entry_Used           : Boolean := False;
    end record;
 

@@ -513,7 +513,7 @@ private
      (Dir_Entry : FAT_Directory_Entry_T) return Filesystem_Node_Type_T
    is (if Dir_Entry.Attributes.Directory
        then Filesystem_Node_Type_Directory
-       else Filesystem_Node_Type_File);
+       else Filesystem_Node_Type_Regular_File);
 
    procedure Read_File_Data
      (Filesystem      : Filesystem_Access;

@@ -359,7 +359,8 @@ package body Filesystems is
       Remaining_Bytes_In_File : Natural := 0;
    begin
       Remaining_Bytes_In_File :=
-        Natural (File_Handle.all.File.all.Size - File_Handle.all.Position);
+        Natural
+          (File_Handle.all.File.all.File_Size - File_Handle.all.Position);
 
       if Bytes_To_Read > Remaining_Bytes_In_File then
          Real_Bytes_To_Read := Remaining_Bytes_In_File;
@@ -448,7 +449,7 @@ package body Filesystems is
       end if;
 
       case File_Handle.all.File.all.Node_Type is
-         when Filesystem_Node_Type_File =>
+         when Filesystem_Node_Type_Regular_File =>
             Read_File_Node_Type_File
               (Process,
                File_Handle,
@@ -457,7 +458,7 @@ package body Filesystems is
                Bytes_Read,
                Result);
 
-         when others                    =>
+         when others                            =>
             Log_Error
               ("Unsupported node type for reading: "
                & File_Handle.all.File.all.Node_Type'Image);
@@ -478,15 +479,15 @@ package body Filesystems is
    is
       Effective_New_Offset : Unsigned_64 := New_Offset;
    begin
-      if New_Offset > File_Handle.all.File.all.Size then
-         if File_Handle.all.File.all.Size = 0 then
+      if New_Offset > File_Handle.all.File.all.File_Size then
+         if File_Handle.all.File.all.File_Size = 0 then
             Log_Debug
               ("Seek_File: File size is 0, setting offset to 0", Logging_Tags);
             Effective_New_Offset := 0;
          else
             Log_Debug
               ("Seek_File: New offset is beyond end of file", Logging_Tags);
-            Effective_New_Offset := File_Handle.all.File.all.Size - 1;
+            Effective_New_Offset := File_Handle.all.File.all.File_Size - 1;
          end if;
       end if;
 
@@ -759,7 +760,7 @@ package body Filesystems is
       end if;
 
       case File_Handle.all.File.all.Node_Type is
-         when Filesystem_Node_Type_File =>
+         when Filesystem_Node_Type_Regular_File =>
             Write_File_Node_Type_File
               (Process,
                File_Handle,
@@ -768,7 +769,7 @@ package body Filesystems is
                Bytes_Written,
                Result);
 
-         when others                    =>
+         when others                            =>
             Log_Error
               ("Unsupported node type for writing: "
                & File_Handle.all.File.all.Node_Type'Image);
@@ -791,12 +792,12 @@ package body Filesystems is
       Result               : out Function_Result) is
    begin
       --  Validate that the read doesn't exceed the file size.
-      if Start_Offset >= Filesystem_Node.all.Size then
+      if Start_Offset >= Filesystem_Node.all.File_Size then
          Log_Error
            ("Read offset exceeds file size: "
             & Start_Offset'Image
             & " >= "
-            & Filesystem_Node.all.Size'Image,
+            & Filesystem_Node.all.File_Size'Image,
             Logging_Tags);
 
          Actual_Bytes_To_Read := 0;
@@ -805,10 +806,11 @@ package body Filesystems is
       end if;
 
       --  Truncate the read if it would exceed the file size.
-      if Start_Offset + Unsigned_64 (Bytes_To_Read) > Filesystem_Node.all.Size
+      if Start_Offset + Unsigned_64 (Bytes_To_Read)
+        > Filesystem_Node.all.File_Size
       then
          Actual_Bytes_To_Read :=
-           Natural (Filesystem_Node.all.Size - Start_Offset);
+           Natural (Filesystem_Node.all.File_Size - Start_Offset);
 
          Log_Debug
            ("Truncating read from "
@@ -992,12 +994,12 @@ package body Filesystems is
       New_Size    : Unsigned_64;
       Result      : out Function_Result) is
    begin
-      if New_Size = File_Handle.all.File.all.Size then
+      if New_Size = File_Handle.all.File.all.File_Size then
          Result := Success;
          return;
       end if;
 
-      if New_Size > File_Handle.all.File.all.Size then
+      if New_Size > File_Handle.all.File.all.File_Size then
          Log_Error
            ("Truncate_File: New size is greater than current file size",
             Logging_Tags);
@@ -1006,7 +1008,9 @@ package body Filesystems is
          return;
       end if;
 
-      if File_Handle.all.File.all.Node_Type /= Filesystem_Node_Type_File then
+      if File_Handle.all.File.all.Node_Type
+        /= Filesystem_Node_Type_Regular_File
+      then
          Log_Error
            ("Truncate_File: Node type is not file: "
             & File_Handle.all.File.all.Node_Type'Image,
