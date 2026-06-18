@@ -1718,82 +1718,155 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Write_File_Data;
 
-   procedure Truncate_File
-     (Writing_Process : in out Process_Control_Block_T;
-      Filesystem_Node : Filesystem_Node_Access;
-      New_Size        : Unsigned_64;
-      Result          : out Function_Result)
-   is
-      Directory_Entry : FAT_Directory_Entry_T;
+   function Is_New_File_Size_Within_Same_Cluster
+     (Cluster_Size_In_Bytes : Natural;
+      Existing_Size         : Unsigned_64;
+      New_Size              : Unsigned_64) return Boolean is
+   begin
+      if Existing_Size = 0 then
+         return False;
+      end if;
 
-      Was_Starting_Cluster_Freed  : Boolean := False;
+      Last_Byte_Offset : constant Unsigned_64 := Existing_Size - 1;
+
+      Offset_Within_Current_Cluster : constant Unsigned_64 :=
+        Last_Byte_Offset mod Unsigned_64 (Cluster_Size_In_Bytes);
+
+      Cluster_Lower_Bound : constant Unsigned_64 :=
+        Last_Byte_Offset - Offset_Within_Current_Cluster;
+
+      Cluster_Upper_Bound : constant Unsigned_64 :=
+        Cluster_Lower_Bound + Unsigned_64 (Cluster_Size_In_Bytes - 1);
+
+      return
+        New_Size > 0
+        and then New_Size - 1 in Cluster_Lower_Bound .. Cluster_Upper_Bound;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Is_New_File_Size_Within_Same_Cluster",
+            Logging_Tags_FAT);
+         return False;
+   end Is_New_File_Size_Within_Same_Cluster;
+
+   procedure Truncate_File_To_Larger_Size
+     (Writing_Process       : in out Process_Control_Block_T;
+      Filesystem_Info       : FAT_Filesystem_Info_T;
+      Cluster_Size_In_Bytes : Natural;
+      Filesystem_Node       : Filesystem_Node_Access;
+      New_Size              : Unsigned_64;
+      First_Cluster         : in out Unsigned_32;
+      Result                : out Function_Result)
+   is
+      Current_Cluster             : Unsigned_32 := 0;
+      Next_Cluster_In_Chain       : Unsigned_32 := 0;
+      Current_Cluster_Upper_Bound : Unsigned_64 := 0;
+   begin
+      Filesystem : constant Filesystem_Access :=
+        Filesystem_Node.all.Parent_Filesystem;
+
+      --  This conversion won't overflow, since all FAT filesystem nodes are
+      --  guaranteed to have at-most a 32-bit Data_Location field value.
+      Current_Cluster := Unsigned_32 (Filesystem_Node.all.Data_Location);
+      First_Cluster := Current_Cluster;
+
+      if Is_Cluster_Free (Current_Cluster) then
+         --  If the file currently has no clusters allocated to it, then we
+         --  need to allocate the first cluster before we can follow the
+         --  cluster chain.
+         Allocate_Cluster
+           (Filesystem,
+            Writing_Process,
+            Filesystem_Info,
+            Next_Cluster_In_Chain,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Current_Cluster := Next_Cluster_In_Chain;
+         First_Cluster := Current_Cluster;
+      end if;
+
+      Follow_Cluster_Chain_Loop : loop
+         Current_Cluster_Upper_Bound :=
+           Current_Cluster_Upper_Bound + Unsigned_64 (Cluster_Size_In_Bytes);
+
+         if Is_Cluster_Bad (Current_Cluster, Filesystem_Info.FAT_Type)
+           or else Is_Cluster_Free (Current_Cluster)
+         then
+            Log_Error
+              ("Invalid cluster in file's cluster chain.", Logging_Tags_FAT);
+
+            Result := Invalid_Filesystem;
+            return;
+         end if;
+
+         exit Follow_Cluster_Chain_Loop when
+           Current_Cluster_Upper_Bound >= New_Size;
+
+         --  Read the FAT entry for the current cluster, so that we can
+         --  determine whether it's the end of the cluster chain.
+         Read_FAT_Entry
+           (Filesystem,
+            Writing_Process,
+            Filesystem_Info,
+            Current_Cluster,
+            Next_Cluster_In_Chain,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         if Is_Cluster_End_Of_Chain
+              (Next_Cluster_In_Chain, Filesystem_Info.FAT_Type)
+         then
+            --  If this is the end of the cluster chain, but we still have more
+            --  clusters to allocate to reach the new file size, then allocate
+            --  the next cluster in the chain.
+            Extend_Cluster_Chain
+              (Filesystem,
+               Writing_Process,
+               Filesystem_Info,
+               Current_Cluster,
+               Next_Cluster_In_Chain,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+         end if;
+
+         Current_Cluster := Next_Cluster_In_Chain;
+      end loop Follow_Cluster_Chain_Loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Truncate_File_To_Larger_Size",
+            Logging_Tags_FAT);
+         Result := Constraint_Exception;
+   end Truncate_File_To_Larger_Size;
+
+   procedure Truncate_File_To_Smaller_Size
+     (Writing_Process       : in out Process_Control_Block_T;
+      Filesystem_Info       : FAT_Filesystem_Info_T;
+      Cluster_Size_In_Bytes : Natural;
+      Filesystem_Node       : Filesystem_Node_Access;
+      New_Size              : Unsigned_64;
+      Result                : out Function_Result)
+   is
       Current_Cluster             : Unsigned_32 := 0;
       Next_Cluster_In_Chain       : Unsigned_32 := 0;
       Current_Cluster_Lower_Bound : Unsigned_64 := 0;
       Current_Cluster_Upper_Bound : Unsigned_64 := 0;
    begin
-      if New_Size > Unsigned_64 (Unsigned_32'Last) then
-         Log_Error
-           ("New file size is greater than the maximum supported size.",
-            Logging_Tags_FAT);
-
-         Result := Invalid_Argument;
-         return;
-      elsif New_Size = Filesystem_Node.all.File_Size then
-         --  If the new size is the same as the current size, then there's
-         --  nothing to do.
-         Result := Success;
-         return;
-      elsif New_Size > Filesystem_Node.all.File_Size then
-         Log_Error
-           ("New file size is greater than current file size.",
-            Logging_Tags_FAT);
-
-         Result := Invalid_Argument;
-         return;
-      end if;
-
       Filesystem : constant Filesystem_Access :=
         Filesystem_Node.all.Parent_Filesystem;
-
-      Validate_Filesystem_And_Node
-        (Filesystem, Filesystem_Node, Filesystem_Type_FAT, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
 
       --  This conversion won't overflow, since all FAT filesystem nodes are
       --  guaranteed to have at-most a 32-bit Data_Location field value.
       Current_Cluster := Unsigned_32 (Filesystem_Node.all.Data_Location);
-
-      Populate_Filesystem_Meta_Info_If_Needed
-        (Filesystem, Writing_Process, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Filesystem_Info : FAT_Filesystem_Info_T
-      with
-        Import,
-        Alignment => 1,
-        Address   => Filesystem.all.Filesystem_Meta_Info_Address;
-
-      Cluster_Size_In_Bytes : constant Natural :=
-        Filesystem_Info.Sectors_Per_Cluster * Filesystem_Info.Bytes_Per_Sector;
-
-      --  Read the file's FAT directory entry, which we'll need to update with
-      --  the new file size and starting cluster (if we need to allocate a new
-      --  cluster for an empty file).
-      Get_Filesystem_Node_Directory_Entry
-        (Filesystem,
-         Writing_Process,
-         Filesystem_Info,
-         Filesystem_Node,
-         Directory_Entry,
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
 
       Follow_Cluster_Chain_Loop : loop
          Current_Cluster_Upper_Bound :=
@@ -1845,12 +1918,10 @@ package body Filesystems.FAT is
                return;
             end if;
          elsif Current_Cluster_Lower_Bound >= New_Size then
-            if Current_Cluster_Lower_Bound = 0 then
-               Was_Starting_Cluster_Freed := True;
-            end if;
-
             --  If the current cluster's lower bound is entirely beyond the
             --  new file size, then it needs to be freed.
+            --  Note that this branch will handle the scenario where the new
+            --  file size is 0.
             Write_FAT_Entry
               (Filesystem,
                Writing_Process,
@@ -1872,14 +1943,124 @@ package body Filesystems.FAT is
          Current_Cluster_Lower_Bound := Current_Cluster_Upper_Bound + 1;
       end loop Follow_Cluster_Chain_Loop;
 
-      if Was_Starting_Cluster_Freed then
-         --  If we freed the starting cluster of the file, then we need to
-         --  update the file's directory entry to indicate it has no starting
-         --  cluster.
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Truncate_File_To_Smaller_Size",
+            Logging_Tags_FAT);
+         Result := Constraint_Exception;
+   end Truncate_File_To_Smaller_Size;
+
+   procedure Truncate_File
+     (Writing_Process : in out Process_Control_Block_T;
+      Filesystem_Node : Filesystem_Node_Access;
+      New_Size        : Unsigned_64;
+      Result          : out Function_Result)
+   is
+      Directory_Entry : FAT_Directory_Entry_T;
+      First_Cluster   : Unsigned_32 := 0;
+   begin
+      if New_Size > Unsigned_64 (Unsigned_32'Last) then
+         Log_Error
+           ("New file size is greater than the maximum supported size.",
+            Logging_Tags_FAT);
+
+         Result := Invalid_Argument;
+         return;
+      elsif New_Size = Filesystem_Node.all.File_Size then
+         --  If the size hasn't changed, there's nothing to do.
+         Result := Success;
+         return;
+      end if;
+
+      Filesystem : constant Filesystem_Access :=
+        Filesystem_Node.all.Parent_Filesystem;
+
+      Validate_Filesystem_And_Node
+        (Filesystem, Filesystem_Node, Filesystem_Type_FAT, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Populate_Filesystem_Meta_Info_If_Needed
+        (Filesystem, Writing_Process, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Filesystem_Info : FAT_Filesystem_Info_T
+      with
+        Import,
+        Alignment => 1,
+        Address   => Filesystem.all.Filesystem_Meta_Info_Address;
+
+      --  Read the file's FAT directory entry, which we'll need to update with
+      --  the new file size and starting cluster (if we need to allocate a new
+      --  cluster for an empty file).
+      Get_Filesystem_Node_Directory_Entry
+        (Filesystem,
+         Writing_Process,
+         Filesystem_Info,
+         Filesystem_Node,
+         Directory_Entry,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Cluster_Size_In_Bytes : constant Natural :=
+        Filesystem_Info.Sectors_Per_Cluster * Filesystem_Info.Bytes_Per_Sector;
+
+      First_Cluster := Unsigned_32 (Filesystem_Node.all.Data_Location);
+
+      --  If the new file size falls within the same cluster as the existing
+      --  file size, then we don't need to modify the cluster chain at all,
+      --  since the data will still fit within the current cluster.
+      if not Is_New_File_Size_Within_Same_Cluster
+               (Cluster_Size_In_Bytes, Filesystem_Node.all.File_Size, New_Size)
+      then
+         if New_Size < Filesystem_Node.all.File_Size then
+            Truncate_File_To_Smaller_Size
+              (Writing_Process,
+               Filesystem_Info,
+               Cluster_Size_In_Bytes,
+               Filesystem_Node,
+               New_Size,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+         else
+            Truncate_File_To_Larger_Size
+              (Writing_Process,
+               Filesystem_Info,
+               Cluster_Size_In_Bytes,
+               Filesystem_Node,
+               New_Size,
+               First_Cluster,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+         end if;
+      end if;
+
+      if New_Size = 0 then
+         --  If the new size is 0, and we freed the starting cluster of the
+         --  file, then we need to update the file's directory entry to
+         --  indicate it has no starting cluster.
          Directory_Entry.First_Cluster_Low := 0;
          Directory_Entry.First_Cluster_High := 0;
 
          Filesystem_Node.all.Data_Location := 0;
+      else
+         Directory_Entry.First_Cluster_Low :=
+           Unsigned_16 (First_Cluster and 16#FFFF#);
+         Directory_Entry.First_Cluster_High :=
+           Unsigned_16 (Shift_Right (First_Cluster, 16));
+
+         Filesystem_Node.all.Data_Location := Unsigned_64 (First_Cluster);
       end if;
 
       Directory_Entry.File_Size := Unsigned_32 (New_Size);

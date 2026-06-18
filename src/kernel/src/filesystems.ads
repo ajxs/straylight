@@ -217,6 +217,8 @@ private
 
    subtype Block_Index_T is Unsigned_64;
 
+   Maximum_File_Size : constant Unsigned_64 := 16#1_0000_0000#; -- 4GB
+
    type Process_File_Handle_Array is
      array (1 .. 64) of aliased Process_File_Handle_T;
 

@@ -999,21 +999,21 @@ package body Filesystems is
          return;
       end if;
 
-      if New_Size > File_Handle.all.File.all.File_Size then
+      if File_Handle.all.File.all.Node_Type
+        /= Filesystem_Node_Type_Regular_File
+      then
          Log_Error
-           ("Truncate_File: New size is greater than current file size",
+           ("Truncate_File: File is not a regular file: "
+            & File_Handle.all.File.all.Node_Type'Image,
             Logging_Tags);
 
          Result := Invalid_Argument;
          return;
       end if;
 
-      if File_Handle.all.File.all.Node_Type
-        /= Filesystem_Node_Type_Regular_File
-      then
+      if New_Size > Maximum_File_Size then
          Log_Error
-           ("Truncate_File: Node type is not file: "
-            & File_Handle.all.File.all.Node_Type'Image,
+           ("Truncate_File: New size is greater than maximum file size",
             Logging_Tags);
 
          Result := Invalid_Argument;
