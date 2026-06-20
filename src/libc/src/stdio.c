@@ -1,16 +1,17 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <straylight_syscall.h>
 #include <string.h>
+#include <unistd.h>
 
 int fclose(FILE *stream)
 {
-	int64_t result = straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_FILE_CLOSE,
-	                                            stream->file_handle_id);
-	if (is_syscall_result_error(result))
+	int result = close(stream->file_handle_id);
+	if (result == -1)
 	{
-		errno = -result;
+		// errno already set by close.
 		return EOF;
 	}
 
@@ -21,53 +22,54 @@ int fclose(FILE *stream)
 
 int feof(FILE *stream) { return stream->eof ? 1 : 0; }
 
-#define OPEN_MODE_FLAG_READ (1 << 0)
-#define OPEN_MODE_FLAG_WRITE (1 << 1)
-#define OPEN_MODE_FLAG_CREATE (1 << 2)
-
-static uint64_t parse_mode_string(const char *mode)
+static int get_file_open_flags_from_mode_string(const char *mode)
 {
 	if (strcmp(mode, "r") == 0)
 	{
-		return OPEN_MODE_FLAG_READ;
+		return O_RDONLY;
 	}
 
 	if (strcmp(mode, "w") == 0)
 	{
-		return OPEN_MODE_FLAG_WRITE | OPEN_MODE_FLAG_CREATE;
+		return O_WRONLY | O_CREAT | O_TRUNC;
+	}
+
+	if (strcmp(mode, "a") == 0)
+	{
+		return O_WRONLY | O_CREAT | O_APPEND;
 	}
 
 	if (strcmp(mode, "r+") == 0)
 	{
-		return OPEN_MODE_FLAG_READ | OPEN_MODE_FLAG_WRITE;
+		return O_RDWR;
 	}
 
 	if (strcmp(mode, "w+") == 0)
 	{
-		return OPEN_MODE_FLAG_READ | OPEN_MODE_FLAG_WRITE | OPEN_MODE_FLAG_CREATE;
+		return O_RDWR | O_CREAT | O_TRUNC;
 	}
 
-	return 0;
+	if (strcmp(mode, "a+") == 0)
+	{
+		return O_RDWR | O_CREAT | O_APPEND;
+	}
+
+	return -1;
 }
 
 FILE *fopen(const char *restrict file_path, const char *restrict mode)
 {
-	size_t filename_length = strlen(file_path);
-
-	uint64_t open_mode_flags = parse_mode_string(mode);
-	if (open_mode_flags == 0)
+	int open_flags = get_file_open_flags_from_mode_string(mode);
+	if (open_flags == -1)
 	{
 		errno = EINVAL;
 		return NULL;
 	}
 
-	int64_t result =
-	    straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_FILE_OPEN, file_path,
-	                               filename_length, open_mode_flags);
-	if (is_syscall_result_error(result))
+	int fd = open((const char *)file_path, open_flags, (mode_t)0666);
+	if (fd == -1)
 	{
-		errno = -result;
-
+		// errno already set by open.
 		return NULL;
 	}
 
@@ -78,7 +80,7 @@ FILE *fopen(const char *restrict file_path, const char *restrict mode)
 		return NULL;
 	}
 
-	file->file_handle_id = (uint64_t)result;
+	file->file_handle_id = (uint32_t)fd;
 	file->buffer_address = 0;
 	file->buffer_size = 0;
 	file->buffer_offset = 0;

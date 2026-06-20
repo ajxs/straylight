@@ -117,43 +117,96 @@ is
    type Filesystem_Node_Access is access all Filesystem_Node_T
    with Convention => C;
 
-   type File_Open_Mode_T is record
-      Read   : Boolean := False;
-      Write  : Boolean := False;
-      Create : Boolean := False;
+   type File_Access_Mode_T is
+     (
+     --  Open for reading only.
+     Read_Only,
+      --  Open for writing only.
+      Write_Only,
+      --  Open for reading and writing.
+      Read_Write,
+      --  Open for execution only.
+      Execute_Only,
+      --  Open for search only.
+      Search_Only,
+      --  These invalid access modes are used to represent invalid
+      --  combinations of access mode flags.
+      Invalid_Access_Mode_1,
+      Invalid_Access_Mode_2,
+      Invalid_Access_Mode_3)
+   with Size => 3;
+   for File_Access_Mode_T use
+     (Read_Only             => 0,
+      Write_Only            => 1,
+      Read_Write            => 2,
+      Execute_Only          => 3,
+      Search_Only           => 4,
+      Invalid_Access_Mode_1 => 5,
+      Invalid_Access_Mode_2 => 6,
+      Invalid_Access_Mode_3 => 7);
+
+   type File_Creation_Flags_T is record
+      Create_If_Not_Exist    : Boolean := False;
+      File_Must_Be_Directory : Boolean := False;
+      Truncate_Existing      : Boolean := False;
    end record
-   with Size => 64;
-   for File_Open_Mode_T use
+   with Size => 3;
+   for File_Creation_Flags_T use
      record
-       Read   at 0 range 0 .. 0;
-       Write  at 0 range 1 .. 1;
-       Create at 0 range 2 .. 2;
+       Create_If_Not_Exist    at 0 range 0 .. 0;
+       File_Must_Be_Directory at 0 range 1 .. 1;
+       Truncate_Existing      at 0 range 2 .. 2;
      end record;
 
-   function Validate_File_Open_Mode (Mode : File_Open_Mode_T) return Boolean
-   is (Mode.Read or else Mode.Write);
+   type File_Status_Flags_T is record
+      Is_Append_Mode   : Boolean := False;
+      Is_Nonblock_Mode : Boolean := False;
+      Is_Sync_Mode     : Boolean := False;
+   end record
+   with Size => 3;
+   for File_Status_Flags_T use
+     record
+       Is_Append_Mode   at 0 range 0 .. 0;
+       Is_Nonblock_Mode at 0 range 1 .. 1;
+       Is_Sync_Mode     at 0 range 2 .. 2;
+     end record;
+
+   type File_Open_Flags_T is record
+      Access_Mode    : File_Access_Mode_T;
+      Creation_Flags : File_Creation_Flags_T;
+      Status_Flags   : File_Status_Flags_T;
+   end record
+   with Size => 64;
+   for File_Open_Flags_T use
+     record
+       Access_Mode    at 0 range 0 .. 2;
+       Creation_Flags at 0 range 3 .. 5;
+       Status_Flags   at 0 range 6 .. 8;
+     end record;
+
+   subtype File_Handle_Id_T is Unsigned_32;
 
    type Process_File_Handle_T is record
-      Entry_Used     : Boolean := False;
+      Entry_Used      : Boolean := False;
       --  The file handle ID is used to reference this handle from user mode.
       --  It's unique to the process, not globally unique across the system.
       --  A file handle is identified by the process ID and the file handle
       --  ID together.
-      File_Handle_Id : Unsigned_64 := 0;
-      Process_Id     : Process_Id_T := 0;
-      File           : Filesystem_Node_Access := null;
-      Mode           : File_Open_Mode_T;
-      Position       : Unsigned_64 := 0;
+      File_Handle_Id  : File_Handle_Id_T := 0;
+      Process_Id      : Process_Id_T := 0;
+      File            : Filesystem_Node_Access := null;
+      File_Open_Flags : File_Open_Flags_T;
+      Position        : Unsigned_64 := 0;
    end record;
 
    type Process_File_Handle_Access is access all Process_File_Handle_T;
 
    procedure Open_File
-     (Process     : in out Process_Control_Block_T;
-      Path        : Filesystem_Path_T;
-      Mode        : File_Open_Mode_T;
-      File_Handle : out Process_File_Handle_Access;
-      Result      : out Function_Result);
+     (Process         : in out Process_Control_Block_T;
+      Path            : Filesystem_Path_T;
+      File_Open_Flags : File_Open_Flags_T;
+      File_Handle     : out Process_File_Handle_Access;
+      Result          : out Function_Result);
 
    procedure Read_File
      (Process        : in out Process_Control_Block_T;
@@ -206,7 +259,7 @@ is
 
    procedure Find_File_Handle
      (Process_Id     : Process_Id_T;
-      File_Handle_Id : Unsigned_64;
+      File_Handle_Id : File_Handle_Id_T;
       File_Handle    : out Process_File_Handle_Access;
       Result         : out Function_Result);
 
@@ -252,7 +305,7 @@ private
    procedure Create_File_Handle_For_Filesystem_Node
      (Process         : in out Process_Control_Block_T;
       Filesystem_Node : Filesystem_Node_Access;
-      Mode            : File_Open_Mode_T;
+      File_Open_Flags : File_Open_Flags_T;
       File_Handle     : out Process_File_Handle_Access;
       Result          : out Function_Result);
 

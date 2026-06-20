@@ -39,7 +39,9 @@ package body Loader is
       Open_File
         (Loading_Process,
          Path,
-         (Read => True, others => False),
+         (Access_Mode    => Read_Only,
+          Creation_Flags => (others => False),
+          Status_Flags   => (others => False)),
          Executable_File,
          Result);
       if Is_Error (Result) then

@@ -29,9 +29,9 @@ is
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
 private
-   function Unsigned_64_To_File_Open_Mode is new
+   function Unsigned_64_To_File_Open_Flags is new
      Ada.Unchecked_Conversion
        (Source => Unsigned_64,
-        Target => File_Open_Mode_T);
+        Target => File_Open_Flags_T);
 
 end System_Calls.Files;

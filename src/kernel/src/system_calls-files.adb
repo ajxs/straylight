@@ -23,8 +23,8 @@ package body System_Calls.Files is
 
       Maximum_Path_String_Length : constant Integer := 256;
 
-      File_Open_Mode : File_Open_Mode_T;
-      File_Handle    : Process_File_Handle_Access := null;
+      File_Open_Flags : File_Open_Flags_T;
+      File_Handle     : Process_File_Handle_Access := null;
    begin
       Log_Debug ("User Mode Syscall: Open File", Logging_Tags);
 
@@ -32,16 +32,12 @@ package body System_Calls.Files is
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
       Path_String_Length := Integer (Trap_Context.Gp_Registers (a2));
 
-      File_Open_Mode :=
-        Unsigned_64_To_File_Open_Mode (Trap_Context.Gp_Registers (a3));
-      if not Validate_File_Open_Mode (File_Open_Mode) then
-         Log_Error ("Invalid file open mode");
+      File_Open_Flags :=
+        Unsigned_64_To_File_Open_Flags (Trap_Context.Gp_Registers (a3));
 
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
+      Log_Debug
+        ("File_Open_Flags: " & Trap_Context.Gp_Registers (a3)'Image,
+         Logging_Tags);
 
       if not Is_Valid_Userspace_Address_Range
                (Path_String_Address, Path_String_Length)
@@ -79,7 +75,7 @@ package body System_Calls.Files is
            User_Path_String (1 .. Path_String_Length);
       begin
          Filesystems.Open_File
-           (Process, New_Path_String, File_Open_Mode, File_Handle, Result);
+           (Process, New_Path_String, File_Open_Flags, File_Handle, Result);
          if Result = File_Not_Found then
             Log_Error ("File not found");
 
@@ -95,7 +91,8 @@ package body System_Calls.Files is
          Log_Debug ("Opened file handle", Logging_Tags);
       end Read_Path_String_And_Open_File;
 
-      Trap_Context.Gp_Registers (a0) := File_Handle.all.File_Handle_Id;
+      Trap_Context.Gp_Registers (a0) :=
+        Unsigned_64 (File_Handle.all.File_Handle_Id);
       Result := Success;
       return;
 
@@ -117,12 +114,12 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id : Unsigned_64 := 0;
+      File_Handle_Id : File_Handle_Id_T := 0;
 
       File_Handle : Process_File_Handle_Access := null;
       New_Offset  : Unsigned_64 := 0;
    begin
-      File_Handle_Id := Trap_Context.Gp_Registers (a1);
+      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
       New_Offset := Trap_Context.Gp_Registers (a2);
 
       --  This function returns 'Not_Found' if the file handle is not found.
@@ -172,7 +169,7 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id : Unsigned_64 := 0;
+      File_Handle_Id : File_Handle_Id_T := 0;
       Buffer_Address : Virtual_Address_T := Null_Address;
       Bytes_To_Read  : Natural := 0;
       Bytes_Read     : Natural := 0;
@@ -181,7 +178,7 @@ package body System_Calls.Files is
    begin
       Log_Debug ("User Mode Syscall: Read File", Logging_Tags);
 
-      File_Handle_Id := Trap_Context.Gp_Registers (a1);
+      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
 
       Buffer_Address :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a2));
@@ -249,12 +246,12 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id : Unsigned_64 := 0;
+      File_Handle_Id : File_Handle_Id_T := 0;
       File_Handle    : Process_File_Handle_Access := null;
    begin
       Log_Debug ("User Mode Syscall: Close File", Logging_Tags);
 
-      File_Handle_Id := Trap_Context.Gp_Registers (a1);
+      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
 
       Find_File_Handle
         (Process.Process_Id, File_Handle_Id, File_Handle, Result);
@@ -295,7 +292,7 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id : Unsigned_64 := 0;
+      File_Handle_Id : File_Handle_Id_T := 0;
       Buffer_Address : Virtual_Address_T := Null_Address;
       Bytes_To_Write : Natural := 0;
       Bytes_Written  : Natural := 0;
@@ -304,7 +301,7 @@ package body System_Calls.Files is
    begin
       Log_Debug ("User Mode Syscall: Write File", Logging_Tags);
 
-      File_Handle_Id := Trap_Context.Gp_Registers (a1);
+      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
 
       Buffer_Address :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a2));
@@ -371,12 +368,13 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id, New_End_Of_File : Unsigned_64 := 0;
-      File_Handle                     : Process_File_Handle_Access := null;
+      File_Handle_Id  : File_Handle_Id_T := 0;
+      New_End_Of_File : Unsigned_64 := 0;
+      File_Handle     : Process_File_Handle_Access := null;
    begin
       Log_Debug ("User Mode Syscall: Truncate File", Logging_Tags);
 
-      File_Handle_Id := Trap_Context.Gp_Registers (a1);
+      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
 
       Find_File_Handle
         (Process.Process_Id, File_Handle_Id, File_Handle, Result);
@@ -394,6 +392,9 @@ package body System_Calls.Files is
 
       Filesystems.Truncate_File
         (Process, File_Handle, New_End_Of_File, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Trap_Context.Gp_Registers (a0) := Unsigned_64 (0);
       Result := Success;

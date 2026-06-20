@@ -248,7 +248,7 @@ package body Filesystems is
    procedure Create_File_Handle_For_Filesystem_Node_Unlocked
      (Process         : in out Process_Control_Block_T;
       Filesystem_Node : Filesystem_Node_Access;
-      Mode            : File_Open_Mode_T;
+      File_Open_Flags : File_Open_Flags_T;
       File_Handle     : out Process_File_Handle_Access;
       Result          : out Function_Result)
    is
@@ -267,7 +267,7 @@ package body Filesystems is
       File_Handle.all.Entry_Used := True;
       File_Handle.all.File := Filesystem_Node;
       File_Handle.all.Position := 0;
-      File_Handle.all.Mode := Mode;
+      File_Handle.all.File_Open_Flags := File_Open_Flags;
       File_Handle.all.Process_Id := Process.Process_Id;
 
       Filesystem_Node.all.Handle_Count := Filesystem_Node.all.Handle_Count + 1;
@@ -284,7 +284,7 @@ package body Filesystems is
    procedure Create_File_Handle_For_Filesystem_Node
      (Process         : in out Process_Control_Block_T;
       Filesystem_Node : Filesystem_Node_Access;
-      Mode            : File_Open_Mode_T;
+      File_Open_Flags : File_Open_Flags_T;
       File_Handle     : out Process_File_Handle_Access;
       Result          : out Function_Result) is
    begin
@@ -292,18 +292,18 @@ package body Filesystems is
       Acquire_Spinlock (Process.Spinlock);
 
       Create_File_Handle_For_Filesystem_Node_Unlocked
-        (Process, Filesystem_Node, Mode, File_Handle, Result);
+        (Process, Filesystem_Node, File_Open_Flags, File_Handle, Result);
 
       Release_Spinlock (Process.Spinlock);
       Release_Spinlock (Open_Files_Spinlock);
    end Create_File_Handle_For_Filesystem_Node;
 
    procedure Open_File
-     (Process     : in out Process_Control_Block_T;
-      Path        : Filesystem_Path_T;
-      Mode        : File_Open_Mode_T;
-      File_Handle : out Process_File_Handle_Access;
-      Result      : out Function_Result)
+     (Process         : in out Process_Control_Block_T;
+      Path            : Filesystem_Path_T;
+      File_Open_Flags : File_Open_Flags_T;
+      File_Handle     : out Process_File_Handle_Access;
+      Result          : out Function_Result)
    is
       Filesystem_Node : Filesystem_Node_Access := null;
    begin
@@ -316,9 +316,12 @@ package body Filesystems is
       elsif Result = File_Not_Found then
          Log_Debug ("File not found: '" & Path & "'", Logging_Tags);
 
-         --  If 'Mode' indicates that the missing file should be created,
-         --  create it and return the new node, else exit.
-         if not Mode.Create then
+         --  If the open mode flags indicate that the missing file should be
+         --  created, create it and return the new node, else exit.
+         if not File_Open_Flags.Creation_Flags.Create_If_Not_Exist then
+            Log_Debug
+              ("Not creating file because creation flag not set.",
+               Logging_Tags);
             File_Handle := null;
             return;
          end if;
@@ -334,10 +337,18 @@ package body Filesystems is
       Log_Debug ("File found: '" & Path & "'", Logging_Tags);
 
       Create_File_Handle_For_Filesystem_Node
-        (Process, Filesystem_Node, Mode, File_Handle, Result);
+        (Process, Filesystem_Node, File_Open_Flags, File_Handle, Result);
       if Is_Error (Result) then
          File_Handle := null;
          return;
+      end if;
+
+      if File_Open_Flags.Creation_Flags.Truncate_Existing then
+         Truncate_File (Process, File_Handle, 0, Result);
+         if Is_Error (Result) then
+            File_Handle := null;
+            return;
+         end if;
       end if;
 
       Result := Success;
@@ -639,7 +650,7 @@ package body Filesystems is
 
    procedure Find_File_Handle
      (Process_Id     : Process_Id_T;
-      File_Handle_Id : Unsigned_64;
+      File_Handle_Id : File_Handle_Id_T;
       File_Handle    : out Process_File_Handle_Access;
       Result         : out Function_Result) is
    begin
@@ -693,6 +704,14 @@ package body Filesystems is
       Result         : out Function_Result) is
    begin
       Bytes_Written := 0;
+
+      --  If the file is opened in append mode, seek to the end of the file.
+      if File_Handle.all.File_Open_Flags.Status_Flags.Is_Append_Mode then
+         Seek_File (File_Handle, File_Handle.all.File.all.File_Size, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+      end if;
 
       case File_Handle.all.File.all.Parent_Filesystem.all.Filesystem_Type is
          when Filesystem_Type_FAT =>

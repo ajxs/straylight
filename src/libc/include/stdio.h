@@ -15,7 +15,7 @@
 
 typedef struct
 {
-	uint64_t file_handle_id;
+	uint32_t file_handle_id;
 	void *buffer_address;
 	size_t buffer_size;
 	size_t buffer_offset;
