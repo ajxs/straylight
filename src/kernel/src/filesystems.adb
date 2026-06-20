@@ -358,7 +358,7 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Open_File;
 
-   procedure Read_File_Node_Type_File
+   procedure Read_File_Node_Type_Regular_File
      (Process        : in out Process_Control_Block_T;
       File_Handle    : Process_File_Handle_Access;
       Buffer_Address : Virtual_Address_T;
@@ -428,9 +428,9 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_File_Node_Type_File");
+         Log_Error ("Constraint_Error: Read_File_Node_Type_Regular_File");
          Result := Constraint_Exception;
-   end Read_File_Node_Type_File;
+   end Read_File_Node_Type_Regular_File;
 
    procedure Read_File
      (Process        : in out Process_Control_Block_T;
@@ -450,6 +450,13 @@ package body Filesystems is
          & File_Handle.all.Position'Image,
          Logging_Tags);
 
+      if File_Handle.all.File_Open_Flags.Access_Mode = Write_Only then
+         Log_Error ("File not opened with read permissions");
+         Bytes_Read := 0;
+         Result := Invalid_Argument;
+         return;
+      end if;
+
       if Bytes_To_Read > Maximum_File_Read_Size or else Bytes_To_Read = 0 then
          Log_Error
            ("Filesystems.Read_File: Invalid Bytes_To_Read: "
@@ -461,7 +468,7 @@ package body Filesystems is
 
       case File_Handle.all.File.all.Node_Type is
          when Filesystem_Node_Type_Regular_File =>
-            Read_File_Node_Type_File
+            Read_File_Node_Type_Regular_File
               (Process,
                File_Handle,
                Buffer_Address,
@@ -672,8 +679,6 @@ package body Filesystems is
      (File_Handle : Process_File_Handle_Access; Result : out Function_Result)
    is
    begin
-      Log_Debug ("Filesystems.Close_File_Unlocked", Logging_Tags);
-
       File_Handle.all.Entry_Used := False;
 
       File_Handle.all.File.all.Handle_Count :=
@@ -767,6 +772,13 @@ package body Filesystems is
          & "  File_Position:  "
          & File_Handle.all.Position'Image,
          Logging_Tags);
+
+      if File_Handle.all.File_Open_Flags.Access_Mode = Read_Only then
+         Log_Error ("File not opened with write permissions");
+         Bytes_Written := 0;
+         Result := Invalid_Argument;
+         return;
+      end if;
 
       if Bytes_To_Write > Maximum_File_Write_Size or else Bytes_To_Write = 0
       then

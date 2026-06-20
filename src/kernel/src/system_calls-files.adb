@@ -270,6 +270,8 @@ package body System_Calls.Files is
          return;
       end if;
 
+      Log_Debug ("Closed file handle", Logging_Tags);
+
       Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
       Result := Success;
       return;

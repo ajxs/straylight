@@ -9,17 +9,23 @@
 
 #define MAX_PATH 256
 
-#define FREAD_BUFFER_SIZE 4096
-
 #define EOF (-1)
 
 typedef struct
 {
 	uint32_t file_handle_id;
-	void *buffer_address;
-	size_t buffer_size;
-	size_t buffer_offset;
-	size_t buffer_valid_bytes;
+
+	int mode_flags;
+
+	void *read_buffer_address;
+	size_t read_buffer_size;
+	size_t read_buffer_offset;
+	size_t read_buffer_valid_bytes;
+
+	void *write_buffer_address;
+	size_t write_buffer_size;
+	size_t write_buffer_offset;
+
 	bool eof;
 } FILE;
 
@@ -33,5 +39,7 @@ int fclose(FILE *stream);
 int fseek(FILE *stream, long offset, int whence);
 
 int feof(FILE *stream);
+
+int fflush(FILE *stream);
 
 #endif

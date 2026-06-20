@@ -40,20 +40,48 @@ int main()
 
 	print_to_serial("Wrote to file!\n");
 
+	int fclose_result = fclose(words_file);
+	if (fclose_result == EOF)
+	{
+		print_to_serial("Failed to close words_file!\n");
+		return EXIT_FAILURE;
+	}
+
+	fclose_result = fclose(test_write_file);
+	if (fclose_result == EOF)
+	{
+		print_to_serial("Failed to close test_write_file!\n");
+		return EXIT_FAILURE;
+	}
+
 	FILE *new_file = fopen("/Devices/Disk/nonexistent_file.txt", "w+");
 	if (new_file == NULL)
 	{
-		print_to_serial("Failed to create file!\n");
+		print_to_serial("Failed to create new_file!\n");
 		return EXIT_FAILURE;
 	}
 
 	FILE *new_file_with_long_name =
 	    fopen("/Devices/Disk/Programs/"
-	          "nonexistent_file_with_really_long_and__silly_name.txt",
+	          "nonexistent_file_with_really_long_and_silly_name.txt",
 	          "w+");
 	if (new_file_with_long_name == NULL)
 	{
-		print_to_serial("Failed to create file!\n");
+		print_to_serial("Failed to create new_file_with_long_name!\n");
+		return EXIT_FAILURE;
+	}
+
+	fclose_result = fclose(new_file);
+	if (fclose_result == EOF)
+	{
+		print_to_serial("Failed to close new_file!\n");
+		return EXIT_FAILURE;
+	}
+
+	fclose_result = fclose(new_file_with_long_name);
+	if (fclose_result == EOF)
+	{
+		print_to_serial("Failed to close new_file_with_long_name!\n");
 		return EXIT_FAILURE;
 	}
 

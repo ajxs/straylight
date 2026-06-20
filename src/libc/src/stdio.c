@@ -6,18 +6,35 @@
 #include <string.h>
 #include <unistd.h>
 
+#define FREAD_BUFFER_SIZE 4096
+#define FWRITE_BUFFER_SIZE 4096
+
 int fclose(FILE *stream)
 {
-	int result = close(stream->file_handle_id);
-	if (result == -1)
+	int flush_result = fflush(stream);
+	int saved_errno = errno;
+
+	int close_result = close(stream->file_handle_id);
+
+	if (stream->read_buffer_address != NULL)
 	{
-		// errno already set by close.
+		free(stream->read_buffer_address);
+	}
+
+	if (stream->write_buffer_address != NULL)
+	{
+		free(stream->write_buffer_address);
+	}
+
+	free(stream);
+
+	if (flush_result == EOF)
+	{
+		errno = saved_errno;
 		return EOF;
 	}
 
-	free(stream->buffer_address);
-	free(stream);
-	return 0;
+	return close_result == -1 ? EOF : 0;
 }
 
 int feof(FILE *stream) { return stream->eof ? 1 : 0; }
@@ -66,13 +83,6 @@ FILE *fopen(const char *restrict file_path, const char *restrict mode)
 		return NULL;
 	}
 
-	int fd = open((const char *)file_path, open_flags, (mode_t)0666);
-	if (fd == -1)
-	{
-		// errno already set by open.
-		return NULL;
-	}
-
 	FILE *file = (FILE *)malloc(sizeof(FILE));
 	if (file == NULL)
 	{
@@ -80,12 +90,25 @@ FILE *fopen(const char *restrict file_path, const char *restrict mode)
 		return NULL;
 	}
 
+	int fd = open((const char *)file_path, open_flags, (mode_t)0666);
+	if (fd == -1)
+	{
+		free(file);
+
+		// errno already set by open.
+		return NULL;
+	}
+
 	file->file_handle_id = (uint32_t)fd;
-	file->buffer_address = 0;
-	file->buffer_size = 0;
-	file->buffer_offset = 0;
-	file->buffer_valid_bytes = 0;
+	file->read_buffer_address = NULL;
+	file->read_buffer_size = 0;
+	file->read_buffer_offset = 0;
+	file->read_buffer_valid_bytes = 0;
+	file->write_buffer_address = NULL;
+	file->write_buffer_size = 0;
+	file->write_buffer_offset = 0;
 	file->eof = false;
+	file->mode_flags = open_flags;
 
 	return file;
 }
@@ -109,28 +132,28 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 		remaining_bytes_to_read = total_bytes_to_read - total_bytes_read;
 
 		// If the stream buffer offset is 0, we need to fill the buffer.
-		if (stream->buffer_offset == 0)
+		if (stream->read_buffer_offset == 0)
 		{
 			// Is the stream buffer initialized?
-			if (stream->buffer_size == 0)
+			if (stream->read_buffer_size == 0)
 			{
 				// Allocate the stream buffer.
-				stream->buffer_size = FREAD_BUFFER_SIZE;
-				stream->buffer_address = malloc(stream->buffer_size);
-				if (stream->buffer_address == NULL)
+				stream->read_buffer_size = FREAD_BUFFER_SIZE;
+				stream->read_buffer_address = malloc(stream->read_buffer_size);
+				if (stream->read_buffer_address == NULL)
 				{
 					// errno already set to ENOMEM by malloc
-					return 0;
+					return total_bytes_read / size;
 				}
 			}
 
 			int64_t read_result = straylight_libc_do_syscall(
 			    STRAYLIGHT_SYSCALL_FILE_READ, stream->file_handle_id,
-			    stream->buffer_address, FREAD_BUFFER_SIZE);
+			    stream->read_buffer_address, FREAD_BUFFER_SIZE);
 			if (is_syscall_result_error(read_result))
 			{
 				errno = -read_result;
-				return 0;
+				return total_bytes_read / size;
 			}
 
 			// If there's no more data to read, exit.
@@ -144,12 +167,12 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 			// returned from the kernel.
 			// This variable becomes useful when the end of the file is reached, and
 			// less data is read than the full buffer size.
-			stream->buffer_valid_bytes = read_result;
+			stream->read_buffer_valid_bytes = read_result;
 		}
 
 		// Is all the remaining data to read already inside the buffer?
 		if (remaining_bytes_to_read <=
-		    stream->buffer_valid_bytes - stream->buffer_offset)
+		    stream->read_buffer_valid_bytes - stream->read_buffer_offset)
 		{
 			current_bytes_to_copy_to_userspace = remaining_bytes_to_read;
 		}
@@ -158,30 +181,73 @@ size_t fread(void *restrict ptr, size_t size, size_t count,
 			// Copy all the remaining data in the buffer, and loop back around to
 			// keep reading the rest of the data.
 			current_bytes_to_copy_to_userspace =
-			    stream->buffer_valid_bytes - stream->buffer_offset;
+			    stream->read_buffer_valid_bytes - stream->read_buffer_offset;
 		}
 
 		// Copy the data from the stream buffer to the userspace buffer.
 		memcpy((uint8_t *)ptr + total_bytes_read,
-		       (uint8_t *)stream->buffer_address + stream->buffer_offset,
+		       (uint8_t *)stream->read_buffer_address + stream->read_buffer_offset,
 		       current_bytes_to_copy_to_userspace);
 
 		total_bytes_read += current_bytes_to_copy_to_userspace;
-		stream->buffer_offset += current_bytes_to_copy_to_userspace;
+		stream->read_buffer_offset += current_bytes_to_copy_to_userspace;
 
 		// If we've read all the data in the buffer, reset the current buffer
 		// offset to 0 to indicate that the buffer needs refilling.
-		if (stream->buffer_offset >= stream->buffer_valid_bytes)
+		if (stream->read_buffer_offset >= stream->read_buffer_valid_bytes)
 		{
-			stream->buffer_offset = 0;
+			stream->read_buffer_offset = 0;
 		}
 	}
 
 	return total_bytes_read / size;
 }
 
+int fflush(FILE *stream)
+{
+	int file_access_mode = stream->mode_flags & O_ACCMODE;
+
+	// If the file is open for reading, discard any data in the read buffer.
+	if (file_access_mode == O_RDONLY || file_access_mode == O_RDWR)
+	{
+		stream->read_buffer_offset = 0;
+	}
+
+	// If the file is open for writing, flush any data in the write buffer to
+	// the kernel.
+	if (file_access_mode == O_WRONLY || file_access_mode == O_RDWR)
+	{
+		if (stream->write_buffer_address != NULL)
+		{
+			if (stream->write_buffer_offset > 0)
+			{
+				int64_t write_result = straylight_libc_do_syscall(
+				    STRAYLIGHT_SYSCALL_FILE_WRITE, stream->file_handle_id,
+				    (uint64_t)stream->write_buffer_address,
+				    stream->write_buffer_offset);
+				if (is_syscall_result_error(write_result))
+				{
+					errno = -write_result;
+					return EOF;
+				}
+
+				stream->write_buffer_offset = 0;
+			}
+		}
+	}
+
+	return 0;
+}
+
 int fseek(FILE *stream, long offset, int whence)
 {
+	int flush_result = fflush(stream);
+	if (flush_result == EOF)
+	{
+		// errno already set by fflush.
+		return -1;
+	}
+
 	int64_t result = straylight_libc_do_syscall(
 	    STRAYLIGHT_SYSCALL_FILE_SEEK, stream->file_handle_id, offset, whence);
 	if (is_syscall_result_error(result))
@@ -190,9 +256,6 @@ int fseek(FILE *stream, long offset, int whence)
 		return -1;
 	}
 
-	// Reset the stream buffer state so that the next read call will refill it.
-	// The next read call will also set the EOF flag if needed.
-	stream->buffer_offset = 0;
 	stream->eof = false;
 
 	return 0;
@@ -208,26 +271,48 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream)
 	size_t total_bytes_to_write = size * count;
 	size_t total_bytes_written = 0;
 	size_t current_bytes_to_write = 0;
+	size_t available_buffer_space = 0;
 
 	while (total_bytes_written < total_bytes_to_write)
 	{
 		current_bytes_to_write = total_bytes_to_write - total_bytes_written;
-
-		int64_t write_result = straylight_libc_do_syscall(
-		    STRAYLIGHT_SYSCALL_FILE_WRITE, stream->file_handle_id,
-		    (uint64_t)buffer + total_bytes_written, current_bytes_to_write);
-		if (is_syscall_result_error(write_result))
+		if (current_bytes_to_write > FWRITE_BUFFER_SIZE)
 		{
-			errno = -write_result;
-			return total_bytes_written / size;
+			current_bytes_to_write = FWRITE_BUFFER_SIZE;
 		}
 
-		if (write_result == 0)
+		if (stream->write_buffer_address == NULL)
 		{
-			break;
+			// Allocate the stream write buffer if it hasn't been allocated yet.
+			stream->write_buffer_size = FWRITE_BUFFER_SIZE;
+			stream->write_buffer_address = malloc(stream->write_buffer_size);
+			if (stream->write_buffer_address == NULL)
+			{
+				// errno already set to ENOMEM by malloc
+				return total_bytes_written / size;
+			}
 		}
 
-		total_bytes_written += write_result;
+		available_buffer_space =
+		    stream->write_buffer_size - stream->write_buffer_offset;
+
+		if (current_bytes_to_write > available_buffer_space)
+		{
+			int result = fflush(stream);
+			if (result == EOF)
+			{
+				// errno already set by fflush.
+				return total_bytes_written / size;
+			}
+		}
+
+		memcpy((uint8_t *)stream->write_buffer_address +
+		           stream->write_buffer_offset,
+		       (uint8_t *)buffer + total_bytes_written, current_bytes_to_write);
+
+		stream->write_buffer_offset += current_bytes_to_write;
+
+		total_bytes_written += current_bytes_to_write;
 	}
 
 	return count;
