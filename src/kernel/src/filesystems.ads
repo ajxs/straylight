@@ -286,14 +286,6 @@ private
    Maximum_File_Read_Size  : constant := 16#60_000#;
    Maximum_File_Write_Size : constant := 16#60_000#;
 
-   procedure Write_File_Node_Type_File
-     (Process        : in out Process_Control_Block_T;
-      File_Handle    : Process_File_Handle_Access;
-      Buffer_Address : Virtual_Address_T;
-      Bytes_To_Write : Natural;
-      Bytes_Written  : out Natural;
-      Result         : out Function_Result);
-
    procedure Create_File_Handle_For_Filesystem_Node
      (Process         : in out Process_Control_Block_T;
       Filesystem_Node : Filesystem_Node_Access;

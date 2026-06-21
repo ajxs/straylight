@@ -346,6 +346,7 @@ package body Boot is
       Disk_Device renames System_Devices (3);
       Disk_B_Device renames System_Devices (5);
       Root_Filesystem_Memory_Device renames System_Devices (4);
+      UART_Device renames System_Devices (2);
 
       Result : Function_Result := Unset;
 
@@ -427,6 +428,18 @@ package body Boot is
          Result,
          Filesystem_Node_Type_Mounted_Filesystem,
          Mounted_Filesystem => Filesystems.Mounted_Filesystems (3)'Access);
+      if Is_Error (Result) then
+         Panic;
+      end if;
+
+      Add_Filesystem_Node_To_Root_Filesystem
+        (Filesystems.System_Root_Filesystem,
+         "Serial",
+         Devices_Filesystem_Node_Index,
+         Disk_Filesystem_Node_Index,
+         Result,
+         Filesystem_Node_Type_Device,
+         Mounted_Device => UART_Device'Access);
       if Is_Error (Result) then
          Panic;
       end if;

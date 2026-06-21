@@ -3,6 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Devices.UART;           use Devices.UART;
 with Filesystems.Block_Cache;
 with Filesystems.FAT;
 with Filesystems.Root;
@@ -700,7 +701,43 @@ package body Filesystems is
       Release_Spinlock (Open_Files_Spinlock);
    end Close_File;
 
-   procedure Write_File_Node_Type_File
+   procedure Write_File_Node_Type_Device
+     (Process        : in out Process_Control_Block_T;
+      File_Handle    : Process_File_Handle_Access;
+      Buffer_Address : Virtual_Address_T;
+      Bytes_To_Write : Natural;
+      Bytes_Written  : out Natural;
+      Result         : out Function_Result) is
+   begin
+      pragma Unreferenced (Process);
+      Bytes_Written := 0;
+
+      case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
+         when Device_Class_Serial =>
+            Data_To_Write : Byte_Array_T (1 .. Bytes_To_Write)
+            with Import, Alignment => 1, Address => Buffer_Address;
+
+            Put_Bytes
+              (File_Handle.all.File.all.Mounted_Device.all, Data_To_Write);
+            Bytes_Written := Bytes_To_Write;
+            Result := Success;
+
+         when others              =>
+            Log_Error
+              ("Unsupported device class: "
+               & File_Handle.all.File.all.Mounted_Device.all
+                   .Device_Class'Image);
+            Result := Not_Supported;
+      end case;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Write_File_Node_Type_Device", Logging_Tags);
+         Bytes_Written := 0;
+         Result := Constraint_Exception;
+   end Write_File_Node_Type_Device;
+
+   procedure Write_File_Node_Type_Regular_File
      (Process        : in out Process_Control_Block_T;
       File_Handle    : Process_File_Handle_Access;
       Buffer_Address : Virtual_Address_T;
@@ -750,10 +787,11 @@ package body Filesystems is
    exception
       when Constraint_Error =>
          Log_Error
-           ("Constraint_Error: Write_File_Node_Type_File", Logging_Tags);
+           ("Constraint_Error: Write_File_Node_Type_Regular_File",
+            Logging_Tags);
          Bytes_Written := 0;
          Result := Constraint_Exception;
-   end Write_File_Node_Type_File;
+   end Write_File_Node_Type_Regular_File;
 
    procedure Write_File
      (Process        : in out Process_Control_Block_T;
@@ -792,7 +830,16 @@ package body Filesystems is
 
       case File_Handle.all.File.all.Node_Type is
          when Filesystem_Node_Type_Regular_File =>
-            Write_File_Node_Type_File
+            Write_File_Node_Type_Regular_File
+              (Process,
+               File_Handle,
+               Buffer_Address,
+               Bytes_To_Write,
+               Bytes_Written,
+               Result);
+
+         when Filesystem_Node_Type_Device       =>
+            Write_File_Node_Type_Device
               (Process,
                File_Handle,
                Buffer_Address,

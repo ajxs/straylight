@@ -85,5 +85,27 @@ int main()
 		return EXIT_FAILURE;
 	}
 
+	FILE *serial_device = fopen("/Devices/Serial", "w");
+	if (serial_device == NULL)
+	{
+		print_to_serial("Failed to open serial device!\n");
+		return EXIT_FAILURE;
+	}
+
+	const char *message = "Hello, Serial Device!\n";
+	int serial_write_result = fwrite(message, 1, strlen(message), serial_device);
+	if (serial_write_result != strlen(message))
+	{
+		print_to_serial("Failed to write to serial_device!\n");
+		return EXIT_FAILURE;
+	}
+
+	fclose_result = fclose(serial_device);
+	if (fclose_result == EOF)
+	{
+		print_to_serial("Failed to close serial_device!\n");
+		return EXIT_FAILURE;
+	}
+
 	return EXIT_SUCCESS;
 }
