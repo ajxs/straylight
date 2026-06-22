@@ -84,7 +84,7 @@ static int get_file_open_flags_from_mode_string(const char *mode)
 	return -1;
 }
 
-FILE *fopen(const char *restrict file_path, const char *restrict mode)
+FILE *fopen(const char *restrict pathname, const char *restrict mode)
 {
 	int open_flags = get_file_open_flags_from_mode_string(mode);
 	if (open_flags == -1)
@@ -100,7 +100,7 @@ FILE *fopen(const char *restrict file_path, const char *restrict mode)
 		return NULL;
 	}
 
-	int fd = open((const char *)file_path, open_flags, (mode_t)0666);
+	int fd = open((const char *)pathname, open_flags, (mode_t)0666);
 	if (fd == -1)
 	{
 		free(file);

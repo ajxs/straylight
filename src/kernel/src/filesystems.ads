@@ -184,15 +184,13 @@ is
        Status_Flags   at 0 range 6 .. 8;
      end record;
 
-   subtype File_Handle_Id_T is Unsigned_32;
-
    type Process_File_Handle_T is record
       Entry_Used      : Boolean := False;
       --  The file handle ID is used to reference this handle from user mode.
       --  It's unique to the process, not globally unique across the system.
       --  A file handle is identified by the process ID and the file handle
       --  ID together.
-      File_Handle_Id  : File_Handle_Id_T := 0;
+      File_Handle_Id  : Process_File_Handle_Id_T := 0;
       Process_Id      : Process_Id_T := 0;
       File            : Filesystem_Node_Access := null;
       File_Open_Flags : File_Open_Flags_T;
@@ -259,7 +257,7 @@ is
 
    procedure Find_File_Handle
      (Process_Id     : Process_Id_T;
-      File_Handle_Id : File_Handle_Id_T;
+      File_Handle_Id : Process_File_Handle_Id_T;
       File_Handle    : out Process_File_Handle_Access;
       Result         : out Function_Result);
 

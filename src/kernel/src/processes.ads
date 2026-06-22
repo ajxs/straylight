@@ -73,6 +73,8 @@ is
    type Userspace_Heap_Allocation_List is
      array (Natural range <>) of Userspace_Heap_Allocation_T;
 
+   subtype Process_File_Handle_Id_T is Unsigned_32;
+
    ----------------------------------------------------------------------------
    --  System Process Control Block type.
    --  Represents a system process.
@@ -103,7 +105,7 @@ is
 
       Spinlock : Spinlock_T;
 
-      Next_File_Handle_Id : Unsigned_32 := 1;
+      Next_File_Handle_Id : Process_File_Handle_Id_T := 0;
 
       Next_Process : Process_Control_Block_Access := null;
    end record;

@@ -114,12 +114,13 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id : File_Handle_Id_T := 0;
+      File_Handle_Id : Process_File_Handle_Id_T := 0;
 
       File_Handle : Process_File_Handle_Access := null;
       New_Offset  : Unsigned_64 := 0;
    begin
-      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
+      File_Handle_Id :=
+        Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
       New_Offset := Trap_Context.Gp_Registers (a2);
 
       --  This function returns 'Not_Found' if the file handle is not found.
@@ -169,7 +170,7 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id : File_Handle_Id_T := 0;
+      File_Handle_Id : Process_File_Handle_Id_T := 0;
       Buffer_Address : Virtual_Address_T := Null_Address;
       Bytes_To_Read  : Natural := 0;
       Bytes_Read     : Natural := 0;
@@ -178,7 +179,8 @@ package body System_Calls.Files is
    begin
       Log_Debug ("User Mode Syscall: Read File", Logging_Tags);
 
-      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
+      File_Handle_Id :=
+        Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
 
       Buffer_Address :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a2));
@@ -246,12 +248,13 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id : File_Handle_Id_T := 0;
+      File_Handle_Id : Process_File_Handle_Id_T := 0;
       File_Handle    : Process_File_Handle_Access := null;
    begin
       Log_Debug ("User Mode Syscall: Close File", Logging_Tags);
 
-      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
+      File_Handle_Id :=
+        Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
 
       Find_File_Handle
         (Process.Process_Id, File_Handle_Id, File_Handle, Result);
@@ -294,7 +297,7 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id : File_Handle_Id_T := 0;
+      File_Handle_Id : Process_File_Handle_Id_T := 0;
       Buffer_Address : Virtual_Address_T := Null_Address;
       Bytes_To_Write : Natural := 0;
       Bytes_Written  : Natural := 0;
@@ -303,7 +306,8 @@ package body System_Calls.Files is
    begin
       Log_Debug ("User Mode Syscall: Write File", Logging_Tags);
 
-      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
+      File_Handle_Id :=
+        Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
 
       Buffer_Address :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a2));
@@ -370,13 +374,14 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      File_Handle_Id  : File_Handle_Id_T := 0;
+      File_Handle_Id  : Process_File_Handle_Id_T := 0;
       New_End_Of_File : Unsigned_64 := 0;
       File_Handle     : Process_File_Handle_Access := null;
    begin
       Log_Debug ("User Mode Syscall: Truncate File", Logging_Tags);
 
-      File_Handle_Id := File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
+      File_Handle_Id :=
+        Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
 
       Find_File_Handle
         (Process.Process_Id, File_Handle_Id, File_Handle, Result);

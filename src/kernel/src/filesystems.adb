@@ -658,7 +658,7 @@ package body Filesystems is
 
    procedure Find_File_Handle
      (Process_Id     : Process_Id_T;
-      File_Handle_Id : File_Handle_Id_T;
+      File_Handle_Id : Process_File_Handle_Id_T;
       File_Handle    : out Process_File_Handle_Access;
       Result         : out Function_Result) is
    begin

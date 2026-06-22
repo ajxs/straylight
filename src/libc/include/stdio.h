@@ -50,7 +50,7 @@ int feof(FILE *stream);
 
 int fflush(FILE *stream);
 
-FILE *fopen(const char *restrict file_path, const char *restrict mode);
+FILE *fopen(const char *restrict pathname, const char *restrict mode);
 
 __attribute__((format(printf, 2, 3))) int fprintf(FILE *stream,
                                                   const char *format, ...);

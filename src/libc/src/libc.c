@@ -11,6 +11,13 @@ void initialise_straylight_libc()
 	initialise_heap(&program_heap, USERSPACE_HEAP_ADDRESS,
 	                USERSPACE_HEAP_STARTING_SIZE);
 
+	stdin = fopen("/Devices/Serial", "r");
+	if (stdin == NULL)
+	{
+		// errno already set by fopen.
+		exit(1);
+	}
+
 	stdout = fopen("/Devices/Serial", "w");
 	if (stdout == NULL)
 	{

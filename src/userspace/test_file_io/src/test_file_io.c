@@ -107,7 +107,8 @@ int main()
 		return EXIT_FAILURE;
 	}
 
-	printf("Hello printf %s\n", "world!");
+	printf("stdin: %u\nstdout: %u\nstderr: %u\n", stdin->file_handle_id,
+	       stdout->file_handle_id, stderr->file_handle_id);
 	fflush(stdout);
 
 	return EXIT_SUCCESS;
