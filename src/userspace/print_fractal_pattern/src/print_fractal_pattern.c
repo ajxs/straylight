@@ -15,7 +15,7 @@ int main()
 	    (uintptr_t)malloc(horizontal_resolution * vertical_resolution * 4);
 	if (framebuffer_address == 0)
 	{
-		printf("Failed to allocate framebuffer memory\n");
+		fprintf(stderr, "Failed to allocate framebuffer memory\n");
 		return EXIT_FAILURE;
 	}
 
@@ -45,7 +45,7 @@ int main()
 		    straylight_graphics_update_framebuffer(framebuffer_address);
 		if (result != 0)
 		{
-			printf("Failed to update framebuffer\n");
+			fprintf(stderr, "Failed to update framebuffer\n");
 			return EXIT_FAILURE;
 		}
 

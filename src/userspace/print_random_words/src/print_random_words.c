@@ -11,14 +11,14 @@ int main()
 	char *buffer = (char *)malloc(64);
 	if (buffer == 0)
 	{
-		printf("Failed to allocate memory!\n");
+		fprintf(stderr, "Failed to allocate memory!\n");
 		exit(EXIT_FAILURE);
 	}
 
 	FILE *file = fopen("/Devices/Disk_B/seven_letter_words.txt", "r");
 	if (file == NULL)
 	{
-		printf("Failed to open file!\n");
+		fprintf(stderr, "Failed to open file!\n");
 		return EXIT_FAILURE;
 	}
 
@@ -26,7 +26,7 @@ int main()
 	{
 		if (fseek(file, 0, SEEK_SET) != 0)
 		{
-			printf("Failed to seek to start of file!\n");
+			fprintf(stderr, "Failed to seek to start of file!\n");
 			return EXIT_FAILURE;
 		}
 

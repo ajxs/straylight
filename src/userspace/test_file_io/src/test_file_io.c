@@ -9,21 +9,21 @@ int main()
 	char *buffer = (char *)malloc(64);
 	if (buffer == 0)
 	{
-		printf("Failed to allocate memory!\n");
+		fprintf(stderr, "Failed to allocate memory!\n");
 		exit(EXIT_FAILURE);
 	}
 
 	FILE *words_file = fopen("/Devices/Disk_B/seven_letter_words.txt", "r");
 	if (words_file == NULL)
 	{
-		printf("Failed to open file!\n");
+		fprintf(stderr, "Failed to open file!\n");
 		return EXIT_FAILURE;
 	}
 
 	FILE *test_write_file = fopen("/Devices/Disk/test_file.txt", "r+");
 	if (test_write_file == NULL)
 	{
-		printf("Failed to open file!\n");
+		fprintf(stderr, "Failed to open file!\n");
 		return EXIT_FAILURE;
 	}
 
@@ -42,21 +42,21 @@ int main()
 	int fclose_result = fclose(words_file);
 	if (fclose_result == EOF)
 	{
-		printf("Failed to close words_file!\n");
+		fprintf(stderr, "Failed to close words_file!\n");
 		return EXIT_FAILURE;
 	}
 
 	fclose_result = fclose(test_write_file);
 	if (fclose_result == EOF)
 	{
-		printf("Failed to close test_write_file!\n");
+		fprintf(stderr, "Failed to close test_write_file!\n");
 		return EXIT_FAILURE;
 	}
 
 	FILE *new_file = fopen("/Devices/Disk/nonexistent_file.txt", "w+");
 	if (new_file == NULL)
 	{
-		printf("Failed to create new_file!\n");
+		fprintf(stderr, "Failed to create new_file!\n");
 		return EXIT_FAILURE;
 	}
 
@@ -66,28 +66,28 @@ int main()
 	          "w+");
 	if (new_file_with_long_name == NULL)
 	{
-		printf("Failed to create new_file_with_long_name!\n");
+		fprintf(stderr, "Failed to create new_file_with_long_name!\n");
 		return EXIT_FAILURE;
 	}
 
 	fclose_result = fclose(new_file);
 	if (fclose_result == EOF)
 	{
-		printf("Failed to close new_file!\n");
+		fprintf(stderr, "Failed to close new_file!\n");
 		return EXIT_FAILURE;
 	}
 
 	fclose_result = fclose(new_file_with_long_name);
 	if (fclose_result == EOF)
 	{
-		printf("Failed to close new_file_with_long_name!\n");
+		fprintf(stderr, "Failed to close new_file_with_long_name!\n");
 		return EXIT_FAILURE;
 	}
 
 	FILE *serial_device = fopen("/Devices/Serial", "w");
 	if (serial_device == NULL)
 	{
-		printf("Failed to open serial device!\n");
+		fprintf(stderr, "Failed to open serial device!\n");
 		return EXIT_FAILURE;
 	}
 
@@ -96,14 +96,14 @@ int main()
 	    fwrite(message, 1, strlen(message), serial_device);
 	if (serial_write_result != strlen(message))
 	{
-		printf("Failed to write to serial_device!\n");
+		fprintf(stderr, "Failed to write to serial_device!\n");
 		return EXIT_FAILURE;
 	}
 
 	fclose_result = fclose(serial_device);
 	if (fclose_result == EOF)
 	{
-		printf("Failed to close serial_device!\n");
+		fprintf(stderr, "Failed to close serial_device!\n");
 		return EXIT_FAILURE;
 	}
 
