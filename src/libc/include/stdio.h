@@ -44,30 +44,35 @@ extern FILE *stdin;
 extern FILE *stdout;
 extern FILE *stderr;
 
-FILE *fopen(const char *restrict file_path, const char *restrict mode);
-
-size_t fread(void *restrict ptr, size_t size, size_t count,
-             FILE *restrict stream);
-
 int fclose(FILE *stream);
-
-int fseek(FILE *stream, long offset, int whence);
 
 int feof(FILE *stream);
 
 int fflush(FILE *stream);
 
+FILE *fopen(const char *restrict file_path, const char *restrict mode);
+
+__attribute__((format(printf, 2, 3))) int fprintf(FILE *stream,
+                                                  const char *format, ...);
+
+__attribute__((format(printf, 1, 2))) int printf(const char *format, ...);
+
 int fputc(int c, FILE *stream);
+
+size_t fread(void *restrict ptr, size_t size, size_t count,
+             FILE *restrict stream);
+
+int fseek(FILE *stream, long offset, int whence);
+
+size_t fwrite(const void *restrict ptr, size_t size, size_t count,
+              FILE *restrict stream);
 
 int putchar(int c);
 
 int puts(const char *s);
 
-size_t fwrite(const void *restrict ptr, size_t size, size_t count,
-              FILE *restrict stream);
-
-__attribute__((format(printf, 1, 2))) int printf(const char *format, ...);
-
 int vprintf(const char *format, va_list ap);
+
+int vfprintf(FILE *stream, const char *format, va_list ap);
 
 #endif

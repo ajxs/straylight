@@ -160,17 +160,17 @@ static char *convert_int_to_string(intmax_t i, char b[], int base,
 	return b;
 }
 
-static void displayCharacter(char c, int *a)
+static void displayCharacter(FILE *stream, char c, int *a)
 {
-	putchar(c);
+	fputc(c, stream);
 	*a += 1;
 }
 
-static void displayString(char *c, int *a)
+static void displayString(FILE *stream, char *c, int *a)
 {
 	for (int i = 0; c[i]; ++i)
 	{
-		displayCharacter(c[i], a);
+		displayCharacter(stream, c[i], a);
 	}
 }
 
@@ -178,7 +178,7 @@ static void displayString(char *c, int *a)
  * This implementation was originally based on:
  * https://wiki.osdev.org/User:A22347/Printf
  */
-int vprintf(const char *format, va_list list)
+int vfprintf(FILE *stream, const char *format, va_list list)
 {
 	int chars = 0;
 	char intStrBuffer[256] = {0};
@@ -307,14 +307,14 @@ int vprintf(const char *format, va_list list)
 				specifier = 'u';
 				if (altForm)
 				{
-					displayString("0", &chars);
+					displayString(stream, "0", &chars);
 				}
 			}
 			if (specifier == 'p')
 			{
 				base = 17;
 				length = 'z';
-				displayString("0x", &chars);
+				displayString(stream, "0x", &chars);
 				specifier = 'u';
 			}
 			switch (specifier)
@@ -326,7 +326,7 @@ int vprintf(const char *format, va_list list)
 				base = base == 10 ? 17 : base;
 				if (altForm)
 				{
-					displayString(specifier == 'X' ? "0X" : "0x", &chars);
+					displayString(stream, specifier == 'X' ? "0X" : "0x", &chars);
 				}
 				__attribute__((fallthrough));
 
@@ -339,7 +339,7 @@ int vprintf(const char *format, va_list list)
 					unsigned int integer = va_arg(list, unsigned int);
 					convert_unsigned_int_to_string(integer, intStrBuffer, base,
 					                               lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -348,7 +348,7 @@ int vprintf(const char *format, va_list list)
 					unsigned char integer = (unsigned char)va_arg(list, unsigned int);
 					convert_unsigned_int_to_string(integer, intStrBuffer, base,
 					                               lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -357,7 +357,7 @@ int vprintf(const char *format, va_list list)
 					unsigned short int integer = va_arg(list, unsigned int);
 					convert_unsigned_int_to_string(integer, intStrBuffer, base,
 					                               lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -366,7 +366,7 @@ int vprintf(const char *format, va_list list)
 					unsigned long integer = va_arg(list, unsigned long);
 					convert_unsigned_int_to_string(integer, intStrBuffer, base,
 					                               lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -375,7 +375,7 @@ int vprintf(const char *format, va_list list)
 					unsigned long long integer = va_arg(list, unsigned long long);
 					convert_unsigned_int_to_string(integer, intStrBuffer, base,
 					                               lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -384,7 +384,7 @@ int vprintf(const char *format, va_list list)
 					uintmax_t integer = va_arg(list, uintmax_t);
 					convert_unsigned_int_to_string(integer, intStrBuffer, base,
 					                               lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -393,7 +393,7 @@ int vprintf(const char *format, va_list list)
 					size_t integer = va_arg(list, size_t);
 					convert_unsigned_int_to_string(integer, intStrBuffer, base,
 					                               lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -402,7 +402,7 @@ int vprintf(const char *format, va_list list)
 					ptrdiff_t integer = va_arg(list, ptrdiff_t);
 					convert_unsigned_int_to_string((uintmax_t)integer, intStrBuffer, base,
 					                               lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -423,7 +423,7 @@ int vprintf(const char *format, va_list list)
 					int integer = va_arg(list, int);
 					convert_int_to_string(integer, intStrBuffer, base, plusSign,
 					                      spaceNoSign, lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -432,7 +432,7 @@ int vprintf(const char *format, va_list list)
 					signed char integer = (signed char)va_arg(list, int);
 					convert_int_to_string(integer, intStrBuffer, base, plusSign,
 					                      spaceNoSign, lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -441,7 +441,7 @@ int vprintf(const char *format, va_list list)
 					short int integer = va_arg(list, int);
 					convert_int_to_string(integer, intStrBuffer, base, plusSign,
 					                      spaceNoSign, lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -450,7 +450,7 @@ int vprintf(const char *format, va_list list)
 					long integer = va_arg(list, long);
 					convert_int_to_string(integer, intStrBuffer, base, plusSign,
 					                      spaceNoSign, lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -459,7 +459,7 @@ int vprintf(const char *format, va_list list)
 					long long integer = va_arg(list, long long);
 					convert_int_to_string(integer, intStrBuffer, base, plusSign,
 					                      spaceNoSign, lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -468,7 +468,7 @@ int vprintf(const char *format, va_list list)
 					intmax_t integer = va_arg(list, intmax_t);
 					convert_int_to_string(integer, intStrBuffer, base, plusSign,
 					                      spaceNoSign, lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -477,7 +477,7 @@ int vprintf(const char *format, va_list list)
 					size_t integer = va_arg(list, size_t);
 					convert_int_to_string(integer, intStrBuffer, base, plusSign,
 					                      spaceNoSign, lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -486,7 +486,7 @@ int vprintf(const char *format, va_list list)
 					ptrdiff_t integer = va_arg(list, ptrdiff_t);
 					convert_int_to_string(integer, intStrBuffer, base, plusSign,
 					                      spaceNoSign, lengthSpec, leftJustify, zeroPad);
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 					break;
 				}
 
@@ -501,11 +501,11 @@ int vprintf(const char *format, va_list list)
 			{
 				if (length == 'l')
 				{
-					displayCharacter(va_arg(list, wint_t), &chars);
+					displayCharacter(stream, va_arg(list, wint_t), &chars);
 				}
 				else
 				{
-					displayCharacter(va_arg(list, int), &chars);
+					displayCharacter(stream, va_arg(list, int), &chars);
 				}
 
 				break;
@@ -513,7 +513,7 @@ int vprintf(const char *format, va_list list)
 
 			case 's':
 			{
-				displayString(va_arg(list, char *), &chars);
+				displayString(stream, va_arg(list, char *), &chars);
 				break;
 			}
 
@@ -587,7 +587,7 @@ int vprintf(const char *format, va_list list)
 				convert_int_to_string(floating, intStrBuffer, base, plusSign,
 				                      spaceNoSign, form, leftJustify, zeroPad);
 
-				displayString(intStrBuffer, &chars);
+				displayString(stream, intStrBuffer, &chars);
 
 				floating -= (int)floating;
 
@@ -599,15 +599,15 @@ int vprintf(const char *format, va_list list)
 
 				if (precSpec)
 				{
-					displayCharacter('.', &chars);
+					displayCharacter(stream, '.', &chars);
 					convert_int_to_string(decPlaces, intStrBuffer, 10, false, false, 0,
 					                      false, false);
 					intStrBuffer[precSpec] = 0;
-					displayString(intStrBuffer, &chars);
+					displayString(stream, intStrBuffer, &chars);
 				}
 				else if (altForm)
 				{
-					displayCharacter('.', &chars);
+					displayCharacter(stream, '.', &chars);
 				}
 
 				break;
@@ -624,34 +624,53 @@ int vprintf(const char *format, va_list list)
 
 			if (specifier == 'e')
 			{
-				displayString("e+", &chars);
+				displayString(stream, "e+", &chars);
 			}
 			else if (specifier == 'E')
 			{
-				displayString("E+", &chars);
+				displayString(stream, "E+", &chars);
 			}
 
 			if (specifier == 'e' || specifier == 'E')
 			{
 				convert_int_to_string(expo, intStrBuffer, 10, false, false, 2, false,
 				                      true);
-				displayString(intStrBuffer, &chars);
+				displayString(stream, intStrBuffer, &chars);
 			}
 		}
 		else
 		{
-			displayCharacter(format[i], &chars);
+			displayCharacter(stream, format[i], &chars);
 		}
 	}
 
 	return chars;
 }
 
+int vprintf(const char *format, va_list list)
+{
+	return vfprintf(stdout, format, list);
+}
+
+__attribute__((format(printf, 2, 3))) int fprintf(FILE *stream,
+                                                  const char *format, ...)
+{
+	va_list list;
+	va_start(list, format);
+	int i = vfprintf(stream, format, list);
+	va_end(list);
+	return i;
+}
+
+// The format attribute specifies that this function takes printf style
+// arguments which should be type-checked against a format string.
+// Refer to:
+// https://gcc.gnu.org/onlinedocs/gcc-3.4.3/gcc/Function-Attributes.html
 __attribute__((format(printf, 1, 2))) int printf(const char *format, ...)
 {
 	va_list list;
 	va_start(list, format);
-	int i = vprintf(format, list);
+	int i = vfprintf(stdout, format, list);
 	va_end(list);
 	return i;
 }
