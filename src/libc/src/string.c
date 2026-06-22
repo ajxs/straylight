@@ -84,3 +84,56 @@ int strcmp(const char *lhs, const char *rhs)
 
 	return (int)((uint8_t)lhs[i] - (uint8_t)rhs[i]);
 }
+
+char *strcat(char *restrict dst, const char *restrict src)
+{
+	size_t dst_len = strlen(dst);
+	size_t i = 0;
+
+	while (src[i] != '\0')
+	{
+		dst[dst_len + i] = src[i];
+		i++;
+	}
+
+	dst[dst_len + i] = '\0';
+
+	return dst;
+}
+
+char *strchr(const char *s, int c)
+{
+	char ch = (char)c;
+
+	while (*s != '\0')
+	{
+		if (*s == ch)
+		{
+			return (char *)s;
+		}
+
+		s++;
+	}
+
+	if (ch == '\0')
+	{
+		return (char *)s;
+	}
+
+	return NULL;
+}
+
+char *strcpy(char *restrict dst, const char *restrict src)
+{
+	size_t i = 0;
+
+	while (src[i] != '\0')
+	{
+		dst[i] = src[i];
+		i++;
+	}
+
+	dst[i] = '\0';
+
+	return dst;
+}

@@ -26,14 +26,20 @@ INC_DIR := include
 
 LIB := ${OBJ_DIR}/libc.a
 
-# Flags
-CFLAGS :=                   \
-	-fno-stack-protector      \
-	-ffreestanding            \
-	-ggdb                     \
-	-I$(INC_DIR)              \
-	-std=gnu99                \
-	-Wall                     \
+# Allow the inclusion of GCC's own internal headers.
+GCC_INCLUDE := $(shell $(CC) -print-file-name=include)
+
+# Use 'nostdinc' to strip out any built-in include paths to avoid accidentally 
+# including headers from the compiler's libc.
+CFLAGS :=                        \
+	-fno-stack-protector           \
+	-ffreestanding                 \
+	-nostdinc                      \
+	-I$(INC_DIR)                   \
+	-isystem $(GCC_INCLUDE)        \
+	-ggdb                          \
+	-std=gnu99                     \
+	-Wall                          \
 	-Wextra
 
 ASFLAGS  := -I$(INC_DIR)

@@ -19,30 +19,29 @@ SRC_DIR := src
 
 SYSROOT_DIR       := ../../libc/
 
-LIBSTRAYLIGHT_DIR := ../../libstraylight
 LIBC_DIR          := ${SYSROOT_DIR}/lib
 
-INCLUDE_DIRS := src/include ${LIBSTRAYLIGHT_DIR}/src/include
+INCLUDE_DIRS := src/include
 INCLUDE_FLAG := ${foreach d, ${INCLUDE_DIRS}, -I$d}
 
-LIBSTRAYLIGHT   := libstraylight
+GCC_INCLUDE := $(shell $(CC) -print-file-name=include)
 
-CFLAGS :=                   \
-	--sysroot=${SYSROOT_DIR}  \
-	-nostdlib                 \
-	${INCLUDE_FLAG}           \
-	-ggdb                     \
-	-std=gnu99                \
-	-Wall                     \
+CFLAGS :=                          \
+	-nostdlib                        \
+	-nostdinc                        \
+	-I${SYSROOT_DIR}/include         \
+	-isystem ${GCC_INCLUDE}          \
+	${INCLUDE_FLAG}                  \
+	-ggdb                            \
+	-std=gnu99                       \
+	-Wall                            \
 	-Wextra
 
 LDFLAGS := -nostdlib
 
 LIBS := \
 	-L${LIBC_DIR}              \
-	-L${LIBSTRAYLIGHT_DIR}/lib \
-	-lc                        \
-	-l${LIBSTRAYLIGHT}
+	-lc
 
 AS_SOURCES :=
 

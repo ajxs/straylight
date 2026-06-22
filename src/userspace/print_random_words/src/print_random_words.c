@@ -3,23 +3,22 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <straylight/logging.h>
 
 int main()
 {
-	print_to_serial("Printing random words!\n");
+	printf("Printing random words!\n");
 
 	char *buffer = (char *)malloc(64);
 	if (buffer == 0)
 	{
-		print_to_serial("Failed to allocate memory!\n");
+		printf("Failed to allocate memory!\n");
 		exit(EXIT_FAILURE);
 	}
 
 	FILE *file = fopen("/Devices/Disk_B/seven_letter_words.txt", "r");
 	if (file == NULL)
 	{
-		print_to_serial("Failed to open file!\n");
+		printf("Failed to open file!\n");
 		return EXIT_FAILURE;
 	}
 
@@ -27,7 +26,7 @@ int main()
 	{
 		if (fseek(file, 0, SEEK_SET) != 0)
 		{
-			print_to_serial("Failed to seek to start of file!\n");
+			printf("Failed to seek to start of file!\n");
 			return EXIT_FAILURE;
 		}
 
@@ -37,7 +36,7 @@ int main()
 			fread((void *)buffer, 1, 8, file);
 			((char *)buffer)[8] = '\0';
 
-			print_to_serial((char *)buffer);
+			printf("%s", (char *)buffer);
 		}
 	}
 

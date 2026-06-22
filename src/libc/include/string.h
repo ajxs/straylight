@@ -16,4 +16,10 @@ size_t strlen(const char *str);
 
 int strcmp(const char *lhs, const char *rhs);
 
+char *strcat(char *restrict dst, const char *restrict src);
+
+char *strchr(const char *s, int c);
+
+char *strcpy(char *restrict dst, const char *restrict src);
+
 #endif

@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <straylight_syscall.h>
 
@@ -30,6 +31,10 @@ void *aligned_alloc(size_t alignment, size_t size)
 
 void exit(int exit_code)
 {
+	fclose(stdout);
+	fclose(stderr);
+	fclose(stdin);
+
 	straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_PROCESS_EXIT, exit_code);
 
 	__builtin_unreachable();

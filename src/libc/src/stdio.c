@@ -9,8 +9,18 @@
 #define FREAD_BUFFER_SIZE 4096
 #define FWRITE_BUFFER_SIZE 4096
 
+FILE *stdin;
+FILE *stdout;
+FILE *stderr;
+
 int fclose(FILE *stream)
 {
+	if (stream == NULL)
+	{
+		errno = EINVAL;
+		return EOF;
+	}
+
 	int flush_result = fflush(stream);
 	int saved_errno = errno;
 
@@ -107,6 +117,7 @@ FILE *fopen(const char *restrict file_path, const char *restrict mode)
 	file->write_buffer_address = NULL;
 	file->write_buffer_size = 0;
 	file->write_buffer_offset = 0;
+	file->buffering_mode = _IOFBF;
 	file->eof = false;
 	file->mode_flags = open_flags;
 
@@ -261,6 +272,54 @@ int fseek(FILE *stream, long offset, int whence)
 	return 0;
 }
 
+static bool does_buffer_contain_newline(const char *buffer, size_t size)
+{
+	for (size_t i = 0; i < size; i++)
+	{
+		if (buffer[i] == '\n')
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool flush_file_stream_after_write_if_needed(FILE *stream,
+                                                    size_t bytes_written)
+{
+	if (stream->buffering_mode == _IONBF)
+	{
+		// If the file stream is unbuffered, flush the buffer after every write.
+		int result = fflush(stream);
+		if (result == EOF)
+		{
+			return false;
+		}
+	}
+	else if (stream->buffering_mode == _IOLBF)
+	{
+		// If the file stream is line buffered, flush the buffer if a newline
+		// character was written to the stream.
+		const char *written_bytes = (const char *)stream->write_buffer_address +
+		                            stream->write_buffer_offset - bytes_written;
+
+		const bool buffer_contains_newline =
+		    does_buffer_contain_newline(written_bytes, bytes_written);
+
+		if (buffer_contains_newline)
+		{
+			int flush_result = fflush(stream);
+			if (flush_result == EOF)
+			{
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
 size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream)
 {
 	if (count == 0 || size == 0)
@@ -313,7 +372,44 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream)
 		stream->write_buffer_offset += current_bytes_to_write;
 
 		total_bytes_written += current_bytes_to_write;
+
+		// In the case that the flush failed, return the number of full items that
+		// were written to the stream buffer.
+		if (!flush_file_stream_after_write_if_needed(stream,
+		                                             current_bytes_to_write))
+		{
+			// errno already set by fflush.
+			return total_bytes_written / size;
+		}
 	}
 
 	return count;
+}
+
+int fputc(int c, FILE *stream)
+{
+	char ch = (char)c;
+
+	size_t result = fwrite(&ch, sizeof(char), 1, stream);
+	if (result == 1)
+	{
+		return c;
+	}
+
+	return EOF;
+}
+
+int putchar(int c) { return fputc(c, stdout); }
+
+int puts(const char *s)
+{
+	while (*s)
+	{
+		if (putchar(*s++) == EOF)
+		{
+			return EOF;
+		}
+	}
+
+	return putchar('\n');
 }

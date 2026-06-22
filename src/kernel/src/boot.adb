@@ -353,6 +353,8 @@ package body Boot is
       Root_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
       Devices_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
       Disk_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
+      Disk_B_Filesystem_Node_Index  : Filesystem_Node_Index_T := 0;
+      UART_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
    begin
       Log_Debug ("Initialising filesystem...", Logging_Tags);
 
@@ -424,7 +426,7 @@ package body Boot is
         (Filesystems.System_Root_Filesystem,
          "Disk_B",
          Devices_Filesystem_Node_Index,
-         Disk_Filesystem_Node_Index,
+         Disk_B_Filesystem_Node_Index,
          Result,
          Filesystem_Node_Type_Mounted_Filesystem,
          Mounted_Filesystem => Filesystems.Mounted_Filesystems (3)'Access);
@@ -436,7 +438,7 @@ package body Boot is
         (Filesystems.System_Root_Filesystem,
          "Serial",
          Devices_Filesystem_Node_Index,
-         Disk_Filesystem_Node_Index,
+         UART_Filesystem_Node_Index,
          Result,
          Filesystem_Node_Type_Device,
          Mounted_Device => UART_Device'Access);

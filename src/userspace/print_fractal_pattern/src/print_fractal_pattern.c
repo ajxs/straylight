@@ -1,12 +1,12 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <straylight/graphics.h>
-#include <straylight/logging.h>
 
 int main()
 {
-	print_to_serial("Printing fractal patterns!\n");
+	printf("Printing fractal patterns!\n");
 
 	const uint16_t horizontal_resolution = 640;
 	const uint16_t vertical_resolution = 480;
@@ -15,7 +15,7 @@ int main()
 	    (uintptr_t)malloc(horizontal_resolution * vertical_resolution * 4);
 	if (framebuffer_address == 0)
 	{
-		log_error("Failed to allocate framebuffer memory");
+		printf("Failed to allocate framebuffer memory\n");
 		return EXIT_FAILURE;
 	}
 
@@ -45,7 +45,7 @@ int main()
 		    straylight_graphics_update_framebuffer(framebuffer_address);
 		if (result != 0)
 		{
-			log_error("Failed to update framebuffer");
+			printf("Failed to update framebuffer\n");
 			return EXIT_FAILURE;
 		}
 

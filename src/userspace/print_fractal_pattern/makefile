@@ -27,12 +27,17 @@ INCLUDE_FLAG := ${foreach d, ${INCLUDE_DIRS}, -I$d}
 
 LIBSTRAYLIGHT   := libstraylight
 
-CFLAGS :=                   \
-	--sysroot=${SYSROOT_DIR}  \
-	-ggdb                     \
-	${INCLUDE_FLAG}           \
-	-std=gnu99                \
-	-Wall                     \
+GCC_INCLUDE := $(shell $(CC) -print-file-name=include)
+
+CFLAGS :=                          \
+	-nostdlib                        \
+	-nostdinc                        \
+	-I${SYSROOT_DIR}/include         \
+	-isystem ${GCC_INCLUDE}          \
+	${INCLUDE_FLAG}                  \
+	-ggdb                            \
+	-std=gnu99                       \
+	-Wall                            \
 	-Wextra
 
 LDFLAGS := -nostdlib

@@ -1,6 +1,7 @@
 #ifndef STRAYLIGHT_LIBC_STDIO_H
 #define STRAYLIGHT_LIBC_STDIO_H 1
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -10,6 +11,14 @@
 #define MAX_PATH 256
 
 #define EOF (-1)
+
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
+#define _IOFBF 0
+#define _IOLBF 1
+#define _IONBF 2
 
 typedef struct
 {
@@ -26,8 +35,14 @@ typedef struct
 	size_t write_buffer_size;
 	size_t write_buffer_offset;
 
+	int buffering_mode;
+
 	bool eof;
 } FILE;
+
+extern FILE *stdin;
+extern FILE *stdout;
+extern FILE *stderr;
 
 FILE *fopen(const char *restrict file_path, const char *restrict mode);
 
@@ -41,5 +56,18 @@ int fseek(FILE *stream, long offset, int whence);
 int feof(FILE *stream);
 
 int fflush(FILE *stream);
+
+int fputc(int c, FILE *stream);
+
+int putchar(int c);
+
+int puts(const char *s);
+
+size_t fwrite(const void *restrict ptr, size_t size, size_t count,
+              FILE *restrict stream);
+
+__attribute__((format(printf, 1, 2))) int printf(const char *format, ...);
+
+int vprintf(const char *format, va_list ap);
 
 #endif
