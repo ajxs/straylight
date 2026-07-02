@@ -107,20 +107,6 @@ is
    is (Physical_Address_T (Convert_Higher_Half_Address_To_Lower (Addr)))
    with Pure_Function;
 
-   function Get_Address_Word_Low (Addr : Address) return Unsigned_32
-   with
-     Pure_Function,
-     Import,
-     Convention    => Assembler,
-     External_Name => "addresses_get_address_word_low";
-
-   function Get_Address_Word_High (Addr : Address) return Unsigned_32
-   with
-     Pure_Function,
-     Import,
-     Convention    => Assembler,
-     External_Name => "addresses_get_address_word_high";
-
    function Unsigned_32_To_Address (U32 : Unsigned_32) return Address
    is (To_Address (Integer_Address (U32)))
    with Inline, Pure_Function;
@@ -131,6 +117,20 @@ is
 
    function Address_To_Unsigned_64 (Addr : Address) return Unsigned_64
    is (Unsigned_64 (To_Integer (Addr)))
+   with Inline, Pure_Function;
+
+   function Get_Dword_Word_Low (Dword : Unsigned_64) return Unsigned_32
+   with Inline, Pure_Function;
+
+   function Get_Dword_Word_High (Dword : Unsigned_64) return Unsigned_32
+   with Inline, Pure_Function;
+
+   function Get_Address_Word_Low (Addr : Address) return Unsigned_32
+   is (Get_Dword_Word_Low (Address_To_Unsigned_64 (Addr)))
+   with Inline, Pure_Function;
+
+   function Get_Address_Word_High (Addr : Address) return Unsigned_32
+   is (Get_Dword_Word_High (Address_To_Unsigned_64 (Addr)))
    with Inline, Pure_Function;
 
    --  This is the upper limit of what physical memory can is mapped into
