@@ -523,10 +523,6 @@ package body Boot is
 
       Initialise_Kernel_Address_Space;
 
-      Initialise_Kernel_Heap;
-
-      Initialise_Kernel_Page_Pool;
-
       Log_Debug
         ("Initialising boot secondary stack for Hart " & Hart_Id'Image & "...",
          Logging_Tags);
@@ -613,6 +609,10 @@ package body Boot is
    begin
       Log_Debug
         ("Initialising kernel services. Hart#" & Hart_Id'Image, Logging_Tags);
+
+      Initialise_Kernel_Heap;
+
+      Initialise_Kernel_Page_Pool;
 
       Initialise_Devices;
 

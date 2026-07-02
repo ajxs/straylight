@@ -52,9 +52,6 @@ package body Memory.Kernel is
    procedure Initialise_Kernel_Heap is
       Allocated_Physical_Address : Physical_Address_T := Null_Physical_Address;
 
-      Heap_Region_Index : Heap_Memory_Region_Index_T :=
-        Null_Memory_Region_Index;
-
       Result : Function_Result := Unset;
    begin
       Log_Debug ("Initialising kernel heap...", Logging_Tags);
@@ -68,6 +65,21 @@ package body Memory.Kernel is
          Panic;
       end if;
 
+      Log_Debug ("Mapping initial kernel heap region...", Logging_Tags);
+
+      Map_Kernel_Memory
+        (Kernel_Heap_Virtual_Address,
+         Allocated_Physical_Address,
+         Storage_Offset (Kernel_Heap_Initial_Size),
+         (True, True, False, False),
+         Result);
+      if Is_Error (Result) then
+         --  Error already printed.
+         Panic;
+      end if;
+
+      Log_Debug ("Adding initial kernel heap region...", Logging_Tags);
+
       Kernel_Heap.Add_Memory_Region_To_Heap
         (Kernel_Heap_Virtual_Address,
          Allocated_Physical_Address,
@@ -78,30 +90,7 @@ package body Memory.Kernel is
          Panic;
       end if;
 
-      Log_Debug ("Mapping kernel heap regions...", Logging_Tags);
-
-      --  Map all kernel heap regions.
-      Heap_Region_Index := Kernel_Heap.Memory_Regions_Head;
-      while Heap_Region_Index /= Null_Memory_Region_Index loop
-         Map_Kernel_Memory
-           (Kernel_Heap.Memory_Regions (Heap_Region_Index).Virtual_Address,
-            Kernel_Heap.Memory_Regions (Heap_Region_Index).Physical_Address,
-            Kernel_Heap.Memory_Regions (Heap_Region_Index).Size,
-            (True, True, False, False),
-            Result);
-         if Is_Error (Result) then
-            --  Error already printed.
-            Panic;
-         end if;
-
-         Heap_Region_Index :=
-           Kernel_Heap.Memory_Regions (Heap_Region_Index).Next_Region;
-      end loop;
-
       Log_Debug ("Initialised kernel heap.", Logging_Tags);
-   exception
-      when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Kernel_Heap");
    end Initialise_Kernel_Heap;
 
    procedure Initialise_Kernel_Page_Pool is
