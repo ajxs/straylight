@@ -1,4 +1,53 @@
 package body Memory.Allocators.Heap is
+   function Calculate_Header_Checksum
+     (Block_Identity : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Unsigned_32 is
+   begin
+      Size_Bits : constant Unsigned_64 := Unsigned_64 (Block_Size);
+
+      return
+        Block_Identity
+        xor Get_Address_Word_Low (Block_Address)
+        xor Get_Address_Word_High (Block_Address)
+        xor Get_Dword_Word_Low (Size_Bits)
+        xor Get_Dword_Word_High (Size_Bits);
+
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Calculate_Header_Checksum", Logging_Tags_Heap);
+         return 0;
+   end Calculate_Header_Checksum;
+
+   function Test_Header_Checksum
+     (Test_Identity  : Unsigned_32;
+      Block_Checksum : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Boolean
+   is (Block_Checksum
+       = Calculate_Header_Checksum (Test_Identity, Block_Address, Block_Size))
+   with Inline;
+
+   function Is_Block_Free
+     (Block_Checksum : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Boolean
+   is (Test_Header_Checksum
+         (Identity_Marker_Free, Block_Checksum, Block_Address, Block_Size))
+   with Inline;
+
+   function Is_Block_Allocated
+     (Block_Checksum : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Boolean
+   is (Test_Header_Checksum
+         (Identity_Marker_Allocated,
+          Block_Checksum,
+          Block_Address,
+          Block_Size))
+   with Inline;
+
    function Is_Allocated_Address_In_Region
      (Region : New_Heap_Memory_Region_T; Addr : Virtual_Address_T)
       return Boolean
@@ -17,9 +66,12 @@ package body Memory.Allocators.Heap is
             - Header_Size)
    with Pure_Function, Inline;
 
-   function Is_Valid_Header (Header : Allocation_Header_T) return Boolean
-   is (Header.Identity = Identity_Marker_Free
-       or else Header.Identity = Identity_Marker_Allocated);
+   function Is_Valid_Header
+     (Block_Checksum : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Boolean
+   is (Is_Block_Free (Block_Checksum, Block_Address, Block_Size)
+       or else Is_Block_Allocated (Block_Checksum, Block_Address, Block_Size));
 
    function Is_Valid_Alignment (Alignment : Storage_Offset) return Boolean is
    begin
@@ -77,19 +129,19 @@ package body Memory.Allocators.Heap is
    procedure Set_New_Block_Header
      (Block_Address     : Virtual_Address_T;
       Block_Size        : Storage_Offset;
-      New_Block_Is_Free : Boolean := True;
-      Result            : out Function_Result) is
+      New_Block_Is_Free : Boolean := True) is
    begin
       New_Block : Allocation_Header_T
       with Import, Alignment => 1, Address => Block_Address;
 
       New_Block :=
-        ((if New_Block_Is_Free
-          then Identity_Marker_Free
-          else Identity_Marker_Allocated),
+        (Calculate_Header_Checksum
+           ((if New_Block_Is_Free
+             then Identity_Marker_Free
+             else Identity_Marker_Allocated),
+            Block_Address,
+            Block_Size),
          Block_Size);
-
-      Result := Success;
    end Set_New_Block_Header;
 
    procedure Allocate_In_Region
@@ -113,12 +165,20 @@ package body Memory.Allocators.Heap is
          with Import, Alignment => 1, Address => Current_Block_Address;
 
          --  If we reach an invalid heap region, return an error.
-         if not Is_Valid_Header (Current_Block) then
+         if not Is_Valid_Header
+                  (Current_Block.Block_Checksum,
+                   Current_Block_Address,
+                   Current_Block.Block_Size)
+         then
+            Log_Error ("Invalid heap block encountered.", Logging_Tags_Heap);
             Result := Region_Not_Mapped;
             return;
          end if;
 
-         if Current_Block.Identity = Identity_Marker_Free
+         if Is_Block_Free
+              (Current_Block.Block_Checksum,
+               Current_Block_Address,
+               Current_Block.Block_Size)
            and then Current_Block.Block_Size >= Size
          then
             --  If the current block is big enough to satisfy the allocation
@@ -175,6 +235,13 @@ package body Memory.Allocators.Heap is
             if Remaining_Size_In_Original_Block > Header_Size then
                Current_Block.Block_Size := Remaining_Size_In_Original_Block;
 
+               --  Update the identity checksum when the size changes.
+               Current_Block.Block_Checksum :=
+                 Calculate_Header_Checksum
+                   (Identity_Marker_Free,
+                    Current_Block_Address,
+                    Current_Block.Block_Size);
+
                --  Take into account that the alignment offset by which this
                --  block was moved back may have left some space at the end of
                --  the block that is too small to hold a valid block. If so,
@@ -185,11 +252,7 @@ package body Memory.Allocators.Heap is
                     then Alignment_Offset
                     else 0);
 
-               Set_New_Block_Header
-                 (New_Block_Addr, Effective_Size, False, Result);
-               if Is_Error (Result) then
-                  return;
-               end if;
+               Set_New_Block_Header (New_Block_Addr, Effective_Size, False);
 
                Allocation_Result :=
                  (New_Block_Addr + Header_Size,
@@ -202,11 +265,7 @@ package body Memory.Allocators.Heap is
                   Set_New_Block_Header
                     (Allocation_Result.Virtual_Address + Size,
                      Alignment_Offset - Header_Size,
-                     True,
-                     Result);
-                  if Is_Error (Result) then
-                     return;
-                  end if;
+                     True);
                end if;
 
                Result := Success;
@@ -227,8 +286,6 @@ package body Memory.Allocators.Heap is
                  (Current_Block_Address + Header_Size,
                   Current_Physical_Address + Header_Size);
 
-               Current_Block.Identity := Identity_Marker_Allocated;
-
                --  Check if enough space is left over for a new block.
                if Remaining_Size > Header_Size then
                   Current_Block.Block_Size := Size;
@@ -236,12 +293,14 @@ package body Memory.Allocators.Heap is
                   Set_New_Block_Header
                     (Allocation_Result.Virtual_Address + Size,
                      Remaining_Size,
-                     True,
-                     Result);
-                  if Is_Error (Result) then
-                     return;
-                  end if;
+                     True);
                end if;
+
+               Current_Block.Block_Checksum :=
+                 Calculate_Header_Checksum
+                   (Identity_Marker_Allocated,
+                    Current_Block_Address,
+                    Current_Block.Block_Size);
 
                Result := Success;
                return;
@@ -254,6 +313,11 @@ package body Memory.Allocators.Heap is
          Current_Physical_Address :=
            Current_Physical_Address + Header_Size + Current_Block.Block_Size;
       end loop;
+
+      Log_Error
+        ("No space in heap region to satisfy allocation request: "
+         & Size'Image,
+         Logging_Tags_Heap);
 
       Result := No_Space_In_Region;
    exception
@@ -350,7 +414,8 @@ package body Memory.Allocators.Heap is
    is
       Current_Block_Address : Virtual_Address_T :=
         Memory_Heap_Region.Heap_Region_Virt_Addr;
-      Next_Block_Address    : Virtual_Address_T := Null_Address;
+
+      Next_Block_Address : Virtual_Address_T := Null_Address;
    begin
       --  Loop over the heap, checking for adjacent free blocks.
       --  If two adjacent free blocks are found, merge them into one block.
@@ -359,7 +424,11 @@ package body Memory.Allocators.Heap is
          Current_Block : Allocation_Header_T
          with Import, Alignment => 1, Address => Current_Block_Address;
 
-         if not Is_Valid_Header (Current_Block) then
+         if not Is_Valid_Header
+                  (Current_Block.Block_Checksum,
+                   Current_Block_Address,
+                   Current_Block.Block_Size)
+         then
             Result := Region_Not_Mapped;
             return;
          end if;
@@ -378,18 +447,36 @@ package body Memory.Allocators.Heap is
          Next_Block : Allocation_Header_T
          with Import, Alignment => 1, Address => Next_Block_Address;
 
-         if not Is_Valid_Header (Next_Block) then
+         if not Is_Valid_Header
+                  (Next_Block.Block_Checksum,
+                   Next_Block_Address,
+                   Next_Block.Block_Size)
+         then
             Result := Region_Not_Mapped;
             return;
          end if;
 
-         if Current_Block.Identity = Identity_Marker_Free
-           and then Next_Block.Identity = Identity_Marker_Free
+         if Is_Block_Free
+              (Current_Block.Block_Checksum,
+               Current_Block_Address,
+               Current_Block.Block_Size)
+           and then
+             Is_Block_Free
+               (Next_Block.Block_Checksum,
+                Next_Block_Address,
+                Next_Block.Block_Size)
          then
             --  If the current block and the next block are both free, merge
             --  them into a single block.
             Current_Block.Block_Size :=
               Current_Block.Block_Size + Header_Size + Next_Block.Block_Size;
+
+            --  Update the identity checksum when the size changes.
+            Current_Block.Block_Checksum :=
+              Calculate_Header_Checksum
+                (Identity_Marker_Free,
+                 Current_Block_Address,
+                 Current_Block.Block_Size);
          else
             --  Otherwise move to check the next block in the heap.
             Current_Block_Address := Next_Block_Address;
@@ -413,7 +500,11 @@ package body Memory.Allocators.Heap is
         Alignment => 1,
         Address   => Allocated_Virtual_Address - Header_Size;
 
-      if Block_Header.Identity /= Identity_Marker_Allocated then
+      if not Is_Block_Allocated
+               (Block_Header.Block_Checksum,
+                Allocated_Virtual_Address - Header_Size,
+                Block_Header.Block_Size)
+      then
          Log_Error
            ("Attempted to free an unallocated block: "
             & Allocated_Virtual_Address'Image,
@@ -423,7 +514,11 @@ package body Memory.Allocators.Heap is
          return;
       end if;
 
-      Block_Header.Identity := Identity_Marker_Free;
+      Block_Header.Block_Checksum :=
+        Calculate_Header_Checksum
+          (Identity_Marker_Free,
+           Allocated_Virtual_Address - Header_Size,
+           Block_Header.Block_Size);
 
       --  Coalesce any adjacent free blocks.
       --  Result set by this call.
@@ -562,10 +657,28 @@ package body Memory.Allocators.Heap is
               Address   =>
                 Memory_Heap.Memory_Regions (Index).Heap_Region_Virt_Addr;
 
-            Heap_Starting_Block.Identity := Identity_Marker_Free;
             Heap_Starting_Block.Block_Size :=
               Memory_Heap.Memory_Regions (Index).Heap_Region_Size
               - Header_Size;
+
+            Heap_Starting_Block.Block_Checksum :=
+              Calculate_Header_Checksum
+                (Identity_Marker_Free,
+                 Memory_Heap.Memory_Regions (Index).Heap_Region_Virt_Addr,
+                 Heap_Starting_Block.Block_Size);
+
+            Log_Debug
+              ("Inserted new heap memory region: "
+               & ASCII.LF
+               & "  VAddr: "
+               & Memory_Heap.Memory_Regions (Index).Heap_Region_Virt_Addr'Image
+               & ASCII.LF
+               & "  PAddr: "
+               & Memory_Heap.Memory_Regions (Index).Heap_Region_Phys_Addr'Image
+               & ASCII.LF
+               & "  Size:  "
+               & Memory_Heap.Memory_Regions (Index).Heap_Region_Size'Image,
+               Logging_Tags_Heap);
 
             Result := Success;
             return;

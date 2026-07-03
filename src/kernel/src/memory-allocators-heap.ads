@@ -33,8 +33,9 @@ is
       Allocated_Virtual_Address : Virtual_Address_T;
       Result                    : out Function_Result);
 
-   --  @NOTE: It's important that the virtual and physical addresses of a new
-   --  region are both page aligned.
+   --  @NOTE: New memory regions will need to be mapped into virtual memory
+   --  before being added to the heap. Otherwise a fault will be generated when
+   --  the heap allocator attempts to initialise the new block's header.
    procedure Add_Memory_Region_To_Heap
      (Memory_Heap      : in out Memory_Heap_T;
       Virtual_Address  : Virtual_Address_T;
@@ -46,14 +47,23 @@ private
    Logging_Tags_Heap : constant Log_Tags := [Log_Tag_Heap, Log_Tag_Memory];
 
    type Allocation_Header_T is record
-      Identity   : Unsigned_32;
-      Block_Size : Storage_Offset;
+      --  The allocation header contains a checksum calculated from the block's
+      --  address, size, and allocation status to verify the integrity of the
+      --  header. This checksum is also used by the allocator to determine
+      --  whether a block is free or allocated.
+      Block_Checksum : Unsigned_32;
+      Block_Size     : Storage_Offset;
    end record
    with Size => 16 * 8;
 
-   Identity_Marker_Free      : constant := 16#ABCDABCD#;
-   Identity_Marker_Allocated : constant := 16#12345678#;
+   Identity_Marker_Free      : constant := 16#AAAA_5555#;
+   Identity_Marker_Allocated : constant := 16#5555_AAAA#;
 
    Header_Size : constant Storage_Offset := Allocation_Header_T'Size / 8;
+
+   function Calculate_Header_Checksum
+     (Block_Identity : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Unsigned_32;
 
 end Memory.Allocators.Heap;
