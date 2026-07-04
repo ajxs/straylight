@@ -20,58 +20,11 @@ package body Memory.Allocators.Heap is
          return 0;
    end Calculate_Header_Checksum;
 
-   function Test_Header_Checksum
-     (Test_Identity  : Unsigned_32;
-      Block_Checksum : Unsigned_32;
-      Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Boolean
-   is (Block_Checksum
-       = Calculate_Header_Checksum (Test_Identity, Block_Address, Block_Size))
-   with Inline;
-
-   function Is_Block_Free
-     (Block_Checksum : Unsigned_32;
-      Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Boolean
-   is (Test_Header_Checksum
-         (Identity_Marker_Free, Block_Checksum, Block_Address, Block_Size))
-   with Inline;
-
-   function Is_Block_Allocated
-     (Block_Checksum : Unsigned_32;
-      Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Boolean
-   is (Test_Header_Checksum
-         (Identity_Marker_Allocated,
-          Block_Checksum,
-          Block_Address,
-          Block_Size))
-   with Inline;
-
    function Is_Allocated_Address_In_Region
-     (Region : New_Heap_Memory_Region_T; Addr : Virtual_Address_T)
-      return Boolean
+     (Region : Heap_Memory_Region_T; Addr : Virtual_Address_T) return Boolean
    is (Addr >= Region.Heap_Region_Virt_Addr + Header_Size
        and then Addr < Region.Heap_Region_Virt_Addr + Region.Heap_Region_Size)
    with Pure_Function, Inline;
-
-   function Is_Valid_Header_Address
-     (Region : New_Heap_Memory_Region_T; Addr : Virtual_Address_T)
-      return Boolean
-   is (Addr >= Region.Heap_Region_Virt_Addr
-       and then
-         Addr
-         <= Region.Heap_Region_Virt_Addr
-            + Region.Heap_Region_Size
-            - Header_Size)
-   with Pure_Function, Inline;
-
-   function Is_Valid_Header
-     (Block_Checksum : Unsigned_32;
-      Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Boolean
-   is (Is_Block_Free (Block_Checksum, Block_Address, Block_Size)
-       or else Is_Block_Allocated (Block_Checksum, Block_Address, Block_Size));
 
    function Is_Valid_Alignment (Alignment : Storage_Offset) return Boolean is
    begin
@@ -87,7 +40,7 @@ package body Memory.Allocators.Heap is
    --  Tests if a given region intersects with a given address range.
    ----------------------------------------------------------------------------
    function Is_Region_Intersecting
-     (Region           : New_Heap_Memory_Region_T;
+     (Region           : Heap_Memory_Region_T;
       Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
       Length           : Storage_Offset) return Boolean
@@ -145,7 +98,7 @@ package body Memory.Allocators.Heap is
    end Set_New_Block_Header;
 
    procedure Allocate_In_Region
-     (Region            : New_Heap_Memory_Region_T;
+     (Region            : Heap_Memory_Region_T;
       Size              : Storage_Offset;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
@@ -412,8 +365,7 @@ package body Memory.Allocators.Heap is
    end Allocate;
 
    procedure Coalesce_Free_Blocks_In_Region
-     (Memory_Heap_Region : New_Heap_Memory_Region_T;
-      Result             : out Function_Result)
+     (Memory_Heap_Region : Heap_Memory_Region_T; Result : out Function_Result)
    is
       Current_Block_Address : Virtual_Address_T :=
         Memory_Heap_Region.Heap_Region_Virt_Addr;
@@ -493,7 +445,7 @@ package body Memory.Allocators.Heap is
    end Coalesce_Free_Blocks_In_Region;
 
    procedure Free_Allocation_In_Region
-     (Memory_Heap_Region        : New_Heap_Memory_Region_T;
+     (Memory_Heap_Region        : Heap_Memory_Region_T;
       Allocated_Virtual_Address : Virtual_Address_T;
       Result                    : out Function_Result) is
    begin

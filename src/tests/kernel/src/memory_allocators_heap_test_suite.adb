@@ -13,5 +13,15 @@ begin
    Test_Suite_Ptr.all.Add_Test
      (Test_Case_Access'(new Test_Calculate_Header_Checksum));
 
+   Test_Suite_Ptr.all.Add_Test (Test_Case_Access'(new Test_Allocate));
+
+   Test_Suite_Ptr.all.Add_Test (Test_Case_Access'(new Test_Allocate_Aligned));
+
+   Test_Suite_Ptr.all.Add_Test
+     (Test_Case_Access'(new Test_Allocate_Aligned_Exact));
+
+   Test_Suite_Ptr.all.Add_Test
+     (Test_Case_Access'(new Test_Allocate_Invalid_Alignment));
+
    return Test_Suite_Ptr;
 end Memory_Allocators_Heap_Test_Suite;

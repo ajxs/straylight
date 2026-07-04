@@ -5,7 +5,7 @@ with Logging;          use Logging;
 package Memory.Allocators.Heap
   with Preelaborate
 is
-   type New_Heap_Memory_Region_T is record
+   type Heap_Memory_Region_T is record
       Heap_Region_Virt_Addr : Virtual_Address_T := Null_Address;
       Heap_Region_Phys_Addr : Physical_Address_T := Null_Physical_Address;
       Heap_Region_Size      : Storage_Offset := 0;
@@ -13,11 +13,11 @@ is
 
    New_Heap_Max_Memory_Regions : constant := 16;
 
-   type New_Heap_Memory_Region_List_T is
-     array (1 .. New_Heap_Max_Memory_Regions) of New_Heap_Memory_Region_T;
+   type Heap_Memory_Region_List_T is
+     array (1 .. New_Heap_Max_Memory_Regions) of Heap_Memory_Region_T;
 
    type Memory_Heap_T is record
-      Memory_Regions : New_Heap_Memory_Region_List_T;
+      Memory_Regions : Heap_Memory_Region_List_T;
       Spinlock       : Spinlock_T;
    end record;
 
@@ -65,5 +65,50 @@ private
      (Block_Identity : Unsigned_32;
       Block_Address  : Virtual_Address_T;
       Block_Size     : Storage_Offset) return Unsigned_32;
+
+   function Is_Valid_Header_Address
+     (Region : Heap_Memory_Region_T; Addr : Virtual_Address_T) return Boolean
+   is (Addr >= Region.Heap_Region_Virt_Addr
+       and then
+         Addr
+         <= Region.Heap_Region_Virt_Addr
+            + Region.Heap_Region_Size
+            - Header_Size)
+   with Pure_Function, Inline;
+
+   function Test_Header_Checksum
+     (Test_Identity  : Unsigned_32;
+      Block_Checksum : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Boolean
+   is (Block_Checksum
+       = Calculate_Header_Checksum (Test_Identity, Block_Address, Block_Size))
+   with Inline;
+
+   function Is_Block_Free
+     (Block_Checksum : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Boolean
+   is (Test_Header_Checksum
+         (Identity_Marker_Free, Block_Checksum, Block_Address, Block_Size))
+   with Inline;
+
+   function Is_Block_Allocated
+     (Block_Checksum : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Boolean
+   is (Test_Header_Checksum
+         (Identity_Marker_Allocated,
+          Block_Checksum,
+          Block_Address,
+          Block_Size))
+   with Inline;
+
+   function Is_Valid_Header
+     (Block_Checksum : Unsigned_32;
+      Block_Address  : Virtual_Address_T;
+      Block_Size     : Storage_Offset) return Boolean
+   is (Is_Block_Free (Block_Checksum, Block_Address, Block_Size)
+       or else Is_Block_Allocated (Block_Checksum, Block_Address, Block_Size));
 
 end Memory.Allocators.Heap;
