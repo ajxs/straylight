@@ -5,12 +5,22 @@
 
 with AUnit.Reporter.Text;
 with AUnit.Run;
+
 with Utilities_Test_Suite;
+with Memory_Allocators_Heap_Test_Suite;
 
 procedure Straylight_Kernel_Tests is
-   procedure Runner is new AUnit.Run.Test_Runner (Utilities_Test_Suite);
+   procedure Utilities_Test_Runner is new
+     AUnit.Run.Test_Runner (Utilities_Test_Suite);
+
+   procedure Heap_Test_Runner is new
+     AUnit.Run.Test_Runner (Memory_Allocators_Heap_Test_Suite);
+
    Reporter : AUnit.Reporter.Text.Text_Reporter;
 begin
    AUnit.Reporter.Text.Set_Use_ANSI_Colors (Reporter, True);
-   Runner (Reporter);
+   Utilities_Test_Runner (Reporter);
+
+   Heap_Test_Runner (Reporter);
+
 end Straylight_Kernel_Tests;

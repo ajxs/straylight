@@ -11,4 +11,17 @@ package body Logging is
       null;
    end Log_Error;
 
+   procedure Log_Debug (Message : String; Tags : Log_Tags := Empty_Tag_List) is
+      pragma Unreferenced (Message, Tags);
+   begin
+      null;
+   end Log_Debug;
+
+   procedure Log_Debug_Wide
+     (Message : Wide_String; Tags : Log_Tags := Empty_Tag_List)
+   is
+      pragma Unreferenced (Message, Tags);
+   begin
+      null;
+   end Log_Debug_Wide;
 end Logging;
