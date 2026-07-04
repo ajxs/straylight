@@ -3,12 +3,9 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Locks; use Locks;
-
 package Logging
   with Preelaborate
 is
-
    type Log_Tag_T is
      (Log_Tag_Allocator,
       Log_Tag_Boot,
@@ -84,43 +81,5 @@ private
       others                          => False];
 
    System_Logging_Level : Log_Level_T := Log_Level_Debug;
-
-   procedure Log_Message
-     (Message : String; Tags : Log_Tags; Level : Log_Level_T);
-
-   procedure Log_Message_Wide
-     (Wide_Message : Wide_String; Tags : Log_Tags; Level : Log_Level_T);
-
-   procedure Log_To_Debug_Console (Message : String; Level : Log_Level_T);
-
-   ----------------------------------------------------------------------------
-   --  Printing a string to the SBI Debug Console requires knowing the
-   --  physical address of the string to be printed. Most strings will be
-   --  printed from the stack, which technically doesn't have a fixed physical
-   --  address. To facilitate this, a static buffer is used to store the string
-   --  before it's sent to the SBI Debug Console.
-   --  The buffer is a fixed size, and the string is copied into the buffer
-   --  in blocks of this size.
-   ----------------------------------------------------------------------------
-   SBI_Log_Buffer_Length : constant := 128;
-
-   ----------------------------------------------------------------------------
-   --  Statically-allocated buffer used to transfer strings to the SBI Debug
-   --  Console.
-   --  This needs to have a static address, so that we can easily derive the
-   --  physical address to pass to the SBI call.
-   ----------------------------------------------------------------------------
-   SBI_Logging_Buffer : String (1 .. SBI_Log_Buffer_Length);
-
-   SBI_Logging_Buffer_Spinlock : Spinlock_T :=
-     (Locked        => 0,
-      Time_Acquired => 0,
-      Hart_Id       => No_Hart_Id,
-      Lock_Id       => Lock_Id_SBI_Log_Buffer);
-
-   function Should_Log_To_Debug_Console
-     (Tags : Log_Tags; Level : Log_Level_T) return Boolean;
-
-   procedure Print_String_To_SBI_Console (Message : String);
 
 end Logging;
