@@ -3,9 +3,10 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Memory.Allocators; use Memory.Allocators;
-with Memory.Kernel;     use Memory.Kernel;
-with Utilities;         use Utilities;
+with Memory.Allocators;   use Memory.Allocators;
+with Memory.Kernel;       use Memory.Kernel;
+with Processes.Scheduler; use Processes.Scheduler;
+with Utilities;           use Utilities;
 
 package body Devices.UART is
    procedure Handle_Rx_Data_Available_Interrupt
@@ -23,6 +24,10 @@ package body Devices.UART is
          & Integer'Image (Bytes_Read)
          & " bytes read.",
          Logging_Tags);
+
+      --  Wake any processes that were waiting for incoming data.
+      Wake_Processes_Waiting_For_Channel
+        (Address_To_Unsigned_64 (Device'Address));
 
       Result := Success;
    exception
@@ -362,7 +367,7 @@ package body Devices.UART is
          Result := Constraint_Exception;
    end Read_Into_Ring_Buffer;
 
-   procedure Read_All_Incoming_Data
+   procedure Read_All_Incoming_Data_Unlocked
      (Device     : in out Device_T;
       Bytes_Read : out Integer;
       Result     : out Function_Result) is
@@ -395,5 +400,101 @@ package body Devices.UART is
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Read_All_Incoming_Data");
          Result := Constraint_Exception;
+   end Read_All_Incoming_Data_Unlocked;
+
+   procedure Read_All_Incoming_Data
+     (Device     : in out Device_T;
+      Bytes_Read : out Integer;
+      Result     : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+      Read_All_Incoming_Data_Unlocked (Device, Bytes_Read, Result);
+      Release_Spinlock (Device.Spinlock);
    end Read_All_Incoming_Data;
+
+   procedure Claim_Buffered_Data
+     (Device     : in out Device_T;
+      Buffer     : out Byte_Array_T;
+      Bytes_Read : out Natural;
+      Result     : out Function_Result) is
+   begin
+      Bytes_Read := 0;
+      Result := Unset;
+
+      if Device.Ring_Buffer_Address = Null_Address
+        or else Device.Ring_Buffer_Size = 0
+      then
+         Log_Error ("Attempted to read from uninitialised UART ring buffer.");
+         Result := Not_Initialised;
+         return;
+      end if;
+
+      Ring_Buffer : Byte_Array_T (0 .. Device.Ring_Buffer_Size - 1)
+      with Import, Alignment => 1, Address => Device.Ring_Buffer_Address;
+
+      while Bytes_Read < Buffer'Length
+        and then
+          Device.Ring_Buffer_Offset_Read /= Device.Ring_Buffer_Offset_Write
+      loop
+         --  Copy the largest contiguous run available, bounded by the
+         --  ring buffer wrapping at its end and by the caller's buffer
+         --  capacity. This requires at most two iterations, one to copy the
+         --  first contiguous run, and one to copy the second contiguous run
+         --  if the ring buffer wraps around.
+         Available_Bytes : constant Natural :=
+           (if Device.Ring_Buffer_Offset_Read < Device.Ring_Buffer_Offset_Write
+            then
+              Device.Ring_Buffer_Offset_Write - Device.Ring_Buffer_Offset_Read
+            else Device.Ring_Buffer_Size - Device.Ring_Buffer_Offset_Read);
+
+         Number_Of_Bytes_To_Copy : constant Natural :=
+           Natural'Min (Available_Bytes, Buffer'Length - Bytes_Read);
+
+         Buffer
+           (Buffer'First + Bytes_Read
+            .. Buffer'First + Bytes_Read + Number_Of_Bytes_To_Copy - 1) :=
+           Ring_Buffer
+             (Device.Ring_Buffer_Offset_Read
+              .. Device.Ring_Buffer_Offset_Read + Number_Of_Bytes_To_Copy - 1);
+
+         Device.Ring_Buffer_Offset_Read :=
+           (Device.Ring_Buffer_Offset_Read + Number_Of_Bytes_To_Copy)
+           mod Device.Ring_Buffer_Size;
+
+         Bytes_Read := Bytes_Read + Number_Of_Bytes_To_Copy;
+      end loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Claim_Buffered_Data_Unlocked");
+         Bytes_Read := 0;
+         Result := Constraint_Exception;
+   end Claim_Buffered_Data;
+
+   procedure Read_Bytes
+     (Device     : in out Device_T;
+      Process    : in out Process_Control_Block_T;
+      Buffer     : out Byte_Array_T;
+      Bytes_Read : out Natural;
+      Result     : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+
+      loop
+         --  Attempt to read any previously read and buffered data. If the
+         --  incoming data ring buffer is empty, block the calling process
+         --  until there is data to read.
+         Claim_Buffered_Data (Device, Buffer, Bytes_Read, Result);
+         --  Exit on error, or if any data was read. Otherwise, block.
+         exit when Is_Error (Result) or else Bytes_Read > 0;
+
+         --  Blocks until woken by Handle_Rx_Data_Available_Interrupt.
+         --  Returns with Device.Spinlock held again.
+         Lock_Process_Waiting_For_Channel
+           (Address_To_Unsigned_64 (Device'Address), Device.Spinlock, Process);
+      end loop;
+
+      Release_Spinlock (Device.Spinlock);
+   end Read_Bytes;
 end Devices.UART;

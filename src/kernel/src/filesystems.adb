@@ -359,6 +359,42 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Open_File;
 
+   procedure Read_File_Node_Type_Device
+     (Process        : in out Process_Control_Block_T;
+      File_Handle    : Process_File_Handle_Access;
+      Buffer_Address : Virtual_Address_T;
+      Bytes_To_Read  : Natural;
+      Bytes_Read     : out Natural;
+      Result         : out Function_Result) is
+   begin
+      case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
+         when Device_Class_Serial =>
+            Data_To_Read : Byte_Array_T (1 .. Bytes_To_Read)
+            with Import, Alignment => 1, Address => Buffer_Address;
+
+            Devices.UART.Read_Bytes
+              (File_Handle.all.File.all.Mounted_Device.all,
+               Process,
+               Data_To_Read,
+               Bytes_Read,
+               Result);
+
+         when others              =>
+            Log_Error
+              ("Unsupported device class: "
+               & File_Handle.all.File.all.Mounted_Device.all
+                   .Device_Class'Image);
+            Bytes_Read := 0;
+            Result := Not_Supported;
+      end case;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Read_File_Node_Type_Device", Logging_Tags);
+         Bytes_Read := 0;
+         Result := Constraint_Exception;
+   end Read_File_Node_Type_Device;
+
    procedure Read_File_Node_Type_Regular_File
      (Process        : in out Process_Control_Block_T;
       File_Handle    : Process_File_Handle_Access;
@@ -477,6 +513,15 @@ package body Filesystems is
                Bytes_Read,
                Result);
 
+         when Filesystem_Node_Type_Device       =>
+            Read_File_Node_Type_Device
+              (Process,
+               File_Handle,
+               Buffer_Address,
+               Bytes_To_Read,
+               Bytes_Read,
+               Result);
+
          when others                            =>
             Log_Error
               ("Unsupported node type for reading: "
@@ -484,6 +529,10 @@ package body Filesystems is
             Bytes_Read := 0;
             Result := Function_Results.Not_Supported;
       end case;
+
+      Log_Debug
+        ("Filesystems.Read_File: " & Bytes_Read'Image & " bytes read.",
+         Logging_Tags);
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Read_File");

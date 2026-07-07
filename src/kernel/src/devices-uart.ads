@@ -74,6 +74,14 @@ is
    procedure Put_Bytes (Device : Device_T; Data : Byte_Array_T);
 
    procedure Put_Byte (Device : Device_T; Data : Unsigned_8);
+
+   procedure Read_Bytes
+     (Device     : in out Device_T;
+      Process    : in out Process_Control_Block_T;
+      Buffer     : out Byte_Array_T;
+      Bytes_Read : out Natural;
+      Result     : out Function_Result);
+
 private
    --  Register offsets.
    UART_Reg_Rx_Buffer_Tx_Holding         : constant := 0;

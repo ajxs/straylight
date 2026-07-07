@@ -10,6 +10,9 @@ elif [[ "$1" == "--quick" ]]; then
 elif [[ "$1" == "--log" ]]; then
 	# Build and run with qemu logging to a file.
 	make -C "src" clean; make -C "src" && make -C "src" emu-log
+elif [[ "$1" == "--socket" ]]; then
+	# Build and run with qemu logging to a file.
+	make -C "src" clean; make -C "src" && make -C "src" emu-socket
 else
 	# Full build: clean and build.
 	make -C "src" clean; make -C "src" && make -C "src" emu

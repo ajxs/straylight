@@ -60,7 +60,7 @@ QEMU_SERIAL_SOCKET   := /tmp/uart0.sock
 QEMU_SERIAL_OUTPUT       := stdio
 
 # Connect with socat - UNIX-CONNECT:${QEMU_SERIAL_SOCKET}
-# QEMU_SERIAL_OUTPUT       := unix:${QEMU_SERIAL_SOCKET},server,wait
+QEMU_SERIAL_SOCKET_OUTPUT       := unix:${QEMU_SERIAL_SOCKET},server,wait
 
 # https://kashyapc.wordpress.com/2016/02/11/qemu-command-line-behavior-of-serial-stdio-vs-serial-monstdio/
 # QEMU_SERIAL_OUTPUT       := mon:stdio
@@ -68,7 +68,6 @@ QEMU_SERIAL_OUTPUT_DEBUG := file:${SERIAL_FILENAME}
 
 QEMU_LOG_FILE            := qemu.log
 
-# all: ${KERNEL_BINARY}
 all: ${KERNEL_BINARY} ${USERSPACE_IMG}
 
 libs: ${LIBSTRAYLIGHT_BINARY} ${LIBC_BINARY}
@@ -102,6 +101,12 @@ emu-log: kernel ${BIOS}
 		${QEMU_DISPLAY_FLAGS} \
 		-serial ${QEMU_SERIAL_OUTPUT_DEBUG}
 
+emu-socket: kernel ${BIOS}
+	qemu-system-riscv64     \
+		${QEMU_FLAGS}         \
+		${QEMU_DISPLAY_FLAGS} \
+		-serial ${QEMU_SERIAL_SOCKET_OUTPUT}
+
 kernel: ${KERNEL_BINARY}
 
 libstraylight: ${LIBSTRAYLIGHT_BINARY}
@@ -126,3 +131,6 @@ ${USERSPACE_IMG}: libstraylight
 
 ${BIOS}:
 	CROSS_COMPILE=riscv64-linux-gnu- PLATFORM_RISCV_XLEN=64 make -C ${OPENSBI_DIR} PLATFORM=generic install
+
+connect-to-debug-socket:
+	socat - UNIX-CONNECT:${QEMU_SERIAL_SOCKET}
