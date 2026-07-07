@@ -44,6 +44,10 @@ extern FILE *stdin;
 extern FILE *stdout;
 extern FILE *stderr;
 
+int fgetc(FILE *stream);
+
+char *fgets(char *restrict str, int n, FILE *restrict stream);
+
 int fclose(FILE *stream);
 
 int feof(FILE *stream);

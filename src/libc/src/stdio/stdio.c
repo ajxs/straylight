@@ -6,12 +6,57 @@
 #include <string.h>
 #include <unistd.h>
 
-#define FREAD_BUFFER_SIZE 4096
 #define FWRITE_BUFFER_SIZE 4096
 
 FILE *stdin;
 FILE *stdout;
 FILE *stderr;
+
+int fgetc(FILE *stream)
+{
+	unsigned char c = 0;
+	size_t result = fread(&c, sizeof(char), 1, stream);
+	if (result == 1)
+	{
+		return (int)c;
+	}
+
+	return EOF;
+}
+
+char *fgets(char *restrict str, int n, FILE *restrict stream)
+{
+	if (n <= 0)
+	{
+		errno = EINVAL;
+		return NULL;
+	}
+
+	int i = 0;
+	while (i < n - 1)
+	{
+		int c = fgetc(stream);
+		if (c == EOF)
+		{
+			if (i == 0)
+			{
+				return NULL; // No characters read before EOF
+			}
+
+			break; // Stop reading on EOF
+		}
+
+		str[i++] = (char)c;
+
+		if (c == '\n')
+		{
+			break; // Stop reading on newline
+		}
+	}
+
+	str[i] = '\0'; // Null-terminate the string
+	return str;
+}
 
 int fclose(FILE *stream)
 {
@@ -122,96 +167,6 @@ FILE *fopen(const char *restrict pathname, const char *restrict mode)
 	file->mode_flags = open_flags;
 
 	return file;
-}
-
-size_t fread(void *restrict ptr, size_t size, size_t count,
-             FILE *restrict stream)
-{
-	if (count == 0 || size == 0)
-	{
-		return 0;
-	}
-
-	size_t total_bytes_to_read = size * count;
-	size_t total_bytes_read = 0;
-	size_t remaining_bytes_to_read = 0;
-	size_t current_bytes_to_copy_to_userspace = 0;
-
-	// Keep reading data until we've read the requested amount or reached EOF.
-	while (total_bytes_read < total_bytes_to_read)
-	{
-		remaining_bytes_to_read = total_bytes_to_read - total_bytes_read;
-
-		// If the stream buffer offset is 0, we need to fill the buffer.
-		if (stream->read_buffer_offset == 0)
-		{
-			// Is the stream buffer initialized?
-			if (stream->read_buffer_size == 0)
-			{
-				// Allocate the stream buffer.
-				stream->read_buffer_size = FREAD_BUFFER_SIZE;
-				stream->read_buffer_address = malloc(stream->read_buffer_size);
-				if (stream->read_buffer_address == NULL)
-				{
-					// errno already set to ENOMEM by malloc
-					return total_bytes_read / size;
-				}
-			}
-
-			int64_t read_result = straylight_libc_do_syscall(
-			    STRAYLIGHT_SYSCALL_FILE_READ, stream->file_handle_id,
-			    stream->read_buffer_address, FREAD_BUFFER_SIZE);
-			if (is_syscall_result_error(read_result))
-			{
-				errno = -read_result;
-				return total_bytes_read / size;
-			}
-
-			// If there's no more data to read, exit.
-			if (read_result == 0)
-			{
-				stream->eof = true;
-				break;
-			}
-
-			// Set the number of bytes in the buffer based upon the amount of data
-			// returned from the kernel.
-			// This variable becomes useful when the end of the file is reached, and
-			// less data is read than the full buffer size.
-			stream->read_buffer_valid_bytes = read_result;
-		}
-
-		// Is all the remaining data to read already inside the buffer?
-		if (remaining_bytes_to_read <=
-		    stream->read_buffer_valid_bytes - stream->read_buffer_offset)
-		{
-			current_bytes_to_copy_to_userspace = remaining_bytes_to_read;
-		}
-		else
-		{
-			// Copy all the remaining data in the buffer, and loop back around to
-			// keep reading the rest of the data.
-			current_bytes_to_copy_to_userspace =
-			    stream->read_buffer_valid_bytes - stream->read_buffer_offset;
-		}
-
-		// Copy the data from the stream buffer to the userspace buffer.
-		memcpy((uint8_t *)ptr + total_bytes_read,
-		       (uint8_t *)stream->read_buffer_address + stream->read_buffer_offset,
-		       current_bytes_to_copy_to_userspace);
-
-		total_bytes_read += current_bytes_to_copy_to_userspace;
-		stream->read_buffer_offset += current_bytes_to_copy_to_userspace;
-
-		// If we've read all the data in the buffer, reset the current buffer
-		// offset to 0 to indicate that the buffer needs refilling.
-		if (stream->read_buffer_offset >= stream->read_buffer_valid_bytes)
-		{
-			stream->read_buffer_offset = 0;
-		}
-	}
-
-	return total_bytes_read / size;
 }
 
 int fflush(FILE *stream)

@@ -18,3 +18,16 @@ int close(int fd)
 
 	return 0;
 }
+
+ssize_t read(int fildes, void *buf, size_t nbyte)
+{
+	int64_t result = straylight_libc_do_syscall(STRAYLIGHT_SYSCALL_FILE_READ,
+	                                            fildes, buf, nbyte);
+	if (is_syscall_result_error(result))
+	{
+		errno = -result;
+		return -1;
+	}
+
+	return result;
+}

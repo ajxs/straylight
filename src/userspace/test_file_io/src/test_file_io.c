@@ -6,7 +6,9 @@ int main()
 {
 	printf("Testing File IO!\n");
 
-	char *buffer = (char *)malloc(64);
+	const int buffer_size = 64;
+
+	char *buffer = (char *)malloc(buffer_size);
 	if (buffer == 0)
 	{
 		fprintf(stderr, "Failed to allocate memory!\n");
@@ -107,9 +109,22 @@ int main()
 		return EXIT_FAILURE;
 	}
 
-	printf("stdin: %u\nstdout: %u\nstderr: %u\n", stdin->file_handle_id,
-	       stdout->file_handle_id, stderr->file_handle_id);
-	fflush(stdout);
+	memset(buffer, 0, buffer_size);
+
+	do
+	{
+		printf("Enter a string:\n");
+		char *fgets_result = fgets(buffer, buffer_size, stdin);
+		if (fgets_result == NULL)
+		{
+			fprintf(stderr, "Failed to read input!\n");
+			return EXIT_FAILURE;
+		}
+
+		printf("You entered: %s", buffer);
+	} while (strcmp(buffer, "exit\n") != 0);
+
+	printf("Exiting program.\n");
 
 	return EXIT_SUCCESS;
 }

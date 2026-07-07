@@ -1,7 +1,7 @@
-#include <sys/types.h>
-
 #ifndef STRAYLIGHT_LIBC_FCNTL_H
 #define STRAYLIGHT_LIBC_FCNTL_H 1
+
+#include <sys/types.h>
 
 /** File Access Flags */
 #define FILE_ACCESS_FLAGS_OFFSET 0

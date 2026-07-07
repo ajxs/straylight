@@ -44,9 +44,9 @@ CFLAGS :=                        \
 
 ASFLAGS  := -I$(INC_DIR)
 
-# Sources
-C_SRCS  := $(wildcard $(SRC_DIR)/*.c)
-S_SRCS  := $(wildcard $(SRC_DIR)/*.S)
+# Sources (recursive)
+C_SRCS  := $(shell find $(SRC_DIR) -name '*.c')
+S_SRCS  := $(shell find $(SRC_DIR) -name '*.S')
 
 # Objects
 C_OBJS  := $(C_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
@@ -61,16 +61,14 @@ $(LIB): $(OBJS)
 	$(AR) $(ARFLAGS) $@ $^
 
 # C compilation
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Assembly compilation (.S = preprocessed)
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.S | $(OBJ_DIR)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.S
+	@mkdir -p $(dir $@)
 	$(CC) $(ASFLAGS) -c $< -o $@
-
-# Ensure object directory exists
-$(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)
 
 # Cleanup
 clean:
