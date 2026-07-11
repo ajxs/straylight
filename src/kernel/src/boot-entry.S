@@ -68,18 +68,8 @@ _start:
 # disable any address translation.
 	csrw satp, zero
 
-# Set up the supervisor-mode trap vector.
-	lla   t0, traps_entry
-	csrw stvec, t0
-
-# Enable supervisor-mode timer and external interrupts, but leave interrupts 
-# disabled until we're ready to jump into userspace.
-	li   t0, SIE_SEIE | SIE_STIE
-	csrs sie, t0
-
-# Disable supervisor-mode interrupts.
-	li   t0, SSTATUS_SIE
-	csrc sstatus, t0
+# Set up supervisor-mode trap handling (trap vector, sscratch, interrupts).
+	call initialise_hart_supervisor_trap_handling
 
 # This call jumps into the Ada code to set up the boot page tables.
 	mv a0, a1
@@ -144,6 +134,37 @@ cpu_halt:
 
 
 ###############################################################################
+# Initialises supervisor-mode trap handling for the current hart.
+# Sets the trap vector, clears sscratch, enables the timer and external 
+# interrupt sources, and leaves supervisor interrupts globally disabled until 
+# the hart is ready to enter userspace.
+# sscratch is cleared to zero to establish the supervisor-mode invariant 
+# expected by traps_entry.
+###############################################################################
+.type initialise_hart_supervisor_trap_handling, @function
+initialise_hart_supervisor_trap_handling:
+# Set up the supervisor-mode trap vector.
+	la   t0, traps_entry
+	csrw stvec, t0
+
+# Zero sscratch to establish the supervisor-mode invariant expected by
+# traps_entry before any trap can fire. sscratch only becomes non-zero while a
+# user process is running.
+	csrw sscratch, zero
+
+# Enable supervisor-mode timer and external interrupts, but leave interrupts
+# disabled until we're ready to jump into userspace.
+	li   t0, SIE_SEIE | SIE_STIE
+	csrs sie, t0
+
+# Disable supervisor-mode interrupts.
+	li   t0, SSTATUS_SIE
+	csrc sstatus, t0
+
+	ret
+
+
+###############################################################################
 # Non-boot hart entry point.
 # Once non-boot harts have been started by the boot hart via SBI,
 # they will jump to this entry point.
@@ -163,14 +184,8 @@ non_boot_hart_entry:
 	li   t0, SSTATUS_SUM
 	csrs sstatus, t0
 
-# Enable supervisor-mode timer and external interrupts, but leave interrupts 
-# disabled until we're ready to jump into userspace.
-	li   t0, SIE_SEIE | SIE_STIE
-	csrs sie, t0
-
-# Set up the supervisor-mode trap vector.
-	la   t0, traps_entry
-	csrw stvec, t0
+# Set up supervisor-mode trap handling (trap vector, sscratch, interrupts).
+	call initialise_hart_supervisor_trap_handling
 
 # Create SATP value for boot page table.
 	ld   t0, boot_root_page_table

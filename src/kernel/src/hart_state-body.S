@@ -28,4 +28,8 @@ hart_state_get_hart_state:
 .global store_hart_state_pointer
 store_hart_state_pointer:
 	mv tp, a0
+	# Sscratch is always zeroed when running in supervisor mode.
+	# It holds the hart state pointer while running in user mode.
+	# This lets the trap entry routine distinguish user from supervisor traps.
+	csrw sscratch, x0
 	ret

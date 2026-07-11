@@ -37,19 +37,24 @@
 .global traps_entry
 .type traps_entry, @function
 traps_entry:
-# Determine whether the trap came from user mode or supervisor mode.
-# t6 will be restored below.
-	csrw  sscratch, t6
-	csrr  t6, sstatus
-	andi  t6, t6, SSTATUS_SPP
+# Determine the source of the trap by checking sscratch.
+# After atomically swapping tp with sscratch:
+#   Trap from user mode:       tp = &hart_state,  sscratch = user's tp.
+#   Trap from supervisor mode: tp = 0,            sscratch = &hart_state.
+	csrrw tp, sscratch, tp
 
-# If SPP == 1, the trap has come from supervisor mode, and we don't need to
-# reload the kernel stack pointer.
-	bnez  t6, save_process_state_to_kernel_stack
+# A non-zero tp means the trap came from user mode, because sscratch previously
+# held the hart state pointer.
+	bnez  tp, user_mode_trap
+
+# Supervisor-mode trap: Move the hart state pointer from sscratch to tp, and 
+# clear sscratch to zero.
+	csrrw tp, sscratch, x0
+	j     save_process_state_to_kernel_stack
 
 user_mode_trap:
-# Since t6 has been saved in sscratch is currently a scratch variable, use 
-# this to load the PCB pointer from the Hart state (tp).
+# tp now holds the hart state pointer; the user's tp is stashed in sscratch and
+# is written into its trap context slot after the register save loop below.
 	ld t6, HART_STATE_PCB_POINTER_OFFSET(tp)
 
 # Save the user stack pointer to the PCB.
@@ -62,9 +67,6 @@ user_mode_trap:
 	ld sp, KERNEL_CONTEXT_OFFSET_SP(t6)
 
 save_process_state_to_kernel_stack:
-# Restore t6 from sscratch.
-	csrr t6, sscratch
-
 	addi sp, sp, -TRAP_CONTEXT_SIZE
 
 # Note: For supervisor-mode traps, the stack pointer in x2 saved here points
@@ -75,6 +77,21 @@ save_process_state_to_kernel_stack:
 		.set i, i+1
 	.endr
 
+# The save loop above stored the hart state pointer into the tp (x4) slot,
+# since tp currently holds it. 
+# For user-mode traps the process' real thread pointer is stashed in sscratch,
+# so overwrite the slot with it and clear sscratch to re-establish the
+# supervisor invariant (sscratch == 0) while the handler runs.
+# For supervisor-mode traps the correct tp was already saved and sscratch is
+# already zero, so this fixup is skipped.
+	csrr t0, sstatus
+	andi t0, t0, SSTATUS_SPP
+	bnez t0, check_fp_save
+	csrr t0, sscratch
+	sd   t0, TRAP_CONTEXT_OFFSET_TP(sp)
+	csrw sscratch, x0
+
+check_fp_save:
 # Read the FS field from sstatus to determine whether we need to save
 # the floating point registers.
 	csrr t0, sstatus
@@ -181,29 +198,40 @@ skip_fp_restore:
 # reload the stack pointer.
 	bnez  t6, restore_gp_pointers_and_return_to_supervisor_mode
 
-	.set  i, 0
-	.rept 32
-		restore_gp_register %i, sp
-		.set i, i+1
-	.endr
+# Restore sscratch to the hart state pointer (currently in tp) so the next trap
+# from user mode can bootstrap via the swap at the top of traps_entry.
+	csrw sscratch, tp
 
 # Re-save the kernel stack pointer before restoring the user stack pointer.
 # This is important, as the process may have been pre-empted during the trap,
 # and the kernel stack pointer with the trap frame may have been persisted in
 # the PCB's kernel context by the scheduler. This will ensure that the correct
 # stack pointer is saved.
-	addi sp, sp, TRAP_CONTEXT_SIZE
-
-# temporarily save t6 in sscratch, then use it to load the PCB pointer.
-	csrw sscratch, t6
-
+# This is done here, before the register restore loop, because it relies on tp
+# still holding the hart state pointer.
 	ld t6, HART_STATE_PCB_POINTER_OFFSET(tp)
-	sd sp, KERNEL_CONTEXT_OFFSET_SP(t6)
+	addi t0, sp, TRAP_CONTEXT_SIZE
+	sd t0, KERNEL_CONTEXT_OFFSET_SP(t6)
 
-	ld sp, PCB_OFFSET_USER_SP(t6)
+# Save the user stack pointer into its trap context slot. It is restored as 
+# the very last step below, so that sp remains the trap frame base for every 
+# other register load.
+	ld t0, PCB_OFFSET_USER_SP(t6)
+	sd t0, TRAP_CONTEXT_OFFSET_SP(sp)
 
-# Restore t6 from sscratch before returning to user mode.
-	csrr t6, sscratch
+# Restore every general-purpose register except sp (x2), using the trap frame
+# base still held in sp. tp (x4) is restored here to the process' own thread
+# pointer, since the hart state pointer now lives in sscratch.
+	.set  i, 0
+	.rept 32
+		.if i != 2
+			restore_gp_register %i, sp
+		.endif
+		.set i, i+1
+	.endr
+
+# Finally restore the user stack pointer from its slot.
+	ld sp, TRAP_CONTEXT_OFFSET_SP(sp)
 
 return_to_user_mode:
 	sret

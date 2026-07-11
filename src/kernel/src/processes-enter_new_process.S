@@ -22,5 +22,12 @@ processes_enter_new_process:
 
 	csrc sstatus, t0
 
+	# Establish the user-mode invariant before entering the process: sscratch
+	# holds the hart state pointer (currently in tp) so the first trap can
+	# bootstrap via the swap in traps_entry, and tp is reset to a clean thread
+	# pointer for the new process.
+	csrw sscratch, tp
+	li   tp, 0
+
 	# Return into the user process.
 	sret
