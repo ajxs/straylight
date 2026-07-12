@@ -4,7 +4,6 @@
 -------------------------------------------------------------------------------
 
 with Hart_State; use Hart_State;
-with Utilities;  use Utilities;
 
 package body Processes.Scheduler is
    procedure Schedule_Next_Process_Unlocked
@@ -118,39 +117,22 @@ package body Processes.Scheduler is
      (Prev_Process, Next_Process : Process_Control_Block_Access)
    is
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
-
-      Old_Process_Name, New_Process_Name : String (1 .. 24) :=
-        "None                    ";
    begin
-      if Next_Process = Hart_Idle_Processes (Hart_Id) then
-         Set_Fixed_Length_String
-           ("Idle (PID#" & Next_Process.all.Process_Id'Image & ")",
-            New_Process_Name);
-      else
-         Set_Fixed_Length_String
-           ("PID#" & Next_Process.all.Process_Id'Image, New_Process_Name);
-      end if;
-
-      if Prev_Process = Hart_Idle_Processes (Hart_Id) then
-         Set_Fixed_Length_String
-           ("Idle (PID#" & Prev_Process.all.Process_Id'Image & ")",
-            Old_Process_Name);
-      elsif Prev_Process /= null then
-         Set_Fixed_Length_String
-           ("PID#" & Prev_Process.all.Process_Id'Image, Old_Process_Name);
-      end if;
-
       Log_Debug
-        ("Scheduler.Run:"
-         & ASCII.LF
-         & "  Hart#"
-         & Hart_Id'Image
-         & ASCII.LF
-         & "  Old Process: "
-         & Old_Process_Name
-         & ASCII.LF
-         & "  New Process: "
-         & New_Process_Name,
+        ("Scheduler.Run: "
+         & (if Prev_Process /= null
+            then
+              "Old PID#"
+              & Prev_Process.all.Process_Id'Image
+              & (if Prev_Process = Hart_Idle_Processes (Hart_Id)
+                 then " (Idle)"
+                 else "")
+            else "No previous process")
+         & ", New PID#"
+         & Next_Process.all.Process_Id'Image
+         & (if Next_Process = Hart_Idle_Processes (Hart_Id)
+            then " (Idle)"
+            else ""),
          Logging_Tags_Scheduler);
    exception
       when Constraint_Error =>
@@ -228,9 +210,7 @@ package body Processes.Scheduler is
 
       --  A previously pre-empted process will resume execution here when
       --  control returns to it, after being scheduled again.
-      Log_Debug
-        ("Scheduler.Run: Hart#" & Hart_Id'Image & " exiting scheduler",
-         Logging_Tags_Scheduler);
+      Log_Debug ("Scheduler.Run: Exiting scheduler", Logging_Tags_Scheduler);
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Scheduler.Run");
@@ -258,8 +238,7 @@ package body Processes.Scheduler is
       --  A previously pre-empted process will resume execution here when
       --  control returns to it, after being scheduled again.
       Log_Debug
-        ("Scheduler.Run_Guarded: Hart#" & Hart_Id'Image & " exiting scheduler",
-         Logging_Tags_Scheduler);
+        ("Scheduler.Run_Guarded: Exiting scheduler", Logging_Tags_Scheduler);
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Scheduler.Run_Guarded");
@@ -282,7 +261,7 @@ package body Processes.Scheduler is
            and then Curr_Process.all.Blocked_By_Channel = Channel
          then
             Log_Debug
-              ("Waking process with PID# " & Curr_Process.all.Process_Id'Image,
+              ("Waking process with PID#" & Curr_Process.all.Process_Id'Image,
                Logging_Tags_Scheduler);
 
             Curr_Process.all.Status := Process_Ready;
