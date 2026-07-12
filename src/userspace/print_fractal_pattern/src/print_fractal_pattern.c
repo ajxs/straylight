@@ -11,6 +11,11 @@ int main()
 	const uint16_t horizontal_resolution = 640;
 	const uint16_t vertical_resolution = 480;
 
+	const uint16_t window_width = horizontal_resolution / 2;
+	const uint16_t window_height = vertical_resolution / 2;
+	const uint16_t window_x = 0;
+	const uint16_t window_y = 0;
+
 	uintptr_t framebuffer_address =
 	    (uintptr_t)malloc(horizontal_resolution * vertical_resolution * 4);
 	if (framebuffer_address == 0)
@@ -29,20 +34,23 @@ int main()
 
 	while (1)
 	{
-		for (y = 0; y < vertical_resolution; y++)
+		for (y = 0; y < window_height; y++)
 		{
-			for (x = 0; x < horizontal_resolution; x++)
+			for (x = 0; x < window_width; x++)
 			{
-				c = (x ^ y) % 256;
+				const uint16_t px = x + window_x;
+				const uint16_t py = y + window_y;
+
+				c = (px ^ py) % 256;
 				colour = straylight_graphics_make_colour(255 - (c % q), c, c % q, 255);
 
-				pixel = x + (y * horizontal_resolution);
+				pixel = px + (py * horizontal_resolution);
 				((uint32_t *)framebuffer_address)[pixel] = colour;
 			}
 		}
 
-		uint64_t result =
-		    straylight_graphics_update_framebuffer(framebuffer_address);
+		uint64_t result = straylight_graphics_update_framebuffer(
+		    framebuffer_address, window_x, window_y, window_width, window_height);
 		if (result != 0)
 		{
 			fprintf(stderr, "Failed to update framebuffer\n");

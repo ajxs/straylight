@@ -3,18 +3,16 @@
 
 #include <stdint.h>
 
-void straylight_graphics_fill_framebuffer(
-		uintptr_t framebuffer_address,
-		uint32_t width,
-		uint32_t height,
-		uint32_t color);
+void straylight_graphics_fill_framebuffer(uintptr_t framebuffer_address,
+                                          uint32_t width, uint32_t height,
+                                          uint32_t color);
 
-uint64_t straylight_graphics_update_framebuffer(uintptr_t framebuffer_address);
+uint64_t straylight_graphics_update_framebuffer(uintptr_t framebuffer_address,
+                                                uint64_t x, uint64_t y,
+                                                uint64_t width,
+                                                uint64_t height);
 
-uint32_t straylight_graphics_make_colour(
-		uint8_t red,
-		uint8_t green,
-		uint8_t blue,
-		uint8_t alpha);
+uint32_t straylight_graphics_make_colour(uint8_t red, uint8_t green,
+                                         uint8_t blue, uint8_t alpha);
 
 #endif

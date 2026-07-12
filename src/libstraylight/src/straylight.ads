@@ -57,7 +57,9 @@ private
      (Syscall_Number : Unsigned_64;
       Arg1           : Unsigned_64 := 0;
       Arg2           : Unsigned_64 := 0;
-      Arg3           : Unsigned_64 := 0) return Syscall_Result_T
+      Arg3           : Unsigned_64 := 0;
+      Arg4           : Unsigned_64 := 0;
+      Arg5           : Unsigned_64 := 0) return Syscall_Result_T
    with
      Volatile_Function,
      Import,

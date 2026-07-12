@@ -3,7 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with System; use System;
+with System;                  use System;
+with System.Storage_Elements; use System.Storage_Elements;
 
 with Devices;
 with Devices.UART;
@@ -246,7 +247,10 @@ package body System_Calls is
 
       User_Framebuffer_Address : Virtual_Address_T := Null_Address;
 
-      Kernel_Framebuffer_Size : Natural := 0;
+      User_Pixel_Data_X,
+      User_Pixel_Data_Y,
+      User_Pixel_Data_Width,
+      User_Pixel_Data_Height : Unsigned_32 := 0;
 
       Graphics_Device renames Devices.System_Devices (6);
    begin
@@ -255,36 +259,99 @@ package body System_Calls is
       User_Framebuffer_Address :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
 
-      Kernel_Framebuffer_Size :=
-        Integer
-          (Graphics_Device.Framebuffer_Width
-           * Graphics_Device.Framebuffer_Height)
-        * 4;
+      User_Pixel_Data_X := Unsigned_32 (Trap_Context.Gp_Registers (a2));
+      User_Pixel_Data_Y := Unsigned_32 (Trap_Context.Gp_Registers (a3));
+      User_Pixel_Data_Width := Unsigned_32 (Trap_Context.Gp_Registers (a4));
+      User_Pixel_Data_Height := Unsigned_32 (Trap_Context.Gp_Registers (a5));
 
-      if not Is_Valid_Userspace_Address_Range
-               (User_Framebuffer_Address, Kernel_Framebuffer_Size)
+      --  Reject any rectangle that extends beyond the framebuffer bounds.
+      --  The rectangle dimensions are untrusted userspace values that drive
+      --  both the row copy below and the GPU transfer offset, so an
+      --  out-of-bounds rectangle would read/write past the framebuffer.
+      --  Validated first so the offset arithmetic below cannot overflow, and
+      --  computed in Unsigned_64 to avoid wraparound on the additions.
+      if Unsigned_64 (User_Pixel_Data_X) + Unsigned_64 (User_Pixel_Data_Width)
+        > Unsigned_64 (Graphics_Device.Framebuffer_Width)
+        or else
+          Unsigned_64 (User_Pixel_Data_Y)
+          + Unsigned_64 (User_Pixel_Data_Height)
+          > Unsigned_64 (Graphics_Device.Framebuffer_Height)
       then
-         Log_Error ("Invalid non-userspace address range", Logging_Tags);
+         Log_Error ("Framebuffer rectangle out of bounds", Logging_Tags);
 
          Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
+           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
 
          goto Syscall_Unsuccessful_No_Kernel_Error;
       end if;
 
-      Copy
-        (Source => User_Framebuffer_Address,
-         Dest   => Graphics_Device.Framebuffer_Addresses.Virtual_Address,
-         Count  => Kernel_Framebuffer_Size);
+      --  An empty rectangle reads and writes nothing, so there is no work to
+      --  do. Returning here also guarantees the width and height are non-zero
+      --  below, keeping the row loop and the offset arithmetic well-defined.
+      if User_Pixel_Data_Width = 0 or else User_Pixel_Data_Height = 0 then
+         Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
+         Result := Success;
+         return;
+      end if;
+
+      --  Confirm the region actually read lies within userspace. The pixel
+      --  data is laid out at the full framebuffer stride, so the highest byte
+      --  read is the end of the rectangle's bottom-most row; validating only
+      --  that extent avoids assuming the caller mapped a whole framebuffer.
+      Validate_User_Buffer : declare
+         Bytes_Per_Pixel : constant := 4;
+         Stride          : constant Natural :=
+           Natural (Graphics_Device.Framebuffer_Width) * Bytes_Per_Pixel;
+         End_Offset      : constant Natural :=
+           (Natural (User_Pixel_Data_Y) + Natural (User_Pixel_Data_Height) - 1)
+           * Stride
+           + (Natural (User_Pixel_Data_X) + Natural (User_Pixel_Data_Width))
+             * Bytes_Per_Pixel;
+      begin
+         if not Is_Valid_Userspace_Address_Range
+                  (User_Framebuffer_Address, End_Offset)
+         then
+            Log_Error ("Invalid non-userspace address range", Logging_Tags);
+
+            Trap_Context.Gp_Registers (a0) :=
+              Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
+
+            goto Syscall_Unsuccessful_No_Kernel_Error;
+         end if;
+      end Validate_User_Buffer;
+
+      Copy_Pixel_Data : declare
+         Bytes_Per_Pixel : constant := 4;
+         Stride          : constant Storage_Offset :=
+           Storage_Offset (Graphics_Device.Framebuffer_Width)
+           * Bytes_Per_Pixel;
+         Row_Bytes       : constant Integer :=
+           Integer (User_Pixel_Data_Width) * Bytes_Per_Pixel;
+      begin
+         for Row in 0 .. User_Pixel_Data_Height - 1 loop
+            declare
+               Row_Offset : constant Storage_Offset :=
+                 Storage_Offset (User_Pixel_Data_Y + Row) * Stride
+                 + Storage_Offset (User_Pixel_Data_X) * Bytes_Per_Pixel;
+            begin
+               Copy
+                 (Source => User_Framebuffer_Address + Row_Offset,
+                  Dest   =>
+                    Graphics_Device.Framebuffer_Addresses.Virtual_Address
+                    + Row_Offset,
+                  Count  => Row_Bytes);
+            end;
+         end loop;
+      end Copy_Pixel_Data;
 
       Devices.Virtio.Graphics.Transfer_To_Host_2d
         (Process,
          Graphics_Device,
          Graphics_Device.Bus_Info.Virtio.Resource_Id,
-         0,
-         0,
-         Graphics_Device.Framebuffer_Width,
-         Graphics_Device.Framebuffer_Height,
+         User_Pixel_Data_X,
+         User_Pixel_Data_Y,
+         User_Pixel_Data_Width,
+         User_Pixel_Data_Height,
          Result);
       if Is_Error (Result) then
          --  Error already logged.
@@ -295,10 +362,10 @@ package body System_Calls is
         (Process,
          Graphics_Device,
          Graphics_Device.Bus_Info.Virtio.Resource_Id,
-         0,
-         0,
-         Graphics_Device.Framebuffer_Width,
-         Graphics_Device.Framebuffer_Height,
+         User_Pixel_Data_X,
+         User_Pixel_Data_Y,
+         User_Pixel_Data_Width,
+         User_Pixel_Data_Height,
          Result);
       if Is_Error (Result) then
          Log_Error ("Error transferring: " & Result'Image);

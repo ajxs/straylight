@@ -56,12 +56,12 @@ C_SOURCES  :=               \
 OBJECTS    := ${AS_SOURCES:.S=.o}
 OBJECTS    += ${C_SOURCES:.c=.o}
 
-BUILD_DIR     := build
-KERNEL_BINARY := ${BUILD_DIR}/print_fractal_pattern.elf
+BUILD_DIR := build
+BINARY    := ${BUILD_DIR}/print_fractal_pattern.elf
 
 .PHONY: all clean
 
-all: ${KERNEL_BINARY}
+all: ${BINARY}
 
 ${BUILD_DIR}:
 	mkdir -p ${BUILD_DIR}
@@ -70,8 +70,8 @@ clean:
 	rm -f ${OBJECTS}
 	rm -rf ${BUILD_DIR}
 
-${KERNEL_BINARY}: ${OBJECTS} ${BUILD_DIR}
-	${CC} ${LDFLAGS} ${OBJECTS} -o ${KERNEL_BINARY} ${LIBS}
+${BINARY}: ${OBJECTS} ${BUILD_DIR}
+	${CC} ${LDFLAGS} ${OBJECTS} -o ${BINARY} ${LIBS}
 
 %.o: %.S
 	${CC} ${INCLUDE_FLAG} -g -c $< -o $@ ${CFLAGS}
