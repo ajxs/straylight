@@ -28,6 +28,32 @@ with Traps;
 with Utilities;            use Utilities;
 
 package body Boot is
+   --  An issue currently exists here with phantom Constraint_Error warnings.
+   --  To work around this, we disable warnings for these functions.
+   pragma Warnings (Off, "Constraint_Error");
+   function Get_Boot_Secondary_Stack_Virtual_Address
+     (Hart_Id : Integer) return Virtual_Address_T
+   with Inline, Pure_Function
+   is
+   begin
+      return
+        Boot_Secondary_Stack_Virtual_Address_Base
+        + Storage_Offset (Hart_Id * Boot_Secondary_Stack_Size);
+   end Get_Boot_Secondary_Stack_Virtual_Address;
+   pragma Warnings (On);
+
+   pragma Warnings (Off, "Constraint_Error");
+   function Get_Boot_Secondary_Stack_Physical_Address
+     (Hart_Id : Integer) return Physical_Address_T
+   with Inline, Pure_Function
+   is
+   begin
+      return
+        Boot_Secondary_Stack_Phys_Address_Base
+        + Storage_Offset (Hart_Id * Boot_Secondary_Stack_Size);
+   end Get_Boot_Secondary_Stack_Physical_Address;
+   pragma Warnings (On);
+
    procedure Free_Boot_Memory is
       --  These are the physical memory addresses of the boot section, with the
       --  higher-half offset added. This is so that they are loadable from the
@@ -480,7 +506,7 @@ package body Boot is
 
       --  Set the Init process' entry point.
       --  Instead of 'returning' to the normal userland process initialisation
-      --  procedure, we jump to the kernel-level 'Start_Init_Process'.
+      --  procedure, we jump to the kernel-level init process.
       Init_Process.all.Kernel_Context (ra) :=
         Address_To_Unsigned_64 (Start_Init_Process'Address);
 
@@ -607,8 +633,7 @@ package body Boot is
 
    procedure Initialise_Kernel_Services (Hart_Id : Hart_Index_T) is
    begin
-      Log_Debug
-        ("Initialising kernel services. Hart#" & Hart_Id'Image, Logging_Tags);
+      Log_Debug ("Initialising kernel services...", Logging_Tags);
 
       Initialise_Kernel_Heap;
 
@@ -622,19 +647,18 @@ package body Boot is
 
       Initialise_Filesystem;
 
+      --  Certain kernel services, such as device IO, require a process context
+      --  to operate in, so we create the init process here.
       Initialise_Init_Process;
 
       Start_Non_Boot_Harts;
 
       Traps.Setup_Next_Timer_Interrupt;
 
-      Log_Debug
-        ("Set initial system tick for Hart#" & Hart_Id'Image, Logging_Tags);
+      Log_Debug ("Set initial system tick.", Logging_Tags);
 
+      --  The scheduler will jump to the init process.
       Processes.Scheduler.Run;
-   exception
-      when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Kernel_Services");
    end Initialise_Kernel_Services;
 
    procedure Initialise_Graphics is
@@ -752,8 +776,9 @@ package body Boot is
          "/Devices/Disk/Programs/print_fractal_pattern.elf",
          Result);
 
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all, "/Devices/Disk/Programs/test_file_io.elf", Result);
+      --  Loader.Load_New_Process_From_Filesystem
+      --    (Init_Process.all, "/Devices/Disk/Programs/test_file_io.elf",
+      --  Result);
 
       --  Loader.Load_New_Process_From_Filesystem
       --    (Init_Process.all,
@@ -911,31 +936,9 @@ package body Boot is
          Panic ("Constraint_Error: Non_Boot_Hart_Entry");
    end Non_Boot_Hart_Entry;
 
-   --  An issue currently exists here with phantom Constraint_Error warnings.
-   --  To work around this, we disable warnings for these functions.
-   pragma Warnings (Off, "Constraint_Error");
-   function Get_Boot_Secondary_Stack_Virtual_Address
-     (Hart_Id : Integer) return Virtual_Address_T is
-   begin
-      return
-        Boot_Secondary_Stack_Virtual_Address_Base
-        + Storage_Offset (Hart_Id * Boot_Secondary_Stack_Size);
-   end Get_Boot_Secondary_Stack_Virtual_Address;
-   pragma Warnings (On);
-
-   pragma Warnings (Off, "Constraint_Error");
-   function Get_Boot_Secondary_Stack_Physical_Address
-     (Hart_Id : Integer) return Physical_Address_T is
-   begin
-      return
-        Boot_Secondary_Stack_Phys_Address_Base
-        + Storage_Offset (Hart_Id * Boot_Secondary_Stack_Size);
-   end Get_Boot_Secondary_Stack_Physical_Address;
-   pragma Warnings (On);
-
    procedure Non_Boot_Hart_Start (Hart_Id : Hart_Index_T) is
    begin
-      Log_Debug ("Started non-boot hart: " & Hart_Id'Image, Logging_Tags);
+      Log_Debug ("Started non-boot hart#" & Hart_Id'Image, Logging_Tags);
 
       Initialise_Hart_Idle_Process (Hart_Id);
 

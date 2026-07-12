@@ -89,14 +89,6 @@ private
 
    Boot_Secondary_Stack_Size : constant := 16#1000#;
 
-   function Get_Boot_Secondary_Stack_Virtual_Address
-     (Hart_Id : Integer) return Virtual_Address_T
-   with Inline, Pure_Function;
-
-   function Get_Boot_Secondary_Stack_Physical_Address
-     (Hart_Id : Integer) return Physical_Address_T
-   with Inline, Pure_Function;
-
    --  Loads the provided SATP, stack pointer, and jumps to the specified
    --  return address. This is used to switch into the kernel's address space
    --  from the boot code.
