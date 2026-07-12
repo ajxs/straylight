@@ -693,7 +693,15 @@ package body Devices.Virtio.Graphics is
                Ctx_Id    => 0,
                Padding   => 0),
             R           => (X => X, Y => Y, Width => Width, Height => Height),
-            Offset      => 0,
+            --  Byte offset of the rectangle's top-left pixel within the
+            --  linear backing framebuffer. The device reads rows sequentially
+            --  from here using the resource stride (Framebuffer_Width), so
+            --  this is the address of the new pixel data that was copied in.
+            Offset      =>
+              (Unsigned_64 (Y)
+               * Unsigned_64 (Device.Framebuffer_Width)
+               + Unsigned_64 (X))
+              * 4,
             Resource_Id => Resource_Id,
             Padding     => 0);
       end Setup_Request;
