@@ -76,18 +76,25 @@ package body Logging.Debug_Console is
    end Print_String_To_SBI_Console;
 
    procedure Log_To_Debug_Console (Message : String; Level : Log_Level_T) is
-      System_Time : constant Unsigned_64 := RISCV.Get_System_Time;
+      System_Time  : constant Unsigned_64 := RISCV.Get_System_Time;
+      Current_Hart : constant Hart_Index_T := Get_Current_Hart_Id;
    begin
       Acquire_Spinlock (SBI_Logging_Buffer_Spinlock);
       Print_String_To_SBI_Console
-        ((if Level = Log_Level_Error
-          then "Error: "
-          elsif Level = Log_Level_Info
-          then "Info: "
-          else "Debug: ")
+        ("hart="
+         & Current_Hart'Image
+         & " time="
          & System_Time'Image
-         & ": "
+         & " level="
+         & (if Level = Log_Level_Error
+            then "Error"
+            elsif Level = Log_Level_Info
+            then "Info"
+            else "Debug")
+         & " message="
+         & ASCII.Quotation
          & Message
+         & ASCII.Quotation
          & ASCII.LF);
       Release_Spinlock (SBI_Logging_Buffer_Spinlock);
    exception
