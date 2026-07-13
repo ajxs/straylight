@@ -239,7 +239,9 @@ package body Processes is
    is
    begin
       Acquire_Spinlock (Process_Id_Spinlock);
+      Acquire_Spinlock (Process.Spinlock);
       Deallocate_Process_Unlocked (Process, Result);
+      Release_Spinlock (Process.Spinlock);
       Release_Spinlock (Process_Id_Spinlock);
    end Deallocate_Process;
 
