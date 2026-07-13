@@ -54,6 +54,32 @@ package body Boot is
    end Get_Boot_Secondary_Stack_Physical_Address;
    pragma Warnings (On);
 
+   procedure Initialise_Hart_Boot_Secondary_Stack
+     (Hart_Id : Integer; Boot_Secondary_Stack_Top : out Virtual_Address_T)
+   is
+      Result : Function_Result := Unset;
+   begin
+      Boot_Secondary_Stack_Phys_Address : constant Physical_Address_T :=
+        Get_Boot_Secondary_Stack_Physical_Address (Hart_Id);
+
+      Boot_Secondary_Stack_Virtual_Address : constant Virtual_Address_T :=
+        Get_Boot_Secondary_Stack_Virtual_Address (Hart_Id);
+
+      Map_Kernel_Memory
+        (Boot_Secondary_Stack_Virtual_Address,
+         Boot_Secondary_Stack_Phys_Address,
+         Boot_Secondary_Stack_Size,
+         (True, True, False, False),
+         Result);
+      if Is_Error (Result) then
+         --  Error already printed.
+         Panic;
+      end if;
+
+      Boot_Secondary_Stack_Top :=
+        Boot_Secondary_Stack_Virtual_Address + Boot_Secondary_Stack_Size;
+   end Initialise_Hart_Boot_Secondary_Stack;
+
    procedure Free_Boot_Memory is
       --  These are the physical memory addresses of the boot section, with the
       --  higher-half offset added. This is so that they are loadable from the
@@ -487,7 +513,8 @@ package body Boot is
          Hart_Id                                    => Hart_Index_T (Hart_Id),
          Interrupts_Off_Counter                     => 0,
          Interrupts_Enabled_Before_Initial_Push_Off => False,
-         Hart_Status                                => Hart_State_Initialised);
+         Hart_Status                                => Hart_State_Initialised,
+         Previous_Process                           => null);
 
       Save_Hart_State_Pointer (Hart_States (Hart_Id)'Address);
    exception
@@ -522,6 +549,8 @@ package body Boot is
    procedure Kernel_Main (Hart_Id : Integer; DTB_Address : Physical_Address_T)
    is
       Result : Function_Result := Unset;
+
+      Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
    begin
       --  This needs to be the first function called on each hart to set up
       --  the hart's state structure. This needs be called before any logging
@@ -549,10 +578,6 @@ package body Boot is
 
       Initialise_Kernel_Address_Space;
 
-      Log_Debug
-        ("Initialising boot secondary stack for Hart " & Hart_Id'Image & "...",
-         Logging_Tags);
-
       --  Allocate the boot secondary stack for all harts.
       --  However only the current hart will be mapped here.
       Allocate_Physical_Memory
@@ -564,25 +589,7 @@ package body Boot is
          Panic;
       end if;
 
-      Boot_Secondary_Stack_Phys_Address : constant Physical_Address_T :=
-        Get_Boot_Secondary_Stack_Physical_Address (Hart_Id);
-
-      Boot_Secondary_Stack_Virtual_Address : constant Virtual_Address_T :=
-        Get_Boot_Secondary_Stack_Virtual_Address (Hart_Id);
-
-      Map_Kernel_Memory
-        (Boot_Secondary_Stack_Virtual_Address,
-         Boot_Secondary_Stack_Phys_Address,
-         Boot_Secondary_Stack_Size,
-         (True, True, False, False),
-         Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      Boot_Secondary_Stack_Top : constant Virtual_Address_T :=
-        Boot_Secondary_Stack_Virtual_Address + Boot_Secondary_Stack_Size;
+      Initialise_Hart_Boot_Secondary_Stack (Hart_Id, Boot_Secondary_Stack_Top);
 
       Log_Debug ("Initialised boot secondary stack.", Logging_Tags);
 
@@ -765,6 +772,9 @@ package body Boot is
    procedure Start_Init_Process is
       Result : Function_Result := Unset;
    begin
+      --  Note: There's no need to release the lock of any previous process
+      --  when starting the init process, as it's impossible by design for any
+      --  other process to be running at this point in time.
       Log_Debug ("Starting init process...", Logging_Tags);
 
       --  The graphics system is initialised here because the Virtio driver
@@ -775,6 +785,17 @@ package body Boot is
         (Init_Process.all,
          "/Devices/Disk/Programs/print_fractal_pattern.elf",
          Result);
+      if Is_Error (Result) then
+         Panic;
+      end if;
+
+      Loader.Load_New_Process_From_Filesystem
+        (Init_Process.all,
+         "/Devices/Disk/Programs/print_fractal_pattern_2.elf",
+         Result);
+      if Is_Error (Result) then
+         Panic;
+      end if;
 
       --  Loader.Load_New_Process_From_Filesystem
       --    (Init_Process.all, "/Devices/Disk/Programs/test_file_io.elf",
@@ -892,7 +913,7 @@ package body Boot is
    end Start_Non_Boot_Harts;
 
    procedure Non_Boot_Hart_Entry (Hart_Id : Hart_Index_T) is
-      Result : Function_Result := Unset;
+      Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
    begin
       --  This needs to be the first function called on each hart to set up
       --  the hart's state structure. This needs be called before any logging
@@ -902,28 +923,7 @@ package body Boot is
 
       Log_Debug ("Starting non-boot Hart#" & Hart_Id'Image, Logging_Tags);
 
-      --  Map the boot secondary stack for this hart.
-      Boot_Secondary_Stack_Phys_Address : constant Physical_Address_T :=
-        Get_Boot_Secondary_Stack_Physical_Address (Hart_Id);
-
-      Boot_Secondary_Stack_Virtual_Address : constant Virtual_Address_T :=
-        Get_Boot_Secondary_Stack_Virtual_Address (Hart_Id);
-
-      Map_Kernel_Memory
-        (Boot_Secondary_Stack_Virtual_Address,
-         Boot_Secondary_Stack_Phys_Address,
-         Boot_Secondary_Stack_Size,
-         (True, True, False, False),
-         Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      Boot_Secondary_Stack_Top : constant Virtual_Address_T :=
-        Boot_Secondary_Stack_Virtual_Address + Boot_Secondary_Stack_Size;
-
-      Hart_States (Hart_Id).Hart_Status := Hart_Status_Running;
+      Initialise_Hart_Boot_Secondary_Stack (Hart_Id, Boot_Secondary_Stack_Top);
 
       --  Enter the kernel address space.
       Switch_To_Kernel_Address_Space
@@ -942,7 +942,9 @@ package body Boot is
 
       Initialise_Hart_Idle_Process (Hart_Id);
 
-      Park_Non_Boot_Hart;
+      Hart_States (Hart_Id).Hart_Status := Hart_Status_Running;
+
+      Processes.Scheduler.Run;
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Non_Boot_Hart_Start");

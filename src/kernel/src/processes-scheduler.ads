@@ -16,6 +16,16 @@ is
 
    procedure Wake_Processes_Waiting_For_Channel (Channel : Blocking_Channel_T);
 
+   --  Releases the per-process spinlock of the process this hart switched away
+   --  from (recorded in Hart_States (..).Previous_Process), once the context
+   --  switch process has completed. This must be called by every process as
+   --  the first thing it does when it begins running after a context switch:
+   --    - Implicitly, from Switch_Process_Context, for a resumed process;
+   --    - Explicitly, at the top of each first-run entry routine
+   --      (Process_Start, Processes.Idle), since a freshly-created process
+   --      does not resume inside Switch_Process_Context.
+   procedure Finish_Context_Switch;
+
 private
    Logging_Tags_Scheduler : constant Log_Tags := [Log_Tag_Scheduler];
 
@@ -39,6 +49,6 @@ private
      (New_Prev_Process_State : Process_Status_T := Process_Ready;
       Condition_Lock         : in out Spinlock_T);
 
-   procedure Ensure_No_Locks_Held_Before_Context_Switch;
+   procedure Verify_Context_Switch_Lock_State;
 
 end Processes.Scheduler;

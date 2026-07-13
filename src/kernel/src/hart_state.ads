@@ -27,6 +27,14 @@ is
       Interrupts_Enabled_Before_Initial_Push_Off : Boolean := True;
       Hart_Status                                : Hart_Status_T :=
         Hart_Status_Unknown;
+      --  The process this hart most recently switched away from. Its
+      --  per-process spinlock is acquired before the process is made
+      --  schedulable/wakeable and held across the context switch; It's
+      --  released by the next process (Scheduler.Finish_Context_Switch). This
+      --  closes the window where another hart could resume a process before
+      --  its kernel context is fully saved.
+      Previous_Process                           :
+        Process_Control_Block_Access := null;
    end record;
    for Hart_State_T use
      record
@@ -35,6 +43,7 @@ is
        Interrupts_Off_Counter                     at 12 range 0 .. 31;
        Interrupts_Enabled_Before_Initial_Push_Off at 16 range 0 .. 0;
        Hart_Status                                at 20 range 0 .. 31;
+       Previous_Process                           at 24 range 0 .. 63;
      end record;
 
    type Hart_State_Access is access all Hart_State_T with Convention => C;

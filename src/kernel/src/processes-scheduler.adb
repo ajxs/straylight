@@ -16,7 +16,13 @@ package body Processes.Scheduler is
       if Current_Process /= null then
          Acquire_Spinlock (Current_Process.all.Spinlock);
          Current_Process.all.Status := New_Prev_Process_State;
-         Release_Spinlock (Current_Process.all.Spinlock);
+      --  The lock is intentionally NOT released here. It's held across the
+      --  context switch (Switch_Process_Context) and released by the next
+      --  process to run (Finish_Context_Switch). This means that the waker
+      --  (Wake_Processes_Waiting_For_Channel) and the ready-scan below both
+      --  block on this process until its context is fully saved, preventing
+      --  another hart from resuming it on a stale/half-saved context.
+
       end if;
 
       --  If there are no processes in the queue, exit.
@@ -44,15 +50,27 @@ package body Processes.Scheduler is
 
       --  Iterate through the process queue, looking for a ready process.
       loop
-         Acquire_Spinlock (Next_Process.all.Spinlock);
+         if Next_Process = Current_Process then
+            --  We already hold this process's spinlock (acquired above and
+            --  held for the context-save hand-off) and have already set its
+            --  status, so evaluate it without re-acquiring. If it is still
+            --  runnable (e.g. it was pre-empted rather than blocked) it may be
+            --  selected again; the lock stays held for Finish_Context_Switch.
+            if Next_Process.all.Status = Process_Ready then
+               Next_Process.all.Status := Process_Running;
+               return;
+            end if;
+         else
+            Acquire_Spinlock (Next_Process.all.Spinlock);
 
-         if Next_Process.all.Status = Process_Ready then
-            Next_Process.all.Status := Process_Running;
+            if Next_Process.all.Status = Process_Ready then
+               Next_Process.all.Status := Process_Running;
+               Release_Spinlock (Next_Process.all.Spinlock);
+               return;
+            end if;
+
             Release_Spinlock (Next_Process.all.Spinlock);
-            return;
          end if;
-
-         Release_Spinlock (Next_Process.all.Spinlock);
 
          Next_Process := Next_Process.all.Next_Process;
          if Next_Process = null then
@@ -139,11 +157,30 @@ package body Processes.Scheduler is
          Panic ("Constraint_Error: Print_Process_Switch_Info");
    end Print_Process_Switch_Info;
 
+   procedure Finish_Context_Switch is
+      Hart_Id      : constant Hart_Index_T := Get_Current_Hart_Id;
+      Prev_Process : Process_Control_Block_Access;
+   begin
+      --  Called by the newly-running process immediately after a context
+      --  switch (implicitly from Switch_Process_Context, or explicitly as the
+      --  first action of a first-run entry routine). Releases the per-process
+      --  spinlock of the process we switched away from, now that its context
+      --  has been fully saved. Releasing this lock also pops the interrupt-off
+      --  nesting it established.
+      Prev_Process := Hart_States (Hart_Id).Previous_Process;
+      if Prev_Process /= null then
+         Hart_States (Hart_Id).Previous_Process := null;
+         Release_Spinlock (Prev_Process.all.Spinlock);
+      end if;
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Finish_Context_Switch");
+   end Finish_Context_Switch;
+
    procedure Switch_Process_Context
      (Prev_Process, Next_Process : Process_Control_Block_Access)
    is
       --  Save the current kernel context, and load a new one.
-      --  Interrupts are re-enabled in this procedure.
       procedure Switch_Kernel_Context
         (SATP                : Unsigned_64;
          ASID                : Unsigned_16;
@@ -161,33 +198,51 @@ package body Processes.Scheduler is
          ASID        : Unsigned_16;
          New_Process : Process_Control_Block_T)
       with
+        No_Return,
         Import,
         Convention    => Assembler,
         External_Name => "scheduler_load_kernel_context";
    begin
-      Ensure_No_Locks_Held_Before_Context_Switch;
+      Verify_Context_Switch_Lock_State;
 
       Print_Process_Switch_Info (Prev_Process, Next_Process);
 
+      --  Record the process we are switching away from. Its spinlock was
+      --  acquired in Schedule_Next_Process, and is held across the save below.
+      --  The next process to run releases it via Finish_Context_Switch.
+      Hart_States (Get_Current_Hart_Id).Previous_Process := Prev_Process;
+
       --  Handle the possibility that there is no current process running on
-      --  the current HART. This could be because it's the first time the
+      --  the current hart. This could be because it's the first time the
       --  scheduler is running.
       if Prev_Process = null then
+         --  No outgoing context to save and no lock held. Previous_Process is
+         --  null, so the incoming process's Finish_Context_Switch is a no-op.
+         --  Load_Kernel_Context does not return here. Control resumes in the
+         --  loaded process.
          Load_Kernel_Context
            (Get_Process_SATP (Next_Process.all),
             Next_Process.all.Memory_Space.Address_Space_ID,
             Next_Process.all);
       elsif Prev_Process /= Next_Process then
-         --  Otherwise, switch to the next process' kernel context.
-         --  The next process will resume execution from here, if it
-         --  previously yielded control via the scheduler,
-         --  or 'return' to the start process routine, if never run.
+         --  Switch to the next process' kernel context. The next process
+         --  releases our (Prev_Process') spinlock via Finish_Context_Switch.
+         --  When *this* process is resumed, execution continues after
+         --  Switch_Kernel_Context returns, and the Finish_Context_Switch below
+         --  releases the spinlock of whichever process yielded the hart.
          Switch_Kernel_Context
            (Get_Process_SATP (Next_Process.all),
             Next_Process.all.Memory_Space.Address_Space_ID,
             Next_Process.all,
             Prev_Process.all.Kernel_Context);
       end if;
+
+      --  Reached two ways:
+      --  1. Directly, when no switch occurred (Prev = Next,
+      --  e.g. idle re-selected) = releases the spinlock we hold on ourselves.
+      --  2. On resume after Switch_Kernel_Context returns = releases the
+      --  spinlock of whichever process yielded the hart to us.
+      Finish_Context_Switch;
    exception
       when Constraint_Error =>
          Panic ("Constraint_Error: Switch_Process_Context");
@@ -289,20 +344,24 @@ package body Processes.Scheduler is
       Release_Spinlock (Process_Queue_Spinlock);
    end Wake_Processes_Waiting_For_Channel;
 
-   procedure Ensure_No_Locks_Held_Before_Context_Switch is
+   procedure Verify_Context_Switch_Lock_State is
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
    begin
-      if Hart_States (Hart_Id).Interrupts_Off_Counter /= 0 then
+      --  At the point of a context switch at most one lock may be held: the
+      --  outgoing process's own spinlock, which is held across the context
+      --  save and released by the next process (Finish_Context_Switch). Zero
+      --  locks are held on the first schedule of a hart (no previous process).
+      --  Anything more indicates a lock was leaked into the switch.
+      if Hart_States (Hart_Id).Interrupts_Off_Counter > 1 then
          Panic
            ("Hart# "
             & Hart_Id'Image
-            & " still has active locks prior to context switch: "
+            & " has unexpected locks held prior to context switch: "
             & Hart_States (Hart_Id).Interrupts_Off_Counter'Image);
       end if;
    exception
       when Constraint_Error =>
-         Panic
-           ("Constraint_Error: Ensure_No_Locks_Held_Before_Context_Switch");
-   end Ensure_No_Locks_Held_Before_Context_Switch;
+         Panic ("Constraint_Error: Verify_Context_Switch_Lock_State");
+   end Verify_Context_Switch_Lock_State;
 
 end Processes.Scheduler;

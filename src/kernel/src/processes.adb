@@ -7,6 +7,7 @@ with Hart_State;        use Hart_State;
 with Memory.Allocators; use Memory.Allocators;
 with Memory.Kernel;     use Memory.Kernel;
 with Memory.Physical;   use Memory.Physical;
+with Processes.Scheduler;
 with RISCV.Interrupts;
 
 package body Processes is
@@ -518,6 +519,10 @@ package body Processes is
       Logging_Tags : constant Log_Tags := [Log_Tag_Idle];
       Result       : Function_Result := Unset;
    begin
+      --  This is a first-run entry point: release the spinlock of the process
+      --  that switched to us, held across its context save.
+      Processes.Scheduler.Finish_Context_Switch;
+
       loop
          Log_Debug ("System Idle.", Logging_Tags);
          RISCV.Interrupts.Disable_Supervisor_Interrupts;
@@ -546,6 +551,11 @@ package body Processes is
         Convention    => Assembler,
         External_Name => "processes_enter_new_process";
    begin
+      --  This is a first-run entry point: release the spinlock of the process
+      --  that switched to us, held across its context save. See
+      --  Processes.Scheduler.Finish_Context_Switch.
+      Processes.Scheduler.Finish_Context_Switch;
+
       Curr_Process : constant Process_Control_Block_Access :=
         Get_Process_Running_On_Current_Hart;
 

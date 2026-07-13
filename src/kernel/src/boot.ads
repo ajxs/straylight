@@ -103,13 +103,6 @@ private
      Convention    => Assembler,
      External_Name => "boot_switch_to_kernel_address_space";
 
-   procedure Park_Non_Boot_Hart
-   with
-     No_Return,
-     Import,
-     Convention    => Assembler,
-     External_Name => "cpu_halt";
-
    procedure Wait_For_All_Harts_To_Start;
 
 end Boot;
