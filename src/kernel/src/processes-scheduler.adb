@@ -239,7 +239,6 @@ package body Processes.Scheduler is
         External_Name => "scheduler_switch_kernel_context";
 
       --  Load a new kernel context without saving the current one.
-      --  Interrupts are re-enabled in this procedure.
       procedure Load_Kernel_Context
         (SATP        : Unsigned_64;
          ASID        : Unsigned_16;

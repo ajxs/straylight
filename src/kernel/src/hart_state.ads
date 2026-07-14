@@ -48,7 +48,8 @@ is
 
    type Hart_State_Access is access all Hart_State_T with Convention => C;
 
-   type Hart_State_Array_T is array (Hart_Index_T) of aliased Hart_State_T;
+   type Hart_State_Array_T is array (Hart_Index_T) of aliased Hart_State_T
+   with Volatile_Components;
 
    Hart_States : Hart_State_Array_T;
 
