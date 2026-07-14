@@ -6,6 +6,53 @@
 with Hart_State; use Hart_State;
 
 package body Processes.Scheduler is
+   procedure Verify_Context_Switch_Lock_State
+     (Prev_Process : Process_Control_Block_Access)
+   is
+      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
+   begin
+      Counter : constant Natural :=
+        Hart_States (Hart_Id).Interrupts_Off_Counter;
+
+      if Prev_Process = null then
+         --  If this is the first process being scheduled on this hart, there
+         --  should be no locks held.
+         if Counter /= 0 then
+            Panic
+              ("Hart#"
+               & Hart_Id'Image
+               & " has locks held at first schedule: "
+               & Counter'Image);
+         end if;
+      else
+         --  If there is a previous process, there should be exactly one lock
+         --  held: the outgoing process's spinlock, which is held for the
+         --  context-save hand-off.
+         if Counter /= 1 then
+            Panic
+              ("Hart#"
+               & Hart_Id'Image
+               & " wrong lock count at context switch: "
+               & Counter'Image);
+         end if;
+
+         --  Verify that the lock being held is held by the hart performing the
+         --  context switch, and that it is the outgoing process's spinlock.
+         if not Is_Current_Hart_Holding_Spinlock
+                  (Prev_Process.all.Spinlock, Hart_Id)
+         then
+            Panic
+              ("Hart#"
+               & Hart_Id'Image
+               & " lock held at context switch is not the outgoing"
+               & " process's spinlock");
+         end if;
+      end if;
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Verify_Context_Switch_Lock_State");
+   end Verify_Context_Switch_Lock_State;
+
    procedure Schedule_Next_Process_Unlocked
      (Current_Process        : Process_Control_Block_Access;
       Next_Process           : out Process_Control_Block_Access;
@@ -203,7 +250,7 @@ package body Processes.Scheduler is
         Convention    => Assembler,
         External_Name => "scheduler_load_kernel_context";
    begin
-      Verify_Context_Switch_Lock_State;
+      Verify_Context_Switch_Lock_State (Prev_Process);
 
       Print_Process_Switch_Info (Prev_Process, Next_Process);
 
@@ -343,25 +390,5 @@ package body Processes.Scheduler is
       Wake_Processes_Waiting_For_Channel_Unlocked (Channel);
       Release_Spinlock (Process_Queue_Spinlock);
    end Wake_Processes_Waiting_For_Channel;
-
-   procedure Verify_Context_Switch_Lock_State is
-      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
-   begin
-      --  At the point of a context switch at most one lock may be held: the
-      --  outgoing process's own spinlock, which is held across the context
-      --  save and released by the next process (Finish_Context_Switch). Zero
-      --  locks are held on the first schedule of a hart (no previous process).
-      --  Anything more indicates a lock was leaked into the switch.
-      if Hart_States (Hart_Id).Interrupts_Off_Counter > 1 then
-         Panic
-           ("Hart# "
-            & Hart_Id'Image
-            & " has unexpected locks held prior to context switch: "
-            & Hart_States (Hart_Id).Interrupts_Off_Counter'Image);
-      end if;
-   exception
-      when Constraint_Error =>
-         Panic ("Constraint_Error: Verify_Context_Switch_Lock_State");
-   end Verify_Context_Switch_Lock_State;
 
 end Processes.Scheduler;
