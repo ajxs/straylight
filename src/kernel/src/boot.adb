@@ -829,8 +829,9 @@ package body Boot is
       --  Loop continuously, polling all the harts until we can see that
       --  they've all been initialised.
       for I in 1 .. Hart_Spinup_Wait_Timeout loop
+         All_Harts_Started := True;
+
          for Hart_Id in 0 .. Maximum_Harts - 1 loop
-            All_Harts_Started := True;
 
             --  All harts should be in either the Running or Invalid state.
             --  Invalid indicates that the hart is not present.
@@ -843,12 +844,12 @@ package body Boot is
          end loop;
 
          if All_Harts_Started then
-            Log_Debug ("All harts have started.", Logging_Tags);
+            Log_Debug ("All harts started successfully.", Logging_Tags);
             return;
          end if;
       end loop;
 
-      Log_Debug ("Timeout waiting for all harts to start.", Logging_Tags);
+      Panic ("Timeout waiting for all harts to start.");
    end Wait_For_All_Harts_To_Start;
 
    procedure Start_Non_Boot_Harts is
