@@ -7,17 +7,8 @@ with Utilities;             use Utilities;
 with Logging.Debug_Console; use Logging.Debug_Console;
 
 package body Logging is
-   function Should_Log_To_Debug_Console
-     (Tags : Log_Tags; Level : Log_Level_T) return Boolean is
+   function Are_Given_Tags_Active (Tags : Log_Tags) return Boolean is
    begin
-      if Level = Log_Level_Error then
-         return True;
-      end if;
-
-      if Level > System_Logging_Level then
-         return False;
-      end if;
-
       for Tag of Tags loop
          if Active_Logging_Tags (Tag) then
             return True;
@@ -25,15 +16,22 @@ package body Logging is
       end loop;
 
       return False;
-   end Should_Log_To_Debug_Console;
+   end Are_Given_Tags_Active;
+
+   function Should_Log_To_Debug_Console
+     (Tags : Log_Tags; Level : Log_Level_T) return Boolean
+   is (Level = Log_Level_Error
+       or else
+         (Level <= System_Logging_Level
+          and then (Tags'Length = 0 or else Are_Given_Tags_Active (Tags))));
 
    procedure Log_Message
      (Message : String; Tags : Log_Tags; Level : Log_Level_T) is
    begin
-      if Should_Log_To_Debug_Console (Tags, Level) then
-         if Active_Logging_Transports (Log_Transport_Debug_Console) then
-            Log_To_Debug_Console (Message, Level);
-         end if;
+      if Active_Logging_Transports (Log_Transport_Debug_Console)
+        and then Should_Log_To_Debug_Console (Tags, Level)
+      then
+         Log_To_Debug_Console (Message, Level);
       end if;
    end Log_Message;
 
