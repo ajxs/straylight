@@ -102,9 +102,10 @@ package body Devices.Virtio.Block is
          Result := Constraint_Exception;
    end Write_Sectors;
 
-   function Is_Valid_Sector_Index_For_Read_Write
-     (Device : Device_T; Sector : Sector_Index_T; Data_Length : Unsigned_32)
-      return Boolean is
+   function Is_Valid_Sector_Range
+     (Device       : Device_T;
+      Start_Sector : Sector_Index_T;
+      Data_Length  : Unsigned_32) return Boolean is
    begin
       --  It's important to ensure the arithmetic here takes into account the
       --  possibility of an integer overflow, and the possibility of
@@ -115,14 +116,15 @@ package body Devices.Virtio.Block is
         Sector_Index_T (Data_Length / Virtio_Block_Sector_Size);
 
       return
-        Sector <= Device.Bus_Info.Virtio.Total_Sectors
-        and then Sector_Count <= Device.Bus_Info.Virtio.Total_Sectors - Sector;
+        Start_Sector <= Device.Bus_Info.Virtio.Total_Sectors
+        and then
+          Sector_Count <= Device.Bus_Info.Virtio.Total_Sectors - Start_Sector;
 
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Is_Valid_Sector_Index_For_Read_Write");
+         Log_Error ("Constraint_Error: Is_Valid_Sector_Range");
          return False;
-   end Is_Valid_Sector_Index_For_Read_Write;
+   end Is_Valid_Sector_Range;
 
    ----------------------------------------------------------------------------
    --  The following methods are the 'unlocked' versions of the above methods
@@ -158,8 +160,7 @@ package body Devices.Virtio.Block is
          return;
       end if;
 
-      if not Is_Valid_Sector_Index_For_Read_Write (Device, Sector, Data_Length)
-      then
+      if not Is_Valid_Sector_Range (Device, Sector, Data_Length) then
          Log_Error ("Read_Write: Sector index out of bounds: " & Sector'Image);
          Result := Sector_Out_Of_Bounds;
          return;

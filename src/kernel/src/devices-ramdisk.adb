@@ -6,61 +6,73 @@
 with Memory;
 
 package body Devices.Ramdisk is
-   function Is_Valid_Sector_Index
-     (Device : Device_T; Sector_Index : Sector_Index_T) return Boolean is
+   function Is_Valid_Sector_Range
+     (Device : Device_T; Start_Sector : Sector_Index_T; Sector_Count : Natural)
+      return Boolean is
    begin
       Sector_Limit : constant Sector_Index_T :=
         Sector_Index_T (Device.Memory_Size / Ramdisk_Sector_Size);
 
-      return Sector_Index < Sector_Limit;
+      return
+        Start_Sector <= Sector_Limit
+        and then Sector_Index_T (Sector_Count) <= Sector_Limit - Start_Sector;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Is_Valid_Sector_Index");
+         Log_Error ("Constraint_Error: Is_Valid_Sector_Range");
          return False;
-   end Is_Valid_Sector_Index;
+   end Is_Valid_Sector_Range;
 
-   procedure Read_Sector_Unlocked
+   procedure Read_Sectors_Unlocked
      (Device               : Device_T;
-      Sector_Index         : Sector_Index_T;
+      Start_Sector         : Sector_Index_T;
+      Sector_Count         : Natural;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result) is
    begin
-      if not Is_Valid_Sector_Index (Device, Sector_Index) then
+      if Sector_Count = 0 then
+         Log_Error ("Read_Sectors: Sector_Count is zero");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if not Is_Valid_Sector_Range (Device, Start_Sector, Sector_Count) then
          Log_Error
-           ("Read_Sector: Sector index out of bounds: " & Sector_Index'Image);
+           ("Read_Sectors: Sector range out of bounds: " & Start_Sector'Image);
 
          Result := Sector_Out_Of_Bounds;
          return;
       end if;
 
-      Sector_Address : constant Virtual_Address_T :=
+      Start_Address : constant Virtual_Address_T :=
         Device.Virtual_Address
-        + Storage_Offset (Sector_Index * Ramdisk_Sector_Size);
+        + Storage_Offset (Start_Sector * Ramdisk_Sector_Size);
 
       Log_Debug
-        ("Devices.Ramdisk.Read_Sector: "
+        ("Devices.Ramdisk.Read_Sectors: "
          & ASCII.LF
          & "  Device VA: "
          & Device.Virtual_Address'Image
          & ASCII.LF
-         & "  Sector Index: "
-         & Sector_Index'Image
+         & "  Start Sector: "
+         & Start_Sector'Image
          & ASCII.LF
-         & "  Sector Address: "
-         & Sector_Address'Image
+         & "  Start Address: "
+         & Start_Address'Image
          & ASCII.LF
          & "  Data VA: "
          & Data_Virtual_Address'Image,
          Logging_Tags_Ramdisk);
 
-      Memory.Copy (Data_Virtual_Address, Sector_Address, Ramdisk_Sector_Size);
+      Bytes_To_Copy : constant Natural := Ramdisk_Sector_Size * Sector_Count;
+
+      Memory.Copy (Data_Virtual_Address, Start_Address, Bytes_To_Copy);
 
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Sector");
+         Log_Error ("Constraint_Error: Read_Sectors");
          Result := Constraint_Exception;
-   end Read_Sector_Unlocked;
+   end Read_Sectors_Unlocked;
 
    procedure Read_Sector
      (Device               : in out Device_T;
@@ -69,53 +81,63 @@ package body Devices.Ramdisk is
       Result               : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
-      Read_Sector_Unlocked
-        (Device, Sector_Index, Data_Virtual_Address, Result);
+      Read_Sectors_Unlocked
+        (Device, Sector_Index, 1, Data_Virtual_Address, Result);
       Release_Spinlock (Device.Spinlock);
    end Read_Sector;
 
-   procedure Write_Sector_Unlocked
+   procedure Write_Sectors_Unlocked
      (Device               : Device_T;
-      Sector_Index         : Sector_Index_T;
+      Start_Sector         : Sector_Index_T;
+      Sector_Count         : Natural;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result) is
    begin
-      if not Is_Valid_Sector_Index (Device, Sector_Index) then
+      if Sector_Count = 0 then
+         Log_Error ("Write_Sectors: Sector_Count is zero");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if not Is_Valid_Sector_Range (Device, Start_Sector, Sector_Count) then
          Log_Error
-           ("Write_Sector: Sector index out of bounds: " & Sector_Index'Image);
+           ("Write_Sectors: Sector range out of bounds: "
+            & Start_Sector'Image);
 
          Result := Sector_Out_Of_Bounds;
          return;
       end if;
 
-      Sector_Address : constant Virtual_Address_T :=
+      Start_Address : constant Virtual_Address_T :=
         Device.Virtual_Address
-        + Storage_Offset (Sector_Index * Ramdisk_Sector_Size);
+        + Storage_Offset (Start_Sector * Ramdisk_Sector_Size);
 
       Log_Debug
-        ("Devices.Ramdisk.Write_Sector: "
+        ("Devices.Ramdisk.Write_Sectors: "
          & ASCII.LF
          & "  Device VA: "
          & Device.Virtual_Address'Image
          & ASCII.LF
-         & "  Sector Index: "
-         & Sector_Index'Image
+         & "  Start Sector: "
+         & Start_Sector'Image
          & ASCII.LF
          & "  Sector Address: "
-         & Sector_Address'Image
+         & Start_Address'Image
          & ASCII.LF
          & "  Data VA: "
          & Data_Virtual_Address'Image,
          Logging_Tags_Ramdisk);
 
-      Memory.Copy (Sector_Address, Data_Virtual_Address, Ramdisk_Sector_Size);
+      Bytes_To_Copy : constant Natural := Ramdisk_Sector_Size * Sector_Count;
+
+      Memory.Copy (Start_Address, Data_Virtual_Address, Bytes_To_Copy);
 
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_Sector");
+         Log_Error ("Constraint_Error: Write_Sectors");
          Result := Constraint_Exception;
-   end Write_Sector_Unlocked;
+   end Write_Sectors_Unlocked;
 
    procedure Write_Sector
      (Device               : in out Device_T;
@@ -124,9 +146,35 @@ package body Devices.Ramdisk is
       Result               : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
-      Write_Sector_Unlocked
-        (Device, Sector_Index, Data_Virtual_Address, Result);
+      Write_Sectors_Unlocked
+        (Device, Sector_Index, 1, Data_Virtual_Address, Result);
       Release_Spinlock (Device.Spinlock);
    end Write_Sector;
+
+   procedure Read_Sectors
+     (Device               : in out Device_T;
+      Start_Sector         : Sector_Index_T;
+      Sector_Count         : Natural;
+      Data_Virtual_Address : Virtual_Address_T;
+      Result               : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+      Read_Sectors_Unlocked
+        (Device, Start_Sector, Sector_Count, Data_Virtual_Address, Result);
+      Release_Spinlock (Device.Spinlock);
+   end Read_Sectors;
+
+   procedure Write_Sectors
+     (Device               : in out Device_T;
+      Start_Sector         : Sector_Index_T;
+      Sector_Count         : Natural;
+      Data_Virtual_Address : Virtual_Address_T;
+      Result               : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+      Write_Sectors_Unlocked
+        (Device, Start_Sector, Sector_Count, Data_Virtual_Address, Result);
+      Release_Spinlock (Device.Spinlock);
+   end Write_Sectors;
 
 end Devices.Ramdisk;

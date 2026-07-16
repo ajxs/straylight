@@ -322,9 +322,8 @@ package body Filesystems.Block_Cache is
       Cache_Index     : Positive;
       Result          : out Function_Result)
    is
-      Current_Sector             : Sector_Index_T := 0;
-      Current_Read_Addr_Virtual  : Virtual_Address_T := Null_Address;
-      Current_Read_Addr_Physical : Physical_Address_T := Null_Physical_Address;
+      Read_Addr_Virtual  : Virtual_Address_T := Null_Address;
+      Read_Addr_Physical : Physical_Address_T := Null_Physical_Address;
 
       --  Currently all of the supported storage devices have fixed 512-byte
       --  sectors, so we can hardcode that here. (VirtIO specifies 512-byte
@@ -336,16 +335,13 @@ package body Filesystems.Block_Cache is
          Logging_Tags_Block_Cache);
 
       Get_Block_Cache_Entry_Data_Address
-        (Cache,
-         Cache_Index,
-         Current_Read_Addr_Virtual,
-         Current_Read_Addr_Physical,
-         Result);
+        (Cache, Cache_Index, Read_Addr_Virtual, Read_Addr_Physical, Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Current_Sector := (Block_Number * Block_Size) / Sector_Size;
+      Start_Sector : constant Sector_Index_T :=
+        (Block_Number * Block_Size) / Sector_Size;
 
       Sectors_Per_Block : constant Natural :=
         Get_Sectors_Per_Block (Sector_Size);
@@ -355,33 +351,24 @@ package body Filesystems.Block_Cache is
             Devices.Virtio.Block.Read_Sectors
               (Reading_Process,
                Filesystem.all.Device.all,
-               Current_Read_Addr_Physical,
-               Current_Sector,
+               Read_Addr_Physical,
+               Start_Sector,
                Sectors_Per_Block,
                Result);
 
-            if Is_Error (Result) then
-               return;
-            end if;
-
          when Device_Bus_Memory_Mapped =>
-            for I in 0 .. Sectors_Per_Block - 1 loop
-               Devices.Ramdisk.Read_Sector
-                 (Filesystem.all.Device.all,
-                  Current_Sector,
-                  Current_Read_Addr_Virtual,
-                  Result);
+            Devices.Ramdisk.Read_Sectors
+              (Filesystem.all.Device.all,
+               Start_Sector,
+               Sectors_Per_Block,
+               Read_Addr_Virtual,
+               Result);
 
-               if Is_Error (Result) then
-                  return;
-               end if;
-
-               Current_Sector := Current_Sector + 1;
-
-               Current_Read_Addr_Virtual :=
-                 Current_Read_Addr_Virtual + Storage_Offset (Sector_Size);
-            end loop;
       end case;
+
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Log_Debug
         ("Added new entry in block cache for block number: "

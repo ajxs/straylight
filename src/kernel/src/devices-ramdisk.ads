@@ -35,7 +35,6 @@ with Filesystems;      use Filesystems;
 package Devices.Ramdisk
   with Preelaborate
 is
-
    procedure Read_Sector
      (Device               : in out Device_T;
       Sector_Index         : Sector_Index_T;
@@ -45,6 +44,20 @@ is
    procedure Write_Sector
      (Device               : in out Device_T;
       Sector_Index         : Sector_Index_T;
+      Data_Virtual_Address : Virtual_Address_T;
+      Result               : out Function_Result);
+
+   procedure Read_Sectors
+     (Device               : in out Device_T;
+      Start_Sector         : Sector_Index_T;
+      Sector_Count         : Natural;
+      Data_Virtual_Address : Virtual_Address_T;
+      Result               : out Function_Result);
+
+   procedure Write_Sectors
+     (Device               : in out Device_T;
+      Start_Sector         : Sector_Index_T;
+      Sector_Count         : Natural;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result);
 
