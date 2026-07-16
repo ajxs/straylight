@@ -12,6 +12,22 @@ is
    procedure Initialise_Block_Device
      (Device : in out Device_T; Result : out Function_Result);
 
+   procedure Read_Sectors
+     (Reading_Process       : in out Process_Control_Block_T;
+      Device                : in out Device_T;
+      Data_Physical_Address : Physical_Address_T;
+      Start_Sector          : Sector_Index_T;
+      Sector_Count          : Natural;
+      Result                : out Function_Result);
+
+   procedure Write_Sectors
+     (Reading_Process       : in out Process_Control_Block_T;
+      Device                : in out Device_T;
+      Data_Physical_Address : Physical_Address_T;
+      Start_Sector          : Sector_Index_T;
+      Sector_Count          : Natural;
+      Result                : out Function_Result);
+
    procedure Read_Sector
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
@@ -44,13 +60,16 @@ is
    VIRTIO_BLK_F_ZONED        : constant := 2 ** 17;
 
 private
+   Virtio_Block_Sector_Size : constant := 512;
+
    procedure Read_Write
      (Reading_Process       : in out Process_Control_Block_T;
       Device                : in out Device_T;
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Write                 : Boolean;
-      Result                : out Function_Result);
+      Result                : out Function_Result;
+      Data_Length           : Unsigned_32 := Virtio_Block_Sector_Size);
 
    type Block_Request_Type_T is
      (VIRTIO_BLK_T_IN,
@@ -150,10 +169,5 @@ private
        Zoned_Write_Granularity       at 88 range 0 .. 31;
        Zoned_Model                   at 92 range 0 .. 7;
      end record;
-
-   function Convert_Request_Block_Number_To_Sector
-     (Block_Number : Unsigned_64) return Unsigned_64
-   is (Block_Number * (BLOCK_SIZE / 512))
-   with Pure_Function, Inline;
 
 end Devices.Virtio.Block;

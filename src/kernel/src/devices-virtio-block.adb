@@ -58,6 +58,72 @@ package body Devices.Virtio.Block is
         (Reading_Process, Device, Data_Physical_Address, Sector, True, Result);
    end Write_Sector;
 
+   procedure Read_Sectors
+     (Reading_Process       : in out Process_Control_Block_T;
+      Device                : in out Device_T;
+      Data_Physical_Address : Physical_Address_T;
+      Start_Sector          : Sector_Index_T;
+      Sector_Count          : Natural;
+      Result                : out Function_Result) is
+   begin
+      Read_Write
+        (Reading_Process,
+         Device,
+         Data_Physical_Address,
+         Start_Sector,
+         False,
+         Result,
+         Unsigned_32 (Sector_Count * Virtio_Block_Sector_Size));
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Read_Sectors");
+         Result := Constraint_Exception;
+   end Read_Sectors;
+
+   procedure Write_Sectors
+     (Reading_Process       : in out Process_Control_Block_T;
+      Device                : in out Device_T;
+      Data_Physical_Address : Physical_Address_T;
+      Start_Sector          : Sector_Index_T;
+      Sector_Count          : Natural;
+      Result                : out Function_Result) is
+   begin
+      Read_Write
+        (Reading_Process,
+         Device,
+         Data_Physical_Address,
+         Start_Sector,
+         True,
+         Result,
+         Unsigned_32 (Sector_Count * Virtio_Block_Sector_Size));
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Write_Sectors");
+         Result := Constraint_Exception;
+   end Write_Sectors;
+
+   function Is_Valid_Sector_Index_For_Read_Write
+     (Device : Device_T; Sector : Sector_Index_T; Data_Length : Unsigned_32)
+      return Boolean is
+   begin
+      --  It's important to ensure the arithmetic here takes into account the
+      --  possibility of an integer overflow, and the possibility of
+      --  unintentionally narrowing the integer ranges in the arithmetic.
+      --  e.g. Conversion to a signed type like 'Natural' for arithmetic will
+      --  greatly reduce the range of valid sectors.
+      Sector_Count : constant Sector_Index_T :=
+        Sector_Index_T (Data_Length / Virtio_Block_Sector_Size);
+
+      return
+        Sector <= Device.Bus_Info.Virtio.Total_Sectors
+        and then Sector_Count <= Device.Bus_Info.Virtio.Total_Sectors - Sector;
+
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Is_Valid_Sector_Index_For_Read_Write");
+         return False;
+   end Is_Valid_Sector_Index_For_Read_Write;
+
    ----------------------------------------------------------------------------
    --  The following methods are the 'unlocked' versions of the above methods
    --  which are called once the spinlock has been acquired.
@@ -72,15 +138,29 @@ package body Devices.Virtio.Block is
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Write                 : Boolean;
-      Result                : out Function_Result)
+      Result                : out Function_Result;
+      Data_Length           : Unsigned_32 := Virtio_Block_Sector_Size)
    is
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
    begin
-      if Sector >= Device.Bus_Info.Virtio.Total_Sectors then
-         Log_Error ("Sector index out of bounds: " & Sector'Image);
+      if Data_Length = 0 then
+         Log_Error ("Read_Write: 0 data length");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if Data_Length mod Virtio_Block_Sector_Size /= 0 then
+         Log_Error ("Read_Write: Data length not a multiple of sector size");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if not Is_Valid_Sector_Index_For_Read_Write (Device, Sector, Data_Length)
+      then
+         Log_Error ("Read_Write: Sector index out of bounds: " & Sector'Image);
          Result := Sector_Out_Of_Bounds;
          return;
       end if;
@@ -89,7 +169,8 @@ package body Devices.Virtio.Block is
       if Write
         and then (Device_Registers.Device_Features and VIRTIO_BLK_F_RO) /= 0
       then
-         Log_Error ("Attempt to write to read-only Virtio Block Device");
+         Log_Error
+           ("Read_Write: Attempt to write to read-only Virtio Block Device");
          Result := Operation_Unsupported;
          return;
       end if;
@@ -170,7 +251,7 @@ package body Devices.Virtio.Block is
 
          Descriptors (Descriptor_Indexes (1)) :=
            (Address => Data_Physical_Address,
-            Length  => BLOCK_SIZE,
+            Length  => Data_Length,
             Flags   => VIRTQ_DESC_F_NEXT,
             Next    => Descriptor_Indexes (2));
 
@@ -256,7 +337,8 @@ package body Devices.Virtio.Block is
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Write                 : Boolean;
-      Result                : out Function_Result) is
+      Result                : out Function_Result;
+      Data_Length           : Unsigned_32 := Virtio_Block_Sector_Size) is
    begin
       Acquire_Spinlock (Device.Spinlock);
 
@@ -266,7 +348,8 @@ package body Devices.Virtio.Block is
          Data_Physical_Address,
          Sector,
          Write,
-         Result);
+         Result,
+         Data_Length);
 
       Release_Spinlock (Device.Spinlock);
    end Read_Write;

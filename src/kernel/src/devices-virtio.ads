@@ -8,7 +8,6 @@ with Function_Results; use Function_Results;
 package Devices.Virtio
   with Preelaborate
 is
-
    procedure Initialise_MMIO_Device
      (Device : in out Device_T; Result : out Function_Result);
 
@@ -38,8 +37,6 @@ private
 
    VIRTQ_DESC_F_NEXT  : constant := 1; --  Chained with another descriptor.
    VIRTQ_DESC_F_WRITE : constant := 2; --  Device writes, as opposed to read.
-
-   BLOCK_SIZE : constant := 512;
 
    type Virtio_Status_Byte_Array_T is
      array (Virtio_Descriptor_Array_Index_T) of Unsigned_8
