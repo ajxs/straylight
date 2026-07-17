@@ -261,13 +261,14 @@ package body Filesystems.Block_Cache is
 
             Release_Spinlock (System_Block_Cache.Spinlock);
 
-            Read_Block_From_Filesystem_Into_Cache_Entry
+            Transfer_Block_Cache_Entry
               (System_Block_Cache,
                Filesystem,
                Reading_Process,
                Block_Number,
                Cache_Index,
-               Result);
+               Write  => False,
+               Result => Result);
             if Is_Error (Result) then
                --  In the case that reading the block from the filesystem
                --  failed, release the cache entry we allocated.
@@ -314,16 +315,17 @@ package body Filesystems.Block_Cache is
          Result := Constraint_Exception;
    end Read_Block_From_Filesystem;
 
-   procedure Read_Block_From_Filesystem_Into_Cache_Entry
-     (Cache           : in out Block_Cache_T;
-      Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Block_Number    : Block_Index_T;
-      Cache_Index     : Positive;
-      Result          : out Function_Result)
+   procedure Transfer_Block_Cache_Entry
+     (Cache        : in out Block_Cache_T;
+      Filesystem   : Filesystem_Access;
+      Process      : in out Process_Control_Block_T;
+      Block_Number : Block_Index_T;
+      Cache_Index  : Positive;
+      Write        : Boolean;
+      Result       : out Function_Result)
    is
-      Read_Addr_Virtual  : Virtual_Address_T := Null_Address;
-      Read_Addr_Physical : Physical_Address_T := Null_Physical_Address;
+      Data_Addr_Virtual  : Virtual_Address_T := Null_Address;
+      Data_Addr_Physical : Physical_Address_T := Null_Physical_Address;
 
       --  Currently all of the supported storage devices have fixed 512-byte
       --  sectors, so we can hardcode that here. (VirtIO specifies 512-byte
@@ -331,11 +333,14 @@ package body Filesystems.Block_Cache is
       Sector_Size : constant := 512;
    begin
       Log_Debug
-        ("Reading block into cache: " & Block_Number'Image,
+        ((if Write
+          then "Writing block from cache: "
+          else "Reading block into cache: ")
+         & Block_Number'Image,
          Logging_Tags_Block_Cache);
 
       Get_Block_Cache_Entry_Data_Address
-        (Cache, Cache_Index, Read_Addr_Virtual, Read_Addr_Physical, Result);
+        (Cache, Cache_Index, Data_Addr_Virtual, Data_Addr_Physical, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -348,40 +353,46 @@ package body Filesystems.Block_Cache is
 
       case Filesystem.all.Device.all.Device_Bus is
          when Device_Bus_Virtio_MMIO   =>
-            Devices.Virtio.Block.Read_Sectors
-              (Reading_Process,
-               Filesystem.all.Device.all,
-               Read_Addr_Physical,
-               Start_Sector,
-               Sectors_Per_Block,
-               Result);
+            if Write then
+               Devices.Virtio.Block.Write_Sectors
+                 (Process,
+                  Filesystem.all.Device.all,
+                  Data_Addr_Physical,
+                  Start_Sector,
+                  Sectors_Per_Block,
+                  Result);
+            else
+               Devices.Virtio.Block.Read_Sectors
+                 (Process,
+                  Filesystem.all.Device.all,
+                  Data_Addr_Physical,
+                  Start_Sector,
+                  Sectors_Per_Block,
+                  Result);
+            end if;
 
          when Device_Bus_Memory_Mapped =>
-            Devices.Ramdisk.Read_Sectors
-              (Filesystem.all.Device.all,
-               Start_Sector,
-               Sectors_Per_Block,
-               Read_Addr_Virtual,
-               Result);
-
+            if Write then
+               Devices.Ramdisk.Write_Sectors
+                 (Filesystem.all.Device.all,
+                  Start_Sector,
+                  Sectors_Per_Block,
+                  Data_Addr_Virtual,
+                  Result);
+            else
+               Devices.Ramdisk.Read_Sectors
+                 (Filesystem.all.Device.all,
+                  Start_Sector,
+                  Sectors_Per_Block,
+                  Data_Addr_Virtual,
+                  Result);
+            end if;
       end case;
-
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Log_Debug
-        ("Added new entry in block cache for block number: "
-         & Block_Number'Image,
-         Logging_Tags_Block_Cache);
-
-      Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Read_Block_From_Filesystem_Into_Cache_Entry");
+         Log_Error ("Constraint_Error: Transfer_Block_Cache_Entry");
          Result := Constraint_Exception;
-   end Read_Block_From_Filesystem_Into_Cache_Entry;
+   end Transfer_Block_Cache_Entry;
 
    procedure Release_Block_Unlocked
      (Filesystem             : Filesystem_Access;
@@ -443,63 +454,6 @@ package body Filesystems.Block_Cache is
       Release_Spinlock (System_Block_Cache.Spinlock);
    end Release_Block;
 
-   procedure Write_Block_From_Cache_Entry_To_Filesystem
-     (Cache           : in out Block_Cache_T;
-      Filesystem      : Filesystem_Access;
-      Writing_Process : in out Process_Control_Block_T;
-      Block_Number    : Block_Index_T;
-      Cache_Index     : Positive;
-      Result          : out Function_Result)
-   is
-      Write_Addr_Virtual  : Virtual_Address_T := Null_Address;
-      Write_Addr_Physical : Physical_Address_T := Null_Physical_Address;
-
-      --  Currently all of the supported storage devices have fixed 512-byte
-      --  sectors, so we can hardcode that here. (VirtIO specifies 512-byte
-      --  sectors, and the ramdisk is implemented with 512-byte sectors.)
-      Sector_Size : constant := 512;
-   begin
-      Log_Debug
-        ("Writing block to cache: " & Block_Number'Image,
-         Logging_Tags_Block_Cache);
-
-      Get_Block_Cache_Entry_Data_Address
-        (Cache, Cache_Index, Write_Addr_Virtual, Write_Addr_Physical, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Sectors_Per_Block : constant Natural :=
-        Get_Sectors_Per_Block (Sector_Size);
-
-      Start_Sector : constant Sector_Index_T :=
-        (Block_Number * Block_Size) / Sector_Size;
-
-      case Filesystem.all.Device.all.Device_Bus is
-         when Device_Bus_Virtio_MMIO   =>
-            Devices.Virtio.Block.Write_Sectors
-              (Writing_Process,
-               Filesystem.all.Device.all,
-               Write_Addr_Physical,
-               Start_Sector,
-               Sectors_Per_Block,
-               Result);
-
-         when Device_Bus_Memory_Mapped =>
-            Devices.Ramdisk.Write_Sectors
-              (Filesystem.all.Device.all,
-               Start_Sector,
-               Sectors_Per_Block,
-               Write_Addr_Virtual,
-               Result);
-      end case;
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Write_Block_From_Cache_Entry_To_Filesystem");
-         Result := Constraint_Exception;
-   end Write_Block_From_Cache_Entry_To_Filesystem;
-
    procedure Write_Block_To_Filesystem
      (Filesystem      : Filesystem_Access;
       Writing_Process : in out Process_Control_Block_T;
@@ -546,13 +500,14 @@ package body Filesystems.Block_Cache is
          return;
       end if;
 
-      Write_Block_From_Cache_Entry_To_Filesystem
+      Transfer_Block_Cache_Entry
         (System_Block_Cache,
          Filesystem,
          Writing_Process,
          Block_Number,
          Cache_Index,
-         Result);
+         Write  => True,
+         Result => Result);
       if Is_Error (Result) then
          return;
       end if;

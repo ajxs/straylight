@@ -93,12 +93,16 @@ private
       Cache_Index  : out Positive;
       Result       : out Function_Result);
 
-   procedure Read_Block_From_Filesystem_Into_Cache_Entry
-     (Cache           : in out Block_Cache_T;
-      Filesystem      : Filesystem_Access;
-      Reading_Process : in out Process_Control_Block_T;
-      Block_Number    : Block_Index_T;
-      Cache_Index     : Positive;
-      Result          : out Function_Result);
+   --  Transfers a single block between a cache entry and the underlying
+   --  storage device: reads the block into the cache entry, or writes the
+   --  cache entry's contents out to the device.
+   procedure Transfer_Block_Cache_Entry
+     (Cache        : in out Block_Cache_T;
+      Filesystem   : Filesystem_Access;
+      Process      : in out Process_Control_Block_T;
+      Block_Number : Block_Index_T;
+      Cache_Index  : Positive;
+      Write        : Boolean;
+      Result       : out Function_Result);
 
 end Filesystems.Block_Cache;
