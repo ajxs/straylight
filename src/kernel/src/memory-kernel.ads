@@ -7,6 +7,7 @@ with Memory.Allocators.Page; use Memory.Allocators.Page;
 package Memory.Kernel
   with Preelaborate
 is
+   Kernel_Page_Pool_Page_Size : constant := Page_Pool_Page_Size;
 
    --  Allocates kernel heap memory, returning both the virtual and physical
    --  addresses of the allocated region.

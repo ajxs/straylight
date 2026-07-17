@@ -154,6 +154,12 @@ package body Memory.Kernel is
             --  Error already printed.
             Panic;
          end if;
+
+         --  Zero the newly allocated page pool region.
+         Set
+           (Kernel_Page_Pool.Page_Pool_Regions (I).Virtual_Address,
+            0,
+            Page_Pool_Region_Size_In_Bytes);
       end loop;
 
       Log_Debug ("Initialised kernel page pool.", Logging_Tags);

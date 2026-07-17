@@ -11,11 +11,12 @@ with RISCV.Paging;     use RISCV.Paging;
 package Memory.Allocators.Page
   with Preelaborate
 is
+   Page_Pool_Page_Size : constant := Small_Page_Size;
 
    Page_Pool_Region_Size : constant := 1024;
 
    Page_Pool_Region_Size_In_Bytes : constant :=
-     Page_Pool_Region_Size * Small_Page_Size;
+     Page_Pool_Region_Size * Page_Pool_Page_Size;
 
    type Page_Status_T is (Free, Allocated) with Size => 1;
 

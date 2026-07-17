@@ -117,7 +117,7 @@ package body Memory.Allocators.Page is
             --  region's beginning.
             Region_Index : constant Natural :=
               Integer (Virtual_Address - Regions (Curr_Region).Virtual_Address)
-              / 16#1000#;
+              / Page_Pool_Page_Size;
 
             --  If the address has been found in an allocated region,
             --  but the start of the address + the count of pages extends
