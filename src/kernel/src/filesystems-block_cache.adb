@@ -451,20 +451,20 @@ package body Filesystems.Block_Cache is
       Cache_Index     : Positive;
       Result          : out Function_Result)
    is
-      Current_Sector : Sector_Index_T := 0;
+      Write_Addr_Virtual  : Virtual_Address_T := Null_Address;
+      Write_Addr_Physical : Physical_Address_T := Null_Physical_Address;
 
-      Curr_Write_Addr_Virtual  : Virtual_Address_T := Null_Address;
-      Curr_Write_Addr_Physical : Physical_Address_T := Null_Physical_Address;
-
-      --  @TODO: This currently assumes 512-byte sectors on all devices.
+      --  Currently all of the supported storage devices have fixed 512-byte
+      --  sectors, so we can hardcode that here. (VirtIO specifies 512-byte
+      --  sectors, and the ramdisk is implemented with 512-byte sectors.)
       Sector_Size : constant := 512;
    begin
+      Log_Debug
+        ("Writing block to cache: " & Block_Number'Image,
+         Logging_Tags_Block_Cache);
+
       Get_Block_Cache_Entry_Data_Address
-        (Cache,
-         Cache_Index,
-         Curr_Write_Addr_Virtual,
-         Curr_Write_Addr_Physical,
-         Result);
+        (Cache, Cache_Index, Write_Addr_Virtual, Write_Addr_Physical, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -472,42 +472,27 @@ package body Filesystems.Block_Cache is
       Sectors_Per_Block : constant Natural :=
         Get_Sectors_Per_Block (Sector_Size);
 
-      Current_Sector := (Block_Number * Block_Size) / Sector_Size;
+      Start_Sector : constant Sector_Index_T :=
+        (Block_Number * Block_Size) / Sector_Size;
 
-      for I in 0 .. Sectors_Per_Block - 1 loop
-         Log_Debug
-           ("Writing sector from block cache: " & Current_Sector'Image,
-            Logging_Tags_Block_Cache);
-         case Filesystem.all.Device.all.Device_Bus is
-            when Device_Bus_Virtio_MMIO   =>
-               Devices.Virtio.Block.Write_Sector
-                 (Writing_Process,
-                  Filesystem.all.Device.all,
-                  Curr_Write_Addr_Physical,
-                  Current_Sector,
-                  Result);
+      case Filesystem.all.Device.all.Device_Bus is
+         when Device_Bus_Virtio_MMIO   =>
+            Devices.Virtio.Block.Write_Sectors
+              (Writing_Process,
+               Filesystem.all.Device.all,
+               Write_Addr_Physical,
+               Start_Sector,
+               Sectors_Per_Block,
+               Result);
 
-            when Device_Bus_Memory_Mapped =>
-               Devices.Ramdisk.Write_Sector
-                 (Filesystem.all.Device.all,
-                  Current_Sector,
-                  Curr_Write_Addr_Virtual,
-                  Result);
-         end case;
-
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         Current_Sector := Current_Sector + 1;
-
-         Curr_Write_Addr_Virtual :=
-           Curr_Write_Addr_Virtual + Storage_Offset (Sector_Size);
-         Curr_Write_Addr_Physical :=
-           Curr_Write_Addr_Physical + Storage_Offset (Sector_Size);
-      end loop;
-
-      Result := Success;
+         when Device_Bus_Memory_Mapped =>
+            Devices.Ramdisk.Write_Sectors
+              (Filesystem.all.Device.all,
+               Start_Sector,
+               Sectors_Per_Block,
+               Write_Addr_Virtual,
+               Result);
+      end case;
    exception
       when Constraint_Error =>
          Log_Error
