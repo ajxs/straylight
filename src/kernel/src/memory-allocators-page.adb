@@ -51,7 +51,8 @@ package body Memory.Allocators.Page is
                   end loop;
 
                   Offset_Within_Region : constant Storage_Offset :=
-                    Storage_Offset ((Curr_Page - 1) * 16#1000#);
+                    Storage_Offset
+                      ((Curr_Page - Page_Count) * Page_Pool_Page_Size);
 
                   Allocation_Result.Virtual_Address :=
                     Regions (Curr_Region).Virtual_Address
