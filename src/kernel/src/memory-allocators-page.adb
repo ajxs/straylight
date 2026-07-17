@@ -36,6 +36,8 @@ package body Memory.Allocators.Page is
       Contiguous_Free_Count : Natural := 0;
    begin
       for Curr_Region in Regions'Range loop
+         Contiguous_Free_Count := 0;
+
          if Regions (Curr_Region).Allocated then
             for Curr_Page in Regions (Curr_Region).Page_Statuses'Range loop
                if Regions (Curr_Region).Page_Statuses (Curr_Page) = Free then
