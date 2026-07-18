@@ -1,4 +1,5 @@
 with Function_Results;       use Function_Results;
+with Locks;                  use Locks;
 with Logging;                use Logging;
 with Memory.Allocators;      use Memory.Allocators;
 with Memory.Allocators.Heap; use Memory.Allocators.Heap;
@@ -37,9 +38,7 @@ is
       Result            : out Function_Result);
 
    procedure Free_Pages
-     (Virtual_Address : Virtual_Address_T;
-      Page_Count      : Positive;
-      Result          : out Function_Result);
+     (Virtual_Address : Virtual_Address_T; Result : out Function_Result);
 
    procedure Initialise_Kernel_Heap;
 
@@ -48,7 +47,21 @@ is
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Memory];
 
-   Kernel_Heap      : Memory_Heap_T;
-   Kernel_Page_Pool : Page_Pool_T;
+   Kernel_Heap : Memory_Heap_T;
+
+   Kernel_Page_Pool : Page_Pool_T :=
+     (Page_Pool_Regions =>
+        [others =>
+           (Virtual_Address  => System'To_Address (0),
+            Physical_Address => Physical_Address_T (System'To_Address (0)),
+            Page_Statuses    => [others => Free],
+            Page_Count       => 0,
+            Allocated        => False)],
+      Free_Page_Count   => 0,
+      Spinlock          =>
+        (Locked        => 0,
+         Time_Acquired => 0,
+         Hart_Id       => No_Hart_Id,
+         Lock_Id       => Lock_Id_Kernel_Page_Pool));
 
 end Memory.Kernel;

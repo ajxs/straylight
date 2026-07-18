@@ -8,21 +8,38 @@ package body Memory.Allocators.Page is
      (Page_Pool        : in out Page_Pool_T;
       Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
+      Page_Count       : Positive;
       Result           : out Function_Result)
    is
       Regions renames Page_Pool.Page_Pool_Regions;
    begin
+      if Page_Count > Max_Page_Pool_Region_Size then
+         Result := Invalid_Argument;
+         return;
+      end if;
+
       for Curr_Region in Regions'Range loop
          if not Regions (Curr_Region).Allocated then
-            Regions (Curr_Region).Virtual_Address := Virtual_Address;
-            Regions (Curr_Region).Physical_Address := Physical_Address;
-            Regions (Curr_Region).Allocated := True;
+            Regions (Curr_Region) :=
+              (Virtual_Address  => Virtual_Address,
+               Physical_Address => Physical_Address,
+               Page_Statuses    => [others => Free],
+               Page_Count       => Page_Count,
+               Allocated        => True);
+
+            Page_Pool.Free_Page_Count :=
+              Page_Pool.Free_Page_Count + Page_Count;
+
             Result := Success;
             return;
          end if;
       end loop;
 
       Result := Region_Array_Exhausted;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Add_Region_To_Page_Pool");
+         Result := Constraint_Exception;
    end Add_Region_To_Page_Pool;
 
    procedure Allocate_Unlocked
@@ -39,7 +56,7 @@ package body Memory.Allocators.Page is
          Contiguous_Free_Count := 0;
 
          if Regions (Curr_Region).Allocated then
-            for Curr_Page in Regions (Curr_Region).Page_Statuses'Range loop
+            for Curr_Page in 1 .. Regions (Curr_Region).Page_Count loop
                if Regions (Curr_Region).Page_Statuses (Curr_Page) = Free then
                   Contiguous_Free_Count := Contiguous_Free_Count + 1;
                else
@@ -47,14 +64,26 @@ package body Memory.Allocators.Page is
                end if;
 
                if Contiguous_Free_Count = Page_Count then
-                  for K in 0 .. Page_Count - 1 loop
-                     Regions (Curr_Region).Page_Statuses (Curr_Page - K) :=
-                       Allocated;
+                  Run_First_Page : constant Positive :=
+                    Curr_Page - Page_Count + 1;
+
+                  --  Mark the allocated run: the first page identifies the
+                  --  start of the allocation, so that Free can recover the
+                  --  run's length from its address alone.
+                  Regions (Curr_Region).Page_Statuses (Run_First_Page) :=
+                    Run_Start;
+
+                  for K in Run_First_Page + 1 .. Curr_Page loop
+                     Regions (Curr_Region).Page_Statuses (K) :=
+                       Run_Continuation;
                   end loop;
+
+                  Page_Pool.Free_Page_Count :=
+                    Page_Pool.Free_Page_Count - Page_Count;
 
                   Offset_Within_Region : constant Storage_Offset :=
                     Storage_Offset
-                      ((Curr_Page - Page_Count) * Page_Pool_Page_Size);
+                      ((Run_First_Page - 1) * Page_Pool_Page_Size);
 
                   Allocation_Result.Virtual_Address :=
                     Regions (Curr_Region).Virtual_Address
@@ -80,7 +109,7 @@ package body Memory.Allocators.Page is
          end if;
       end loop;
 
-      Result := No_Free_Entries;
+      Result := Not_Enough_Memory_Available;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Allocate_Unlocked");
@@ -102,12 +131,18 @@ package body Memory.Allocators.Page is
 
    procedure Free_Unlocked
      (Page_Pool       : in out Page_Pool_T;
-      Page_Count      : Positive;
       Virtual_Address : Virtual_Address_T;
       Result          : out Function_Result)
    is
       Regions renames Page_Pool.Page_Pool_Regions;
    begin
+      --  If the address isn't page-aligned, we automatically know it isn't the
+      --  start of a page pool allocation.
+      if not Is_Address_Page_Aligned (Virtual_Address) then
+         Result := Invalid_Argument;
+         return;
+      end if;
+
       for Curr_Region in Regions'Range loop
          if Regions (Curr_Region).Allocated
            and then
@@ -117,23 +152,40 @@ package body Memory.Allocators.Page is
             --  The index within the region can be calculated by counting
             --  the number of pages that the address is offset from the
             --  region's beginning.
-            Region_Index : constant Natural :=
-              Integer (Virtual_Address - Regions (Curr_Region).Virtual_Address)
-              / Page_Pool_Page_Size;
+            First_Page : constant Positive :=
+              (Integer
+                 (Virtual_Address - Regions (Curr_Region).Virtual_Address)
+               / Page_Pool_Page_Size)
+              + 1;
 
-            --  If the address has been found in an allocated region,
-            --  but the start of the address + the count of pages extends
-            --  beyond the edge of the region, then return an error.
-            if (Region_Index + Page_Count) > Page_Pool_Region_Size then
+            --  Only the first page of an allocated run can be freed.
+            --  This rejects double-frees and addresses inside a run.
+            if Regions (Curr_Region).Page_Statuses (First_Page) /= Run_Start
+            then
+               Log_Error ("Free: Address is not the start of an allocation");
                Result := Invalid_Argument;
                return;
             end if;
 
-            for K in 1 .. Page_Count loop
-               Regions (Curr_Region).Page_Statuses (Region_Index + K) := Free;
-               Result := Success;
+            Regions (Curr_Region).Page_Statuses (First_Page) := Free;
+
+            Freed_Page_Count : Positive := 1;
+
+            --  Free the remainder of the run.
+            for Curr_Page in First_Page + 1 .. Regions (Curr_Region).Page_Count
+            loop
+               exit when
+                 Regions (Curr_Region).Page_Statuses (Curr_Page)
+                 /= Run_Continuation;
+
+               Regions (Curr_Region).Page_Statuses (Curr_Page) := Free;
+               Freed_Page_Count := Freed_Page_Count + 1;
             end loop;
 
+            Page_Pool.Free_Page_Count :=
+              Page_Pool.Free_Page_Count + Freed_Page_Count;
+
+            Result := Success;
             return;
          end if;
       end loop;
@@ -148,13 +200,12 @@ package body Memory.Allocators.Page is
 
    procedure Free
      (Page_Pool       : in out Page_Pool_T;
-      Page_Count      : Positive;
       Virtual_Address : Virtual_Address_T;
       Result          : out Function_Result) is
    begin
       Acquire_Spinlock (Page_Pool.Spinlock);
 
-      Free_Unlocked (Page_Pool, Page_Count, Virtual_Address, Result);
+      Free_Unlocked (Page_Pool, Virtual_Address, Result);
 
       Release_Spinlock (Page_Pool.Spinlock);
    end Free;

@@ -15,14 +15,16 @@ package Function_Results is
    Unhandled_Exception  : constant := -1;
    Constraint_Exception : constant := -2;
 
-   No_Free_Entries : constant := -1111_0000;
-   Not_Found       : constant := -1111_0001;
-   Not_Supported   : constant := -1111_0002;
-   Not_Initialised : constant := -1111_0003;
+   No_Free_Entries  : constant := -1111_0000;
+   Not_Found        : constant := -1111_0001;
+   Not_Supported    : constant := -1111_0002;
+   Not_Initialised  : constant := -1111_0003;
+   Invalid_Argument : constant := -1111_0004;
 
    --  Memory function result codes.
+   Not_Enough_Memory_Available : constant := -7777_0001;
+
    Address_Not_In_Heap                 : constant := -7777_0000;
-   Invalid_Argument                    : constant := -7777_0003;
    Invalid_Non_Aligned_Address         : constant := -7777_0004;
    Invalid_Physical_Memory_Size        : constant := -7777_0006;
    Invalid_Table_Index                 : constant := -7777_0007;
