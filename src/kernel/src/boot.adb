@@ -642,8 +642,6 @@ package body Boot is
    begin
       Log_Debug ("Initialising kernel services...", Logging_Tags);
 
-      Initialise_Kernel_Heap;
-
       Initialise_Devices;
 
       Initialise_Hart_Idle_Process (Hart_Id);

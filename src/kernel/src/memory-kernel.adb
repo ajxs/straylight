@@ -1,6 +1,5 @@
 with Memory.Physical; use Memory.Physical;
 with Memory.Virtual;  use Memory.Virtual;
-with Hart_State;      use Hart_State;
 
 package body Memory.Kernel is
    --  The offset into the page pool's virtual address window at which the
@@ -8,10 +7,10 @@ package body Memory.Kernel is
    --  NOTE: This variable is protected by the kernel page pool's spinlock.
    Kernel_Page_Pool_Next_Region_Offset : Storage_Offset := 0;
 
-   --  When the pool's free page count falls below this threshold after an
-   --  allocation, the pool is grown pre-emptively, while the physical
-   --  allocator is more likely to still hold large contiguous blocks.
-   Page_Pool_Low_Watermark : constant := 64;
+   --  The offset into the kernel heap's virtual address window at which the
+   --  next growth region will be mapped.
+   --  NOTE: This variable is protected by the kernel heap's spinlock.
+   Kernel_Heap_Next_Region_Offset : Storage_Offset := 0;
 
    procedure Reserve_Kernel_Page_Pool_Virtual_Address_Space_Unlocked
      (New_Region_Size_In_Bytes : Positive;
@@ -189,6 +188,196 @@ package body Memory.Kernel is
          Result := Constraint_Exception;
    end Grow_Kernel_Page_Pool;
 
+   procedure Reserve_Kernel_Heap_Virtual_Address_Space_Unlocked
+     (New_Region_Size_In_Bytes : Positive;
+      Region_Virtual_Address   : out Virtual_Address_T;
+      Result                   : out Function_Result) is
+   begin
+      Region_Virtual_Address :=
+        Kernel_Heap_Virtual_Address + Kernel_Heap_Next_Region_Offset;
+
+      Kernel_Heap_Next_Region_Offset :=
+        Kernel_Heap_Next_Region_Offset
+        + Storage_Offset (New_Region_Size_In_Bytes);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: "
+            & "Reserve_Kernel_Heap_Virtual_Address_Space");
+         Result := Constraint_Exception;
+   end Reserve_Kernel_Heap_Virtual_Address_Space_Unlocked;
+
+   procedure Reserve_Kernel_Heap_Virtual_Address_Space
+     (New_Region_Size_In_Bytes : Positive;
+      Region_Virtual_Address   : out Virtual_Address_T;
+      Result                   : out Function_Result) is
+   begin
+      Acquire_Spinlock (Kernel_Heap.Spinlock);
+      Reserve_Kernel_Heap_Virtual_Address_Space_Unlocked
+        (New_Region_Size_In_Bytes, Region_Virtual_Address, Result);
+      Release_Spinlock (Kernel_Heap.Spinlock);
+   end Reserve_Kernel_Heap_Virtual_Address_Space;
+
+   procedure Recover_Kernel_Heap_Virtual_Address_Space_Unlocked
+     (Region_Virtual_Address         : Virtual_Address_T;
+      Recovered_Region_Size_In_Bytes : Positive) is
+   begin
+      Reserved_Region_Offset : constant Storage_Offset :=
+        Kernel_Heap_Next_Region_Offset
+        - Storage_Offset (Recovered_Region_Size_In_Bytes);
+
+      --  A reservation can only be rolled back while it's still the most
+      --  recent one: If another hart has reserved address space since, the
+      --  region being recovered isn't at the top of the window anymore, and
+      --  subtracting its size would un-reserve that hart's live region.
+      --  In that case the reserved space is deliberately leaked; the heap's
+      --  virtual address window is large enough that this is harmless.
+      if Reserved_Region_Offset >= 0
+        and then
+          Kernel_Heap_Virtual_Address + Reserved_Region_Offset
+          = Region_Virtual_Address
+      then
+         Kernel_Heap_Next_Region_Offset := Reserved_Region_Offset;
+      end if;
+   exception
+      when Constraint_Error =>
+         --  The reserved space is leaked, which is safe.
+         Log_Error
+           ("Constraint_Error: "
+            & "Recover_Kernel_Heap_Virtual_Address_Space_Unlocked");
+   end Recover_Kernel_Heap_Virtual_Address_Space_Unlocked;
+
+   procedure Recover_Kernel_Heap_Virtual_Address_Space
+     (Region_Virtual_Address         : Virtual_Address_T;
+      Recovered_Region_Size_In_Bytes : Positive) is
+   begin
+      Acquire_Spinlock (Kernel_Heap.Spinlock);
+      Recover_Kernel_Heap_Virtual_Address_Space_Unlocked
+        (Region_Virtual_Address, Recovered_Region_Size_In_Bytes);
+      Release_Spinlock (Kernel_Heap.Spinlock);
+   end Recover_Kernel_Heap_Virtual_Address_Space;
+
+   --  Grows the kernel heap by acquiring new memory from the kernel page
+   --  pool, mapping it at the next free offset in the heap's virtual
+   --  address window, and adding it to the heap as a new region.
+   --  Each region is backed by a single run of pages from the kernel page
+   --  pool, and is therefore a single physically contiguous block: If a
+   --  full-sized region cannot be satisfied, progressively smaller region
+   --  sizes are attempted, provided they can still satisfy the allocation
+   --  which triggered the growth.
+   procedure Grow_Kernel_Heap
+     (Minimum_Size_In_Bytes : Positive; Result : out Function_Result)
+   is
+      --  The extra capacity a heap growth region needs beyond the allocation
+      --  which triggered the growth, covering the region's block headers and
+      --  any alignment slack.
+      Heap_Growth_Region_Overhead : constant := 4096;
+
+      Growth_Region_Page_Counts :
+        constant array (Positive range <>) of Positive :=
+          [Max_Page_Pool_Region_Size, 256, 64];
+
+      Allocation_Result      : Memory_Allocation_Result;
+      Region_Virtual_Address : Virtual_Address_T := Null_Address;
+
+      Region_Size_In_Bytes : Positive := 1;
+
+      Free_Result : Function_Result := Unset;
+   begin
+      --  Each growth region is backed by a single run of pages allocated from
+      --  the kernel page pool, so this can be no larger than a single page
+      --  pool region.
+      if Minimum_Size_In_Bytes
+        > Page_Pool_Region_Size_In_Bytes - Heap_Growth_Region_Overhead
+      then
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      --  Query each of the possible region sizes, until one is accepted
+      --  by the kernel page pool.
+      for Region_Page_Count of Growth_Region_Page_Counts loop
+         if Region_Page_Count
+           * Kernel_Page_Pool_Page_Size
+           - Heap_Growth_Region_Overhead
+           >= Minimum_Size_In_Bytes
+         then
+            Region_Size_In_Bytes :=
+              Region_Page_Count * Kernel_Page_Pool_Page_Size;
+
+            --  Allocate the physical memory backing the new region from the
+            --  kernel page pool.
+            Allocate_Pages (Region_Page_Count, Allocation_Result, Result);
+            if Result = Success then
+               --  Reserve the virtual address space for the new region.
+               Reserve_Kernel_Heap_Virtual_Address_Space
+                 (Region_Size_In_Bytes, Region_Virtual_Address, Result);
+               if Is_Error (Result) then
+                  goto Error_Free_Pages;
+               end if;
+
+               --  Map the new region into the heap's virtual address window.
+               Map_Kernel_Memory
+                 (Region_Virtual_Address,
+                  Allocation_Result.Physical_Address,
+                  Storage_Offset (Region_Size_In_Bytes),
+                  (True, True, False, False),
+                  Result);
+               if Is_Error (Result) then
+                  goto Error_Recover_Virtual_Memory_Space;
+               end if;
+
+               Kernel_Heap.Add_Memory_Region_To_Heap
+                 (Region_Virtual_Address,
+                  Allocation_Result.Physical_Address,
+                  Storage_Offset (Region_Size_In_Bytes),
+                  Result);
+               if Is_Error (Result) then
+                  --  The region is already mapped, so its physical memory
+                  --  can't be returned to the page pool.
+                  --  This only occurs if the heap's region array is exhausted.
+                  --  @TODO: Handle this error.
+                  return;
+               end if;
+
+               Log_Debug
+                 ("Grew kernel heap by"
+                  & Region_Size_In_Bytes'Image
+                  & " bytes",
+                  Logging_Tags);
+
+               return;
+            elsif Result = Not_Enough_Memory_Available then
+               --  The kernel page pool couldn't satisfy the request.
+               --  Try the next smaller region size.
+               null;
+            else
+               --  An unexpected error occurred.
+               return;
+            end if;
+         end if;
+      end loop;
+
+      --  All candidate region sizes were rejected by the kernel page pool.
+      --  Result holds the error from the last attempt.
+      return;
+
+      --  Result retains the error which caused the growth attempt to fail
+      --  throughout the error handling below.
+      <<Error_Recover_Virtual_Memory_Space>>
+      Recover_Kernel_Heap_Virtual_Address_Space
+        (Region_Virtual_Address, Region_Size_In_Bytes);
+
+      <<Error_Free_Pages>>
+      Free_Pages (Allocation_Result.Virtual_Address, Free_Result);
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Grow_Kernel_Heap");
+         Result := Constraint_Exception;
+   end Grow_Kernel_Heap;
+
    procedure Allocate_Kernel_Memory
      (Size              : Positive;
       Allocated_Address : out Virtual_Address_T;
@@ -197,7 +386,11 @@ package body Memory.Kernel is
    is
       Allocation_Result : Memory_Allocation_Result;
    begin
-      Kernel_Heap.Allocate (Size, Allocation_Result, Result, Alignment);
+      Allocate_Kernel_Physical_Memory
+        (Size, Allocation_Result, Result, Alignment);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Allocated_Address := Allocation_Result.Virtual_Address;
    end Allocate_Kernel_Memory;
@@ -206,9 +399,22 @@ package body Memory.Kernel is
      (Size              : Positive;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1) is
+      Alignment         : Storage_Offset := 1)
+   is
+      Grow_Result : Function_Result := Unset;
    begin
       Kernel_Heap.Allocate (Size, Allocation_Result, Result, Alignment);
+
+      --  If the allocation can't be fulfilled, attempt to grow the heap,
+      --  then retry the allocation.
+      if Result = Not_Enough_Memory_Available then
+         Grow_Kernel_Heap (Size, Grow_Result);
+         if Is_Error (Grow_Result) then
+            return;
+         end if;
+
+         Kernel_Heap.Allocate (Size, Allocation_Result, Result, Alignment);
+      end if;
    end Allocate_Kernel_Physical_Memory;
 
    procedure Allocate_Pages
@@ -216,6 +422,11 @@ package body Memory.Kernel is
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result)
    is
+      --  When the pool's free page count falls below this threshold after an
+      --  allocation, the pool is grown pre-emptively, while the physical
+      --  allocator is more likely to still hold large contiguous blocks.
+      Page_Pool_Low_Watermark : constant := 64;
+
       Grow_Result : Function_Result := Unset;
    begin
       Kernel_Page_Pool.Allocate (Number_of_Pages, Allocation_Result, Result);
@@ -260,49 +471,5 @@ package body Memory.Kernel is
    begin
       Kernel_Page_Pool.Free (Virtual_Address, Result);
    end Free_Pages;
-
-   procedure Initialise_Kernel_Heap is
-      Allocated_Physical_Address : Physical_Address_T := Null_Physical_Address;
-
-      Result : Function_Result := Unset;
-   begin
-      Log_Debug ("Initialising kernel heap...", Logging_Tags);
-
-      Kernel_Heap.Spinlock.Lock_Id := Lock_Id_Kernel_Heap;
-
-      Allocate_Physical_Memory
-        (Kernel_Heap_Initial_Size, Allocated_Physical_Address, Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      Log_Debug ("Mapping initial kernel heap region...", Logging_Tags);
-
-      Map_Kernel_Memory
-        (Kernel_Heap_Virtual_Address,
-         Allocated_Physical_Address,
-         Storage_Offset (Kernel_Heap_Initial_Size),
-         (True, True, False, False),
-         Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      Log_Debug ("Adding initial kernel heap region...", Logging_Tags);
-
-      Kernel_Heap.Add_Memory_Region_To_Heap
-        (Kernel_Heap_Virtual_Address,
-         Allocated_Physical_Address,
-         Storage_Offset (Kernel_Heap_Initial_Size),
-         Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      Log_Debug ("Initialised kernel heap.", Logging_Tags);
-   end Initialise_Kernel_Heap;
 
 end Memory.Kernel;

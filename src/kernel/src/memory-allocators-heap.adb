@@ -342,7 +342,7 @@ package body Memory.Allocators.Heap is
         ("Heap exhausted: unable to allocate " & Size'Image & " bytes.",
          Logging_Tags_Heap);
 
-      Result := Heap_Exhausted;
+      Result := Not_Enough_Memory_Available;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Allocate", Logging_Tags_Heap);

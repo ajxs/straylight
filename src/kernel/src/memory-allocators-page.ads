@@ -86,6 +86,6 @@ is
 
 private
    Logging_Tags_Page_Pool : constant Log_Tags :=
-     [Log_Tag_Page_Pool, Log_Tag_Memory];
+     [Log_Tag_Page_Pool, Log_Tag_Memory, Log_Tag_Memory_Allocators];
 
 end Memory.Allocators.Page;

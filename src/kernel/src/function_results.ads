@@ -22,13 +22,10 @@ package Function_Results is
    Invalid_Argument : constant := -1111_0004;
 
    --  Memory function result codes.
-   Not_Enough_Memory_Available : constant := -7777_0001;
-
    Address_Not_In_Heap                 : constant := -7777_0000;
+   Not_Enough_Memory_Available         : constant := -7777_0001;
    Invalid_Non_Aligned_Address         : constant := -7777_0004;
    Invalid_Physical_Memory_Size        : constant := -7777_0006;
-   Invalid_Table_Index                 : constant := -7777_0007;
-   Heap_Exhausted                      : constant := -7777_0012;
    No_Block_Small_Enough               : constant := -7777_0014;
    No_Block_Large_Enough               : constant := -7777_0015;
    Memory_Block_Cannot_Be_Consolidated : constant := 7777_0019;
@@ -39,7 +36,6 @@ package Function_Results is
    Region_Not_Mapped                   : constant := -7777_0024;
    Region_Is_Overlapping               : constant := -7777_0027;
    Region_Array_Exhausted              : constant := -7777_0025;
-   Virtual_Memory_Exhausted            : constant := -7777_0026;
    No_Space_In_Region                  : constant := 7777_0027;
 
    --  Process function result codes.

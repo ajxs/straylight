@@ -40,13 +40,22 @@ is
    procedure Free_Pages
      (Virtual_Address : Virtual_Address_T; Result : out Function_Result);
 
-   procedure Initialise_Kernel_Heap;
-
 private
    Logging_Tags : constant Log_Tags :=
      [Log_Tag_Memory, Log_Tag_Memory_Allocators];
 
-   Kernel_Heap : Memory_Heap_T;
+   Kernel_Heap : Memory_Heap_T :=
+     (Memory_Regions =>
+        [others =>
+           (Heap_Region_Virt_Addr => System'To_Address (0),
+            Heap_Region_Phys_Addr =>
+              Physical_Address_T (System'To_Address (0)),
+            Heap_Region_Size      => 0)],
+      Spinlock       =>
+        (Locked        => 0,
+         Time_Acquired => 0,
+         Hart_Id       => No_Hart_Id,
+         Lock_Id       => Lock_Id_Kernel_Heap));
 
    Kernel_Page_Pool : Page_Pool_T :=
      (Page_Pool_Regions =>

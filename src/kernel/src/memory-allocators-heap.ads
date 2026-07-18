@@ -44,7 +44,8 @@ is
       Result           : out Function_Result);
 
 private
-   Logging_Tags_Heap : constant Log_Tags := [Log_Tag_Heap, Log_Tag_Memory];
+   Logging_Tags_Heap : constant Log_Tags :=
+     [Log_Tag_Heap, Log_Tag_Memory, Log_Tag_Memory_Allocators];
 
    type Allocation_Header_T is record
       --  The allocation header contains a checksum calculated from the block's
