@@ -42,10 +42,9 @@ is
 
    procedure Initialise_Kernel_Heap;
 
-   procedure Initialise_Kernel_Page_Pool;
-
 private
-   Logging_Tags : constant Log_Tags := [Log_Tag_Memory];
+   Logging_Tags : constant Log_Tags :=
+     [Log_Tag_Memory, Log_Tag_Memory_Allocators];
 
    Kernel_Heap : Memory_Heap_T;
 

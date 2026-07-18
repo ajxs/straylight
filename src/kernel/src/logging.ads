@@ -7,8 +7,7 @@ package Logging
   with Preelaborate
 is
    type Log_Tag_T is
-     (Log_Tag_Allocator,
-      Log_Tag_Boot,
+     (Log_Tag_Boot,
       Log_Tag_Devices,
       Log_Tag_Devicetree,
       Log_Tag_Devices_Ramdisk,
@@ -26,6 +25,7 @@ is
       Log_Tag_Page_Pool,
       Log_Tag_Idle,
       Log_Tag_Memory,
+      Log_Tag_Memory_Allocators,
       Log_Tag_Memory_Page_Walking,
       Log_Tag_Memory_Physical,
       Log_Tag_Memory_Virtual,
@@ -74,7 +74,7 @@ private
       Log_Tag_Processes               => False,
       Log_Tag_System_Calls            => False,
       Log_Tag_Scheduler               => False,
-      Log_Tag_Allocator               => False,
+      Log_Tag_Memory_Allocators       => False,
       Log_Tag_Traps                   => False,
       Log_Tag_Locks                   => False,
       Log_Tag_Loader                  => False,

@@ -644,8 +644,6 @@ package body Boot is
 
       Initialise_Kernel_Heap;
 
-      Initialise_Kernel_Page_Pool;
-
       Initialise_Devices;
 
       Initialise_Hart_Idle_Process (Hart_Id);
