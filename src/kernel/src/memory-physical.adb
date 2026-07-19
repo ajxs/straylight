@@ -140,24 +140,23 @@ package body Memory.Physical is
 
       Release_Spinlock (Phys_Memory_Space.Spinlock);
 
-      Log_Debug
-        ("Initialising allocated physical memory block.", Logging_Tags);
-
       --  @NOTE: Only the specified required size will be initialised, not the
       --  whole underlying physical memory block. Normally this shouldn't be
       --  a problem due to the alignment of the memory blocks. It's important
       --  that no more physical memory is mapped into a process' virtual
       --  address space than is allocated here, as it would expose
       --  uninitialised memory to the process.
-      Initialise_Allocated_Physical_Memory : declare
-         Mapped_Address : Virtual_Address_T := Null_Address;
-      begin
-         Mapped_Address :=
-           Memory.Virtual.Get_Physical_Address_Virtual_Mapping
-             (Allocated_Address);
+      if Result = Success then
+         Initialise_Allocated_Physical_Memory : declare
+            Mapped_Address : Virtual_Address_T := Null_Address;
+         begin
+            Mapped_Address :=
+              Memory.Virtual.Get_Physical_Address_Virtual_Mapping
+                (Allocated_Address);
 
-         Memory.Set (Mapped_Address, 0, Required_Size);
-      end Initialise_Allocated_Physical_Memory;
+            Memory.Set (Mapped_Address, 0, Required_Size);
+         end Initialise_Allocated_Physical_Memory;
+      end if;
    end Allocate_Physical_Memory;
 
    procedure Consolidate_Adjacent_Memory_Blocks
