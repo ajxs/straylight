@@ -43,6 +43,18 @@ is
       Size             : Storage_Offset;
       Result           : out Function_Result);
 
+   --  Atomically add a new memory region to the heap, and allocate memory.
+   --  This is used to avoid data races when growing the heap.
+   procedure Add_Memory_Region_To_Heap_And_Allocate
+     (Memory_Heap       : in out Memory_Heap_T;
+      Virtual_Address   : Virtual_Address_T;
+      Physical_Address  : Physical_Address_T;
+      Region_Size       : Storage_Offset;
+      Allocation_Size   : Positive;
+      Allocation_Result : out Memory_Allocation_Result;
+      Result            : out Function_Result;
+      Alignment         : Storage_Offset := 1);
+
 private
    Logging_Tags_Heap : constant Log_Tags :=
      [Log_Tag_Heap, Log_Tag_Memory, Log_Tag_Memory_Allocators];

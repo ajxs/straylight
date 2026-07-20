@@ -267,8 +267,11 @@ package body Memory.Kernel is
    --  full-sized region cannot be satisfied, progressively smaller region
    --  sizes are attempted, provided they can still satisfy the allocation
    --  which triggered the growth.
-   procedure Grow_Kernel_Heap
-     (Minimum_Size_In_Bytes : Positive; Result : out Function_Result)
+   procedure Grow_Kernel_Heap_And_Allocate
+     (Allocation_Size   : Positive;
+      Allocation_Result : out Memory_Allocation_Result;
+      Result            : out Function_Result;
+      Alignment         : Storage_Offset := 1)
    is
       --  The extra capacity a heap growth region needs beyond the allocation
       --  which triggered the growth, covering the region's block headers and
@@ -279,8 +282,8 @@ package body Memory.Kernel is
         constant array (Positive range <>) of Positive :=
           [Max_Page_Pool_Region_Size, 256, 64];
 
-      Allocation_Result      : Memory_Allocation_Result;
-      Region_Virtual_Address : Virtual_Address_T := Null_Address;
+      Pages_Allocation_Result : Memory_Allocation_Result;
+      Region_Virtual_Address  : Virtual_Address_T := Null_Address;
 
       Region_Size_In_Bytes : Positive := 1;
 
@@ -289,7 +292,7 @@ package body Memory.Kernel is
       --  Each growth region is backed by a single run of pages allocated from
       --  the kernel page pool, so this can be no larger than a single page
       --  pool region.
-      if Minimum_Size_In_Bytes
+      if Allocation_Size
         > Page_Pool_Region_Size_In_Bytes - Heap_Growth_Region_Overhead
       then
          Result := Invalid_Argument;
@@ -302,14 +305,15 @@ package body Memory.Kernel is
          if Region_Page_Count
            * Kernel_Page_Pool_Page_Size
            - Heap_Growth_Region_Overhead
-           >= Minimum_Size_In_Bytes
+           >= Allocation_Size
          then
             Region_Size_In_Bytes :=
               Region_Page_Count * Kernel_Page_Pool_Page_Size;
 
             --  Allocate the physical memory backing the new region from the
             --  kernel page pool.
-            Allocate_Pages (Region_Page_Count, Allocation_Result, Result);
+            Allocate_Pages
+              (Region_Page_Count, Pages_Allocation_Result, Result);
             if Result = Success then
                --  Reserve the virtual address space for the new region.
                Reserve_Kernel_Heap_Virtual_Address_Space
@@ -321,7 +325,7 @@ package body Memory.Kernel is
                --  Map the new region into the heap's virtual address window.
                Map_Kernel_Memory
                  (Region_Virtual_Address,
-                  Allocation_Result.Physical_Address,
+                  Pages_Allocation_Result.Physical_Address,
                   Storage_Offset (Region_Size_In_Bytes),
                   (True, True, False, False),
                   Result);
@@ -329,11 +333,19 @@ package body Memory.Kernel is
                   goto Error_Recover_Virtual_Memory_Space;
                end if;
 
-               Kernel_Heap.Add_Memory_Region_To_Heap
-                 (Region_Virtual_Address,
-                  Allocation_Result.Physical_Address,
+               --  @TODO: In the future, check whether the newly allocated
+               --  pages are physically and virtually contiguous with the last
+               --  allocated region. If so, the region can be 'extended'.
+               Add_Memory_Region_To_Heap_And_Allocate
+                 (Kernel_Heap,
+                  Region_Virtual_Address,
+                  Pages_Allocation_Result.Physical_Address,
                   Storage_Offset (Region_Size_In_Bytes),
-                  Result);
+                  Allocation_Size,
+                  Allocation_Result,
+                  Result,
+                  Alignment);
+
                if Is_Error (Result) then
                   --  The region is already mapped, so its physical memory
                   --  can't be returned to the page pool.
@@ -364,9 +376,9 @@ package body Memory.Kernel is
       --  Result holds the error from the last attempt.
       return;
 
+      <<Error_Recover_Virtual_Memory_Space>>
       --  Result retains the error which caused the growth attempt to fail
       --  throughout the error handling below.
-      <<Error_Recover_Virtual_Memory_Space>>
       Recover_Kernel_Heap_Virtual_Address_Space
         (Region_Virtual_Address, Region_Size_In_Bytes);
 
@@ -374,9 +386,9 @@ package body Memory.Kernel is
       Free_Pages (Allocation_Result.Virtual_Address, Free_Result);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Grow_Kernel_Heap");
+         Log_Error ("Constraint_Error: Grow_Kernel_Heap_And_Allocate");
          Result := Constraint_Exception;
-   end Grow_Kernel_Heap;
+   end Grow_Kernel_Heap_And_Allocate;
 
    procedure Allocate_Kernel_Memory
      (Size              : Positive;
@@ -399,21 +411,15 @@ package body Memory.Kernel is
      (Size              : Positive;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1)
-   is
-      Grow_Result : Function_Result := Unset;
+      Alignment         : Storage_Offset := 1) is
    begin
       Kernel_Heap.Allocate (Size, Allocation_Result, Result, Alignment);
 
       --  If the allocation can't be fulfilled, attempt to grow the heap,
       --  then retry the allocation.
       if Result = Not_Enough_Memory_Available then
-         Grow_Kernel_Heap (Size, Grow_Result);
-         if Is_Error (Grow_Result) then
-            return;
-         end if;
-
-         Kernel_Heap.Allocate (Size, Allocation_Result, Result, Alignment);
+         Grow_Kernel_Heap_And_Allocate
+           (Size, Allocation_Result, Result, Alignment);
       end if;
    end Allocate_Kernel_Physical_Memory;
 

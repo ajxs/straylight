@@ -578,19 +578,6 @@ package body Memory.Allocators.Heap is
          return;
       end if;
 
-      Log_Debug
-        ("Inserting new heap memory region: "
-         & ASCII.LF
-         & "  VAddr: "
-         & Virtual_Address'Image
-         & ASCII.LF
-         & "  PAddr: "
-         & Physical_Address'Image
-         & ASCII.LF
-         & "  Size:  "
-         & Size'Image,
-         Logging_Tags_Heap);
-
       --  Ensure the new region doesn't overlap with any existing region.
       Does_Address_Range_Overlap_Any_Region
         (Memory_Heap, Virtual_Address, Physical_Address, Size, Result);
@@ -663,5 +650,30 @@ package body Memory.Allocators.Heap is
 
       Release_Spinlock (Memory_Heap.Spinlock);
    end Add_Memory_Region_To_Heap;
+
+   procedure Add_Memory_Region_To_Heap_And_Allocate
+     (Memory_Heap       : in out Memory_Heap_T;
+      Virtual_Address   : Virtual_Address_T;
+      Physical_Address  : Physical_Address_T;
+      Region_Size       : Storage_Offset;
+      Allocation_Size   : Positive;
+      Allocation_Result : out Memory_Allocation_Result;
+      Result            : out Function_Result;
+      Alignment         : Storage_Offset := 1) is
+   begin
+      Acquire_Spinlock (Memory_Heap.Spinlock);
+
+      Add_Memory_Region_To_Heap_Unlocked
+        (Memory_Heap, Virtual_Address, Physical_Address, Region_Size, Result);
+      if Is_Error (Result) then
+         Release_Spinlock (Memory_Heap.Spinlock);
+         return;
+      end if;
+
+      Allocate_Unlocked
+        (Memory_Heap, Allocation_Size, Allocation_Result, Result, Alignment);
+
+      Release_Spinlock (Memory_Heap.Spinlock);
+   end Add_Memory_Region_To_Heap_And_Allocate;
 
 end Memory.Allocators.Heap;
