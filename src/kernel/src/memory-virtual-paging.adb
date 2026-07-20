@@ -3,6 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Hart_State;      use Hart_State;
 with Memory.Physical; use Memory.Physical;
 
 package body Memory.Virtual.Paging is
@@ -24,8 +25,7 @@ package body Memory.Virtual.Paging is
          & Table_Physical_Address'Image,
          Logging_Tags);
 
-      Initialise_New_Table :
-      declare
+      Initialise_New_Table : declare
          --  The new page table, with the physical ad`dress
          --  mapped into the kernel address space.
          Page_Table : Page_Table_T
@@ -62,17 +62,19 @@ package body Memory.Virtual.Paging is
       --  and 'gigapages' must be virtually and physically aligned to
       --  their boundary.
       if Remaining_Size >= RISCV.Paging.Huge_Page_Size
-        and then Is_Address_Aligned
-                   (Virtual_Address, RISCV.Paging.Huge_Page_Size)
-        and then Is_Address_Aligned
-                   (Address (Physical_Address), RISCV.Paging.Huge_Page_Size)
+        and then
+          Is_Address_Aligned (Virtual_Address, RISCV.Paging.Huge_Page_Size)
+        and then
+          Is_Address_Aligned
+            (Address (Physical_Address), RISCV.Paging.Huge_Page_Size)
       then
          return Huge;
       elsif Remaining_Size >= RISCV.Paging.Large_Page_Size
-        and then Is_Address_Aligned
-                   (Virtual_Address, RISCV.Paging.Large_Page_Size)
-        and then Is_Address_Aligned
-                   (Address (Physical_Address), RISCV.Paging.Large_Page_Size)
+        and then
+          Is_Address_Aligned (Virtual_Address, RISCV.Paging.Large_Page_Size)
+        and then
+          Is_Address_Aligned
+            (Address (Physical_Address), RISCV.Paging.Large_Page_Size)
       then
          return Large;
       end if;
@@ -141,6 +143,25 @@ package body Memory.Virtual.Paging is
             Region_Flags,
             Result);
          if Is_Error (Result) then
+            --  In case of an error, roll back the pages mapped so far, so a
+            --  failed mapping leaves the range in its original unmapped state.
+            Memory_Mapped_So_Far : constant Storage_Offset :=
+              Addr_Offset - Page_Size_In_Bytes (Region_Size);
+
+            Unmap_Result : Function_Result := Unset;
+
+            if Memory_Mapped_So_Far > 0 then
+               Unmap
+                 (Base_Page_Table_Address,
+                  Virtual_Address,
+                  Memory_Region_Size (Memory_Mapped_So_Far),
+                  Unmap_Result);
+               if Is_Error (Unmap_Result) then
+                  Panic ("Failed to roll back partial mapping");
+               end if;
+            end if;
+
+            --  Result holds the original mapping error.
             return;
          end if;
 
@@ -185,10 +206,8 @@ package body Memory.Virtual.Paging is
       Curr_Table_Virtual_Addr :=
         Get_Physical_Address_Virtual_Mapping (Base_Page_Table_Address);
 
-      Walk_Page_Tables :
-      for Table_Level in reverse 0 .. 2 loop
-         Read_Table_Entry :
-         declare
+      Walk_Page_Tables : for Table_Level in reverse 0 .. 2 loop
+         Read_Table_Entry : declare
             --  The current level page table.
             Page_Table          : Page_Table_T
             with Import, Alignment => 1, Address => Curr_Table_Virtual_Addr;
@@ -357,10 +376,8 @@ package body Memory.Virtual.Paging is
       Curr_Table_Virtual_Addr :=
         Get_Physical_Address_Virtual_Mapping (Base_Page_Table_Address);
 
-      Walk_Page_Tables :
-      for Table_Level in reverse 0 .. 2 loop
-         Read_Table_Entry :
-         declare
+      Walk_Page_Tables : for Table_Level in reverse 0 .. 2 loop
+         Read_Table_Entry : declare
             --  The current level page table.
             Page_Table : Page_Table_T
             with Import, Alignment => 1, Address => Curr_Table_Virtual_Addr;
