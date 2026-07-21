@@ -55,6 +55,12 @@ is
       Result            : out Function_Result;
       Alignment         : Storage_Offset := 1);
 
+   procedure Get_Minimum_Region_Size
+     (Allocation_Size     : Positive;
+      Alignment           : Storage_Offset;
+      Minimum_Region_Size : out Storage_Offset;
+      Result              : out Function_Result);
+
 private
    Logging_Tags_Heap : constant Log_Tags :=
      [Log_Tag_Heap, Log_Tag_Memory, Log_Tag_Memory_Allocators];

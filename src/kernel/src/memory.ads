@@ -10,7 +10,6 @@ with System.Storage_Elements; use System.Storage_Elements;
 package Memory
   with Preelaborate
 is
-
    --  The virtual/physical addresses are declared as separate, incompatible
    --  types so that the compiler will prevent any mixing of the two.
    --  Physical addresses cannot be used in virtual space without first being
@@ -136,9 +135,6 @@ is
    --  This is the upper limit of what physical memory can is mapped into
    --  the kernel's address space. Currently, this is 64GiB.
    Physical_Memory_Map_Limit : constant := 16#10_0000_0000#;
-
-   --  64MiB kernel heap initial size.
-   Kernel_Heap_Initial_Size : constant := 16#400_0000#;
 
    ----------------------------------------------------------------------------
    --  Generic memcpy implementation.

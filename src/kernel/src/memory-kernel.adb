@@ -273,11 +273,6 @@ package body Memory.Kernel is
       Result            : out Function_Result;
       Alignment         : Storage_Offset := 1)
    is
-      --  The extra capacity a heap growth region needs beyond the allocation
-      --  which triggered the growth, covering the region's block headers and
-      --  any alignment slack.
-      Heap_Growth_Region_Overhead : constant := 4096;
-
       Growth_Region_Page_Counts :
         constant array (Positive range <>) of Positive :=
           [Max_Page_Pool_Region_Size, 256, 64];
@@ -285,16 +280,18 @@ package body Memory.Kernel is
       Pages_Allocation_Result : Memory_Allocation_Result;
       Region_Virtual_Address  : Virtual_Address_T := Null_Address;
 
-      Region_Size_In_Bytes : Positive := 1;
+      Region_Size_In_Bytes         : Positive := 1;
+      Minimum_Region_Size_In_Bytes : Storage_Offset := 1;
 
       Free_Result : Function_Result := Unset;
    begin
-      --  Each growth region is backed by a single run of pages allocated from
-      --  the kernel page pool, so this can be no larger than a single page
-      --  pool region.
-      if Allocation_Size
-        > Page_Pool_Region_Size_In_Bytes - Heap_Growth_Region_Overhead
-      then
+      Get_Minimum_Region_Size
+        (Allocation_Size, Alignment, Minimum_Region_Size_In_Bytes, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      if Minimum_Region_Size_In_Bytes > Page_Pool_Region_Size_In_Bytes then
          Result := Invalid_Argument;
          return;
       end if;
@@ -302,10 +299,8 @@ package body Memory.Kernel is
       --  Query each of the possible region sizes, until one is accepted
       --  by the kernel page pool.
       for Region_Page_Count of Growth_Region_Page_Counts loop
-         if Region_Page_Count
-           * Kernel_Page_Pool_Page_Size
-           - Heap_Growth_Region_Overhead
-           >= Allocation_Size
+         if Storage_Offset (Region_Page_Count * Kernel_Page_Pool_Page_Size)
+           >= Minimum_Region_Size_In_Bytes
          then
             Region_Size_In_Bytes :=
               Region_Page_Count * Kernel_Page_Pool_Page_Size;

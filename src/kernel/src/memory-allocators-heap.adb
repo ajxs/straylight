@@ -676,4 +676,20 @@ package body Memory.Allocators.Heap is
       Release_Spinlock (Memory_Heap.Spinlock);
    end Add_Memory_Region_To_Heap_And_Allocate;
 
+   procedure Get_Minimum_Region_Size
+     (Allocation_Size     : Positive;
+      Alignment           : Storage_Offset;
+      Minimum_Region_Size : out Storage_Offset;
+      Result              : out Function_Result) is
+   begin
+      Minimum_Region_Size :=
+        Storage_Offset (Allocation_Size) + Alignment + 3 * Header_Size;
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error
+           ("Constraint_Error: Get_Minimum_Region_Size", Logging_Tags_Heap);
+         Result := Constraint_Exception;
+   end Get_Minimum_Region_Size;
+
 end Memory.Allocators.Heap;
