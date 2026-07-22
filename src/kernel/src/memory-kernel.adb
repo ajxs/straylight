@@ -446,7 +446,8 @@ package body Memory.Kernel is
       --  allocator is more likely to still hold large contiguous blocks.
       Page_Pool_Low_Watermark : constant := 64;
 
-      Grow_Result : Function_Result := Unset;
+      Grow_Result    : Function_Result := Unset;
+      Pool_Was_Grown : Boolean := False;
    begin
       Kernel_Page_Pool.Allocate (Number_of_Pages, Allocation_Result, Result);
 
@@ -455,6 +456,8 @@ package body Memory.Kernel is
       if Result = Not_Enough_Memory_Available then
          Grow_Kernel_Page_Pool_And_Allocate
            (Number_of_Pages, Allocation_Result, Result);
+
+         Pool_Was_Grown := True;
       end if;
 
       if Is_Error (Result) then
@@ -462,11 +465,15 @@ package body Memory.Kernel is
       end if;
 
       --  Grow the pool pre-emptively when the number of free pages is low.
-      --  A failure here is not a fatal error: the current allocation has
-      --  already been satisfied.
-      if Kernel_Page_Pool.Free_Page_Count < Page_Pool_Low_Watermark then
+      --  However, don't grow the page pool pre-emptively if it was only just
+      --  grown to satisfy the current allocation.
+      if not Pool_Was_Grown
+        and then Kernel_Page_Pool.Free_Page_Count < Page_Pool_Low_Watermark
+      then
          Grow_Kernel_Page_Pool (1, Grow_Result);
          if Is_Error (Grow_Result) then
+            --  A failure here won't impact the current allocation, so it's
+            --  currently logged and ignored. In future this may be changed.
             Log_Error
               ("Failed to grow kernel page pool pre-emptively", Logging_Tags);
          end if;
