@@ -210,4 +210,28 @@ package body Memory.Allocators.Page is
       Release_Spinlock (Page_Pool.Spinlock);
    end Free;
 
+   procedure Add_Region_To_Page_Pool_And_Allocate
+     (Page_Pool             : in out Page_Pool_T;
+      Virtual_Address       : Virtual_Address_T;
+      Physical_Address      : Physical_Address_T;
+      New_Page_Count        : Positive;
+      Allocation_Page_Count : Positive;
+      Allocation_Result     : out Memory_Allocation_Result;
+      Result                : out Function_Result) is
+   begin
+      Acquire_Spinlock (Page_Pool.Spinlock);
+
+      Add_Region_To_Page_Pool
+        (Page_Pool, Virtual_Address, Physical_Address, New_Page_Count, Result);
+      if Is_Error (Result) then
+         Release_Spinlock (Page_Pool.Spinlock);
+         return;
+      end if;
+
+      Allocate_Unlocked
+        (Page_Pool, Allocation_Page_Count, Allocation_Result, Result);
+
+      Release_Spinlock (Page_Pool.Spinlock);
+   end Add_Region_To_Page_Pool_And_Allocate;
+
 end Memory.Allocators.Page;

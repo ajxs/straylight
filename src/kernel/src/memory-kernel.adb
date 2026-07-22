@@ -83,26 +83,30 @@ package body Memory.Kernel is
       Release_Spinlock (Kernel_Page_Pool.Spinlock);
    end Recover_Kernel_Page_Pool_Virtual_Address_Space;
 
-   --  Grows the kernel page pool by acquiring new memory from the physical
-   --  memory allocator, mapping it at the next free offset in the
-   --  pool's virtual address window, and adding it to the pool.
+   --  Allocates and maps the physical memory backing a new page pool region,
+   --  without adding it to the pool.
    --  Each region is a single physically contiguous block: If a full-sized
    --  region cannot be satisfied, progressively smaller region sizes are
    --  attempted, provided they can still satisfy the required page count.
-   procedure Grow_Kernel_Page_Pool
-     (Minimum_Page_Count : Positive; Result : out Function_Result)
+   procedure Provision_New_Page_Pool_Region
+     (Minimum_Page_Count      : Positive;
+      Region_Virtual_Address  : out Virtual_Address_T;
+      Region_Physical_Address : out Physical_Address_T;
+      Region_Page_Count       : out Positive;
+      Result                  : out Function_Result)
    is
       Growth_Region_Page_Counts :
         constant array (Positive range <>) of Positive :=
           [Max_Page_Pool_Region_Size, 256, 64];
 
-      Allocated_Physical_Address : Physical_Address_T := Null_Physical_Address;
-      Region_Virtual_Address     : Virtual_Address_T := Null_Address;
-
       Region_Size_In_Bytes : Positive := 1;
 
       Free_Result : Function_Result := Unset;
    begin
+      Region_Virtual_Address := Null_Address;
+      Region_Physical_Address := Null_Physical_Address;
+      Region_Page_Count := 1;
+
       if Minimum_Page_Count > Max_Page_Pool_Region_Size then
          Result := Invalid_Argument;
          return;
@@ -110,13 +114,13 @@ package body Memory.Kernel is
 
       --  Query each of the possible allocation sizes, until one is accepted
       --  by the physical memory allocator.
-      for Region_Page_Count of Growth_Region_Page_Counts loop
-         if Region_Page_Count >= Minimum_Page_Count then
-            Region_Size_In_Bytes := Region_Page_Count * Page_Pool_Page_Size;
+      for Candidate_Page_Count of Growth_Region_Page_Counts loop
+         if Candidate_Page_Count >= Minimum_Page_Count then
+            Region_Size_In_Bytes := Candidate_Page_Count * Page_Pool_Page_Size;
 
             --  Allocate the physical memory backing the new region.
             Allocate_Physical_Memory
-              (Region_Size_In_Bytes, Allocated_Physical_Address, Result);
+              (Region_Size_In_Bytes, Region_Physical_Address, Result);
             if Result = Success then
                --  Reserve the virtual address space for the new region.
                Reserve_Kernel_Page_Pool_Virtual_Address_Space
@@ -128,7 +132,7 @@ package body Memory.Kernel is
                --  Map the new region into the pool's virtual address window.
                Map_Kernel_Memory
                  (Region_Virtual_Address,
-                  Allocated_Physical_Address,
+                  Region_Physical_Address,
                   Storage_Offset (Region_Size_In_Bytes),
                   (True, True, False, False),
                   Result);
@@ -139,25 +143,15 @@ package body Memory.Kernel is
                --  Zero the newly allocated page pool region.
                Set (Region_Virtual_Address, 0, Region_Size_In_Bytes);
 
-               Kernel_Page_Pool.Add_Region_To_Page_Pool
-                 (Region_Virtual_Address,
-                  Allocated_Physical_Address,
-                  Region_Page_Count,
-                  Result);
-               if Is_Error (Result) then
-                  --  The region is already mapped, so its physical memory
-                  --  can't be returned to the physical allocator.
-                  --  This only occurs if the pool's region array is exhausted.
-                  --  @TODO: Handle this error.
-                  return;
-               end if;
+               Region_Page_Count := Candidate_Page_Count;
 
                Log_Debug
-                 ("Grew kernel page pool by"
-                  & Region_Page_Count'Image
+                 ("Provisioned new page pool region of"
+                  & Candidate_Page_Count'Image
                   & " pages",
                   Logging_Tags);
 
+               Result := Success;
                return;
             elsif Result = No_Block_Large_Enough then
                --  The physical memory allocator couldn't satisfy the request.
@@ -181,12 +175,75 @@ package body Memory.Kernel is
         (Region_Virtual_Address, Region_Size_In_Bytes);
 
       <<Error_Free_Physical_Memory>>
-      Free_Physical_Memory (Allocated_Physical_Address, Free_Result);
+      Free_Physical_Memory (Region_Physical_Address, Free_Result);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Grow_Kernel_Page_Pool");
+         Log_Error ("Constraint_Error: Provision_New_Page_Pool_Region");
          Result := Constraint_Exception;
+   end Provision_New_Page_Pool_Region;
+
+   procedure Grow_Kernel_Page_Pool
+     (Minimum_Page_Count : Positive; Result : out Function_Result)
+   is
+      Region_Virtual_Address  : Virtual_Address_T;
+      Region_Physical_Address : Physical_Address_T;
+      Region_Page_Count       : Positive;
+   begin
+      Provision_New_Page_Pool_Region
+        (Minimum_Page_Count,
+         Region_Virtual_Address,
+         Region_Physical_Address,
+         Region_Page_Count,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Kernel_Page_Pool.Add_Region_To_Page_Pool
+        (Region_Virtual_Address,
+         Region_Physical_Address,
+         Region_Page_Count,
+         Result);
+      --  If this fails, the region is already mapped, so its physical memory
+      --  can't be returned to the physical allocator.
+      --  This only occurs if the pool's region array is exhausted.
+      --  @TODO: Handle this error.
    end Grow_Kernel_Page_Pool;
+
+   --  Grow the kernel page pool by provisioning a new region, adding it to the
+   --  pool, and creating a new allocation from it, atomically under the page
+   --  pool's spinlock.
+   procedure Grow_Kernel_Page_Pool_And_Allocate
+     (Allocation_Page_Count : Positive;
+      Allocation_Result     : out Memory_Allocation_Result;
+      Result                : out Function_Result)
+   is
+      Region_Virtual_Address  : Virtual_Address_T;
+      Region_Physical_Address : Physical_Address_T;
+      Region_Page_Count       : Positive;
+   begin
+      Provision_New_Page_Pool_Region
+        (Allocation_Page_Count,
+         Region_Virtual_Address,
+         Region_Physical_Address,
+         Region_Page_Count,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Kernel_Page_Pool.Add_Region_To_Page_Pool_And_Allocate
+        (Region_Virtual_Address,
+         Region_Physical_Address,
+         Region_Page_Count,
+         Allocation_Page_Count,
+         Allocation_Result,
+         Result);
+      --  If this fails, the region is already mapped, so its physical memory
+      --  can't be returned to the page pool.
+      --  This only occurs if the pool's region array is exhausted.
+      --  @TODO: Handle this error.
+   end Grow_Kernel_Page_Pool_And_Allocate;
 
    procedure Reserve_Kernel_Heap_Virtual_Address_Space_Unlocked
      (New_Region_Size_In_Bytes : Positive;
@@ -433,14 +490,9 @@ package body Memory.Kernel is
       Kernel_Page_Pool.Allocate (Number_of_Pages, Allocation_Result, Result);
 
       --  If the allocation can't be fulfilled, attempt to grow the page pool,
-      --  then retry the allocation.
+      --  which will itself satisfy the allocation from the new region.
       if Result = Not_Enough_Memory_Available then
-         Grow_Kernel_Page_Pool (Number_of_Pages, Grow_Result);
-         if Is_Error (Grow_Result) then
-            return;
-         end if;
-
-         Kernel_Page_Pool.Allocate
+         Grow_Kernel_Page_Pool_And_Allocate
            (Number_of_Pages, Allocation_Result, Result);
       end if;
 

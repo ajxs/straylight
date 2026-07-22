@@ -70,6 +70,15 @@ is
       Page_Count       : Positive;
       Result           : out Function_Result);
 
+   procedure Add_Region_To_Page_Pool_And_Allocate
+     (Page_Pool             : in out Page_Pool_T;
+      Virtual_Address       : Virtual_Address_T;
+      Physical_Address      : Physical_Address_T;
+      New_Page_Count        : Positive;
+      Allocation_Page_Count : Positive;
+      Allocation_Result     : out Memory_Allocation_Result;
+      Result                : out Function_Result);
+
    procedure Free
      (Page_Pool       : in out Page_Pool_T;
       Virtual_Address : Virtual_Address_T;
