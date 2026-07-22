@@ -11,7 +11,7 @@ is
       Heap_Region_Size      : Storage_Offset := 0;
    end record;
 
-   New_Heap_Max_Memory_Regions : constant := 16;
+   New_Heap_Max_Memory_Regions : constant := 32;
 
    type Heap_Memory_Region_List_T is
      array (1 .. New_Heap_Max_Memory_Regions) of Heap_Memory_Region_T;
