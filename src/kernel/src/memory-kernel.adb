@@ -12,26 +12,25 @@ package body Memory.Kernel is
    --  NOTE: This variable is protected by the kernel heap's spinlock.
    Kernel_Heap_Next_Region_Offset : Storage_Offset := 0;
 
-   procedure Reserve_Kernel_Page_Pool_Virtual_Address_Space_Unlocked
+   procedure Reserve_Virtual_Memory_Space_Unlocked
      (New_Region_Size_In_Bytes : Positive;
+      Start_Address            : Virtual_Address_T;
+      Next_Region_Offset       : in out Storage_Offset;
       Region_Virtual_Address   : out Virtual_Address_T;
       Result                   : out Function_Result) is
    begin
-      Region_Virtual_Address :=
-        Kernel_Page_Pool_Virtual_Address + Kernel_Page_Pool_Next_Region_Offset;
+      Region_Virtual_Address := Start_Address + Next_Region_Offset;
 
-      Kernel_Page_Pool_Next_Region_Offset :=
-        Kernel_Page_Pool_Next_Region_Offset
-        + Storage_Offset (New_Region_Size_In_Bytes);
+      Next_Region_Offset :=
+        Next_Region_Offset + Storage_Offset (New_Region_Size_In_Bytes);
 
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Error
-           ("Constraint_Error: "
-            & "Reserve_Kernel_Page_Pool_Virtual_Address_Space");
+           ("Constraint_Error: " & "Reserve_Virtual_Memory_Space_Unlocked");
          Result := Constraint_Exception;
-   end Reserve_Kernel_Page_Pool_Virtual_Address_Space_Unlocked;
+   end Reserve_Virtual_Memory_Space_Unlocked;
 
    procedure Reserve_Kernel_Page_Pool_Virtual_Address_Space
      (New_Region_Size_In_Bytes : Positive;
@@ -39,18 +38,23 @@ package body Memory.Kernel is
       Result                   : out Function_Result) is
    begin
       Acquire_Spinlock (Kernel_Page_Pool.Spinlock);
-      Reserve_Kernel_Page_Pool_Virtual_Address_Space_Unlocked
-        (New_Region_Size_In_Bytes, Region_Virtual_Address, Result);
+      Reserve_Virtual_Memory_Space_Unlocked
+        (New_Region_Size_In_Bytes,
+         Kernel_Page_Pool_Virtual_Address,
+         Kernel_Page_Pool_Next_Region_Offset,
+         Region_Virtual_Address,
+         Result);
       Release_Spinlock (Kernel_Page_Pool.Spinlock);
    end Reserve_Kernel_Page_Pool_Virtual_Address_Space;
 
-   procedure Recover_Kernel_Page_Pool_Virtual_Address_Space_Unlocked
+   procedure Recover_Virtual_Memory_Space_Unlocked
      (Region_Virtual_Address         : Virtual_Address_T;
-      Recovered_Region_Size_In_Bytes : Positive) is
+      Recovered_Region_Size_In_Bytes : Positive;
+      Start_Address                  : Virtual_Address_T;
+      Next_Region_Offset             : in out Storage_Offset) is
    begin
       Reserved_Region_Offset : constant Storage_Offset :=
-        Kernel_Page_Pool_Next_Region_Offset
-        - Storage_Offset (Recovered_Region_Size_In_Bytes);
+        Next_Region_Offset - Storage_Offset (Recovered_Region_Size_In_Bytes);
 
       --  A reservation can only be rolled back while it's still the most
       --  recent one: If another hart has reserved address space since, the
@@ -60,26 +64,26 @@ package body Memory.Kernel is
       --  virtual address window is large enough that this is harmless.
       if Reserved_Region_Offset >= 0
         and then
-          Kernel_Page_Pool_Virtual_Address + Reserved_Region_Offset
-          = Region_Virtual_Address
+          Start_Address + Reserved_Region_Offset = Region_Virtual_Address
       then
-         Kernel_Page_Pool_Next_Region_Offset := Reserved_Region_Offset;
+         Next_Region_Offset := Reserved_Region_Offset;
       end if;
    exception
       when Constraint_Error =>
          --  The reserved space is leaked, which is safe.
-         Log_Error
-           ("Constraint_Error: "
-            & "Recover_Kernel_Page_Pool_Virtual_Address_Space_Unlocked");
-   end Recover_Kernel_Page_Pool_Virtual_Address_Space_Unlocked;
+         Log_Error ("Constraint_Error: Recover_Virtual_Memory_Space_Unlocked");
+   end Recover_Virtual_Memory_Space_Unlocked;
 
    procedure Recover_Kernel_Page_Pool_Virtual_Address_Space
      (Region_Virtual_Address         : Virtual_Address_T;
       Recovered_Region_Size_In_Bytes : Positive) is
    begin
       Acquire_Spinlock (Kernel_Page_Pool.Spinlock);
-      Recover_Kernel_Page_Pool_Virtual_Address_Space_Unlocked
-        (Region_Virtual_Address, Recovered_Region_Size_In_Bytes);
+      Recover_Virtual_Memory_Space_Unlocked
+        (Region_Virtual_Address,
+         Recovered_Region_Size_In_Bytes,
+         Kernel_Page_Pool_Virtual_Address,
+         Kernel_Page_Pool_Next_Region_Offset);
       Release_Spinlock (Kernel_Page_Pool.Spinlock);
    end Recover_Kernel_Page_Pool_Virtual_Address_Space;
 
@@ -245,74 +249,31 @@ package body Memory.Kernel is
       --  @TODO: Handle this error.
    end Grow_Kernel_Page_Pool_And_Allocate;
 
-   procedure Reserve_Kernel_Heap_Virtual_Address_Space_Unlocked
-     (New_Region_Size_In_Bytes : Positive;
-      Region_Virtual_Address   : out Virtual_Address_T;
-      Result                   : out Function_Result) is
-   begin
-      Region_Virtual_Address :=
-        Kernel_Heap_Virtual_Address + Kernel_Heap_Next_Region_Offset;
-
-      Kernel_Heap_Next_Region_Offset :=
-        Kernel_Heap_Next_Region_Offset
-        + Storage_Offset (New_Region_Size_In_Bytes);
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: "
-            & "Reserve_Kernel_Heap_Virtual_Address_Space");
-         Result := Constraint_Exception;
-   end Reserve_Kernel_Heap_Virtual_Address_Space_Unlocked;
-
    procedure Reserve_Kernel_Heap_Virtual_Address_Space
      (New_Region_Size_In_Bytes : Positive;
       Region_Virtual_Address   : out Virtual_Address_T;
       Result                   : out Function_Result) is
    begin
       Acquire_Spinlock (Kernel_Heap.Spinlock);
-      Reserve_Kernel_Heap_Virtual_Address_Space_Unlocked
-        (New_Region_Size_In_Bytes, Region_Virtual_Address, Result);
+      Reserve_Virtual_Memory_Space_Unlocked
+        (New_Region_Size_In_Bytes,
+         Kernel_Heap_Virtual_Address,
+         Kernel_Heap_Next_Region_Offset,
+         Region_Virtual_Address,
+         Result);
       Release_Spinlock (Kernel_Heap.Spinlock);
    end Reserve_Kernel_Heap_Virtual_Address_Space;
-
-   procedure Recover_Kernel_Heap_Virtual_Address_Space_Unlocked
-     (Region_Virtual_Address         : Virtual_Address_T;
-      Recovered_Region_Size_In_Bytes : Positive) is
-   begin
-      Reserved_Region_Offset : constant Storage_Offset :=
-        Kernel_Heap_Next_Region_Offset
-        - Storage_Offset (Recovered_Region_Size_In_Bytes);
-
-      --  A reservation can only be rolled back while it's still the most
-      --  recent one: If another hart has reserved address space since, the
-      --  region being recovered isn't at the top of the window anymore, and
-      --  subtracting its size would un-reserve that hart's live region.
-      --  In that case the reserved space is deliberately leaked; the heap's
-      --  virtual address window is large enough that this is harmless.
-      if Reserved_Region_Offset >= 0
-        and then
-          Kernel_Heap_Virtual_Address + Reserved_Region_Offset
-          = Region_Virtual_Address
-      then
-         Kernel_Heap_Next_Region_Offset := Reserved_Region_Offset;
-      end if;
-   exception
-      when Constraint_Error =>
-         --  The reserved space is leaked, which is safe.
-         Log_Error
-           ("Constraint_Error: "
-            & "Recover_Kernel_Heap_Virtual_Address_Space_Unlocked");
-   end Recover_Kernel_Heap_Virtual_Address_Space_Unlocked;
 
    procedure Recover_Kernel_Heap_Virtual_Address_Space
      (Region_Virtual_Address         : Virtual_Address_T;
       Recovered_Region_Size_In_Bytes : Positive) is
    begin
       Acquire_Spinlock (Kernel_Heap.Spinlock);
-      Recover_Kernel_Heap_Virtual_Address_Space_Unlocked
-        (Region_Virtual_Address, Recovered_Region_Size_In_Bytes);
+      Recover_Virtual_Memory_Space_Unlocked
+        (Region_Virtual_Address,
+         Recovered_Region_Size_In_Bytes,
+         Kernel_Heap_Virtual_Address,
+         Kernel_Heap_Next_Region_Offset);
       Release_Spinlock (Kernel_Heap.Spinlock);
    end Recover_Kernel_Heap_Virtual_Address_Space;
 
