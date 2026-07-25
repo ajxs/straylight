@@ -47,28 +47,28 @@ is
    Null_Physical_Address : constant Physical_Address_T :=
      Physical_Address_T (System'To_Address (0));
 
-   Kernel_Address_Space_Start : constant Address :=
-     System'To_Address (16#FFFF_FFC0_0000_0000#);
+   Kernel_Address_Space_Start : constant Virtual_Address_T :=
+     To_Address (16#FFFF_FFC0_0000_0000#);
 
    --  16GiB kernel page pool maximum address space size.
-   Kernel_Page_Pool_Virtual_Address : constant Address :=
-     System'To_Address (16#FFFF_FFC4_0000_0000#);
+   Kernel_Page_Pool_Virtual_Address : constant Virtual_Address_T :=
+     To_Address (16#FFFF_FFC4_0000_0000#);
 
    --  32GiB kernel heap maximum address space size.
-   Kernel_Heap_Virtual_Address : constant Address :=
-     System'To_Address (16#FFFF_FFC8_0000_0000#);
+   Kernel_Heap_Virtual_Address : constant Virtual_Address_T :=
+     To_Address (16#FFFF_FFC8_0000_0000#);
 
-   Device_Mapping_Virtual_Address : constant Address :=
-     System'To_Address (16#FFFF_FFE8_C000_0000#);
+   Device_Mapping_Virtual_Address : constant Virtual_Address_T :=
+     To_Address (16#FFFF_FFE8_C000_0000#);
 
    --  All of the kernel stacks are mapped into the kernel address space,
    --  starting at this address.
-   Kernel_Stack_Area_Virtual_Address : constant Address :=
-     System'To_Address (16#FFFF_FFEA_0000_0000#);
+   Kernel_Stack_Area_Virtual_Address : constant Virtual_Address_T :=
+     To_Address (16#FFFF_FFEA_0000_0000#);
 
    --  64GiB user address space limit.
-   User_Address_Space_Limit : constant Address :=
-     System'To_Address (16#10_0000_0000#);
+   User_Address_Space_Limit : constant Virtual_Address_T :=
+     To_Address (16#10_0000_0000#);
 
    Process_Heap_Virtual_Address : constant Virtual_Address_T :=
      To_Address (16#0C_0000_0000#);
