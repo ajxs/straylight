@@ -7,6 +7,7 @@
 -------------------------------------------------------------------------------
 
 with System.Storage_Elements; use System.Storage_Elements;
+with System;                  use System;
 
 package Straylight.Common is
    pragma Preelaborate;

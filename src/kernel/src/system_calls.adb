@@ -7,7 +7,6 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Devices;
-with Devices.UART;
 with Devices.Virtio.Graphics;
 with Memory;             use Memory;
 with RISCV;              use RISCV;
@@ -16,136 +15,6 @@ with Hart_State;         use Hart_State;
 with System_Calls.Files; use System_Calls.Files;
 
 package body System_Calls is
-   procedure Handle_Logging_Syscall
-     (Process   : in out Process_Control_Block_T;
-      Log_Level : Log_Level_T;
-      Result    : out Function_Result)
-   is
-      Trap_Context : Process_Context_T
-      with
-        Import,
-        Convention => C,
-        Alignment  => 1,
-        Address    => Process.Trap_Context_Addr;
-
-      String_Address : Virtual_Address_T := Null_Address;
-      String_Length  : Integer := 0;
-
-      Maximum_String_Length : constant Integer := 256;
-   begin
-      Log_Debug ("User Mode Syscall: Log", Logging_Tags);
-
-      String_Address :=
-        Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
-      String_Length := Integer (Trap_Context.Gp_Registers (a2));
-
-      if not Is_Valid_Userspace_Address_Range (String_Address, String_Length)
-      then
-         Log_Error ("Invalid non-userspace address range", Logging_Tags);
-
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
-
-      if String_Length > Maximum_String_Length or else String_Length < 0 then
-         Log_Error
-           ("Invalid string length: " & String_Length'Image, Logging_Tags);
-
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
-
-      Read_String : declare
-         String_Buffer : String (1 .. String_Length)
-         with Import, Alignment => 1, Address => String_Address;
-      begin
-         if Log_Level = Log_Level_Debug then
-            Log_Debug (String_Buffer (1 .. String_Length), Logging_Tags);
-         elsif Log_Level = Log_Level_Error then
-            Log_Error (String_Buffer (1 .. String_Length), Logging_Tags);
-         end if;
-      end Read_String;
-
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
-      Result := Success;
-      return;
-
-      <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Result := Syscall_Unsuccessful_Without_Kernel_Error;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Logging_Syscall");
-         Result := Constraint_Exception;
-   end Handle_Logging_Syscall;
-
-   procedure Handle_Print_To_Serial_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result)
-   is
-      Trap_Context : Process_Context_T
-      with
-        Import,
-        Convention => C,
-        Alignment  => 1,
-        Address    => Process.Trap_Context_Addr;
-
-      String_Address : Virtual_Address_T := Null_Address;
-      String_Length  : Integer := 0;
-
-      Maximum_String_Length : constant Integer := 256;
-
-      --  @TODO: Revisit device discovery.
-      --  This implementation is temporary.
-      UART_Device renames Devices.System_Devices (2);
-   begin
-      Log_Debug ("User Mode Syscall: Print To Serial", Logging_Tags);
-
-      String_Address :=
-        Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
-      String_Length := Integer (Trap_Context.Gp_Registers (a2));
-
-      if not Is_Valid_Userspace_Address_Range (String_Address, String_Length)
-      then
-         Log_Error ("Invalid non-userspace address range", Logging_Tags);
-
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
-
-      if String_Length > Maximum_String_Length then
-         Log_Error ("String length exceeds maximum length", Logging_Tags);
-
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
-      end if;
-
-      Print_String : declare
-         String_Buffer : String (1 .. String_Length)
-         with Import, Alignment => 1, Address => String_Address;
-      begin
-         Devices.UART.Put_String
-           (UART_Device, String_Buffer (1 .. String_Length));
-      end Print_String;
-
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
-      Result := Success;
-      return;
-
-      <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Result := Syscall_Unsuccessful_Without_Kernel_Error;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Print_To_Serial_Syscall");
-         Result := Constraint_Exception;
-   end Handle_Print_To_Serial_Syscall;
-
    procedure Handle_Process_Exit_Syscall is
    begin
       Log_Debug ("User Mode Syscall: Exit", Logging_Tags);
@@ -190,15 +59,6 @@ package body System_Calls is
          when Syscall_Yield_Process      =>
             Handle_Process_Yield_Syscall;
             Result := Success;
-
-         when Syscall_Log_Debug          =>
-            Handle_Logging_Syscall (Process, Log_Level_Debug, Result);
-
-         when Syscall_Log_Error          =>
-            Handle_Logging_Syscall (Process, Log_Level_Error, Result);
-
-         when Syscall_Print_To_Serial    =>
-            Handle_Print_To_Serial_Syscall (Process, Result);
 
          when Syscall_Open_File          =>
             Handle_Open_File_Syscall (Process, Result);

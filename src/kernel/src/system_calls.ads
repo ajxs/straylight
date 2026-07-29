@@ -13,11 +13,8 @@ with Processes;        use Processes;
 package System_Calls
   with Preelaborate
 is
-   Syscall_Exit_Process    : constant := 5446_0000;
-   Syscall_Yield_Process   : constant := 5446_0001;
-   Syscall_Log_Debug       : constant := 5446_0002;
-   Syscall_Log_Error       : constant := 5446_0003;
-   Syscall_Print_To_Serial : constant := 5446_0006;
+   Syscall_Exit_Process  : constant := 5446_0000;
+   Syscall_Yield_Process : constant := 5446_0001;
 
    Syscall_Open_File     : constant := 5446_0107;
    Syscall_Read_File     : constant := 5446_0108;
@@ -35,18 +32,10 @@ private
    Logging_Tags : constant Log_Tags :=
      [Log_Tag_Processes, Log_Tag_System_Calls];
 
-   procedure Handle_Logging_Syscall
-     (Process   : in out Process_Control_Block_T;
-      Log_Level : Log_Level_T;
-      Result    : out Function_Result);
-
    procedure Handle_Process_Exit_Syscall
    with No_Return;
 
    procedure Handle_Process_Yield_Syscall;
-
-   procedure Handle_Print_To_Serial_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
    procedure Handle_Update_Framebuffer_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result);

@@ -1,3 +1,5 @@
+with System; use System;
+
 with Straylight.Common; use Straylight.Common;
 
 package Straylight.Graphics is
@@ -14,7 +16,7 @@ package Straylight.Graphics is
       Framebuffer_Height  : Integer;
       Colour              : Unsigned_32)
    with
-     Import,
+     Export,
      Convention    => Assembler,
      External_Name => "straylight_graphics_fill_framebuffer";
 
@@ -23,9 +25,13 @@ package Straylight.Graphics is
       Green : Unsigned_8;
       Blue  : Unsigned_8;
       Alpha : Unsigned_8) return Unsigned_32
+   is (Shift_Left (Unsigned_32 (Alpha), 24)
+       or Shift_Left (Unsigned_32 (Blue), 16)
+       or Shift_Left (Unsigned_32 (Green), 8)
+       or Unsigned_32 (Red))
    with
-     Import,
-     Convention    => Assembler,
+     Export,
+     Convention    => C,
      External_Name => "straylight_graphics_make_colour";
 
 private
