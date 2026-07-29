@@ -45,13 +45,10 @@ private
      [Log_Tag_Memory, Log_Tag_Memory_Allocators];
 
    Kernel_Heap : Memory_Heap_T :=
-     (Memory_Regions =>
-        [others =>
-           (Heap_Region_Virt_Addr => System'To_Address (0),
-            Heap_Region_Phys_Addr =>
-              Physical_Address_T (System'To_Address (0)),
-            Heap_Region_Size      => 0)],
-      Spinlock       =>
+     (Memory_Regions_List_Head => null,
+      Window_Base              => System'To_Address (Kernel_Heap_Address),
+      Window_Size              => Kernel_Heap_Address_Space_Size,
+      Spinlock                 =>
         (Locked        => 0,
          Time_Acquired => 0,
          Hart_Id       => No_Hart_Id,

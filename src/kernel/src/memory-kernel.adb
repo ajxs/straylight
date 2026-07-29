@@ -362,8 +362,6 @@ package body Memory.Kernel is
                if Is_Error (Result) then
                   --  The region is already mapped, so its physical memory
                   --  can't be returned to the page pool.
-                  --  This only occurs if the heap's region array is exhausted.
-                  --  @TODO: Handle this error.
                   return;
                end if;
 

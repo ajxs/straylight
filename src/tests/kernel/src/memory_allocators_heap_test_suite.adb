@@ -23,5 +23,16 @@ begin
    Test_Suite_Ptr.all.Add_Test
      (Test_Case_Access'(new Test_Allocate_Invalid_Alignment));
 
+   Test_Suite_Ptr.all.Add_Test
+     (Test_Case_Access'(new Test_Calculate_Region_Header_Checksum));
+
+   Test_Suite_Ptr.all.Add_Test
+     (Test_Case_Access'(new Test_Region_Header_Validation));
+
+   Test_Suite_Ptr.all.Add_Test (Test_Case_Access'(new Test_Multiple_Regions));
+
+   Test_Suite_Ptr.all.Add_Test
+     (Test_Case_Access'(new Test_Add_Overlapping_Region));
+
    return Test_Suite_Ptr;
 end Memory_Allocators_Heap_Test_Suite;

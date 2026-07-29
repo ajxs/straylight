@@ -1,3 +1,5 @@
+with Ada.Unchecked_Conversion;
+
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
 with Logging;          use Logging;
@@ -5,20 +7,29 @@ with Logging;          use Logging;
 package Memory.Allocators.Heap
   with Preelaborate
 is
+   type Heap_Memory_Region_T;
+
+   type Heap_Memory_Region_Access is access all Heap_Memory_Region_T
+   with Convention => C;
+
    type Heap_Memory_Region_T is record
+      Checksum              : Unsigned_64 := 0;
       Heap_Region_Virt_Addr : Virtual_Address_T := Null_Address;
       Heap_Region_Phys_Addr : Physical_Address_T := Null_Physical_Address;
       Heap_Region_Size      : Storage_Offset := 0;
-   end record;
-
-   New_Heap_Max_Memory_Regions : constant := 32;
-
-   type Heap_Memory_Region_List_T is
-     array (1 .. New_Heap_Max_Memory_Regions) of Heap_Memory_Region_T;
+      Next_Region           : Heap_Memory_Region_Access := null;
+   end record
+   with Size => 5 * 8 * 8;
 
    type Memory_Heap_T is record
-      Memory_Regions : Heap_Memory_Region_List_T;
-      Spinlock       : Spinlock_T;
+      Memory_Regions_List_Head : Heap_Memory_Region_Access;
+      --  Window_Base and Window_Size describe the reserved virtual
+      --  address window that this heap's regions are mapped within. They
+      --  are used to validate that a region pointer refers to a valid heap
+      --  address.
+      Window_Base              : Virtual_Address_T;
+      Window_Size              : Storage_Offset;
+      Spinlock                 : Spinlock_T;
    end record;
 
    procedure Allocate
@@ -65,6 +76,19 @@ private
    Logging_Tags_Heap : constant Log_Tags :=
      [Log_Tag_Heap, Log_Tag_Memory, Log_Tag_Memory_Allocators];
 
+   --  This needs to stay in this package to avoid issues re: strict aliasing.
+   --  This automatically suppresses the aliasing optimisations.
+   --  refer to: https://gcc.gnu.org/onlinedocs/gcc-9.4.0/
+   --    gnat_ugn/Optimization-and-Strict-Aliasing.html
+   function Convert_Address_To_Heap_Memory_Region_Access is new
+     Ada.Unchecked_Conversion (Virtual_Address_T, Heap_Memory_Region_Access);
+
+   --  Reinterprets a region pointer as the address it refers to. This reads
+   --  only the pointer value, it does not dereference it, so it is safe to
+   --  use to bound-check a pointer prior to accessing the region header.
+   function Convert_Heap_Memory_Region_Access_To_Address is new
+     Ada.Unchecked_Conversion (Heap_Memory_Region_Access, Virtual_Address_T);
+
    type Allocation_Header_T is record
       --  The allocation header contains a checksum calculated from the block's
       --  address, size, and allocation status to verify the integrity of the
@@ -78,7 +102,13 @@ private
    Identity_Marker_Free      : constant := 16#AAAA_5555#;
    Identity_Marker_Allocated : constant := 16#5555_AAAA#;
 
+   Heap_Region_Checksum_Identity : constant Unsigned_64 :=
+     16#A5A5_A5A5_5A5A_5A5A#;
+
    Header_Size : constant Storage_Offset := Allocation_Header_T'Size / 8;
+
+   Region_Header_Size : constant Storage_Offset :=
+     Heap_Memory_Region_T'Size / 8;
 
    function Calculate_Header_Checksum
      (Block_Identity : Unsigned_32;
@@ -87,7 +117,7 @@ private
 
    function Is_Valid_Header_Address
      (Region : Heap_Memory_Region_T; Addr : Virtual_Address_T) return Boolean
-   is (Addr >= Region.Heap_Region_Virt_Addr
+   is (Addr >= Region.Heap_Region_Virt_Addr + Region_Header_Size
        and then
          Addr
          <= Region.Heap_Region_Virt_Addr
@@ -129,5 +159,22 @@ private
       Block_Size     : Storage_Offset) return Boolean
    is (Is_Block_Free (Block_Checksum, Block_Address, Block_Size)
        or else Is_Block_Allocated (Block_Checksum, Block_Address, Block_Size));
+
+   function Calculate_Region_Header_Checksum
+     (Region_Address          : Virtual_Address_T;
+      Region_Physical_Address : Physical_Address_T;
+      Region_Size             : Storage_Offset;
+      Next_Region             : Heap_Memory_Region_Access) return Unsigned_64;
+
+   function Test_Region_Header_Checksum
+     (Region_Checksum         : Unsigned_64;
+      Region_Address          : Virtual_Address_T;
+      Region_Physical_Address : Physical_Address_T;
+      Region_Size             : Storage_Offset;
+      Next_Region             : Heap_Memory_Region_Access) return Boolean
+   is (Region_Checksum
+       = Calculate_Region_Header_Checksum
+           (Region_Address, Region_Physical_Address, Region_Size, Next_Region))
+   with Inline;
 
 end Memory.Allocators.Heap;

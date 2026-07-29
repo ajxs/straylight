@@ -55,8 +55,16 @@ is
      To_Address (16#FFFF_FFC4_0000_0000#);
 
    --  32GiB kernel heap maximum address space size.
+   --  The base is kept as a named number so that it can be used in static
+   --  expressions, such as the initialisation of the kernel heap.
+   Kernel_Heap_Address : constant := 16#FFFF_FFC8_0000_0000#;
+
    Kernel_Heap_Virtual_Address : constant Virtual_Address_T :=
-     To_Address (16#FFFF_FFC8_0000_0000#);
+     To_Address (Kernel_Heap_Address);
+
+   --  The size of the kernel heap's reserved virtual address window.
+   --  Every heap region is allocated within this window.
+   Kernel_Heap_Address_Space_Size : constant := 16#8_0000_0000#;
 
    Device_Mapping_Virtual_Address : constant Virtual_Address_T :=
      To_Address (16#FFFF_FFE8_C000_0000#);
