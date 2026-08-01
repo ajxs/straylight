@@ -38,7 +38,8 @@ CFLAGS :=                        \
 	-I$(INC_DIR)                   \
 	-isystem $(GCC_INCLUDE)        \
 	-ggdb                          \
-	-std=gnu99                     \
+	-std=gnu23                     \
+	-Wpedantic                     \
 	-Wall                          \
 	-Wextra
 
