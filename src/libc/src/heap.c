@@ -3,361 +3,313 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define ALLOCATION_IDENTITY_FREE 0xAAAA5555
+#define ALLOCATION_IDENTITY_ALLOCATED 0x5555AAAA
+
+static uint32_t calculate_header_checksum(uint32_t block_identity,
+                                          uintptr_t block_address,
+                                          size_t block_size)
+{
+	const uint64_t address_bits = (uint64_t)block_address;
+	const uint64_t size_bits = (uint64_t)block_size;
+
+	return block_identity ^ (uint32_t)address_bits ^
+	       (uint32_t)(address_bits >> 32) ^ (uint32_t)size_bits ^
+	       (uint32_t)(size_bits >> 32);
+}
+
+static bool test_header_checksum(uint32_t block_identity,
+                                 uintptr_t block_address)
+{
+	const Allocation_Header *header = (const Allocation_Header *)block_address;
+
+	return header->checksum ==
+	       calculate_header_checksum(block_identity, block_address, header->size);
+}
+
+bool is_block_free(uintptr_t block_address)
+{
+	return test_header_checksum(ALLOCATION_IDENTITY_FREE, block_address);
+}
+
+bool is_block_allocated(uintptr_t block_address)
+{
+	return test_header_checksum(ALLOCATION_IDENTITY_ALLOCATED, block_address);
+}
+
+static bool is_valid_header(uintptr_t block_address)
+{
+	return is_block_free(block_address) || is_block_allocated(block_address);
+}
+
+static bool is_valid_alignment(size_t alignment)
+{
+	return alignment > 0 && (alignment & (alignment - 1)) == 0;
+}
+
 /**
- * Calculates the offset necessary to align the given address to the desired
- * alignment, while also factoring in the size of the allocation header.
+ * Tests whether an address is within the heap, and can hold a block header.
  */
-static size_t calculate_alignment_offset(uintptr_t address, size_t alignment)
+static bool is_valid_header_address(const Program_Heap *program_heap,
+                                    uintptr_t address)
 {
-	// Since a virtual address can only be 39 - bits in length, we can mask the
-	// address to help avoid an arithmetic overflow.
-	const uintptr_t masked_address = address & 0x7fffffffff;
-
-	// The alignment offset needs to factor in the size of the allocation header,
-	// since it's the final allocated address that needs to be aligned, not the
-	// address of the allocation header.
-	const size_t mod = (masked_address + sizeof(Allocation_Header)) % alignment;
-
-	return mod == 0 ? 0 : alignment - mod;
+	return program_heap->heap_size >= ALLOCATION_HEADER_SIZE &&
+	       address >= program_heap->heap_start_address &&
+	       address <= (program_heap->heap_start_address +
+	                   program_heap->heap_size - ALLOCATION_HEADER_SIZE);
 }
 
-static region_index_t find_unused_free_region_entry(Program_Heap *program_heap)
+/**
+ * Tests whether an address is valid for an allocation's payload.
+ * This only tests that the address is within the bounds of the heap. It can't
+ * determine whether the allocation is within a valid block.
+ */
+static bool is_allocated_address_in_heap(const Program_Heap *program_heap,
+                                         uintptr_t address)
 {
-	for (region_index_t i = 0; i < MAX_FREE_REGIONS; i++)
-	{
-		if (!program_heap->free_region_list[i].entry_used)
-		{
-			return i;
-		}
-	}
-
-	return NULL_REGION_INDEX;
+	return address >=
+	           (program_heap->heap_start_address + ALLOCATION_HEADER_SIZE) &&
+	       address < (program_heap->heap_start_address + program_heap->heap_size);
 }
 
-static bool find_and_allocate_free_region(Program_Heap *program_heap,
-                                          size_t size, size_t alignment,
-                                          uintptr_t *allocated_address)
+/**
+ * Writes a block header, calculating its checksum from the block's address,
+ * size, and its allocation status.
+ */
+static void set_block_header(uintptr_t block_address, size_t block_size,
+                             bool block_is_free)
 {
-	size_t alignment_offset = 0;
-	size_t remaining_size = 0;
-	const size_t real_allocation_size = sizeof(Allocation_Header) + size;
+	Allocation_Header *header = (Allocation_Header *)block_address;
 
-	region_index_t current_region_index =
-	    program_heap->free_region_list_head_index;
-	region_index_t previous_region_index = NULL_REGION_INDEX;
-
-	while (current_region_index != NULL_REGION_INDEX)
-	{
-		if (alignment != 1)
-		{
-			alignment_offset = calculate_alignment_offset(
-			    program_heap->free_region_list[current_region_index].address,
-			    alignment);
-		}
-
-		// If the current region is the same size and alignment as the desired
-		// allocation size, it can be 'fully allocated' without subdividing the
-		// free block.
-		// Clear the current region, and 'attach' its previous node to its next
-		// to 'remove' it from the list.
-		if (program_heap->free_region_list[current_region_index].size ==
-		        real_allocation_size &&
-		    alignment_offset == 0)
-		{
-			program_heap->free_region_list[current_region_index].entry_used = false;
-
-			// If there is a previous region set its next region pointer to the next
-			// region pointer of the current entry.
-			if (previous_region_index != NULL_REGION_INDEX)
-			{
-				program_heap->free_region_list[previous_region_index]
-				    .next_region_index =
-				    program_heap->free_region_list[current_region_index]
-				        .next_region_index;
-			}
-			else
-			{
-				program_heap->free_region_list_head_index =
-				    program_heap->free_region_list[current_region_index]
-				        .next_region_index;
-			}
-
-			*allocated_address =
-			    program_heap->free_region_list[current_region_index].address;
-
-			return true;
-		}
-
-		// If the current region is larger than the desired allocation size, and
-		// aligned, amend the current region so that its new size reflects the
-		// alignment.
-		// At the same time, move its start offset forward to reflect the
-		// allocated region being at its start.
-		if (program_heap->free_region_list[current_region_index].size >
-		        real_allocation_size &&
-		    alignment_offset == 0)
-		{
-			*allocated_address =
-			    program_heap->free_region_list[current_region_index].address;
-
-			program_heap->free_region_list[current_region_index].size -=
-			    real_allocation_size;
-			program_heap->free_region_list[current_region_index].address +=
-			    real_allocation_size;
-
-			return true;
-		}
-
-		// If the alignment doesn't match, but the current block is
-		// large enough to fit the allocation (and the number of bytes
-		// necessary to offset the start to make the block match the
-		// desired alignment), then resize the current block to match the
-		// amount necessary to get the desired alignment.
-		// If there is any remaining size after this, insert a new region
-		// with the remaining size after the allocation.
-		if (program_heap->free_region_list[current_region_index].size >=
-		    (real_allocation_size + alignment_offset))
-		{
-			remaining_size =
-			    program_heap->free_region_list[current_region_index].size -
-			    (real_allocation_size + alignment_offset);
-
-			program_heap->free_region_list[current_region_index].size =
-			    alignment_offset;
-
-			// If there is any remaining size after the allocation, insert a new
-			// region with the remaining size after the allocation.
-			if (remaining_size > 0)
-			{
-				const region_index_t new_region_index =
-				    find_unused_free_region_entry(program_heap);
-				if (new_region_index == NULL_REGION_INDEX)
-				{
-					return false;
-				}
-
-				program_heap->free_region_list[new_region_index].entry_used = true;
-				program_heap->free_region_list[new_region_index].address =
-				    program_heap->free_region_list[current_region_index].address +
-				    alignment_offset + real_allocation_size;
-
-				program_heap->free_region_list[new_region_index].size = remaining_size;
-
-				program_heap->free_region_list[new_region_index].next_region_index =
-				    program_heap->free_region_list[current_region_index]
-				        .next_region_index;
-
-				program_heap->free_region_list[current_region_index].next_region_index =
-				    new_region_index;
-			}
-
-			*allocated_address =
-			    program_heap->free_region_list[current_region_index].address +
-			    alignment_offset;
-
-			return true;
-		}
-
-		previous_region_index = current_region_index;
-		current_region_index =
-		    program_heap->free_region_list[current_region_index].next_region_index;
-	}
-
-	// If this point is reached, the heap is too fragmented to find a free region
-	// large enough to satisfy the allocation request.
-	return false;
+	header->size = block_size;
+	header->reserved = 0;
+	header->checksum = calculate_header_checksum(
+	    block_is_free ? ALLOCATION_IDENTITY_FREE : ALLOCATION_IDENTITY_ALLOCATED,
+	    block_address, block_size);
 }
 
 uintptr_t allocate_memory(Program_Heap *program_heap, size_t size,
                           size_t alignment)
 {
-	uintptr_t allocated_address = 0;
-	if (!find_and_allocate_free_region(program_heap, size, alignment,
-	                                   &allocated_address))
+	// From the POSIX spec:
+	// "If the size of the space requested is 0, the behavior is
+	// implementation-defined: either a null pointer shall be returned, or the
+	// behavior shall be as if the size were some non-zero value, except that the
+	// behavior is undefined if the returned pointer is used to access an object"
+	if (size == 0 || size > program_heap->heap_size ||
+	    !is_valid_alignment(alignment))
 	{
 		return 0;
 	}
 
-	Allocation_Header *allocation_header =
-	    (Allocation_Header *)(allocated_address);
-	allocation_header->identity = ALLOCATION_HEADER_IDENTITY;
-	allocation_header->size = size;
+	// Ensure the alignment is at least the minimum required to align the header.
+	if (alignment < ALLOCATION_MINIMUM_ALIGNMENT)
+	{
+		alignment = ALLOCATION_MINIMUM_ALIGNMENT;
+	}
 
-	return allocated_address + sizeof(Allocation_Header);
+	// Round size up to the nearest multiple of the minimum alignment.
+	size = (size + ALLOCATION_MINIMUM_ALIGNMENT - 1) &
+	       ~(ALLOCATION_MINIMUM_ALIGNMENT - 1);
+
+	uintptr_t current_block_address = program_heap->heap_start_address;
+
+	while (is_valid_header_address(program_heap, current_block_address))
+	{
+		Allocation_Header *current_block =
+		    (Allocation_Header *)current_block_address;
+
+		// If an invalid block header is encountered, the heap has been
+		// corrupted, so there's no safe way to continue walking it.
+		if (!is_valid_header(current_block_address))
+		{
+			return 0;
+		}
+
+		if (is_block_free(current_block_address) && current_block->size >= size)
+		{
+			// If the current block is big enough to satisfy the allocation request,
+			// check if we can split the block into two blocks. With the tail block
+			// being the allocated block.
+			// First check whether we can align the new second block address
+			// downwards to satisfy the alignment requirement while still keeping
+			// enough space within the original block to be valid.
+			// If not, check whether we can allocate from the start of the
+			// current block.
+			const uintptr_t end_of_current_block =
+			    current_block_address + ALLOCATION_HEADER_SIZE + current_block->size;
+
+			// Note that it's the payload address that needs to be aligned, not
+			// the address of the block header.
+			const size_t alignment_offset = (end_of_current_block - size) % alignment;
+
+			const uintptr_t new_block_data_address =
+			    end_of_current_block - size - alignment_offset;
+
+			const uintptr_t new_block_address =
+			    new_block_data_address - ALLOCATION_HEADER_SIZE;
+
+			// Test whether the space remaining in the original block is large
+			// enough to hold a valid block. This is equivalent to testing that
+			// the remaining size exceeds the size of a block header.
+			if (new_block_data_address >
+			    (current_block_address + 3 * ALLOCATION_HEADER_SIZE))
+			{
+				const size_t remaining_size_in_original_block =
+				    new_block_address - current_block_address - ALLOCATION_HEADER_SIZE;
+
+				set_block_header(current_block_address,
+				                 remaining_size_in_original_block, true);
+
+				// Take into account that the alignment offset by which this block
+				// was moved back may have left some space at the end of the block
+				// that is too small to hold a valid block. If so, include that
+				// space in the size of the new block.
+				const size_t effective_size =
+				    size +
+				    (alignment_offset <= ALLOCATION_HEADER_SIZE ? alignment_offset : 0);
+
+				set_block_header(new_block_address, effective_size, false);
+
+				// If moving the second block back to satisfy alignment left enough
+				// space for a new block at the end of this block, create it.
+				if (alignment_offset > ALLOCATION_HEADER_SIZE)
+				{
+					set_block_header(new_block_data_address + size,
+					                 alignment_offset - ALLOCATION_HEADER_SIZE, true);
+				}
+
+				return new_block_data_address;
+			}
+			else if (((current_block_address + ALLOCATION_HEADER_SIZE) % alignment) ==
+			         0)
+			{
+				// If the remaining space in the first block is too small to hold a
+				// valid block, but the current block is already aligned, allocate
+				// from the start of the current block.
+				// If enough space is left over in the current block, create a new
+				// free block at its end.
+				const uintptr_t allocated_address =
+				    current_block_address + ALLOCATION_HEADER_SIZE;
+
+				size_t allocated_block_size = current_block->size;
+
+				if (current_block->size > (size + 2 * ALLOCATION_HEADER_SIZE))
+				{
+					const size_t remaining_size =
+					    current_block->size - size - ALLOCATION_HEADER_SIZE;
+
+					allocated_block_size = size;
+
+					set_block_header(allocated_address + size, remaining_size, true);
+				}
+
+				set_block_header(current_block_address, allocated_block_size, false);
+
+				return allocated_address;
+			}
+		}
+
+		// Move to check the next block in the heap.
+		current_block_address += ALLOCATION_HEADER_SIZE + current_block->size;
+	}
+
+	// If this point is reached, there's no free block large enough to satisfy
+	// the allocation request.
+	return 0;
 }
 
-static void coalesce_free_regions(Program_Heap *program_heap)
+/**
+ * Walks the heap, merging any adjacent free blocks into a single block.
+ */
+static void coalesce_free_blocks(Program_Heap *program_heap)
 {
-	region_index_t previous_region_index = NULL_REGION_INDEX;
-	region_index_t current_region_index =
-	    program_heap->free_region_list_head_index;
+	uintptr_t current_block_address = program_heap->heap_start_address;
 
-	while (current_region_index != NULL_REGION_INDEX)
+	while (is_valid_header_address(program_heap, current_block_address))
 	{
-		if (previous_region_index != NULL_REGION_INDEX)
+		Allocation_Header *current_block =
+		    (Allocation_Header *)current_block_address;
+
+		if (!is_valid_header(current_block_address))
 		{
-			uintptr_t region_end_address =
-			    program_heap->free_region_list[previous_region_index].address +
-			    program_heap->free_region_list[previous_region_index].size;
+			// The heap has been corrupted.
+			return;
+		}
 
-			bool matched =
-			    program_heap->free_region_list[current_region_index].address ==
-			    region_end_address;
+		const uintptr_t next_block_address =
+		    current_block_address + ALLOCATION_HEADER_SIZE + current_block->size;
 
-			if (matched)
-			{
-				program_heap->free_region_list[previous_region_index].size +=
-				    program_heap->free_region_list[current_region_index].size;
+		// If the next block lies outside the heap, we're done.
+		if (!is_valid_header_address(program_heap, next_block_address))
+		{
+			return;
+		}
 
-				program_heap->free_region_list[previous_region_index]
-				    .next_region_index =
-				    program_heap->free_region_list[current_region_index]
-				        .next_region_index;
+		const Allocation_Header *next_block =
+		    (const Allocation_Header *)next_block_address;
 
-				program_heap->free_region_list[current_region_index].entry_used = false;
-			}
-			else
-			{
-				previous_region_index = current_region_index;
-			}
+		if (!is_valid_header(next_block_address))
+		{
+			return;
+		}
+
+		if (is_block_free(current_block_address) &&
+		    is_block_free(next_block_address))
+		{
+			// If the current block and the next block are both free, merge them
+			// into a single block.
+			set_block_header(current_block_address,
+			                 current_block->size + ALLOCATION_HEADER_SIZE +
+			                     next_block->size,
+			                 true);
 		}
 		else
 		{
-			previous_region_index = current_region_index;
+			// Otherwise move to check the next block in the heap.
+			current_block_address = next_block_address;
 		}
-
-		current_region_index =
-		    program_heap->free_region_list[current_region_index].next_region_index;
 	}
-}
-
-static region_index_t insert_free_region(Program_Heap *program_heap,
-                                         uintptr_t new_address, size_t new_size)
-{
-	const region_index_t new_region_index =
-	    find_unused_free_region_entry(program_heap);
-	region_index_t current_region_index =
-	    program_heap->free_region_list_head_index;
-	region_index_t previous_region_index = NULL_REGION_INDEX;
-	bool inserted_new_region = false;
-
-	if (new_region_index == NULL_REGION_INDEX)
-	{
-		// No free region entries are available, so the region being freed cannot be
-		// added to the free region list. This will cause it to be effectively
-		// leaked, as there is no way to track it or reallocate it in the future.
-		return NULL_REGION_INDEX;
-	}
-
-	program_heap->free_region_list[new_region_index].entry_used = true;
-	program_heap->free_region_list[new_region_index].address = new_address;
-	program_heap->free_region_list[new_region_index].size = new_size;
-	program_heap->free_region_list[new_region_index].next_region_index =
-	    NULL_REGION_INDEX;
-
-	if (program_heap->free_region_list_head_index == NULL_REGION_INDEX)
-	{
-		program_heap->free_region_list_head_index = new_region_index;
-		return new_region_index;
-	}
-
-	// Iterate through the list of free regions until one is found with a higher
-	// starting offset. Add the new region _before_ this entry in the list to
-	// perform an insertion sort. Ensuring all regions are sorted by offset into
-	// the heap. This allows for easily coalescing adjacent entries.
-	current_region_index = program_heap->free_region_list_head_index;
-
-	while (current_region_index != NULL_REGION_INDEX)
-	{
-		if (program_heap->free_region_list[current_region_index].address >
-		    new_address)
-		{
-			// The current region is after the newly inserted region, so the
-			// newly inserted region should be before the current region in the
-			// list. Update the next region pointer of the newly inserted region
-			// to point to the current region, and update the next region pointer
-			// of the previous region to point to the newly inserted region.
-			program_heap->free_region_list[new_region_index].next_region_index =
-			    current_region_index;
-
-			if (previous_region_index != NULL_REGION_INDEX)
-			{
-				program_heap->free_region_list[previous_region_index]
-				    .next_region_index = new_region_index;
-			}
-			else
-			{
-				// If the _current_ region's offset is higher than that of the new
-				// entry, and there is no 'previous region', this means that the new
-				// region belongs at the head of the list. Make the new region the
-				// new list head. The 'current region' points to the original list
-				// head.
-				program_heap->free_region_list_head_index = new_region_index;
-			}
-
-			inserted_new_region = true;
-			break;
-		}
-
-		previous_region_index = current_region_index;
-		current_region_index =
-		    program_heap->free_region_list[current_region_index].next_region_index;
-	}
-
-	if (!inserted_new_region)
-	{
-		// If the new region has not been inserted at this point, it means that
-		// its offset is higher than all existing regions, so it belongs at the end
-		// of the list. Update the next region pointer of the previous tail to point
-		// to the new region, and set the next region pointer of the new region to
-		// null.
-		program_heap->free_region_list[previous_region_index].next_region_index =
-		    new_region_index;
-	}
-
-	// After inserting the new free region 'Coalesce' all of the free region
-	// entries. This will combine any adjacent regions into a single region entry.
-	coalesce_free_regions(program_heap);
-
-	return new_region_index;
 }
 
 void free_memory(Program_Heap *program_heap, uintptr_t addr)
 {
-	uintptr_t actual_region_address =
-	    (uintptr_t)(addr - sizeof(Allocation_Header));
-
-	Allocation_Header *allocation_header =
-	    (Allocation_Header *)(actual_region_address);
-	if (allocation_header->identity != ALLOCATION_HEADER_IDENTITY)
+	if (addr == 0 || !is_allocated_address_in_heap(program_heap, addr))
 	{
-		// The provided address is invalid, as the allocation header identity is
-		// not correct.
 		return;
 	}
 
-	allocation_header->identity = 0;
+	const uintptr_t block_address = addr - ALLOCATION_HEADER_SIZE;
 
-	size_t region_size = allocation_header->size + sizeof(Allocation_Header);
+	// The provided address is invalid if the block preceding it is not a valid
+	// allocated block.
+	if (!is_block_allocated(block_address))
+	{
+		return;
+	}
 
-	insert_free_region(program_heap, actual_region_address, region_size);
+	Allocation_Header *block = (Allocation_Header *)block_address;
+
+	set_block_header(block_address, block->size, true);
+
+	coalesce_free_blocks(program_heap);
 }
 
 void initialise_heap(Program_Heap *program_heap, uintptr_t heap_start_address,
                      size_t heap_size)
 {
 	program_heap->heap_start_address = heap_start_address;
-	program_heap->free_region_list_head_index = NULL_REGION_INDEX;
+	program_heap->heap_size = heap_size;
 
-	for (size_t i = 0; i < MAX_FREE_REGIONS; i++)
+	if (heap_size <= ALLOCATION_HEADER_SIZE)
 	{
-		program_heap->free_region_list[i].entry_used = false;
-		program_heap->free_region_list[i].address = 0;
-		program_heap->free_region_list[i].size = 0;
-		program_heap->free_region_list[i].next_region_index = NULL_REGION_INDEX;
+		// The heap is too small to hold a single valid block.
+		program_heap->heap_size = 0;
+
+		return;
 	}
 
-	// Initialise the free region list with a single region that encompasses the
-	// entire heap.
-	insert_free_region(program_heap, heap_start_address, heap_size);
+	// Initialise the heap with a single free block spanning the whole heap.
+	set_block_header(heap_start_address, heap_size - ALLOCATION_HEADER_SIZE,
+	                 true);
 }

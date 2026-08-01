@@ -19,15 +19,19 @@ CFLAGS  := \
 
 LDFLAGS := -lcunit
 
-SRCS    := test_heap.c ../../../libc/src/heap.c
-TARGET  := heap_tests
+SRCS      := test_heap.c ../../../libc/src/heap.c
+BUILD_DIR := build
+TARGET    := ${BUILD_DIR}/heap_tests
 
 .PHONY: all run clean
 
 all: ${TARGET}
 
-${TARGET}: ${SRCS}
+${TARGET}: ${SRCS} ${BUILD_DIR}
 	${CC} ${CFLAGS} ${SRCS} ${LDFLAGS} -o ${TARGET}
+
+${BUILD_DIR}:
+	mkdir -p ${BUILD_DIR}
 
 run: ${TARGET}
 	./${TARGET}
