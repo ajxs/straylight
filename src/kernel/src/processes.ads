@@ -62,16 +62,22 @@ is
 
    subtype Blocking_Channel_T is Unsigned_64;
 
-   type Userspace_Heap_Allocation_T is record
-      Phys_Addr  : Physical_Address_T := Null_Physical_Address;
-      Virt_Addr  : Virtual_Address_T := Null_Address;
-      Size       : Storage_Offset := 0;
-      Entry_Used : Boolean := False;
+   --  An allocated region of process memory. e.g. The process' heap, or stack.
+   type Process_Memory_Region_Allocation_T is record
+      Phys_Addr : Physical_Address_T := Null_Physical_Address;
+      Size      : Natural := 0;
    end record;
 
-   --  The userspace heap is a fixed-size array of allocated regions.
-   type Userspace_Heap_Allocation_List is
-     array (Natural range <>) of Userspace_Heap_Allocation_T;
+   --  A list of non-contiguous regions of allocated physical memory. These
+   --  regions are physically non-contiguous, but are mapped to contiguous,
+   --  sequential addresses in the process' memory space.
+   --  These regions are mapped into the process' memory space one at a
+   --  time, sequentially, so if deallocated, these regions either need to be
+   --  deallocated in the reverse order they're allocated, or all at once.
+   --  In the future, a more comprehensive system may be developed to
+   --  accomodate unlimited process heap growth.
+   type Process_Memory_Region_Allocation_List_T is
+     array (Natural range <>) of Process_Memory_Region_Allocation_T;
 
    subtype Process_File_Handle_Id_T is Unsigned_32;
 
@@ -101,7 +107,7 @@ is
 
       Process_Entry_Point : Virtual_Address_T := Null_Address;
 
-      Userspace_Heap : Userspace_Heap_Allocation_List (0 .. 7);
+      Heap : Process_Memory_Region_Allocation_List_T (0 .. 7);
 
       Spinlock : Spinlock_T;
 
@@ -153,6 +159,11 @@ is
 
    procedure Initialise_Hart_Idle_Process (Hart_Id : Integer);
 
+   procedure Grow_Process_Heap
+     (Process : in out Process_Control_Block_T;
+      Size    : Positive;
+      Result  : out Function_Result);
+
 private
    Logging_Tags : constant Log_Tags := [Log_Tag_Processes];
 
@@ -170,22 +181,18 @@ private
       Hart_Id       => No_Hart_Id,
       Lock_Id       => Lock_Id_Process_Queue);
 
-   --  16KiB process kernel stack starting size.
-   Process_Kernel_Stack_Size   : constant := 4 * 16#1000#;
-   --  16KiB process user stack starting size.
-   Process_Stack_Starting_Size : constant := 4 * 16#1000#;
+   --  16KiB process kernel stack size.
+   Process_Kernel_Stack_Size  : constant := 4 * 16#1000#;
+   --  16KiB process user stack size.
+   Process_Stack_Size         : constant := 4 * 16#1000#;
    --  4MiB process heap starting size.
-   Process_Heap_Starting_Size  : constant := 1024 * 16#1000#;
+   Process_Heap_Starting_Size : constant := 1024 * 16#1000#;
 
    procedure Allocate_And_Map_New_Process_Stack
      (New_Process : in out Process_Control_Block_T;
       Result      : out Function_Result);
 
    procedure Allocate_And_Map_New_Process_Kernel_Stack
-     (New_Process : in out Process_Control_Block_T;
-      Result      : out Function_Result);
-
-   procedure Allocate_And_Map_New_Process_Heap
      (New_Process : in out Process_Control_Block_T;
       Result      : out Function_Result);
 

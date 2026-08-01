@@ -32,58 +32,60 @@ package body Processes is
          return;
       end if;
 
-      Allocate_And_Map_New_Process_Heap (New_Process, Result);
+      Grow_Process_Heap (New_Process, Process_Heap_Starting_Size, Result);
       if Is_Error (Result) then
          return;
       end if;
    end Allocate_And_Map_New_Process_Memory;
 
-   procedure Allocate_And_Map_New_Process_Heap
-     (New_Process : in out Process_Control_Block_T;
-      Result      : out Function_Result)
+   procedure Grow_Process_Heap
+     (Process : in out Process_Control_Block_T;
+      Size    : Positive;
+      Result  : out Function_Result)
    is
-      Process_Heap_Physical_Address : Physical_Address_T :=
-        Null_Physical_Address;
+      New_Heap_Memory_Phys_Addr : Physical_Address_T := Null_Physical_Address;
+      New_Heap_Memory_Virt_Addr : Virtual_Address_T :=
+        Process_Heap_Virtual_Address;
    begin
       Log_Debug ("Allocating process heap physical memory...", Logging_Tags);
 
-      Allocate_Physical_Memory
-        (Process_Heap_Starting_Size, Process_Heap_Physical_Address, Result);
-      if Is_Error (Result) then
-         Log_Error ("Error allocating new process heap: " & Result'Image);
-         Result := Unhandled_Exception;
-         return;
-      end if;
+      --  Loop through the list until we find a region that isn't mapped.
+      --  As the heap is iterated through, the current 'end' of the heap is
+      --  calculated by keeping a running total of the heap region sizes.
+      --  Once an empty entry is found, the new memory is allocated, and mapped
+      --  to the 'current' end address.
+      for Index in Process.Heap'Range loop
+         if Process.Heap (Index).Phys_Addr = Null_Physical_Address then
+            Allocate_Physical_Memory (Size, New_Heap_Memory_Phys_Addr, Result);
+            if Is_Error (Result) then
+               return;
+            end if;
 
-      Log_Debug
-        ("Allocated process heap physical memory: "
-         & Process_Heap_Physical_Address'Image,
-         Logging_Tags);
+            Process.Memory_Space.Map
+              (New_Heap_Memory_Virt_Addr,
+               New_Heap_Memory_Phys_Addr,
+               Memory_Region_Size (Size),
+               (True, True, False, True),
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
 
-      New_Process.Memory_Space.Map
-        (Process_Heap_Virtual_Address,
-         Process_Heap_Physical_Address,
-         Process_Heap_Starting_Size,
-         (True, True, False, True),
-         Result);
-      if Is_Error (Result) then
-         Log_Error ("Error mapping process heap: " & Result'Image);
-         Result := Unhandled_Exception;
-         return;
-      end if;
+            Process.Heap (Index) :=
+              (Phys_Addr => New_Heap_Memory_Phys_Addr, Size => Size);
 
-      New_Process.Userspace_Heap (0) :=
-        (Virt_Addr  => Process_Heap_Virtual_Address,
-         Phys_Addr  => Process_Heap_Physical_Address,
-         Size       => Process_Heap_Starting_Size,
-         Entry_Used => True);
+            Log_Debug ("Allocated new process heap memory.", Logging_Tags);
+            Result := Success;
+            return;
+         end if;
 
-      Log_Debug ("Allocated new process heap.", Logging_Tags);
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_And_Map_New_Process_Heap");
-         Result := Constraint_Exception;
-   end Allocate_And_Map_New_Process_Heap;
+         New_Heap_Memory_Virt_Addr :=
+           @ + Storage_Offset (Process.Heap (Index).Size);
+      end loop;
+
+      Log_Error ("No free entries to grow userspace heap", Logging_Tags);
+      Result := No_Free_Entries;
+   end Grow_Process_Heap;
 
    procedure Allocate_And_Map_New_Process_Stack
      (New_Process : in out Process_Control_Block_T;
@@ -92,7 +94,7 @@ package body Processes is
       Log_Debug ("Allocating process stack physical memory...", Logging_Tags);
 
       Allocate_Physical_Memory
-        (Process_Stack_Starting_Size, New_Process.Stack_Phys_Addr, Result);
+        (Process_Stack_Size, New_Process.Stack_Phys_Addr, Result);
       if Is_Error (Result) then
          Log_Error
            ("Error allocating process stack physical memory: " & Result'Image);
@@ -100,12 +102,12 @@ package body Processes is
          return;
       end if;
 
-      New_Process.Stack_Size := Process_Stack_Starting_Size;
+      New_Process.Stack_Size := Process_Stack_Size;
 
       New_Process.Memory_Space.Map
         (Process_Stack_Virtual_Address,
          New_Process.Stack_Phys_Addr,
-         Process_Stack_Starting_Size,
+         Process_Stack_Size,
          (True, True, False, True),
          Result);
       if Is_Error (Result) then
@@ -252,10 +254,9 @@ package body Processes is
    begin
       Log_Debug ("Freeing process heap physical memory...", Logging_Tags);
 
-      for I in Process.Userspace_Heap'Range loop
-         if Process.Userspace_Heap (I).Entry_Used then
-            Free_Physical_Memory
-              (Process.Userspace_Heap (I).Phys_Addr, Result);
+      for I in Process.Heap'Range loop
+         if Process.Heap (I).Phys_Addr /= Null_Physical_Address then
+            Free_Physical_Memory (Process.Heap (I).Phys_Addr, Result);
             if Is_Error (Result) then
                return;
             end if;
