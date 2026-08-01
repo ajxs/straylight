@@ -33,6 +33,28 @@ package body System_Calls is
       Processes.Scheduler.Run (Process_Ready);
    end Handle_Process_Yield_Syscall;
 
+   procedure Handle_Grow_Process_Heap_Syscall
+     (Process : in out Process_Control_Block_T; Result : out Function_Result)
+   is
+      Trap_Context : Process_Context_T
+      with
+        Import,
+        Convention => C,
+        Alignment  => 1,
+        Address    => Process.Trap_Context_Addr;
+
+      Heap_New_Memory_Amount : constant := 4 * 1024 * 1024;
+   begin
+      Grow_Process_Heap (Process, Heap_New_Memory_Amount, Result);
+      if Is_Error (Result) then
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
+      Result := Success;
+   end Handle_Grow_Process_Heap_Syscall;
+
    procedure Handle_User_Mode_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
@@ -80,6 +102,9 @@ package body System_Calls is
 
          when Syscall_Update_Framebuffer =>
             Handle_Update_Framebuffer_Syscall (Process, Result);
+
+         when Syscall_Grow_Process_Heap  =>
+            Handle_Grow_Process_Heap_Syscall (Process, Result);
 
          when others                     =>
             Panic ("Unknown Syscall Number: " & Syscall_Number'Image);
