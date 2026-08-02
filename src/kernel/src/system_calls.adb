@@ -34,9 +34,11 @@ package body System_Calls is
    end Handle_Process_Yield_Syscall;
 
    procedure Handle_Grow_Process_Heap_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result)
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result)
    is
-      Trap_Context : Process_Context_T
+      Trap_Context : constant Process_Context_T
       with
         Import,
         Convention => C,
@@ -47,18 +49,19 @@ package body System_Calls is
    begin
       Grow_Process_Heap (Process, Heap_New_Memory_Amount, Result);
       if Is_Error (Result) then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ENOMEM);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
       end if;
 
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
+      Syscall_Result := 0;
       Result := Success;
    end Handle_Grow_Process_Heap_Syscall;
 
    procedure Handle_User_Mode_Syscall
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
-      Syscall_Number : Unsigned_64 := 0;
+      Syscall_Result : Unsigned_64 := 0;
 
       Trap_Context : Process_Context_T
       with
@@ -67,8 +70,8 @@ package body System_Calls is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
    begin
-      --  Retrieve the Syscall number from a0.
-      Syscall_Number := Trap_Context.Gp_Registers (a0);
+      --  Retrieve the Syscall number passed in a0.
+      Syscall_Number : constant Unsigned_64 := Trap_Context.Gp_Registers (a0);
 
       case Syscall_Number is
          when Syscall_Exit_Process       =>
@@ -83,28 +86,29 @@ package body System_Calls is
             Result := Success;
 
          when Syscall_Open_File          =>
-            Handle_Open_File_Syscall (Process, Result);
+            Handle_Open_File_Syscall (Process, Syscall_Result, Result);
 
          when Syscall_Read_File          =>
-            Handle_Read_File_Syscall (Process, Result);
+            Handle_Read_File_Syscall (Process, Syscall_Result, Result);
 
          when Syscall_Seek_File          =>
-            Handle_Seek_File_Syscall (Process, Result);
+            Handle_Seek_File_Syscall (Process, Syscall_Result, Result);
 
          when Syscall_Write_File         =>
-            Handle_Write_File_Syscall (Process, Result);
+            Handle_Write_File_Syscall (Process, Syscall_Result, Result);
 
          when Syscall_Close_File         =>
-            Handle_Close_File_Syscall (Process, Result);
+            Handle_Close_File_Syscall (Process, Syscall_Result, Result);
 
          when Syscall_Truncate_File      =>
-            Handle_Truncate_File_Syscall (Process, Result);
+            Handle_Truncate_File_Syscall (Process, Syscall_Result, Result);
 
          when Syscall_Update_Framebuffer =>
-            Handle_Update_Framebuffer_Syscall (Process, Result);
+            Handle_Update_Framebuffer_Syscall
+              (Process, Syscall_Result, Result);
 
          when Syscall_Grow_Process_Heap  =>
-            Handle_Grow_Process_Heap_Syscall (Process, Result);
+            Handle_Grow_Process_Heap_Syscall (Process, Syscall_Result, Result);
 
          when others                     =>
             Panic ("Unknown Syscall Number: " & Syscall_Number'Image);
@@ -114,6 +118,8 @@ package body System_Calls is
          Panic ("Kernel Error in Syscall Handler: " & Result'Image);
       end if;
 
+      Trap_Context.Gp_Registers (a0) := Syscall_Result;
+
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Handle_User_Mode_Syscall");
@@ -121,33 +127,32 @@ package body System_Calls is
    end Handle_User_Mode_Syscall;
 
    procedure Handle_Update_Framebuffer_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result)
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result)
    is
-      Trap_Context : Process_Context_T
+      Trap_Context : constant Process_Context_T
       with
         Import,
         Convention => C,
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      User_Framebuffer_Address : Virtual_Address_T := Null_Address;
-
-      User_Pixel_Data_X,
-      User_Pixel_Data_Y,
-      User_Pixel_Data_Width,
-      User_Pixel_Data_Height : Unsigned_32 := 0;
-
       Graphics_Device renames Devices.System_Devices (6);
    begin
       Log_Debug ("User Mode Syscall: Update Framebuffer", Logging_Tags);
 
-      User_Framebuffer_Address :=
+      User_Framebuffer_Address : constant Virtual_Address_T :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
 
-      User_Pixel_Data_X := Unsigned_32 (Trap_Context.Gp_Registers (a2));
-      User_Pixel_Data_Y := Unsigned_32 (Trap_Context.Gp_Registers (a3));
-      User_Pixel_Data_Width := Unsigned_32 (Trap_Context.Gp_Registers (a4));
-      User_Pixel_Data_Height := Unsigned_32 (Trap_Context.Gp_Registers (a5));
+      User_Pixel_Data_X : constant Unsigned_32 :=
+        Unsigned_32 (Trap_Context.Gp_Registers (a2));
+      User_Pixel_Data_Y : constant Unsigned_32 :=
+        Unsigned_32 (Trap_Context.Gp_Registers (a3));
+      User_Pixel_Data_Width : constant Unsigned_32 :=
+        Unsigned_32 (Trap_Context.Gp_Registers (a4));
+      User_Pixel_Data_Height : constant Unsigned_32 :=
+        Unsigned_32 (Trap_Context.Gp_Registers (a5));
 
       --  Reject any rectangle that extends beyond the framebuffer bounds.
       --  The rectangle dimensions are untrusted userspace values that drive
@@ -164,17 +169,16 @@ package body System_Calls is
       then
          Log_Error ("Framebuffer rectangle out of bounds", Logging_Tags);
 
-         Trap_Context.Gp_Registers (a0) :=
-           Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
-
-         goto Syscall_Unsuccessful_No_Kernel_Error;
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
       end if;
 
       --  An empty rectangle reads and writes nothing, so there is no work to
       --  do. Returning here also guarantees the width and height are non-zero
       --  below, keeping the row loop and the offset arithmetic well-defined.
       if User_Pixel_Data_Width = 0 or else User_Pixel_Data_Height = 0 then
-         Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
+         Syscall_Result := 0;
          Result := Success;
          return;
       end if;
@@ -197,11 +201,9 @@ package body System_Calls is
                   (User_Framebuffer_Address, End_Offset)
          then
             Log_Error ("Invalid non-userspace address range", Logging_Tags);
-
-            Trap_Context.Gp_Registers (a0) :=
-              Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
-
-            goto Syscall_Unsuccessful_No_Kernel_Error;
+            Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
+            Result := Syscall_Unsuccessful_Without_Kernel_Error;
+            return;
          end if;
       end Validate_User_Buffer;
 
@@ -257,12 +259,8 @@ package body System_Calls is
          return;
       end if;
 
-      Trap_Context.Gp_Registers (a0) := Syscall_Result_Success;
+      Syscall_Result := 0;
       Result := Success;
-      return;
-
-      <<Syscall_Unsuccessful_No_Kernel_Error>>
-      Result := Syscall_Unsuccessful_Without_Kernel_Error;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint_Error: Handle_Update_Framebuffer_Syscall");

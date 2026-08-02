@@ -40,7 +40,9 @@ private
    procedure Handle_Process_Yield_Syscall;
 
    procedure Handle_Update_Framebuffer_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
 
    Syscall_Result_Success : constant := 0;
 

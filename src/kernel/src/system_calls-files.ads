@@ -11,22 +11,34 @@ private package System_Calls.Files
   with Preelaborate
 is
    procedure Handle_Close_File_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
 
    procedure Handle_Open_File_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
 
    procedure Handle_Read_File_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
 
    procedure Handle_Seek_File_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
 
    procedure Handle_Write_File_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
 
    procedure Handle_Truncate_File_Syscall
-     (Process : in out Process_Control_Block_T; Result : out Function_Result);
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
 
 private
    function Unsigned_64_To_File_Open_Flags is new
