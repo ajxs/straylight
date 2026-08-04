@@ -1,4 +1,56 @@
 package body Boot.Devicetree is
+   procedure Parse_Reserved_Memory_Regions
+     (Reserved_Mem_Map_Address : Address;
+      Total_Size               : Storage_Offset;
+      Result                   : out Function_Result)
+   is
+      Curr_Offset : Storage_Offset := 0;
+   begin
+      Log_Debug
+        ("Parsing Reserved Memory Regions...", Devicetree_Logging_Tags);
+
+      loop
+         Read_Block : declare
+            Block : Reserved_Memory_Block_T
+            with
+              Import,
+              Address   => Reserved_Mem_Map_Address + Curr_Offset,
+              Alignment => 1;
+         begin
+            --  Section 5.3.2 of the Devicetree specification states that
+            --  the reserved memory map is terminated by a block with both
+            --  address and size set to zero.
+            exit when Block.Size = 0 and then Block.Addr = 0;
+
+            Log_Debug
+              ("Addr="
+               & Convert_BEU64_To_LEU64 (Block.Addr)'Image
+               & ", Size= "
+               & Convert_BEU64_To_LEU64 (Block.Size)'Image,
+               Devicetree_Logging_Tags);
+
+         end Read_Block;
+
+         --  Advance by the size of the reserved memory block structure.
+         Curr_Offset := Curr_Offset + 16;
+         if Curr_Offset >= Total_Size then
+            Log_Error
+              ("Reserved memory map exceeds total devicetree size.",
+               Devicetree_Logging_Tags);
+            Result := Unhandled_Exception;
+            return;
+         end if;
+      end loop;
+
+      Result := Success;
+   exception
+      when others =>
+         Log_Error
+           ("Constraint_Error: Parse_Reserved_Memory_Regions",
+            Devicetree_Logging_Tags);
+         Result := Constraint_Exception;
+   end Parse_Reserved_Memory_Regions;
+
    procedure Read_Node_Name_String
      (Structure_Block_Address : Address;
       Structure_Block_Size    : Storage_Offset;
@@ -103,6 +155,9 @@ package body Boot.Devicetree is
       Header : constant FDT_Header_T
       with Import, Address => DTB_Address, Alignment => 1;
    begin
+      Total_Size : constant Storage_Offset :=
+        Storage_Offset (Convert_BEU32_To_LEU32 (Header.Totalsize));
+
       Log_Debug
         ("Devicetree Header:"
          & ASCII.LF
@@ -110,7 +165,7 @@ package body Boot.Devicetree is
          & Convert_BEU32_To_LEU32 (Header.Magic)'Image
          & ASCII.LF
          & "  Totalsize:        "
-         & Convert_BEU32_To_LEU32 (Header.Totalsize)'Image
+         & Total_Size'Image
          & ASCII.LF
          & "  Off_DT_Struct:    "
          & Convert_BEU32_To_LEU32 (Header.Off_DT_Struct)'Image
@@ -150,34 +205,11 @@ package body Boot.Devicetree is
         DTB_Address
         + Storage_Offset (Convert_BEU32_To_LEU32 (Header.Off_DT_Struct));
 
-      Read_Reserved_Memory_Regions : declare
-         Curr_Addr : Address := Reserved_Mem_Map_Address;
-      begin
-
-         Log_Debug ("Reserved Memory Regions", Devicetree_Logging_Tags);
-
-         while True loop
-            Read_Block : declare
-               Block : Reserved_Memory_Block_T
-               with Import, Address => Curr_Addr, Alignment => 1;
-            begin
-               exit when Block.Size = 0 and then Block.Addr = 0;
-
-               Log_Debug
-                 ("  Block Addr: "
-                  & Convert_BEU64_To_LEU64 (Block.Addr)'Image
-                  & ASCII.LF
-                  & "  Block Size: "
-                  & Convert_BEU64_To_LEU64 (Block.Size)'Image
-                  & ASCII.LF
-                  & "------------------------",
-                  Devicetree_Logging_Tags);
-
-            end Read_Block;
-
-            Curr_Addr := Curr_Addr + 16;
-         end loop;
-      end Read_Reserved_Memory_Regions;
+      Parse_Reserved_Memory_Regions
+        (Reserved_Mem_Map_Address, Total_Size, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Parse_Structure_Block
         (Structure_Block_Address,
