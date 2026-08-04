@@ -6,7 +6,6 @@ with Utilities;        use Utilities;
 package Boot.Devicetree
   with Preelaborate
 is
-
    procedure Parse_Devicetree
      (DTB_Address : Address; Result : out Function_Result);
 

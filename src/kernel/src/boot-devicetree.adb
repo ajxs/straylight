@@ -4,30 +4,34 @@ package body Boot.Devicetree is
       Structure_Block_Size    : Storage_Offset;
       Curr_Offset             : in out Storage_Offset;
       Node_Name               : in out Devicetree_String_T;
-      Result                  : out Function_Result)
-   is
-      Name_String : String (1 .. Maximum_FDT_String_Length)
+      Result                  : out Function_Result) is
+   begin
+      Maximum_Possible_String_Length : constant Integer :=
+        Integer'Min
+          (Integer (Structure_Block_Size - Curr_Offset),
+           Maximum_FDT_String_Length);
+
+      if Maximum_Possible_String_Length <= 0 then
+         Log_Error
+           ("Unexpected end of structure block", Devicetree_Logging_Tags);
+         Result := Unhandled_Exception;
+         return;
+      end if;
+
+      Name_String : String (1 .. Maximum_Possible_String_Length)
       with
         Import,
         Address   => Structure_Block_Address + Curr_Offset,
         Alignment => 1;
-   begin
-      for I in Name_String'Range loop
-         --  Note that I is a 1-based index into the current name string.
-         --  The offset into the structure block is 0-based.
-         if Curr_Offset + Storage_Offset (I - 1) >= Structure_Block_Size then
-            Log_Error
-              ("Node name string exceeds structure block size.",
-               Devicetree_Logging_Tags);
-            Result := Unhandled_Exception;
-            return;
-         end if;
 
+      for I in Name_String'Range loop
          exit when Name_String (I) = ASCII.NUL;
          Node_Name.Value (I) := Name_String (I);
          Node_Name.Byte_Length := I;
       end loop;
 
+      --  Increment the current read offset by the length of the node name
+      --  string, taking into account the null terminator.
       Curr_Offset := Curr_Offset + Storage_Offset (Node_Name.Byte_Length) + 1;
 
       Result := Success;
@@ -42,29 +46,29 @@ package body Boot.Devicetree is
       String_Table_Size    : Storage_Offset;
       String_Table_Offset  : Storage_Offset;
       Property_Name        : out Devicetree_String_T;
-      Result               : out Function_Result)
-   is
-      Property_Name_String : String (1 .. Maximum_FDT_String_Length)
+      Result               : out Function_Result) is
+   begin
+      Property_Name.Byte_Length := 0;
+
+      Maximum_Possible_String_Length : constant Integer :=
+        Integer'Min
+          (Integer (String_Table_Size - String_Table_Offset),
+           Maximum_FDT_String_Length);
+
+      if Maximum_Possible_String_Length <= 0 then
+         Log_Error ("Unexpected end of string table", Devicetree_Logging_Tags);
+         Result := Unhandled_Exception;
+         return;
+      end if;
+
+      Property_Name_String : String (1 .. Maximum_Possible_String_Length)
       with
         Import,
         Convention => C,
         Address    => String_Table_Address + String_Table_Offset,
         Alignment  => 1;
-   begin
-      Property_Name.Byte_Length := 0;
 
       for I in Property_Name_String'Range loop
-         --  Note that I is a 1-based index into the current name string.
-         --  The offset into the structure block is 0-based.
-         if String_Table_Offset + Storage_Offset (I - 1) >= String_Table_Size
-         then
-            Log_Error
-              ("Property name string exceeds string table size.",
-               Devicetree_Logging_Tags);
-            Result := Unhandled_Exception;
-            return;
-         end if;
-
          exit when Property_Name_String (I) = ASCII.NUL;
          Property_Name.Value (I) := Property_Name_String (I);
          Property_Name.Byte_Length := I;
