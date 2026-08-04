@@ -66,34 +66,31 @@ private
        Size at 8 range 0 .. 63;
      end record;
 
-   Maximum_String_Length : constant := 256;
+   Maximum_FDT_String_Length : constant := 256;
 
    subtype Devicetree_String_T is
-     Fixed_Length_String_T (Maximum_String_Length);
+     Fixed_Length_String_T (Maximum_FDT_String_Length);
 
    procedure Parse_Structure_Block
      (Structure_Block_Address : Address;
+      Structure_Block_Size    : Storage_Offset;
       String_Table_Address    : Address;
+      String_Table_Size       : Storage_Offset;
       Result                  : out Function_Result);
 
    procedure Parse_Property
      (Structure_Block_Address : Address;
+      Structure_Block_Size    : Storage_Offset;
       String_Table_Address    : Address;
+      String_Table_Size       : Storage_Offset;
       Property_Name           : out Devicetree_String_T;
       Property_Length         : out Unsigned_32;
       Property_Address        : out Address;
-      Curr_Offset             : in out Storage_Offset);
-
-   procedure Read_Property_Name_String
-     (String_Table_Address : Address;
-      String_Table_Offset  : Storage_Offset;
-      Property_Name        : out Devicetree_String_T);
+      Curr_Offset             : in out Storage_Offset;
+      Result                  : out Function_Result);
 
    function Compare_Node_Name
      (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean;
-
-   function Is_String_Value
-     (Property_Name : Devicetree_String_T) return Boolean;
 
    --  The current address and size cells context is captured in a stack, so
    --  that we can properly handle nested nodes that override the

@@ -1,4 +1,98 @@
 package body Boot.Devicetree is
+   procedure Read_Node_Name_String
+     (Structure_Block_Address : Address;
+      Structure_Block_Size    : Storage_Offset;
+      Curr_Offset             : in out Storage_Offset;
+      Node_Name               : in out Devicetree_String_T;
+      Result                  : out Function_Result)
+   is
+      Name_String : String (1 .. Maximum_FDT_String_Length)
+      with
+        Import,
+        Address   => Structure_Block_Address + Curr_Offset,
+        Alignment => 1;
+   begin
+      for I in Name_String'Range loop
+         --  Note that I is a 1-based index into the current name string.
+         --  The offset into the structure block is 0-based.
+         if Curr_Offset + Storage_Offset (I - 1) >= Structure_Block_Size then
+            Log_Error
+              ("Node name string exceeds structure block size.",
+               Devicetree_Logging_Tags);
+            Result := Unhandled_Exception;
+            return;
+         end if;
+
+         exit when Name_String (I) = ASCII.NUL;
+         Node_Name.Value (I) := Name_String (I);
+         Node_Name.Byte_Length := I;
+      end loop;
+
+      Curr_Offset := Curr_Offset + Storage_Offset (Node_Name.Byte_Length) + 1;
+
+      Result := Success;
+   exception
+      when others =>
+         Log_Error ("Constraint_Error: Read_Node_Name_String");
+         Result := Constraint_Exception;
+   end Read_Node_Name_String;
+
+   procedure Read_Property_Name_String
+     (String_Table_Address : Address;
+      String_Table_Size    : Storage_Offset;
+      String_Table_Offset  : Storage_Offset;
+      Property_Name        : out Devicetree_String_T;
+      Result               : out Function_Result)
+   is
+      Property_Name_String : String (1 .. Maximum_FDT_String_Length)
+      with
+        Import,
+        Convention => C,
+        Address    => String_Table_Address + String_Table_Offset,
+        Alignment  => 1;
+   begin
+      Property_Name.Byte_Length := 0;
+
+      for I in Property_Name_String'Range loop
+         --  Note that I is a 1-based index into the current name string.
+         --  The offset into the structure block is 0-based.
+         if String_Table_Offset + Storage_Offset (I - 1) >= String_Table_Size
+         then
+            Log_Error
+              ("Property name string exceeds string table size.",
+               Devicetree_Logging_Tags);
+            Result := Unhandled_Exception;
+            return;
+         end if;
+
+         exit when Property_Name_String (I) = ASCII.NUL;
+         Property_Name.Value (I) := Property_Name_String (I);
+         Property_Name.Byte_Length := I;
+      end loop;
+
+      --  Note that this procedure does not update the current read offset into
+      --  the structure block. Since we're already reading a property at this
+      --  point, the caller will advance the read offset by the entire property
+      --  size.
+
+      Result := Success;
+   exception
+      when others =>
+         Log_Error ("Constraint_Error: Read_Property_Name_String");
+         Result := Constraint_Exception;
+   end Read_Property_Name_String;
+
+   function Is_String_Value
+     (Property_Name : Devicetree_String_T) return Boolean
+   is
+      --  For simplicity, assume properties with names ending in
+      --  "compatible", "model", or "device_type" are string values.
+      (Compare_Fixed_Length_String_With_String (Property_Name, "compatible")
+       or else Compare_Fixed_Length_String_With_String (Property_Name, "model")
+       or else
+         Compare_Fixed_Length_String_With_String
+           (Property_Name, "device_type"));
+
    procedure Parse_Devicetree
      (DTB_Address : Address; Result : out Function_Result)
    is
@@ -82,7 +176,11 @@ package body Boot.Devicetree is
       end Read_Reserved_Memory_Regions;
 
       Parse_Structure_Block
-        (Structure_Block_Address, String_Table_Address, Result);
+        (Structure_Block_Address,
+         Storage_Offset (Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)),
+         String_Table_Address,
+         Storage_Offset (Convert_BEU32_To_LEU32 (Header.Size_DT_Strings)),
+         Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -98,11 +196,14 @@ package body Boot.Devicetree is
 
    procedure Parse_Property
      (Structure_Block_Address : Address;
+      Structure_Block_Size    : Storage_Offset;
       String_Table_Address    : Address;
+      String_Table_Size       : Storage_Offset;
       Property_Name           : out Devicetree_String_T;
       Property_Length         : out Unsigned_32;
       Property_Address        : out Address;
-      Curr_Offset             : in out Storage_Offset)
+      Curr_Offset             : in out Storage_Offset;
+      Result                  : out Function_Result)
    is
       Property : FDT_Property_T
       with
@@ -110,23 +211,76 @@ package body Boot.Devicetree is
         Address   => Structure_Block_Address + Curr_Offset,
         Alignment => 1;
    begin
+      Property_Length := 0;
+      Property_Address := Null_Address;
+
       Read_Property_Name_String
         (String_Table_Address,
+         String_Table_Size,
          Storage_Offset (Convert_BEU32_To_LEU32 (Property.Name_Offset)),
-         Property_Name);
+         Property_Name,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Property_Length := Convert_BEU32_To_LEU32 (Property.Length);
       Property_Address := Structure_Block_Address + Curr_Offset + 8;
 
+      --  Advance the read offset by the size of the property structure
+      --  (8 bytes) plus the length of the property value.
       Curr_Offset := Curr_Offset + 8 + Storage_Offset (Property_Length);
+      if Curr_Offset >= Structure_Block_Size then
+         Log_Error
+           ("Property exceeds structure block size.", Devicetree_Logging_Tags);
+         Result := Unhandled_Exception;
+         return;
+      end if;
+
+      Result := Success;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Parse_Property");
+         Log_Error
+           ("Constraint_Error: Parse_Property", Devicetree_Logging_Tags);
+         Result := Constraint_Exception;
    end Parse_Property;
+
+   procedure Get_Next_Token
+     (Structure_Block_Address : Address;
+      Structure_Block_Size    : Storage_Offset;
+      Curr_Offset             : in out Storage_Offset;
+      Token_Value             : out Unsigned_32;
+      Result                  : out Function_Result)
+   is
+      Curr_Token : constant FDT_Token_T
+      with
+        Import,
+        Address   => Structure_Block_Address + Curr_Offset,
+        Alignment => 1;
+   begin
+      if Curr_Offset >= Structure_Block_Size then
+         Log_Error ("End of structure block reached while reading token");
+         Result := Unhandled_Exception;
+         Token_Value := 0;
+         return;
+      end if;
+
+      Token_Value := Convert_BEU32_To_LEU32 (Curr_Token);
+
+      --  Advance the read offset by the size of the token (4 bytes).
+      Curr_Offset := Curr_Offset + 4;
+      Result := Success;
+   exception
+      when others =>
+         Log_Error ("Constraint_Error: Get_Next_Token");
+         Result := Constraint_Exception;
+   end Get_Next_Token;
 
    procedure Parse_Structure_Block
      (Structure_Block_Address : Address;
+      Structure_Block_Size    : Storage_Offset;
       String_Table_Address    : Address;
+      String_Table_Size       : Storage_Offset;
       Result                  : out Function_Result)
    is
       Curr_Offset : Storage_Offset := 0;
@@ -152,155 +306,148 @@ package body Boot.Devicetree is
       Current_Cells_Context : FDT_Cells_Context_T :=
         (Address_Cells => 2, Size_Cells => 1);
 
+      Token_Value : Unsigned_32 := 0;
    begin
-      while True loop
-         Read_Structure : declare
-            Curr_Token : FDT_Token_T
-            with
-              Import,
-              Address   => Structure_Block_Address + Curr_Offset,
-              Alignment => 1;
+      loop
+         Get_Next_Token
+           (Structure_Block_Address,
+            Structure_Block_Size,
+            Curr_Offset,
+            Token_Value,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
 
-            Token_Value : constant Unsigned_32 :=
-              Convert_BEU32_To_LEU32 (Curr_Token);
-         begin
-            if Token_Value = FDT_BEGIN_NODE then
-               Log_Debug ("START STRUCTURE", Devicetree_Logging_Tags);
-               Curr_Offset := Curr_Offset + 4;
-               Node_Name.Byte_Length := 0;
+         if Token_Value = FDT_BEGIN_NODE then
+            Log_Debug ("START STRUCTURE", Devicetree_Logging_Tags);
+            Node_Name.Byte_Length := 0;
 
-               Push_Cells_Context
-                 (Cells_Context_Stack,
-                  Cells_Context_Stack_Ptr,
-                  Current_Cells_Context,
-                  Result);
-               if Is_Error (Result) then
-                  return;
-               end if;
-
-               Read_Name : declare
-                  Name_String : String (1 .. Maximum_String_Length)
-                  with
-                    Import,
-                    Address   => Structure_Block_Address + Curr_Offset,
-                    Alignment => 1;
-               begin
-                  for I in Name_String'Range loop
-                     exit when Name_String (I) = ASCII.NUL;
-                     Node_Name.Value (I) := Name_String (I);
-                     Node_Name.Byte_Length := I;
-                  end loop;
-
-                  Curr_Offset :=
-                    Curr_Offset + Storage_Offset (Node_Name.Byte_Length) + 1;
-               end Read_Name;
-
-               while Curr_Offset mod 4 /= 0 loop
-                  Curr_Offset := Curr_Offset + 1;
-               end loop;
-
-               Log_Debug
-                 ("  Node Name: '"
-                  & Node_Name.Value (1 .. Node_Name.Byte_Length)
-                  & "'",
-                  Devicetree_Logging_Tags);
-
-            elsif Token_Value = FDT_END_NODE then
-               Log_Debug
-                 ("Node cells context: ("
-                  & "Address_Cells: "
-                  & Current_Cells_Context.Address_Cells'Image
-                  & ", Size_Cells: "
-                  & Current_Cells_Context.Size_Cells'Image
-                  & ")",
-                  Devicetree_Logging_Tags);
-
-               Pop_Cells_Context
-                 (Cells_Context_Stack,
-                  Cells_Context_Stack_Ptr,
-                  Current_Cells_Context,
-                  Result);
-               if Is_Error (Result) then
-                  return;
-               end if;
-
-               Log_Debug ("END STRUCTURE" & ASCII.LF, Devicetree_Logging_Tags);
-
-               Curr_Offset := Curr_Offset + 4;
-            elsif Token_Value = FDT_PROP then
-               Curr_Offset := Curr_Offset + 4;
-
-               Parse_Property
-                 (Structure_Block_Address,
-                  String_Table_Address,
-                  Property_Name,
-                  Property_Length,
-                  Property_Address,
-                  Curr_Offset);
-
-               Log_Debug ("Property:", Devicetree_Logging_Tags);
-
-               Log_Debug
-                 ("  Name: '"
-                  & Property_Name.Value (1 .. Property_Name.Byte_Length)
-                  & "'",
-                  Devicetree_Logging_Tags);
-
-               if Property_Length = 0 then
-                  Log_Debug ("  (No Value)", Devicetree_Logging_Tags);
-               elsif Is_String_Value (Property_Name) then
-                  Read_Property_Value : declare
-                     Prop_Value : String (1 .. Integer (Property_Length))
-                     with Import, Address => Property_Address, Alignment => 1;
-                  begin
-                     Log_Debug
-                       ("  Value: '" & Prop_Value & "'",
-                        Devicetree_Logging_Tags);
-                  end Read_Property_Value;
-               end if;
-
-               if Compare_Fixed_Length_String_With_String
-                    (Property_Name, "#size-cells")
-                 or else
-                   Compare_Fixed_Length_String_With_String
-                     (Property_Name, "#address-cells")
-               then
-                  Read_Cells_Property_Value : declare
-                     Prop_Value : Unsigned_32
-                     with Import, Address => Property_Address, Alignment => 1;
-                  begin
-
-                     Cells_Value : constant Unsigned_32 :=
-                       Convert_BEU32_To_LEU32 (Prop_Value);
-
-                     if Compare_Fixed_Length_String_With_String
-                          (Property_Name, "#size-cells")
-                     then
-                        Current_Cells_Context.Size_Cells := Cells_Value;
-                     elsif Compare_Fixed_Length_String_With_String
-                             (Property_Name, "#address-cells")
-                     then
-                        Current_Cells_Context.Address_Cells := Cells_Value;
-                     end if;
-
-                  end Read_Cells_Property_Value;
-               end if;
-
-               while Curr_Offset mod 4 /= 0 loop
-                  Curr_Offset := Curr_Offset + 1;
-               end loop;
-            elsif Token_Value = FDT_NOP then
-               Log_Debug ("NOP", Devicetree_Logging_Tags);
-               Curr_Offset := Curr_Offset + 4;
-            elsif Token_Value = FDT_END then
-               Log_Debug ("END", Devicetree_Logging_Tags);
-               exit;
-            else
-               Log_Debug ("ABORT", Devicetree_Logging_Tags);
-               exit;
+            Push_Cells_Context
+              (Cells_Context_Stack,
+               Cells_Context_Stack_Ptr,
+               Current_Cells_Context,
+               Result);
+            if Is_Error (Result) then
+               return;
             end if;
 
-         end Read_Structure;
+            Read_Node_Name_String
+              (Structure_Block_Address,
+               Structure_Block_Size,
+               Curr_Offset,
+               Node_Name,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+
+            --  Align offset to the next word boundary.
+            while Curr_Offset mod 4 /= 0 loop
+               Curr_Offset := Curr_Offset + 1;
+            end loop;
+
+            Log_Debug
+              ("  Node Name: '"
+               & Node_Name.Value (1 .. Node_Name.Byte_Length)
+               & "'",
+               Devicetree_Logging_Tags);
+
+         elsif Token_Value = FDT_END_NODE then
+            Log_Debug
+              ("Node cells context: ("
+               & "Address_Cells: "
+               & Current_Cells_Context.Address_Cells'Image
+               & ", Size_Cells: "
+               & Current_Cells_Context.Size_Cells'Image
+               & ")",
+               Devicetree_Logging_Tags);
+
+            Pop_Cells_Context
+              (Cells_Context_Stack,
+               Cells_Context_Stack_Ptr,
+               Current_Cells_Context,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+
+            Log_Debug ("END STRUCTURE", Devicetree_Logging_Tags);
+         elsif Token_Value = FDT_PROP then
+            Parse_Property
+              (Structure_Block_Address,
+               Structure_Block_Size,
+               String_Table_Address,
+               String_Table_Size,
+               Property_Name,
+               Property_Length,
+               Property_Address,
+               Curr_Offset,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+
+            Log_Debug ("Property:", Devicetree_Logging_Tags);
+
+            Log_Debug
+              ("  Name: '"
+               & Property_Name.Value (1 .. Property_Name.Byte_Length)
+               & "'",
+               Devicetree_Logging_Tags);
+
+            if Property_Length = 0 then
+               Log_Debug ("  (No Value)", Devicetree_Logging_Tags);
+            elsif Is_String_Value (Property_Name) then
+               Read_Property_Value : declare
+                  Prop_Value : String (1 .. Integer (Property_Length))
+                  with Import, Address => Property_Address, Alignment => 1;
+               begin
+                  Log_Debug
+                    ("  Value: '" & Prop_Value & "'", Devicetree_Logging_Tags);
+               end Read_Property_Value;
+            end if;
+
+            if Compare_Fixed_Length_String_With_String
+                 (Property_Name, "#size-cells")
+              or else
+                Compare_Fixed_Length_String_With_String
+                  (Property_Name, "#address-cells")
+            then
+               Read_Cells_Property_Value : declare
+                  Prop_Value : constant Unsigned_32
+                  with Import, Address => Property_Address, Alignment => 1;
+               begin
+                  Cells_Value : constant Unsigned_32 :=
+                    Convert_BEU32_To_LEU32 (Prop_Value);
+
+                  if Compare_Fixed_Length_String_With_String
+                       (Property_Name, "#size-cells")
+                  then
+                     Current_Cells_Context.Size_Cells := Cells_Value;
+                  elsif Compare_Fixed_Length_String_With_String
+                          (Property_Name, "#address-cells")
+                  then
+                     Current_Cells_Context.Address_Cells := Cells_Value;
+                  end if;
+               end Read_Cells_Property_Value;
+            end if;
+
+            --  Align offset to the next word boundary.
+            while Curr_Offset mod 4 /= 0 loop
+               Curr_Offset := Curr_Offset + 1;
+            end loop;
+         elsif Token_Value = FDT_NOP then
+            Log_Debug ("NOP", Devicetree_Logging_Tags);
+         elsif Token_Value = FDT_END then
+            Log_Debug ("END", Devicetree_Logging_Tags);
+            exit;
+         else
+            Log_Error
+              ("Unknown token type: " & Token_Value'Image,
+               Devicetree_Logging_Tags);
+            exit;
+         end if;
       end loop;
 
       Result := Success;
@@ -310,52 +457,12 @@ package body Boot.Devicetree is
          Result := Constraint_Exception;
    end Parse_Structure_Block;
 
-   procedure Read_Property_Name_String
-     (String_Table_Address : Address;
-      String_Table_Offset  : Storage_Offset;
-      Property_Name        : out Devicetree_String_T)
-   is
-      S : array (0 .. Maximum_String_Length - 1) of Character
-      with
-        Import,
-        Convention => C,
-        Address    => String_Table_Address + String_Table_Offset,
-        Alignment  => 1;
-   begin
-      Property_Name.Byte_Length := 0;
-
-      for I in S'Range loop
-         exit when S (I) = ASCII.NUL;
-         Property_Name.Value (I + 1) := S (I);
-         Property_Name.Byte_Length := I + 1;
-      end loop;
-
-   end Read_Property_Name_String;
-
-   function Is_String_Value
-     (Property_Name : Devicetree_String_T) return Boolean is
-   begin
-      --  For simplicity, assume properties with names ending in
-      --  "compatible", "model", or "device_type" are string values.
-      if Compare_Fixed_Length_String_With_String (Property_Name, "compatible")
-        or else
-          Compare_Fixed_Length_String_With_String (Property_Name, "model")
-        or else
-          Compare_Fixed_Length_String_With_String
-            (Property_Name, "device_type")
-      then
-         return True;
-      end if;
-
-      return False;
-   end Is_String_Value;
-
    function Get_Devicetree_Size (DTB_Address : Address) return Storage_Offset
    is
       Header : FDT_Header_T
       with Import, Address => DTB_Address, Alignment => 1;
    begin
-      return Storage_Offset (Header.Totalsize);
+      return Storage_Offset (Convert_BEU32_To_LEU32 (Header.Totalsize));
    end Get_Devicetree_Size;
 
    procedure Push_Cells_Context
@@ -364,7 +471,7 @@ package body Boot.Devicetree is
       New_Context       : FDT_Cells_Context_T;
       Result            : out Function_Result) is
    begin
-      if Context_Stack_Ptr >= Context_Stack'Last then
+      if Context_Stack_Ptr > Context_Stack'Last then
          Log_Error
            ("Cells context stack overflow: " & Context_Stack_Ptr'Image);
          Result := Constraint_Exception;
