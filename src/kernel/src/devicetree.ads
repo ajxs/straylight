@@ -1,16 +1,19 @@
+with Interfaces;              use Interfaces;
+with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Function_Results; use Function_Results;
+with Logging;          use Logging;
 with Utilities;        use Utilities;
 
-package Boot.Devicetree
+package Devicetree
   with Preelaborate
 is
    procedure Parse_Devicetree
      (DTB_Address : Address; Result : out Function_Result);
 
-   function Get_Devicetree_Size (DTB_Address : Address) return Storage_Offset;
-
+   --  The header is a public definition, since it's used in the early
+   --  boot stage when mapping the devicetree into virtual memory.
    type FDT_Header_T is record
       Magic             : Unsigned_32;
       Totalsize         : Unsigned_32;
@@ -22,20 +25,8 @@ is
       Boot_Cpuid_Phys   : Unsigned_32;
       Size_DT_Strings   : Unsigned_32;
       Size_DT_Struct    : Unsigned_32;
-   end record;
-   for FDT_Header_T use
-     record
-       Magic             at 0  range 0 .. 31;
-       Totalsize         at 4  range 0 .. 31;
-       Off_DT_Struct     at 8  range 0 .. 31;
-       Off_DT_Strings    at 12 range 0 .. 31;
-       Off_Mem_Rsvmap    at 16 range 0 .. 31;
-       Version           at 20 range 0 .. 31;
-       Last_Comp_Version at 24 range 0 .. 31;
-       Boot_Cpuid_Phys   at 28 range 0 .. 31;
-       Size_DT_Strings   at 32 range 0 .. 31;
-       Size_DT_Struct    at 36 range 0 .. 31;
-     end record;
+   end record
+   with Convention => C;
 
 private
    Devicetree_Logging_Tags : constant Log_Tags := [Log_Tag_Devicetree];
@@ -47,23 +38,14 @@ private
    type FDT_Property_T is record
       Length      : Unsigned_32;
       Name_Offset : Unsigned_32;
-   end record;
-   for FDT_Property_T use
-     record
-       Length      at 0 range 0 .. 31;
-       Name_Offset at 4 range 0 .. 31;
-     end record;
+   end record
+   with Convention => C;
 
    type Reserved_Memory_Block_T is record
       Addr : Unsigned_64;
       Size : Unsigned_64;
-   end record;
-
-   for Reserved_Memory_Block_T use
-     record
-       Addr at 0 range 0 .. 63;
-       Size at 8 range 0 .. 63;
-     end record;
+   end record
+   with Convention => C;
 
    Maximum_FDT_String_Length : constant := 256;
 
@@ -91,29 +73,4 @@ private
    function Compare_Node_Name
      (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean;
 
-   --  The current address and size cells context is captured in a stack, so
-   --  that we can properly handle nested nodes that override the
-   --  #address-cells and #size-cells properties.
-   --  Procedures are contained in this package for pushing and popping the
-   --  context as the devicetree is traversed.
-   type FDT_Cells_Context_T is record
-      Address_Cells : Unsigned_32;
-      Size_Cells    : Unsigned_32;
-   end record;
-
-   type FDT_Cells_Context_Stack_T is
-     array (Natural range <>) of FDT_Cells_Context_T;
-
-   procedure Push_Cells_Context
-     (Context_Stack     : in out FDT_Cells_Context_Stack_T;
-      Context_Stack_Ptr : in out Natural;
-      New_Context       : FDT_Cells_Context_T;
-      Result            : out Function_Result);
-
-   procedure Pop_Cells_Context
-     (Context_Stack     : FDT_Cells_Context_Stack_T;
-      Context_Stack_Ptr : in out Natural;
-      Popped_Context    : out FDT_Cells_Context_T;
-      Result            : out Function_Result);
-
-end Boot.Devicetree;
+end Devicetree;

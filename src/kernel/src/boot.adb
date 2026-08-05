@@ -5,13 +5,13 @@
 
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Boot.Devicetree;
 with Devices;              use Devices;
 with Devices.Virtio;       use Devices.Virtio;
 with Devices.Virtio.Block; use Devices.Virtio.Block;
 with Devices.Virtio.Graphics;
 with Devices.UART;
 with Devices.PLIC;
+with Devicetree;
 with Filesystems;          use Filesystems;
 with Filesystems.Root;     use Filesystems.Root;
 with Function_Results;     use Function_Results;
@@ -565,8 +565,7 @@ package body Boot is
       Devicetree_Higher_Half_Address : constant Address :=
         Address (DTB_Address) + Higher_Half_Offset;
 
-      Boot.Devicetree.Parse_Devicetree
-        (Devicetree_Higher_Half_Address, Result);
+      Devicetree.Parse_Devicetree (Devicetree_Higher_Half_Address, Result);
       if Is_Error (Result) then
          --  Error already printed.
          Panic;

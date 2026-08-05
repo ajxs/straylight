@@ -3,7 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Boot.Devicetree; use Boot.Devicetree;
+with Devicetree; use Devicetree;
 
 package body Boot.Early is
    procedure Allocate_New_Boot_Page_Table

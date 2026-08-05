@@ -1,4 +1,66 @@
-package body Boot.Devicetree is
+with Memory; use Memory;
+
+package body Devicetree is
+   --  The current address and size cells context is captured in a stack, so
+   --  that we can properly handle nested nodes that override the
+   --  #address-cells and #size-cells properties.
+   --  Procedures are contained in this package for pushing and popping the
+   --  context as the devicetree is traversed.
+   type FDT_Cells_Context_T is record
+      Address_Cells : Unsigned_32;
+      Size_Cells    : Unsigned_32;
+   end record;
+
+   type FDT_Cells_Context_Stack_T is
+     array (Natural range <>) of FDT_Cells_Context_T;
+
+   procedure Push_Cells_Context
+     (Context_Stack     : in out FDT_Cells_Context_Stack_T;
+      Context_Stack_Ptr : in out Natural;
+      New_Context       : FDT_Cells_Context_T;
+      Result            : out Function_Result) is
+   begin
+      if Context_Stack_Ptr > Context_Stack'Last then
+         Log_Error
+           ("Cells context stack overflow: " & Context_Stack_Ptr'Image);
+         Result := Constraint_Exception;
+         return;
+      end if;
+
+      Log_Debug ("Pushing cells context", Devicetree_Logging_Tags);
+
+      Context_Stack (Context_Stack_Ptr) := New_Context;
+      Context_Stack_Ptr := Context_Stack_Ptr + 1;
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Push_Cells_Context");
+         Result := Constraint_Exception;
+   end Push_Cells_Context;
+
+   procedure Pop_Cells_Context
+     (Context_Stack     : FDT_Cells_Context_Stack_T;
+      Context_Stack_Ptr : in out Natural;
+      Popped_Context    : out FDT_Cells_Context_T;
+      Result            : out Function_Result) is
+   begin
+      if Context_Stack_Ptr <= Context_Stack'First then
+         Log_Error ("Cells context stack underflow");
+         Result := Constraint_Exception;
+         return;
+      end if;
+
+      Log_Debug ("Popping cells context", Devicetree_Logging_Tags);
+
+      Context_Stack_Ptr := Context_Stack_Ptr - 1;
+      Popped_Context := Context_Stack (Context_Stack_Ptr);
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Pop_Cells_Context");
+         Result := Constraint_Exception;
+   end Pop_Cells_Context;
+
    procedure Parse_Reserved_Memory_Regions
      (Reserved_Mem_Map_Address : Address;
       Total_Size               : Storage_Offset;
@@ -493,61 +555,6 @@ package body Boot.Devicetree is
          Result := Constraint_Exception;
    end Parse_Structure_Block;
 
-   function Get_Devicetree_Size (DTB_Address : Address) return Storage_Offset
-   is
-      Header : FDT_Header_T
-      with Import, Address => DTB_Address, Alignment => 1;
-   begin
-      return Storage_Offset (Convert_BEU32_To_LEU32 (Header.Totalsize));
-   end Get_Devicetree_Size;
-
-   procedure Push_Cells_Context
-     (Context_Stack     : in out FDT_Cells_Context_Stack_T;
-      Context_Stack_Ptr : in out Natural;
-      New_Context       : FDT_Cells_Context_T;
-      Result            : out Function_Result) is
-   begin
-      if Context_Stack_Ptr > Context_Stack'Last then
-         Log_Error
-           ("Cells context stack overflow: " & Context_Stack_Ptr'Image);
-         Result := Constraint_Exception;
-         return;
-      end if;
-
-      Log_Debug ("Pushing cells context", Devicetree_Logging_Tags);
-
-      Context_Stack (Context_Stack_Ptr) := New_Context;
-      Context_Stack_Ptr := Context_Stack_Ptr + 1;
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Push_Cells_Context");
-         Result := Constraint_Exception;
-   end Push_Cells_Context;
-
-   procedure Pop_Cells_Context
-     (Context_Stack     : FDT_Cells_Context_Stack_T;
-      Context_Stack_Ptr : in out Natural;
-      Popped_Context    : out FDT_Cells_Context_T;
-      Result            : out Function_Result) is
-   begin
-      if Context_Stack_Ptr <= Context_Stack'First then
-         Log_Error ("Cells context stack underflow");
-         Result := Constraint_Exception;
-         return;
-      end if;
-
-      Log_Debug ("Popping cells context", Devicetree_Logging_Tags);
-
-      Context_Stack_Ptr := Context_Stack_Ptr - 1;
-      Popped_Context := Context_Stack (Context_Stack_Ptr);
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Pop_Cells_Context");
-         Result := Constraint_Exception;
-   end Pop_Cells_Context;
-
    function Compare_Node_Name
      (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean is
    begin
@@ -572,4 +579,4 @@ package body Boot.Devicetree is
          return False;
    end Compare_Node_Name;
 
-end Boot.Devicetree;
+end Devicetree;
