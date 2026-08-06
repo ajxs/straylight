@@ -44,14 +44,18 @@ package body Memory.Allocators.Heap is
       Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
       Length           : Storage_Offset) return Boolean
-   is ((Virtual_Address
-        < (Region.Heap_Region_Virt_Addr + Region.Heap_Region_Size)
-        and then (Virtual_Address + Length) > Region.Heap_Region_Virt_Addr)
+   is (Do_Memory_Regions_Overlap
+         (Region.Heap_Region_Virt_Addr,
+          Region.Heap_Region_Size,
+          Virtual_Address,
+          Length)
        or else
-         (Physical_Address
-          < (Region.Heap_Region_Phys_Addr + Region.Heap_Region_Size)
-          and then (Physical_Address + Length) > Region.Heap_Region_Phys_Addr))
-   with Pure_Function;
+         Do_Memory_Regions_Overlap
+           (Address (Region.Heap_Region_Phys_Addr),
+            Region.Heap_Region_Size,
+            Address (Physical_Address),
+            Length))
+   with Inline, Pure_Function;
 
    procedure Align_Address_Downwards
      (Virtual_Addr     : in out Virtual_Address_T;

@@ -163,4 +163,13 @@ is
    procedure Set (Dest : Address; Value : Integer; Size : Integer)
    with Import, Convention => C, External_Name => "memset";
 
+   function Do_Memory_Regions_Overlap
+     (Region1_Start  : Address;
+      Region1_Length : Storage_Offset;
+      Region2_Start  : Address;
+      Region2_Length : Storage_Offset) return Boolean
+   is ((Region1_Start < Region2_Start + Region2_Length)
+       and then (Region2_Start < Region1_Start + Region1_Length))
+   with Pure_Function;
+
 end Memory;

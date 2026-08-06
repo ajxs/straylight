@@ -106,6 +106,14 @@ private
 
    function Get_List_Tail return Block_Index;
 
+   procedure Check_For_Intersecting_Blocks
+     (Region_Start  : Physical_Address_T;
+      Region_Length : Positive;
+      Result        : out Function_Result);
+
+   function Get_Block_Size_In_Bytes (Order : Block_Order) return Natural
+   with Inline, Pure_Function;
+
    --  Checks if the specified region intersects with the given block.
    --  This is used to determine if a block can be allocated for a requested
    --  region of memory.
@@ -113,14 +121,11 @@ private
      (Start  : Physical_Address_T;
       Length : Positive;
       Block  : Physical_Memory_Block_T) return Boolean
-   with Pure_Function;
-
-   procedure Check_For_Intersecting_Blocks
-     (Region_Start  : Physical_Address_T;
-      Region_Length : Positive;
-      Result        : out Function_Result);
-
-   function Get_Block_Size_In_Bytes (Order : Block_Order) return Natural
+   is (Do_Memory_Regions_Overlap
+         (Address (Start),
+          Storage_Offset (Length),
+          Address (Block.Address),
+          Storage_Offset (Get_Block_Size_In_Bytes (Block.Order))))
    with Inline, Pure_Function;
 
    procedure Divide_Physical_Memory_Block

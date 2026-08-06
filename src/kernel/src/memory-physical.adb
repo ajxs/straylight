@@ -612,40 +612,6 @@ package body Memory.Physical is
       Result := Invalid_Physical_Memory_Size;
    end Get_Smallest_Possible_Block_Order;
 
-   function Is_Region_Intersecting
-     (Start  : Physical_Address_T;
-      Length : Positive;
-      Block  : Physical_Memory_Block_T) return Boolean
-   is
-      Maximum_Start : Address := Null_Address;
-      Minimum_End   : Address := Null_Address;
-   begin
-      Test_Region_End : constant Address :=
-        Address (Start) + Storage_Offset (Length);
-
-      Block_End : constant Address :=
-        Address (Block.Address)
-        + Storage_Offset (Get_Block_Size_In_Bytes (Block.Order));
-
-      if Block.Address > Start then
-         Maximum_Start := Address (Block.Address);
-      else
-         Maximum_Start := Address (Start);
-      end if;
-
-      if Block_End < Test_Region_End then
-         Minimum_End := Block_End;
-      else
-         Minimum_End := Test_Region_End;
-      end if;
-
-      if Minimum_End > Maximum_Start then
-         return True;
-      end if;
-
-      return False;
-   end Is_Region_Intersecting;
-
    procedure Reallocate_Unlocked
      (Addr     : in out Physical_Address_T;
       New_Size : Positive;
