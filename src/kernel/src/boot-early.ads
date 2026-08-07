@@ -46,7 +46,7 @@ private
    function Get_Largest_Page_Size_For_Remaining_Region
      (Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
-      Remaining_Size   : Storage_Offset) return RISCV_Page_Size_T
+      Remaining_Size   : Storage_Count) return RISCV_Page_Size_T
    with Pure_Function, Linker_Section => ".boot_text";
 
    procedure Map_Boot_Memory_Section
@@ -105,7 +105,7 @@ private
    --  Therefore this map is redefined here.
    ----------------------------------------------------------------------------
    Early_Page_Size_In_Bytes :
-     constant array (RISCV_Page_Size_T) of Storage_Offset :=
+     constant array (RISCV_Page_Size_T) of Storage_Count :=
        [Small => Small_Page_Size,
         Large => Large_Page_Size,
         Huge  => Huge_Page_Size]

@@ -172,7 +172,7 @@ package body Boot.Early is
    function Get_Largest_Page_Size_For_Remaining_Region
      (Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
-      Remaining_Size   : Storage_Offset) return RISCV_Page_Size_T is
+      Remaining_Size   : Storage_Count) return RISCV_Page_Size_T is
    begin
       --  Ensure the virtual and physical addresses are properly page aligned.
       --  Section 4.4.1 of the privileged spec specifies that 'megapages',
@@ -258,7 +258,7 @@ package body Boot.Early is
       Kernel_Boot_Stacks_Base_Virtual_Address : constant Address :=
         To_Address (16#FFFF_FFFF_FF00_0000#);
 
-      Boot_Stacks_Size : Storage_Offset := 0;
+      Boot_Stacks_Size : Storage_Count := 0;
 
       Result : Function_Result := Unset;
    begin
@@ -491,7 +491,7 @@ package body Boot.Early is
       Curr_Addr_Phys : Physical_Address_T := Base_Physical_Address;
 
       Next_Region_Size          : RISCV_Page_Size_T := Huge;
-      Next_Region_Size_In_Bytes : Storage_Offset := 0;
+      Next_Region_Size_In_Bytes : Storage_Count := 0;
    begin
       while Curr_Addr_Virt < Virtual_Address_End loop
          Next_Region_Size :=
