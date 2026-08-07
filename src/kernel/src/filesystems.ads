@@ -334,10 +334,6 @@ private
 
    function Get_Sectors_Per_Block (Sector_Size : Natural) return Natural;
 
-   function Get_Sector_Offset_Within_Block
-     (Sector_Number : Sector_Index_T; Sector_Size : Natural)
-      return Storage_Offset;
-
    procedure Find_Unused_File_Handle_Entry
      (File_Handle_Array : in out Process_File_Handle_Array;
       File_Handle_Index : out Positive;
@@ -363,7 +359,7 @@ private
      (Sector_Number              : Sector_Index_T;
       Sector_Size                : Natural;
       Block_Number               : out Block_Index_T;
-      Sector_Offset_Within_Block : out Storage_Offset;
+      Sector_Offset_Within_Block : out Storage_Count;
       Result                     : out Function_Result);
 
 end Filesystems;

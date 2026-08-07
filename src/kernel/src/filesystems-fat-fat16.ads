@@ -66,7 +66,7 @@ private
       FAT_Index                  : Natural;
       Cluster                    : Unsigned_16;
       Block_Number               : out Unsigned_64;
-      Sector_Offset_Within_Block : out Storage_Offset;
+      Sector_Offset_Within_Block : out Storage_Count;
       Result                     : out Function_Result);
 
    procedure Get_FAT16_Table_Entry_Sector_Number

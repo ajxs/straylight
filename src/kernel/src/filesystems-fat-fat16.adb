@@ -143,7 +143,7 @@ package body Filesystems.FAT.FAT16 is
    is
       Current_Sector             : Sector_Index_T := 0;
       Block_Address              : Virtual_Address_T := Null_Address;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
       Current_Block              : Block_Index_T := 0;
 
       Current_Free_Entry_Count : Natural := 0;
@@ -250,7 +250,7 @@ package body Filesystems.FAT.FAT16 is
    is
       Current_Sector             : Sector_Index_T := 0;
       Block_Address              : Virtual_Address_T := Null_Address;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
       Current_Block              : Block_Index_T := 0;
 
       DOS_Entry_Sector          : Sector_Index_T := 0;
@@ -490,7 +490,7 @@ package body Filesystems.FAT.FAT16 is
       DOS_Entry_Index_In_Sector : Natural := 0;
 
       Block_Address              : Virtual_Address_T := Null_Address;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
       Current_Block              : Block_Index_T := 0;
 
       First_Free_Entry_Index : Natural := 0;
@@ -956,7 +956,7 @@ package body Filesystems.FAT.FAT16 is
       Next_Cluster_In_Chain : Unsigned_16 := 0;
 
       Block_Address              : Virtual_Address_T := Null_Address;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
       Current_Block              : Block_Index_T := 0;
 
       Search_Result      : Function_Result := Unset;
@@ -1105,7 +1105,7 @@ package body Filesystems.FAT.FAT16 is
       Block_Address              : Virtual_Address_T := Null_Address;
       Current_Sector             : Sector_Index_T := 0;
       Current_Block              : Block_Index_T := 0;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
    begin
       Last_Sector : constant Sector_Index_T :=
         Filesystem_Info.FAT12_16_Root_Directory_Sector
@@ -1206,7 +1206,7 @@ package body Filesystems.FAT.FAT16 is
       FAT_Index                  : Natural;
       Cluster                    : Unsigned_16;
       Block_Number               : out Unsigned_64;
-      Sector_Offset_Within_Block : out Storage_Offset;
+      Sector_Offset_Within_Block : out Storage_Count;
       Result                     : out Function_Result)
    is
       Sector_Number : Sector_Index_T := 0;
@@ -1270,7 +1270,7 @@ package body Filesystems.FAT.FAT16 is
    is
       Block_Address              : Virtual_Address_T := Null_Address;
       Block_Number               : Block_Index_T := 0;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
    begin
       --  Uses the primary FAT table (index 0) to read the FAT entry,
       --  since all FAT tables should be identical.
@@ -1331,7 +1331,7 @@ package body Filesystems.FAT.FAT16 is
    is
       Block_Address              : Virtual_Address_T := Null_Address;
       Block_Number               : Block_Index_T := 0;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
    begin
       Number_Of_Entries_Within_Sector : constant Natural :=
         Natural (Filesystem_Info.Bytes_Per_Sector / 2);
@@ -1386,7 +1386,7 @@ package body Filesystems.FAT.FAT16 is
       Result          : out Function_Result)
    is
       Block_Address              : Virtual_Address_T := Null_Address;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
       Current_Block              : Block_Index_T := 0;
       Found_Free_Cluster         : Boolean := False;
    begin

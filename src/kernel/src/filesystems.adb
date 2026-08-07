@@ -582,20 +582,6 @@ package body Filesystems is
          return 0;
    end Get_Sectors_Per_Block;
 
-   function Get_Sector_Offset_Within_Block
-     (Sector_Number : Sector_Index_T; Sector_Size : Natural)
-      return Storage_Offset is
-   begin
-      return
-        Storage_Offset
-          ((Integer (Sector_Number) mod Get_Sectors_Per_Block (Sector_Size))
-           * Sector_Size);
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Sector_Offset_Within_Block");
-         return 0;
-   end Get_Sector_Offset_Within_Block;
-
    procedure Initialise_Block_Cache is
       Result            : Function_Result := Unset;
       Allocation_Result : Memory_Allocation_Result;
@@ -1044,14 +1030,14 @@ package body Filesystems is
      (Sector_Number              : Sector_Index_T;
       Sector_Size                : Natural;
       Block_Number               : out Block_Index_T;
-      Sector_Offset_Within_Block : out Storage_Offset;
+      Sector_Offset_Within_Block : out Storage_Count;
       Result                     : out Function_Result) is
    begin
       Block_Number :=
         Block_Index_T ((Natural (Sector_Number) * Sector_Size) / Block_Size);
 
       Sector_Offset_Within_Block :=
-        Storage_Offset
+        Storage_Count
           ((Integer (Sector_Number) mod Get_Sectors_Per_Block (Sector_Size))
            * Sector_Size);
 

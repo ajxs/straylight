@@ -19,7 +19,7 @@ package body Filesystems.UStar is
 
       Block_Number               : Block_Index_T := 0;
       Block_Address              : Virtual_Address_T := Null_Address;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
 
       File_Sector_Size : Unsigned_64 := 0;
    begin
@@ -242,7 +242,7 @@ package body Filesystems.UStar is
       Sector_Number              : Sector_Index_T := 0;
       Block_Address              : Virtual_Address_T := Null_Address;
       Block_Number               : Block_Index_T := 0;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
 
       Current_Offset     : Unsigned_64 := Start_Offset;
       Bytes_Left_To_Read : Natural := 0;
@@ -294,9 +294,9 @@ package body Filesystems.UStar is
             return;
          end if;
 
-         Offset_Within_Block : constant Storage_Offset :=
+         Offset_Within_Block : constant Storage_Count :=
            Sector_Offset_Within_Block
-           + Storage_Offset
+           + Storage_Count
                (Current_Offset mod Unsigned_64 (Ustar_Sector_Size));
 
          --  Truncate the number of bytes to copy within the current block
@@ -306,7 +306,7 @@ package body Filesystems.UStar is
              (Bytes_Left_To_Read, Block_Size - Natural (Offset_Within_Block));
 
          Copy
-           (Buffer_Address + Storage_Offset (Bytes_Read),
+           (Buffer_Address + Storage_Count (Bytes_Read),
             Block_Address + Offset_Within_Block,
             Bytes_To_Copy_From_Block);
 
