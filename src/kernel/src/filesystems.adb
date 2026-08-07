@@ -14,29 +14,6 @@ with Memory.Kernel;          use Memory.Kernel;
 with Hart_State;             use Hart_State;
 
 package body Filesystems is
-   function Compare_Node_Name_With_Wide_String
-     (Name1 : Wide_String; Name1_Length : Integer; Name2 : Wide_String)
-      return Boolean is
-   begin
-      if Name1_Length /= Name2'Length then
-         return False;
-      end if;
-
-      for Index in Name2'Range loop
-         if Name1 (Index) /= Name2 (Index) then
-            return False;
-         end if;
-      end loop;
-
-      return True;
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Compare_Node_Name_With_Wide_String",
-            Logging_Tags);
-         return False;
-   end Compare_Node_Name_With_Wide_String;
-
    procedure Find_Unused_File_Handle_Entry
      (File_Handle_Array : in out Process_File_Handle_Array;
       File_Handle_Index : out Positive;
@@ -82,22 +59,6 @@ package body Filesystems is
          Log_Error ("Constraint_Error: Get_Next_Path_Component", Logging_Tags);
    end Get_Next_Path_Component;
 
-   function Can_Filesystem_Node_Contain_Child_Nodes
-     (Node : Filesystem_Node_Access) return Boolean is
-   begin
-      return
-        Node /= null
-        and then
-          (Node.all.Node_Type = Filesystem_Node_Type_Directory
-           or else
-             Node.all.Node_Type = Filesystem_Node_Type_Mounted_Filesystem);
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Can_Filesystem_Node_Contain_Child_Nodes");
-         return False;
-   end Can_Filesystem_Node_Contain_Child_Nodes;
-
    procedure Find_File
      (Process         : in out Process_Control_Block_T;
       Path            : Filesystem_Path_T;
@@ -140,7 +101,7 @@ package body Filesystems is
          if Filesystem_Node_Parent /= null then
             --  Ensure we can traverse the parent node.
             if not Can_Filesystem_Node_Contain_Child_Nodes
-                     (Filesystem_Node_Parent)
+                     (Filesystem_Node_Parent.all)
             then
                Log_Debug ("Unable to traverse node.", Logging_Tags);
                Filesystem_Node := null;
@@ -401,20 +362,16 @@ package body Filesystems is
       Buffer_Address : Virtual_Address_T;
       Bytes_To_Read  : Natural;
       Bytes_Read     : out Natural;
-      Result         : out Function_Result)
-   is
-      Real_Bytes_To_Read      : Natural := 0;
-      Remaining_Bytes_In_File : Natural := 0;
+      Result         : out Function_Result) is
    begin
-      Remaining_Bytes_In_File :=
+      Remaining_Bytes_In_File : constant Natural :=
         Natural
           (File_Handle.all.File.all.File_Size - File_Handle.all.Position);
 
-      if Bytes_To_Read > Remaining_Bytes_In_File then
-         Real_Bytes_To_Read := Remaining_Bytes_In_File;
-      else
-         Real_Bytes_To_Read := Bytes_To_Read;
-      end if;
+      Real_Bytes_To_Read : constant Natural :=
+        (if Bytes_To_Read > Remaining_Bytes_In_File
+         then Remaining_Bytes_In_File
+         else Bytes_To_Read);
 
       if Real_Bytes_To_Read = 0 then
          Log_Debug ("Filesystems.Read_File: No bytes to read.", Logging_Tags);
@@ -933,22 +890,11 @@ package body Filesystems is
       end if;
 
       --  Truncate the read if it would exceed the file size.
-      if Start_Offset + Unsigned_64 (Bytes_To_Read)
-        > Filesystem_Node.all.File_Size
-      then
-         Actual_Bytes_To_Read :=
-           Natural (Filesystem_Node.all.File_Size - Start_Offset);
-
-         Log_Debug
-           ("Truncating read from "
-            & Bytes_To_Read'Image
-            & " to "
-            & Actual_Bytes_To_Read'Image
-            & " bytes to stay within file size",
-            Logging_Tags);
-      else
-         Actual_Bytes_To_Read := Bytes_To_Read;
-      end if;
+      Actual_Bytes_To_Read :=
+        (if Start_Offset + Unsigned_64 (Bytes_To_Read)
+           > Filesystem_Node.all.File_Size
+         then Natural (Filesystem_Node.all.File_Size - Start_Offset)
+         else Bytes_To_Read);
 
       Result := Success;
    exception
@@ -1041,7 +987,12 @@ package body Filesystems is
 
       --  Test whether the parent node is one that can actually contain
       --  child nodes (i.e. is a directory or mounted filesystem).
-      if not Can_Filesystem_Node_Contain_Child_Nodes (Parent_File_Node) then
+      --  Note that the parent file node pointer should never be null. This
+      --  check is simply there for additional safety.
+      if Parent_File_Node = null
+        or else
+          not Can_Filesystem_Node_Contain_Child_Nodes (Parent_File_Node.all)
+      then
          Log_Debug
            ("Filesystems.Create_File: Node cannot contain child nodes: '"
             & Parent_File_Path

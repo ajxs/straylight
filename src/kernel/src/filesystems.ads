@@ -291,10 +291,6 @@ private
       File_Handle     : out Process_File_Handle_Access;
       Result          : out Function_Result);
 
-   function Compare_Node_Name_With_Wide_String
-     (Name1 : Wide_String; Name1_Length : Integer; Name2 : Wide_String)
-      return Boolean;
-
    function Does_Node_Name_Match_Path_Name
      (Node_Name        : Filesystem_Node_Name_T;
       Path             : Filesystem_Path_T;
@@ -314,7 +310,9 @@ private
        and then Node.all.Node_Type = Filesystem_Node_Type_Mounted_Filesystem);
 
    function Can_Filesystem_Node_Contain_Child_Nodes
-     (Node : Filesystem_Node_Access) return Boolean;
+     (Node : Filesystem_Node_T) return Boolean
+   is (Node.Node_Type = Filesystem_Node_Type_Directory
+       or else Node.Node_Type = Filesystem_Node_Type_Mounted_Filesystem);
 
    procedure Find_File
      (Process         : in out Process_Control_Block_T;
