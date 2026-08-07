@@ -18,11 +18,11 @@ package body Devices.Virtio.Graphics is
 
       Resource_Allocation : Memory_Allocation_Result;
    begin
-      Request_Size_Attach_Backing : constant Natural :=
+      Request_Size_Attach_Backing : constant Storage_Count :=
         Request_Resource_Attach_Backing'Size / 8;
-      Request_Size_Mem_Entry : constant Natural :=
+      Request_Size_Mem_Entry : constant Storage_Count :=
         Virtio_Gpu_Mem_Entry'Size / 8;
-      Response_Size : constant Natural := Virtio_Gpu_Ctrl_Hdr'Size / 8;
+      Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
       Log_Debug
         ("Attaching framebuffer to Virtio Graphics Resource",
@@ -34,7 +34,10 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Request_Size_Attach_Backing + Request_Size_Mem_Entry + Response_Size,
+        (Positive
+           (Request_Size_Attach_Backing
+            + Request_Size_Mem_Entry
+            + Response_Size),
          Resource_Allocation,
          Result);
       if Is_Error (Result) then
@@ -52,8 +55,7 @@ package body Devices.Virtio.Graphics is
          with
            Import,
            Address   =>
-             Resource_Allocation.Virtual_Address
-             + Storage_Offset (Request_Size_Attach_Backing),
+             Resource_Allocation.Virtual_Address + Request_Size_Attach_Backing,
            Alignment => 1;
       begin
          Request_Data :=
@@ -97,7 +99,7 @@ package body Devices.Virtio.Graphics is
          Descriptors (Descriptor_Indexes (1)) :=
            (Address =>
               Resource_Allocation.Physical_Address
-              + Storage_Offset (Request_Size_Attach_Backing),
+              + Request_Size_Attach_Backing,
             Length  => Unsigned_32 (Request_Size_Mem_Entry),
             Flags   => VIRTQ_DESC_F_NEXT,
             Next    => Descriptor_Indexes (2));
@@ -105,8 +107,8 @@ package body Devices.Virtio.Graphics is
          Descriptors (Descriptor_Indexes (2)) :=
            (Address =>
               Resource_Allocation.Physical_Address
-              + Storage_Offset (Request_Size_Attach_Backing)
-              + Storage_Offset (Request_Size_Mem_Entry),
+              + Request_Size_Attach_Backing
+              + Request_Size_Mem_Entry,
             Length  => Unsigned_32 (Response_Size),
             Flags   => VIRTQ_DESC_F_WRITE,
             Next    => 0);
@@ -140,8 +142,8 @@ package body Devices.Virtio.Graphics is
            Import,
            Address   =>
              Resource_Allocation.Virtual_Address
-             + Storage_Offset (Request_Size_Attach_Backing)
-             + Storage_Offset (Request_Size_Mem_Entry),
+             + Request_Size_Attach_Backing
+             + Request_Size_Mem_Entry,
            Alignment => 1;
       begin
          if Response_Data.Ctrl_Type /= Resp_Ok_NoData then
@@ -202,9 +204,8 @@ package body Devices.Virtio.Graphics is
 
       Resource_Allocation : Memory_Allocation_Result;
    begin
-      Request_Size : constant Natural := Virtio_Gpu_Ctrl_Hdr'Size / 8;
-      Response_Size : constant Natural :=
-        Virtio_Gpu_Resp_Display_Info'Size / 8;
+      Request_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
+      Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
       Log_Debug
         ("Getting display info from Virtio Graphics Device",
@@ -216,7 +217,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Request_Size + Response_Size, Resource_Allocation, Result);
+        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -257,9 +258,7 @@ package body Devices.Virtio.Graphics is
             Next    => Descriptor_Indexes (1));
 
          Descriptors (Descriptor_Indexes (1)) :=
-           (Address =>
-              Resource_Allocation.Physical_Address
-              + Storage_Offset (Request_Size),
+           (Address => Resource_Allocation.Physical_Address + Request_Size,
             Length  => Unsigned_32 (Response_Size),
             Flags   => VIRTQ_DESC_F_WRITE,
             Next    => 0);
@@ -291,9 +290,7 @@ package body Devices.Virtio.Graphics is
          Response_Data : Virtio_Gpu_Resp_Display_Info
          with
            Import,
-           Address   =>
-             Resource_Allocation.Virtual_Address
-             + Storage_Offset (Request_Size),
+           Address   => Resource_Allocation.Virtual_Address + Request_Size,
            Alignment => 1;
       begin
          for I in Response_Data.Pmodes'Range loop
@@ -355,8 +352,9 @@ package body Devices.Virtio.Graphics is
 
       Resource_Allocation : Memory_Allocation_Result;
    begin
-      Request_Size : constant Natural := Request_Resource_Create_2D'Size / 8;
-      Response_Size : constant Natural := Virtio_Gpu_Ctrl_Hdr'Size / 8;
+      Request_Size : constant Storage_Count :=
+        Request_Resource_Create_2D'Size / 8;
+      Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
       Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
@@ -364,7 +362,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Request_Size + Response_Size, Resource_Allocation, Result);
+        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -410,9 +408,7 @@ package body Devices.Virtio.Graphics is
             Next    => Descriptor_Indexes (1));
 
          Descriptors (Descriptor_Indexes (1)) :=
-           (Address =>
-              Resource_Allocation.Physical_Address
-              + Storage_Offset (Request_Size),
+           (Address => Resource_Allocation.Physical_Address + Request_Size,
             Length  => Unsigned_32 (Response_Size),
             Flags   => VIRTQ_DESC_F_WRITE,
             Next    => 0);
@@ -444,9 +440,7 @@ package body Devices.Virtio.Graphics is
          Response_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
-           Address   =>
-             Resource_Allocation.Virtual_Address
-             + Storage_Offset (Request_Size),
+           Address   => Resource_Allocation.Virtual_Address + Request_Size,
            Alignment => 1;
       begin
          if Response_Data.Ctrl_Type /= Resp_Ok_NoData then
@@ -505,8 +499,8 @@ package body Devices.Virtio.Graphics is
 
       Resource_Allocation : Memory_Allocation_Result;
    begin
-      Request_Size : constant Natural := Request_Set_Scanout'Size / 8;
-      Response_Size : constant Natural := Virtio_Gpu_Ctrl_Hdr'Size / 8;
+      Request_Size : constant Storage_Count := Request_Set_Scanout'Size / 8;
+      Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
       Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
@@ -514,7 +508,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Request_Size + Response_Size, Resource_Allocation, Result);
+        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -559,9 +553,7 @@ package body Devices.Virtio.Graphics is
             Next    => Descriptor_Indexes (1));
 
          Descriptors (Descriptor_Indexes (1)) :=
-           (Address =>
-              Resource_Allocation.Physical_Address
-              + Storage_Offset (Request_Size),
+           (Address => Resource_Allocation.Physical_Address + Request_Size,
             Length  => Unsigned_32 (Response_Size),
             Flags   => VIRTQ_DESC_F_WRITE,
             Next    => 0);
@@ -593,9 +585,7 @@ package body Devices.Virtio.Graphics is
          Response_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
-           Address   =>
-             Resource_Allocation.Virtual_Address
-             + Storage_Offset (Request_Size),
+           Address   => Resource_Allocation.Virtual_Address + Request_Size,
            Alignment => 1;
       begin
          if Response_Data.Ctrl_Type /= Resp_Ok_NoData then
@@ -664,8 +654,9 @@ package body Devices.Virtio.Graphics is
 
       Resource_Allocation : Memory_Allocation_Result;
    begin
-      Request_Size : constant Natural := Request_Transfer_To_Host_2D'Size / 8;
-      Response_Size : constant Natural := Virtio_Gpu_Ctrl_Hdr'Size / 8;
+      Request_Size : constant Storage_Count :=
+        Request_Transfer_To_Host_2D'Size / 8;
+      Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
       Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
@@ -673,7 +664,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Request_Size + Response_Size, Resource_Allocation, Result);
+        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -727,9 +718,7 @@ package body Devices.Virtio.Graphics is
             Next    => Descriptor_Indexes (1));
 
          Descriptors (Descriptor_Indexes (1)) :=
-           (Address =>
-              Resource_Allocation.Physical_Address
-              + Storage_Offset (Request_Size),
+           (Address => Resource_Allocation.Physical_Address + Request_Size,
             Length  => Unsigned_32 (Response_Size),
             Flags   => VIRTQ_DESC_F_WRITE,
             Next    => 0);
@@ -761,9 +750,7 @@ package body Devices.Virtio.Graphics is
          Response_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
-           Address   =>
-             Resource_Allocation.Virtual_Address
-             + Storage_Offset (Request_Size),
+           Address   => Resource_Allocation.Virtual_Address + Request_Size,
            Alignment => 1;
       begin
          if Response_Data.Ctrl_Type /= Resp_Ok_NoData then
@@ -827,8 +814,8 @@ package body Devices.Virtio.Graphics is
 
       Resource_Allocation : Memory_Allocation_Result;
    begin
-      Request_Size : constant Natural := Request_Resource_Flush'Size / 8;
-      Response_Size : constant Natural := Virtio_Gpu_Ctrl_Hdr'Size / 8;
+      Request_Size : constant Storage_Count := Request_Resource_Flush'Size / 8;
+      Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
       Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
@@ -836,7 +823,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Request_Size + Response_Size, Resource_Allocation, Result);
+        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -881,9 +868,7 @@ package body Devices.Virtio.Graphics is
             Next    => Descriptor_Indexes (1));
 
          Descriptors (Descriptor_Indexes (1)) :=
-           (Address =>
-              Resource_Allocation.Physical_Address
-              + Storage_Offset (Request_Size),
+           (Address => Resource_Allocation.Physical_Address + Request_Size,
             Length  => Unsigned_32 (Response_Size),
             Flags   => VIRTQ_DESC_F_WRITE,
             Next    => 0);
@@ -915,9 +900,7 @@ package body Devices.Virtio.Graphics is
          Response_Data : Virtio_Gpu_Ctrl_Hdr
          with
            Import,
-           Address   =>
-             Resource_Allocation.Virtual_Address
-             + Storage_Offset (Request_Size),
+           Address   => Resource_Allocation.Virtual_Address + Request_Size,
            Alignment => 1;
       begin
          if Response_Data.Ctrl_Type /= Resp_Ok_NoData then
