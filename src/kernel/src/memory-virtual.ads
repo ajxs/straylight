@@ -10,7 +10,6 @@ with Logging;          use Logging;
 package Memory.Virtual
   with Preelaborate
 is
-
    ----------------------------------------------------------------------------
    --  Initialise the kernel's virtual address space.
    --  This initialises all kernel memory by mapping all of the kernel
@@ -22,9 +21,9 @@ is
    --  references the private kernel memory space.
    function Get_Kernel_Address_Space_SATP return Unsigned_64;
 
-   Maximum_Virtual_Memory_Mapping_Entries : constant := 128;
+   Maximum_Virtual_Memory_Mapping_Entries : constant := 64;
 
-   subtype Memory_Region_Size is Storage_Offset;
+   subtype Memory_Region_Size is Storage_Count;
 
    type Memory_Region_Flags_T is record
       Read    : Boolean;
