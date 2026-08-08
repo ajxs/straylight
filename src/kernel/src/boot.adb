@@ -513,7 +513,7 @@ package body Boot is
          Hart_Id                                    => Hart_Index_T (Hart_Id),
          Interrupts_Off_Counter                     => 0,
          Interrupts_Enabled_Before_Initial_Push_Off => False,
-         Hart_Status                                => Hart_State_Initialised,
+         Hart_Status                                => Hart_Status_Initialised,
          Previous_Process                           => null);
 
       Save_Hart_State_Pointer (Hart_States (Hart_Id)'Address);

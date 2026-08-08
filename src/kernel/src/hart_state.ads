@@ -14,7 +14,7 @@ is
 
    type Hart_Status_T is
      (Hart_Status_Unknown,
-      Hart_State_Initialised,
+      Hart_Status_Initialised,
       Hart_Status_Stopped,
       Hart_Status_Running,
       Hart_Status_Invalid);
