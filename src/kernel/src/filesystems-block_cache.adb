@@ -127,16 +127,15 @@ package body Filesystems.Block_Cache is
       Cache_Index           : Positive;
       Data_Address_Virtual  : out Virtual_Address_T;
       Data_Address_Physical : out Physical_Address_T;
-      Result                : out Function_Result)
-   is
-      Cache_Entry_Offset : Storage_Offset := 0;
+      Result                : out Function_Result) is
    begin
       if Cache_Index > Cache.Entries'Last then
          Result := Invalid_Argument;
          return;
       end if;
 
-      Cache_Entry_Offset := Storage_Offset (Block_Size * (Cache_Index - 1));
+      Cache_Entry_Offset : constant Storage_Offset :=
+        Storage_Offset (Block_Size * (Cache_Index - 1));
 
       Data_Address_Virtual := Cache.Data_Address_Virtual + Cache_Entry_Offset;
       Data_Address_Physical :=

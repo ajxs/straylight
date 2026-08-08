@@ -63,7 +63,7 @@ package body Devicetree is
 
    procedure Parse_Reserved_Memory_Regions
      (Reserved_Mem_Map_Address : Address;
-      Total_Size               : Storage_Offset;
+      Total_Size               : Storage_Count;
       Result                   : out Function_Result)
    is
       Curr_Offset : Storage_Offset := 0;
@@ -115,7 +115,7 @@ package body Devicetree is
 
    procedure Read_Node_Name_String
      (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Offset;
+      Structure_Block_Size    : Storage_Count;
       Curr_Offset             : in out Storage_Offset;
       Node_Name               : in out Devicetree_String_T;
       Result                  : out Function_Result) is
@@ -157,8 +157,8 @@ package body Devicetree is
 
    procedure Read_Property_Name_String
      (String_Table_Address : Address;
-      String_Table_Size    : Storage_Offset;
-      String_Table_Offset  : Storage_Offset;
+      String_Table_Size    : Storage_Count;
+      String_Table_Offset  : Storage_Count;
       Property_Name        : out Devicetree_String_T;
       Result               : out Function_Result) is
    begin
@@ -217,8 +217,8 @@ package body Devicetree is
       Header : constant FDT_Header_T
       with Import, Address => DTB_Address, Alignment => 1;
    begin
-      Total_Size : constant Storage_Offset :=
-        Storage_Offset (Convert_BEU32_To_LEU32 (Header.Totalsize));
+      Total_Size : constant Storage_Count :=
+        Storage_Count (Convert_BEU32_To_LEU32 (Header.Totalsize));
 
       Log_Debug
         ("Devicetree Header:"
@@ -275,9 +275,9 @@ package body Devicetree is
 
       Parse_Structure_Block
         (Structure_Block_Address,
-         Storage_Offset (Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)),
+         Storage_Count (Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)),
          String_Table_Address,
-         Storage_Offset (Convert_BEU32_To_LEU32 (Header.Size_DT_Strings)),
+         Storage_Count (Convert_BEU32_To_LEU32 (Header.Size_DT_Strings)),
          Result);
       if Is_Error (Result) then
          return;
@@ -294,9 +294,9 @@ package body Devicetree is
 
    procedure Parse_Property
      (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Offset;
+      Structure_Block_Size    : Storage_Count;
       String_Table_Address    : Address;
-      String_Table_Size       : Storage_Offset;
+      String_Table_Size       : Storage_Count;
       Property_Name           : out Devicetree_String_T;
       Property_Length         : out Unsigned_32;
       Property_Address        : out Address;
@@ -345,7 +345,7 @@ package body Devicetree is
 
    procedure Get_Next_Token
      (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Offset;
+      Structure_Block_Size    : Storage_Count;
       Curr_Offset             : in out Storage_Offset;
       Token_Value             : out Unsigned_32;
       Result                  : out Function_Result)
@@ -376,9 +376,9 @@ package body Devicetree is
 
    procedure Parse_Structure_Block
      (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Offset;
+      Structure_Block_Size    : Storage_Count;
       String_Table_Address    : Address;
-      String_Table_Size       : Storage_Offset;
+      String_Table_Size       : Storage_Count;
       Result                  : out Function_Result)
    is
       Curr_Offset : Storage_Offset := 0;

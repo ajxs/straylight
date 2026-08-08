@@ -54,16 +54,16 @@ private
 
    procedure Parse_Structure_Block
      (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Offset;
+      Structure_Block_Size    : Storage_Count;
       String_Table_Address    : Address;
-      String_Table_Size       : Storage_Offset;
+      String_Table_Size       : Storage_Count;
       Result                  : out Function_Result);
 
    procedure Parse_Property
      (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Offset;
+      Structure_Block_Size    : Storage_Count;
       String_Table_Address    : Address;
-      String_Table_Size       : Storage_Offset;
+      String_Table_Size       : Storage_Count;
       Property_Name           : out Devicetree_String_T;
       Property_Length         : out Unsigned_32;
       Property_Address        : out Address;

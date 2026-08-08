@@ -1117,7 +1117,7 @@ package body Filesystems.FAT is
    is
       Block_Address              : Virtual_Address_T := Null_Address;
       Block_Number               : Block_Index_T := 0;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
 
       Directory_Entry_Sector              : Sector_Index_T := 0;
       Directory_Entry_Index_Within_Sector : Natural := 0;
@@ -1184,7 +1184,7 @@ package body Filesystems.FAT is
    is
       Block_Address              : Virtual_Address_T := Null_Address;
       Block_Number               : Block_Index_T := 0;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
 
       Directory_Entry_Sector              : Sector_Index_T := 0;
       Directory_Entry_Index_Within_Sector : Natural := 0;
@@ -1252,7 +1252,7 @@ package body Filesystems.FAT is
       Current_Sector             : Sector_Index_T := 0;
       Block_Address              : Virtual_Address_T := Null_Address;
       Block_Number               : Block_Index_T := 0;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
 
       Current_Offset       : Unsigned_64 := Start_Offset;
       Actual_Bytes_To_Read : Natural := Bytes_To_Read;
@@ -1415,7 +1415,7 @@ package body Filesystems.FAT is
    is
       Current_Block              : Block_Index_T := 0;
       Block_Address              : Virtual_Address_T := Null_Address;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
    begin
       Allocate_Cluster
         (Filesystem, Writing_Process, Filesystem_Info, New_Cluster, Result);
@@ -1565,7 +1565,7 @@ package body Filesystems.FAT is
       Current_Sector             : Sector_Index_T := 0;
       Block_Address              : Virtual_Address_T := Null_Address;
       Block_Number               : Block_Index_T := 0;
-      Sector_Offset_Within_Block : Storage_Offset := 0;
+      Sector_Offset_Within_Block : Storage_Count := 0;
 
       Current_Offset : Unsigned_64 := Start_Offset;
    begin
