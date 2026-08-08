@@ -9,6 +9,7 @@ with System;     use System;
 with Hart_State; use Hart_State;
 with Locks;      use Locks;
 with Memory;     use Memory;
+with Processes;  use Processes;
 with RISCV;
 with RISCV.SBI;
 
@@ -77,12 +78,16 @@ package body Logging.Debug_Console is
 
    procedure Log_To_Debug_Console (Message : String; Level : Log_Level_T) is
       System_Time  : constant Unsigned_64 := RISCV.Get_System_Time;
-      Current_Hart : constant Hart_Index_T := Get_Current_Hart_Id;
+      Current_Hart : constant Hart_State_Access := Get_Current_Hart_State;
    begin
       Acquire_Spinlock (SBI_Logging_Buffer_Spinlock);
       Print_String_To_SBI_Console
         ("hart="
-         & Current_Hart'Image
+         & Current_Hart.all.Hart_Id'Image
+         & " process="
+         & (if Current_Hart.all.Current_Process = null
+            then "null"
+            else Current_Hart.all.Current_Process.all.Process_Id'Image)
          & " time="
          & System_Time'Image
          & " level="
