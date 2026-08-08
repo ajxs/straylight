@@ -15,18 +15,16 @@ is
    --  This is generally used for any kernel memory that needs DMA access
    --  by a device, like filesystem buffers.
    procedure Allocate_Kernel_Physical_Memory
-     (Size              : Positive;
+     (Size              : Storage_Count;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1);
+      Alignment         : Storage_Count := 1);
 
-   --  @TODO: Potentially this could be a front-end to both the heap and page
-   --  allocators, depending on the size/alignment requested.
    procedure Allocate_Kernel_Memory
-     (Size              : Positive;
+     (Size              : Storage_Count;
       Allocated_Address : out Virtual_Address_T;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1);
+      Alignment         : Storage_Count := 1);
 
    procedure Free_Kernel_Memory
      (Allocated_Virtual_Address : Virtual_Address_T;

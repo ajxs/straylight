@@ -34,10 +34,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Positive
-           (Request_Size_Attach_Backing
-            + Request_Size_Mem_Entry
-            + Response_Size),
+        (Request_Size_Attach_Backing + Request_Size_Mem_Entry + Response_Size,
          Resource_Allocation,
          Result);
       if Is_Error (Result) then
@@ -217,7 +214,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
+        (Request_Size + Response_Size, Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -362,7 +359,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
+        (Request_Size + Response_Size, Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -508,7 +505,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
+        (Request_Size + Response_Size, Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -664,7 +661,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
+        (Request_Size + Response_Size, Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -823,7 +820,7 @@ package body Devices.Virtio.Graphics is
       end if;
 
       Allocate_Kernel_Physical_Memory
-        (Positive (Request_Size + Response_Size), Resource_Allocation, Result);
+        (Request_Size + Response_Size, Resource_Allocation, Result);
       if Is_Error (Result) then
          return;
       end if;

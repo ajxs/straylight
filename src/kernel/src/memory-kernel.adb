@@ -13,7 +13,7 @@ package body Memory.Kernel is
    Kernel_Heap_Next_Region_Offset : Storage_Offset := 0;
 
    procedure Reserve_Virtual_Memory_Space_Unlocked
-     (New_Region_Size_In_Bytes : Positive;
+     (New_Region_Size_In_Bytes : Storage_Count;
       Start_Address            : Virtual_Address_T;
       Next_Region_Offset       : in out Storage_Offset;
       Region_Virtual_Address   : out Virtual_Address_T;
@@ -33,7 +33,7 @@ package body Memory.Kernel is
    end Reserve_Virtual_Memory_Space_Unlocked;
 
    procedure Reserve_Kernel_Page_Pool_Virtual_Address_Space
-     (New_Region_Size_In_Bytes : Positive;
+     (New_Region_Size_In_Bytes : Storage_Count;
       Region_Virtual_Address   : out Virtual_Address_T;
       Result                   : out Function_Result) is
    begin
@@ -49,7 +49,7 @@ package body Memory.Kernel is
 
    procedure Recover_Virtual_Memory_Space_Unlocked
      (Region_Virtual_Address         : Virtual_Address_T;
-      Recovered_Region_Size_In_Bytes : Positive;
+      Recovered_Region_Size_In_Bytes : Storage_Count;
       Start_Address                  : Virtual_Address_T;
       Next_Region_Offset             : in out Storage_Offset) is
    begin
@@ -76,7 +76,7 @@ package body Memory.Kernel is
 
    procedure Recover_Kernel_Page_Pool_Virtual_Address_Space
      (Region_Virtual_Address         : Virtual_Address_T;
-      Recovered_Region_Size_In_Bytes : Positive) is
+      Recovered_Region_Size_In_Bytes : Storage_Count) is
    begin
       Acquire_Spinlock (Kernel_Page_Pool.Spinlock);
       Recover_Virtual_Memory_Space_Unlocked
@@ -103,7 +103,7 @@ package body Memory.Kernel is
         constant array (Positive range <>) of Positive :=
           [Max_Page_Pool_Region_Size, 256, 64];
 
-      Region_Size_In_Bytes : Positive := 1;
+      Region_Size_In_Bytes : Storage_Count := 1;
 
       Free_Result : Function_Result := Unset;
    begin
@@ -120,11 +120,14 @@ package body Memory.Kernel is
       --  by the physical memory allocator.
       for Candidate_Page_Count of Growth_Region_Page_Counts loop
          if Candidate_Page_Count >= Minimum_Page_Count then
-            Region_Size_In_Bytes := Candidate_Page_Count * Page_Pool_Page_Size;
+            Region_Size_In_Bytes :=
+              Storage_Count (Candidate_Page_Count) * Page_Pool_Page_Size;
 
             --  Allocate the physical memory backing the new region.
             Allocate_Physical_Memory
-              (Region_Size_In_Bytes, Region_Physical_Address, Result);
+              (Positive (Region_Size_In_Bytes),
+               Region_Physical_Address,
+               Result);
             if Result = Success then
                --  Reserve the virtual address space for the new region.
                Reserve_Kernel_Page_Pool_Virtual_Address_Space
@@ -137,7 +140,7 @@ package body Memory.Kernel is
                Map_Kernel_Memory
                  (Region_Virtual_Address,
                   Region_Physical_Address,
-                  Storage_Offset (Region_Size_In_Bytes),
+                  Region_Size_In_Bytes,
                   (True, True, False, False),
                   Result);
                if Is_Error (Result) then
@@ -145,7 +148,8 @@ package body Memory.Kernel is
                end if;
 
                --  Zero the newly allocated page pool region.
-               Set (Region_Virtual_Address, 0, Region_Size_In_Bytes);
+               Set
+                 (Region_Virtual_Address, 0, Positive (Region_Size_In_Bytes));
 
                Region_Page_Count := Candidate_Page_Count;
 
@@ -250,7 +254,7 @@ package body Memory.Kernel is
    end Grow_Kernel_Page_Pool_And_Allocate;
 
    procedure Reserve_Kernel_Heap_Virtual_Address_Space
-     (New_Region_Size_In_Bytes : Positive;
+     (New_Region_Size_In_Bytes : Storage_Count;
       Region_Virtual_Address   : out Virtual_Address_T;
       Result                   : out Function_Result) is
    begin
@@ -266,7 +270,7 @@ package body Memory.Kernel is
 
    procedure Recover_Kernel_Heap_Virtual_Address_Space
      (Region_Virtual_Address         : Virtual_Address_T;
-      Recovered_Region_Size_In_Bytes : Positive) is
+      Recovered_Region_Size_In_Bytes : Storage_Count) is
    begin
       Acquire_Spinlock (Kernel_Heap.Spinlock);
       Recover_Virtual_Memory_Space_Unlocked
@@ -286,10 +290,10 @@ package body Memory.Kernel is
    --  sizes are attempted, provided they can still satisfy the allocation
    --  which triggered the growth.
    procedure Grow_Kernel_Heap_And_Allocate
-     (Allocation_Size   : Positive;
+     (Allocation_Size   : Storage_Count;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1)
+      Alignment         : Storage_Count := 1)
    is
       Growth_Region_Page_Counts :
         constant array (Positive range <>) of Positive :=
@@ -298,13 +302,16 @@ package body Memory.Kernel is
       Pages_Allocation_Result : Memory_Allocation_Result;
       Region_Virtual_Address  : Virtual_Address_T := Null_Address;
 
-      Region_Size_In_Bytes         : Positive := 1;
-      Minimum_Region_Size_In_Bytes : Storage_Offset := 1;
+      Region_Size_In_Bytes         : Storage_Count := 1;
+      Minimum_Region_Size_In_Bytes : Storage_Count := 1;
 
       Free_Result : Function_Result := Unset;
    begin
       Get_Minimum_Region_Size
-        (Allocation_Size, Alignment, Minimum_Region_Size_In_Bytes, Result);
+        (Positive (Allocation_Size),
+         Alignment,
+         Minimum_Region_Size_In_Bytes,
+         Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -321,7 +328,7 @@ package body Memory.Kernel is
            >= Minimum_Region_Size_In_Bytes
          then
             Region_Size_In_Bytes :=
-              Region_Page_Count * Kernel_Page_Pool_Page_Size;
+              Storage_Count (Region_Page_Count) * Kernel_Page_Pool_Page_Size;
 
             --  Allocate the physical memory backing the new region from the
             --  kernel page pool.
@@ -354,7 +361,7 @@ package body Memory.Kernel is
                   Region_Virtual_Address,
                   Pages_Allocation_Result.Physical_Address,
                   Storage_Offset (Region_Size_In_Bytes),
-                  Allocation_Size,
+                  Positive (Allocation_Size),
                   Allocation_Result,
                   Result,
                   Alignment);
@@ -402,10 +409,10 @@ package body Memory.Kernel is
    end Grow_Kernel_Heap_And_Allocate;
 
    procedure Allocate_Kernel_Memory
-     (Size              : Positive;
+     (Size              : Storage_Count;
       Allocated_Address : out Virtual_Address_T;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1)
+      Alignment         : Storage_Count := 1)
    is
       Allocation_Result : Memory_Allocation_Result;
    begin
@@ -419,12 +426,13 @@ package body Memory.Kernel is
    end Allocate_Kernel_Memory;
 
    procedure Allocate_Kernel_Physical_Memory
-     (Size              : Positive;
+     (Size              : Storage_Count;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1) is
+      Alignment         : Storage_Count := 1) is
    begin
-      Kernel_Heap.Allocate (Size, Allocation_Result, Result, Alignment);
+      Kernel_Heap.Allocate
+        (Positive (Size), Allocation_Result, Result, Alignment);
 
       --  If the allocation can't be fulfilled, attempt to grow the heap,
       --  then retry the allocation.
@@ -432,6 +440,10 @@ package body Memory.Kernel is
          Grow_Kernel_Heap_And_Allocate
            (Size, Allocation_Result, Result, Alignment);
       end if;
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint_Error: Allocate_Kernel_Physical_Memory");
+         Result := Constraint_Exception;
    end Allocate_Kernel_Physical_Memory;
 
    procedure Allocate_Pages
