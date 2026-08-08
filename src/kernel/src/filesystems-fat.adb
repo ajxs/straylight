@@ -1159,20 +1159,12 @@ package body Filesystems.FAT is
 
       Copy
         (Directory_Entry'Address,
-         Block_Address
-         + Sector_Offset_Within_Block
-         + Storage_Offset (Directory_Entry_Index_Within_Sector * 32),
+         Block_Address + Sector_Offset_Within_Block
+         + Storage_Offset (Directory_Entry_Index_Within_Sector) * 32,
          32);
 
       Release_Block (Filesystem, Block_Number, Result);
-
-      pragma Warnings (Off, "No_Exception_Propagation");
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Filesystem_Node_Directory_Entry");
-         Result := Constraint_Exception;
    end Get_Filesystem_Node_Directory_Entry;
-   pragma Warnings (On, "No_Exception_Propagation");
 
    procedure Write_Filesystem_Node_Directory_Entry
      (Filesystem              : Filesystem_Access;
@@ -1216,23 +1208,15 @@ package body Filesystems.FAT is
       end if;
 
       Copy
-        (Block_Address
-         + Sector_Offset_Within_Block
-         + Storage_Offset (Directory_Entry_Index_Within_Sector * 32),
+        (Block_Address + Sector_Offset_Within_Block
+         + Storage_Offset (Directory_Entry_Index_Within_Sector) * 32,
          Updated_Directory_Entry'Address,
          32);
 
       --  Result set by this call.
       Write_Block_To_Filesystem_And_Release
         (Filesystem, Calling_Process, Block_Number, Result);
-
-      pragma Warnings (Off, "No_Exception_Propagation");
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_Filesystem_Node_Directory_Entry");
-         Result := Constraint_Exception;
    end Write_Filesystem_Node_Directory_Entry;
-   pragma Warnings (On, "No_Exception_Propagation");
 
    procedure Read_File_Data
      (Filesystem      : Filesystem_Access;

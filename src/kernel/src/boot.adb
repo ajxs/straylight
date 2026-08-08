@@ -28,31 +28,17 @@ with Traps;
 with Utilities;            use Utilities;
 
 package body Boot is
-   --  An issue currently exists here with phantom Constraint_Error warnings.
-   --  To work around this, we disable warnings for these functions.
-   pragma Warnings (Off, "Constraint_Error");
    function Get_Boot_Secondary_Stack_Virtual_Address
      (Hart_Id : Integer) return Virtual_Address_T
-   with Inline, Pure_Function
-   is
-   begin
-      return
-        Boot_Secondary_Stack_Virtual_Address_Base
-        + Storage_Offset (Hart_Id * Boot_Secondary_Stack_Size);
-   end Get_Boot_Secondary_Stack_Virtual_Address;
-   pragma Warnings (On);
+   is (Boot_Secondary_Stack_Virtual_Address_Base
+       + Storage_Offset (Hart_Id) * Boot_Secondary_Stack_Size)
+   with Inline, Pure_Function;
 
-   pragma Warnings (Off, "Constraint_Error");
    function Get_Boot_Secondary_Stack_Physical_Address
      (Hart_Id : Integer) return Physical_Address_T
-   with Inline, Pure_Function
-   is
-   begin
-      return
-        Boot_Secondary_Stack_Phys_Address_Base
-        + Storage_Offset (Hart_Id * Boot_Secondary_Stack_Size);
-   end Get_Boot_Secondary_Stack_Physical_Address;
-   pragma Warnings (On);
+   is (Boot_Secondary_Stack_Phys_Address_Base
+       + Storage_Offset (Hart_Id) * Boot_Secondary_Stack_Size)
+   with Inline, Pure_Function;
 
    procedure Initialise_Hart_Boot_Secondary_Stack
      (Hart_Id : Integer; Boot_Secondary_Stack_Top : out Virtual_Address_T)
