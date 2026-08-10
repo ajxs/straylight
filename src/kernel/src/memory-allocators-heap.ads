@@ -16,7 +16,7 @@ is
       Checksum              : Unsigned_64 := 0;
       Heap_Region_Virt_Addr : Virtual_Address_T := Null_Address;
       Heap_Region_Phys_Addr : Physical_Address_T := Null_Physical_Address;
-      Heap_Region_Size      : Storage_Offset := 0;
+      Heap_Region_Size      : Storage_Count := 0;
       Next_Region           : Heap_Memory_Region_Access := null;
    end record
    with Size => 5 * 8 * 8;
@@ -28,7 +28,7 @@ is
       --  are used to validate that a region pointer refers to a valid heap
       --  address.
       Window_Base              : Virtual_Address_T;
-      Window_Size              : Storage_Offset;
+      Window_Size              : Storage_Count;
       Spinlock                 : Spinlock_T;
    end record;
 
@@ -37,7 +37,7 @@ is
       Size              : Positive;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1);
+      Alignment         : Storage_Count := 1);
 
    procedure Free
      (Memory_Heap               : in out Memory_Heap_T;
@@ -51,7 +51,7 @@ is
      (Memory_Heap      : in out Memory_Heap_T;
       Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
-      Size             : Storage_Offset;
+      Size             : Storage_Count;
       Result           : out Function_Result);
 
    --  Atomically add a new memory region to the heap, and allocate memory.
@@ -60,16 +60,16 @@ is
      (Memory_Heap       : in out Memory_Heap_T;
       Virtual_Address   : Virtual_Address_T;
       Physical_Address  : Physical_Address_T;
-      Region_Size       : Storage_Offset;
+      Region_Size       : Storage_Count;
       Allocation_Size   : Positive;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1);
+      Alignment         : Storage_Count := 1);
 
    procedure Get_Minimum_Region_Size
      (Allocation_Size     : Positive;
-      Alignment           : Storage_Offset;
-      Minimum_Region_Size : out Storage_Offset;
+      Alignment           : Storage_Count;
+      Minimum_Region_Size : out Storage_Count;
       Result              : out Function_Result);
 
 private
@@ -95,7 +95,7 @@ private
       --  header. This checksum is also used by the allocator to determine
       --  whether a block is free or allocated.
       Block_Checksum : Unsigned_32;
-      Block_Size     : Storage_Offset;
+      Block_Size     : Storage_Count;
    end record
    with Size => 16 * 8;
 
@@ -105,15 +105,15 @@ private
    Heap_Region_Checksum_Identity : constant Unsigned_64 :=
      16#A5A5_A5A5_5A5A_5A5A#;
 
-   Header_Size : constant Storage_Offset := Allocation_Header_T'Size / 8;
+   Header_Size : constant Storage_Count := Allocation_Header_T'Size / 8;
 
-   Region_Header_Size : constant Storage_Offset :=
+   Region_Header_Size : constant Storage_Count :=
      Heap_Memory_Region_T'Size / 8;
 
    function Calculate_Header_Checksum
      (Block_Identity : Unsigned_32;
       Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Unsigned_32;
+      Block_Size     : Storage_Count) return Unsigned_32;
 
    function Is_Valid_Header_Address
      (Region : Heap_Memory_Region_T; Addr : Virtual_Address_T) return Boolean
@@ -129,7 +129,7 @@ private
      (Test_Identity  : Unsigned_32;
       Block_Checksum : Unsigned_32;
       Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Boolean
+      Block_Size     : Storage_Count) return Boolean
    is (Block_Checksum
        = Calculate_Header_Checksum (Test_Identity, Block_Address, Block_Size))
    with Inline;
@@ -137,7 +137,7 @@ private
    function Is_Block_Free
      (Block_Checksum : Unsigned_32;
       Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Boolean
+      Block_Size     : Storage_Count) return Boolean
    is (Test_Header_Checksum
          (Identity_Marker_Free, Block_Checksum, Block_Address, Block_Size))
    with Inline;
@@ -145,7 +145,7 @@ private
    function Is_Block_Allocated
      (Block_Checksum : Unsigned_32;
       Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Boolean
+      Block_Size     : Storage_Count) return Boolean
    is (Test_Header_Checksum
          (Identity_Marker_Allocated,
           Block_Checksum,
@@ -156,21 +156,21 @@ private
    function Is_Valid_Header
      (Block_Checksum : Unsigned_32;
       Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Boolean
+      Block_Size     : Storage_Count) return Boolean
    is (Is_Block_Free (Block_Checksum, Block_Address, Block_Size)
        or else Is_Block_Allocated (Block_Checksum, Block_Address, Block_Size));
 
    function Calculate_Region_Header_Checksum
      (Region_Address          : Virtual_Address_T;
       Region_Physical_Address : Physical_Address_T;
-      Region_Size             : Storage_Offset;
+      Region_Size             : Storage_Count;
       Next_Region             : Heap_Memory_Region_Access) return Unsigned_64;
 
    function Test_Region_Header_Checksum
      (Region_Checksum         : Unsigned_64;
       Region_Address          : Virtual_Address_T;
       Region_Physical_Address : Physical_Address_T;
-      Region_Size             : Storage_Offset;
+      Region_Size             : Storage_Count;
       Next_Region             : Heap_Memory_Region_Access) return Boolean
    is (Region_Checksum
        = Calculate_Region_Header_Checksum

@@ -2,7 +2,7 @@ package body Memory.Allocators.Heap is
    function Calculate_Header_Checksum
      (Block_Identity : Unsigned_32;
       Block_Address  : Virtual_Address_T;
-      Block_Size     : Storage_Offset) return Unsigned_32 is
+      Block_Size     : Storage_Count) return Unsigned_32 is
    begin
       Size_Bits : constant Unsigned_64 := Unsigned_64 (Block_Size);
 
@@ -12,12 +12,6 @@ package body Memory.Allocators.Heap is
         xor Get_Address_Word_High (Block_Address)
         xor Get_Dword_Word_Low (Size_Bits)
         xor Get_Dword_Word_High (Size_Bits);
-
-   exception
-      when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Calculate_Header_Checksum", Logging_Tags_Heap);
-         return 0;
    end Calculate_Header_Checksum;
 
    function Is_Allocated_Address_In_Region
@@ -26,7 +20,7 @@ package body Memory.Allocators.Heap is
        and then Addr < Region.Heap_Region_Virt_Addr + Region.Heap_Region_Size)
    with Pure_Function, Inline;
 
-   function Is_Valid_Alignment (Alignment : Storage_Offset) return Boolean is
+   function Is_Valid_Alignment (Alignment : Storage_Count) return Boolean is
    begin
       return
         Alignment > 0
@@ -43,7 +37,7 @@ package body Memory.Allocators.Heap is
      (Region           : Heap_Memory_Region_T;
       Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
-      Length           : Storage_Offset) return Boolean
+      Length           : Storage_Count) return Boolean
    is (Do_Memory_Regions_Overlap
          (Region.Heap_Region_Virt_Addr,
           Region.Heap_Region_Size,
@@ -60,8 +54,8 @@ package body Memory.Allocators.Heap is
    procedure Align_Address_Downwards
      (Virtual_Addr     : in out Virtual_Address_T;
       Physical_Addr    : in out Physical_Address_T;
-      Alignment        : Storage_Offset;
-      Alignment_Offset : out Storage_Offset;
+      Alignment        : Storage_Count;
+      Alignment_Offset : out Storage_Count;
       Result           : out Function_Result) is
    begin
       if Alignment = 1 then
@@ -85,7 +79,7 @@ package body Memory.Allocators.Heap is
 
    procedure Set_New_Block_Header
      (Block_Address     : Virtual_Address_T;
-      Block_Size        : Storage_Offset;
+      Block_Size        : Storage_Count;
       New_Block_Is_Free : Boolean := True) is
    begin
       New_Block : Allocation_Header_T
@@ -103,17 +97,17 @@ package body Memory.Allocators.Heap is
 
    procedure Allocate_In_Region
      (Region            : Heap_Memory_Region_T;
-      Size              : Storage_Offset;
+      Size              : Storage_Count;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1)
+      Alignment         : Storage_Count := 1)
    is
       Current_Block_Address    : Virtual_Address_T :=
         Region.Heap_Region_Virt_Addr + Region_Header_Size;
       Current_Physical_Address : Physical_Address_T :=
         Region.Heap_Region_Phys_Addr + Region_Header_Size;
 
-      Alignment_Offset : Storage_Offset := 0;
+      Alignment_Offset : Storage_Count := 0;
    begin
       Allocation_Result := (Null_Address, Null_Physical_Address);
 
@@ -183,7 +177,7 @@ package body Memory.Allocators.Heap is
             New_Block_Addr_Phys : constant Physical_Address_T :=
               New_Block_Data_Addr_Phys - Header_Size;
 
-            Remaining_Size_In_Original_Block : constant Storage_Offset :=
+            Remaining_Size_In_Original_Block : constant Storage_Count :=
               New_Block_Addr - Current_Block_Address - Header_Size;
 
             --  If the remaining size in the original block is big enough to
@@ -203,7 +197,7 @@ package body Memory.Allocators.Heap is
                --  block was moved back may have left some space at the end of
                --  the block that is too small to hold a valid block. If so,
                --  include that space in the size of the new block.
-               Effective_Size : constant Storage_Offset :=
+               Effective_Size : constant Storage_Count :=
                  Size
                  + (if Alignment_Offset <= Header_Size
                     then Alignment_Offset
@@ -236,7 +230,7 @@ package body Memory.Allocators.Heap is
                --  allocate from the start of the current block.
                --  If there's enough space left over in the current block,
                --  create a new block at the end.
-               Remaining_Size : constant Storage_Offset :=
+               Remaining_Size : constant Storage_Count :=
                  Current_Block.Block_Size - Size - Header_Size;
 
                Allocation_Result :=
@@ -330,7 +324,7 @@ package body Memory.Allocators.Heap is
       Size              : Positive;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1)
+      Alignment         : Storage_Count := 1)
    is
       Curr_Region : Heap_Memory_Region_Access :=
         Memory_Heap.Memory_Regions_List_Head;
@@ -366,7 +360,7 @@ package body Memory.Allocators.Heap is
 
          Allocate_In_Region
            (Curr_Region.all,
-            Storage_Offset (Size),
+            Storage_Count (Size),
             Allocation_Result,
             Result,
             Alignment);
@@ -414,7 +408,7 @@ package body Memory.Allocators.Heap is
       Size              : Positive;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1) is
+      Alignment         : Storage_Count := 1) is
    begin
       Acquire_Spinlock (Memory_Heap.Spinlock);
 
@@ -617,7 +611,7 @@ package body Memory.Allocators.Heap is
    procedure Initialise_New_Region
      (Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
-      Size             : Storage_Offset;
+      Size             : Storage_Count;
       Result           : out Function_Result) is
    begin
       --  Initialize the new region's header and first block.
@@ -673,7 +667,7 @@ package body Memory.Allocators.Heap is
      (Memory_Heap      : in out Memory_Heap_T;
       Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
-      Size             : Storage_Offset;
+      Size             : Storage_Count;
       Result           : out Function_Result)
    is
       Curr_Region : Heap_Memory_Region_Access :=
@@ -748,7 +742,7 @@ package body Memory.Allocators.Heap is
      (Memory_Heap      : in out Memory_Heap_T;
       Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
-      Size             : Storage_Offset;
+      Size             : Storage_Count;
       Result           : out Function_Result) is
    begin
       Acquire_Spinlock (Memory_Heap.Spinlock);
@@ -763,11 +757,11 @@ package body Memory.Allocators.Heap is
      (Memory_Heap       : in out Memory_Heap_T;
       Virtual_Address   : Virtual_Address_T;
       Physical_Address  : Physical_Address_T;
-      Region_Size       : Storage_Offset;
+      Region_Size       : Storage_Count;
       Allocation_Size   : Positive;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
-      Alignment         : Storage_Offset := 1) is
+      Alignment         : Storage_Count := 1) is
    begin
       Acquire_Spinlock (Memory_Heap.Spinlock);
 
@@ -786,12 +780,12 @@ package body Memory.Allocators.Heap is
 
    procedure Get_Minimum_Region_Size
      (Allocation_Size     : Positive;
-      Alignment           : Storage_Offset;
-      Minimum_Region_Size : out Storage_Offset;
+      Alignment           : Storage_Count;
+      Minimum_Region_Size : out Storage_Count;
       Result              : out Function_Result) is
    begin
       Minimum_Region_Size :=
-        Storage_Offset (Allocation_Size) + Region_Header_Size + Alignment
+        Storage_Count (Allocation_Size) + Region_Header_Size + Alignment
         + 3 * Header_Size;
       Result := Success;
    exception
@@ -804,7 +798,7 @@ package body Memory.Allocators.Heap is
    function Calculate_Region_Header_Checksum
      (Region_Address          : Virtual_Address_T;
       Region_Physical_Address : Physical_Address_T;
-      Region_Size             : Storage_Offset;
+      Region_Size             : Storage_Count;
       Next_Region             : Heap_Memory_Region_Access) return Unsigned_64
    is
    begin

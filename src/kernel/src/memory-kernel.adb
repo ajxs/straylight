@@ -324,7 +324,7 @@ package body Memory.Kernel is
       --  Query each of the possible region sizes, until one is accepted
       --  by the kernel page pool.
       for Region_Page_Count of Growth_Region_Page_Counts loop
-         if Storage_Offset (Region_Page_Count * Kernel_Page_Pool_Page_Size)
+         if Storage_Count (Region_Page_Count) * Kernel_Page_Pool_Page_Size
            >= Minimum_Region_Size_In_Bytes
          then
             Region_Size_In_Bytes :=
@@ -346,7 +346,7 @@ package body Memory.Kernel is
                Map_Kernel_Memory
                  (Region_Virtual_Address,
                   Pages_Allocation_Result.Physical_Address,
-                  Storage_Offset (Region_Size_In_Bytes),
+                  Region_Size_In_Bytes,
                   (True, True, False, False),
                   Result);
                if Is_Error (Result) then
@@ -360,7 +360,7 @@ package body Memory.Kernel is
                  (Kernel_Heap,
                   Region_Virtual_Address,
                   Pages_Allocation_Result.Physical_Address,
-                  Storage_Offset (Region_Size_In_Bytes),
+                  Region_Size_In_Bytes,
                   Positive (Allocation_Size),
                   Allocation_Result,
                   Result,
