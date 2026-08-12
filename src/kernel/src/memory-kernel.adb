@@ -361,7 +361,7 @@ package body Memory.Kernel is
                   Region_Virtual_Address,
                   Pages_Allocation_Result.Physical_Address,
                   Region_Size_In_Bytes,
-                  Positive (Allocation_Size),
+                  Allocation_Size,
                   Allocation_Result,
                   Result,
                   Alignment);
@@ -431,8 +431,7 @@ package body Memory.Kernel is
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1) is
    begin
-      Kernel_Heap.Allocate
-        (Positive (Size), Allocation_Result, Result, Alignment);
+      Kernel_Heap.Allocate (Size, Allocation_Result, Result, Alignment);
 
       --  If the allocation can't be fulfilled, attempt to grow the heap,
       --  then retry the allocation.
@@ -440,10 +439,6 @@ package body Memory.Kernel is
          Grow_Kernel_Heap_And_Allocate
            (Size, Allocation_Result, Result, Alignment);
       end if;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Kernel_Physical_Memory");
-         Result := Constraint_Exception;
    end Allocate_Kernel_Physical_Memory;
 
    procedure Allocate_Pages

@@ -266,25 +266,6 @@ package body Devices.Virtio is
       Device.Bus_Info.Virtio.Q_Available.Virtual_Address :=
         Allocation_Result.Virtual_Address + 16#2000#;
 
-      Log_Debug
-        ("Initialised Device Queues:"
-         & ASCII.LF
-         & "  Descriptor Q:         "
-         & Device.Bus_Info.Virtio.Q_Descriptor.Physical_Address'Image
-         & " / "
-         & Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address'Image
-         & ASCII.LF
-         & "  Initialised Device Q: "
-         & Device.Bus_Info.Virtio.Q_Used.Physical_Address'Image
-         & " / "
-         & Device.Bus_Info.Virtio.Q_Used.Virtual_Address'Image
-         & ASCII.LF
-         & "  Initialised Driver Q: "
-         & Device.Bus_Info.Virtio.Q_Available.Physical_Address'Image
-         & " / "
-         & Device.Bus_Info.Virtio.Q_Available.Virtual_Address'Image,
-         Logging_Tags_Virtio);
-
       Result := Success;
    exception
       when Constraint_Error =>

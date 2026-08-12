@@ -321,7 +321,7 @@ package body Memory.Allocators.Heap is
 
    procedure Allocate_Unlocked
      (Memory_Heap       : in out Memory_Heap_T;
-      Size              : Positive;
+      Size              : Storage_Count;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1)
@@ -359,11 +359,7 @@ package body Memory.Allocators.Heap is
          end if;
 
          Allocate_In_Region
-           (Curr_Region.all,
-            Storage_Count (Size),
-            Allocation_Result,
-            Result,
-            Alignment);
+           (Curr_Region.all, Size, Allocation_Result, Result, Alignment);
 
          --  If the allocation was successful, or if it failed for a reason
          --  other than heap exhaustion, return.
@@ -382,7 +378,7 @@ package body Memory.Allocators.Heap is
                Logging_Tags_Heap);
 
             --  Zero the new block's memory.
-            Set (Allocation_Result.Virtual_Address, 0, Size);
+            Set (Allocation_Result.Virtual_Address, 0, Integer (Size));
 
             return;
          elsif Is_Error (Result) then
@@ -405,7 +401,7 @@ package body Memory.Allocators.Heap is
 
    procedure Allocate
      (Memory_Heap       : in out Memory_Heap_T;
-      Size              : Positive;
+      Size              : Storage_Count;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1) is
@@ -758,7 +754,7 @@ package body Memory.Allocators.Heap is
       Virtual_Address   : Virtual_Address_T;
       Physical_Address  : Physical_Address_T;
       Region_Size       : Storage_Count;
-      Allocation_Size   : Positive;
+      Allocation_Size   : Storage_Count;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1) is

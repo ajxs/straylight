@@ -34,7 +34,7 @@ is
 
    procedure Allocate
      (Memory_Heap       : in out Memory_Heap_T;
-      Size              : Positive;
+      Size              : Storage_Count;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1);
@@ -61,7 +61,7 @@ is
       Virtual_Address   : Virtual_Address_T;
       Physical_Address  : Physical_Address_T;
       Region_Size       : Storage_Count;
-      Allocation_Size   : Positive;
+      Allocation_Size   : Storage_Count;
       Allocation_Result : out Memory_Allocation_Result;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1);
