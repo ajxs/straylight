@@ -81,4 +81,9 @@ package body Hart_State is
          Panic ("Constraint_Error: Push_Interrupts_Off");
    end Push_Interrupts_Off;
 
+   procedure Handle_Kernel_Stack_Overflow is
+   begin
+      Panic ("Kernel stack overflow.");
+   end Handle_Kernel_Stack_Overflow;
+
 end Hart_State;

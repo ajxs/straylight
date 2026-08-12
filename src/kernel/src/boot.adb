@@ -29,19 +29,47 @@ with Utilities;            use Utilities;
 
 package body Boot is
    function Get_Boot_Secondary_Stack_Virtual_Address
-     (Hart_Id : Integer) return Virtual_Address_T
+     (Hart_Id : Hart_Index_T) return Virtual_Address_T
    is (Boot_Secondary_Stack_Virtual_Address_Base
        + Storage_Offset (Hart_Id) * Boot_Secondary_Stack_Size)
    with Inline, Pure_Function;
 
    function Get_Boot_Secondary_Stack_Physical_Address
-     (Hart_Id : Integer) return Physical_Address_T
+     (Hart_Id : Hart_Index_T) return Physical_Address_T
    is (Boot_Secondary_Stack_Phys_Address_Base
        + Storage_Offset (Hart_Id) * Boot_Secondary_Stack_Size)
    with Inline, Pure_Function;
 
+   function Get_Hart_Emergency_Stack_Top_Address
+     (Hart_Id : Hart_Index_T) return Virtual_Address_T
+   is
+      Emergency_Stacks_Base : constant Integer
+      with
+        Import,
+        Alignment     => 4096,
+        External_Name => "__hart_emergency_stacks_base";
+
+      Emergency_Stacks_Top : constant Integer
+      with
+        Import,
+        Alignment     => 4096,
+        External_Name => "__hart_emergency_stacks_top";
+
+   begin
+      Stack_Size : constant Storage_Count :=
+        (Emergency_Stacks_Top'Address - Emergency_Stacks_Base'Address)
+        / Maximum_Harts;
+
+      return
+        (Emergency_Stacks_Base'Address + Storage_Offset (Hart_Id) * Stack_Size)
+        + Stack_Size;
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error: Get_Hart_Emergency_Stack_Top_Address");
+   end Get_Hart_Emergency_Stack_Top_Address;
+
    procedure Initialise_Hart_Boot_Secondary_Stack
-     (Hart_Id : Integer; Boot_Secondary_Stack_Top : out Virtual_Address_T)
+     (Hart_Id : Hart_Index_T; Boot_Secondary_Stack_Top : out Virtual_Address_T)
    is
       Result : Function_Result := Unset;
    begin
@@ -487,7 +515,7 @@ package body Boot is
       Log_Debug ("Initialised filesystem.", Logging_Tags);
    end Initialise_Filesystem;
 
-   procedure Initialise_Hart (Hart_Id : Integer) is
+   procedure Initialise_Hart (Hart_Id : Hart_Index_T) is
       procedure Save_Hart_State_Pointer (Hart_State_Address : Address)
       with
         Import,
@@ -496,11 +524,14 @@ package body Boot is
    begin
       Hart_States (Hart_Id) :=
         (Current_Process                            => null,
-         Hart_Id                                    => Hart_Index_T (Hart_Id),
+         Hart_Id                                    => Hart_Id,
          Interrupts_Off_Counter                     => 0,
          Interrupts_Enabled_Before_Initial_Push_Off => False,
          Hart_Status                                => Hart_Status_Initialised,
-         Previous_Process                           => null);
+         Previous_Process                           => null,
+         Emergency_Stack_Top                        =>
+           Get_Hart_Emergency_Stack_Top_Address (Hart_Id),
+         Stack_Limit                                => Null_Address);
 
       Save_Hart_State_Pointer (Hart_States (Hart_Id)'Address);
    exception
@@ -532,7 +563,8 @@ package body Boot is
          Panic ("Constraint_Error: Initialise_Init_Process");
    end Initialise_Init_Process;
 
-   procedure Kernel_Main (Hart_Id : Integer; DTB_Address : Physical_Address_T)
+   procedure Kernel_Main
+     (Hart_Id : Hart_Index_T; DTB_Address : Physical_Address_T)
    is
       Result : Function_Result := Unset;
 
@@ -589,6 +621,7 @@ package body Boot is
         (Hart_Id,
          Get_Kernel_Address_Space_SATP,
          Boot_Secondary_Stack_Top,
+         Boot_Secondary_Stack_Size,
          Initialise_Kernel_Services'Address);
    exception
       when Constraint_Error =>
@@ -912,6 +945,7 @@ package body Boot is
         (Hart_Id,
          Get_Kernel_Address_Space_SATP,
          Boot_Secondary_Stack_Top,
+         Boot_Secondary_Stack_Size,
          Non_Boot_Hart_Start'Address);
    exception
       when Constraint_Error =>

@@ -3,6 +3,9 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with System;
+
+with Memory;    use Memory;
 with Processes; use Processes;
 
 package Hart_State
@@ -35,6 +38,11 @@ is
       --  its kernel context is fully saved.
       Previous_Process                           :
         Process_Control_Block_Access := null;
+      --  Each hart has an 'Emergency Stack', used if a kernel stack overflows.
+      Emergency_Stack_Top                        : Virtual_Address_T :=
+        System'To_Address (0);
+      Stack_Limit                                : Virtual_Address_T :=
+        System'To_Address (0);
    end record;
    for Hart_State_T use
      record
@@ -44,6 +52,8 @@ is
        Interrupts_Enabled_Before_Initial_Push_Off at 16 range 0 .. 0;
        Hart_Status                                at 20 range 0 .. 31;
        Previous_Process                           at 24 range 0 .. 63;
+       Emergency_Stack_Top                        at 32 range 0 .. 63;
+       Stack_Limit                                at 40 range 0 .. 63;
      end record;
 
    type Hart_State_Access is access all Hart_State_T with Convention => C;
@@ -93,5 +103,12 @@ is
 
    function Get_Current_Hart_Supervisor_Interrupt_Context return Natural
    with Inline, Volatile_Function;
+
+   procedure Handle_Kernel_Stack_Overflow
+   with
+     No_Return,
+     Export,
+     Convention    => Assembler,
+     External_Name => "hart_state_handle_kernel_stack_overflow";
 
 end Hart_State;

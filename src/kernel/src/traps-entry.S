@@ -45,12 +45,7 @@ traps_entry:
 
 # A non-zero tp means the trap came from user mode, because sscratch previously
 # held the hart state pointer.
-	bnez  tp, user_mode_trap
-
-# Supervisor-mode trap: Move the hart state pointer from sscratch to tp, and 
-# clear sscratch to zero.
-	csrrw tp, sscratch, x0
-	j     save_process_state_to_kernel_stack
+	beqz  tp, supervisor_mode_trap
 
 user_mode_trap:
 # tp now holds the hart state pointer; the user's tp is stashed in sscratch and
@@ -65,6 +60,21 @@ user_mode_trap:
 # Load the kernel stack pointer.
 # The offset points to the entry for sp in the kernel context saved registers.
 	ld sp, KERNEL_CONTEXT_OFFSET_SP(t6)
+
+	j  save_process_state_to_kernel_stack
+
+supervisor_mode_trap:
+	csrrw tp, sscratch, x0
+	csrw  sscratch, t0
+
+# Ensure there's enough space on the kernel stack to save the trap context.
+# If not, a kernel stack overflow has occurred.
+	ld    t0, HART_STATE_STACK_LIMIT_OFFSET(tp)
+	addi  t0, t0, TRAP_CONTEXT_SIZE
+	bltu  sp, t0, supervisor_stack_overflow
+
+	csrr  t0, sscratch
+	csrw  sscratch, x0
 
 save_process_state_to_kernel_stack:
 	addi sp, sp, -TRAP_CONTEXT_SIZE
@@ -248,3 +258,11 @@ restore_gp_pointers_and_return_to_supervisor_mode:
 return_to_supervisor_mode:
 	sret
 
+supervisor_stack_overflow:
+# Load the emergency stack pointer from the hart state, and jump to the
+# kernel stack overflow handler.
+	ld    t0, HART_STATE_EMERGENCY_STACK_POINTER_OFFSET(tp)
+	mv    sp, t0
+	csrr  t0, sscratch
+	csrw  sscratch, x0
+	j     hart_state_handle_kernel_stack_overflow

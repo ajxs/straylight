@@ -20,7 +20,8 @@ is
    --  initial boot page tables have been set up, and supervisor address
    --  translation (paging) has been enabled.
    ----------------------------------------------------------------------------
-   procedure Kernel_Main (Hart_Id : Integer; DTB_Address : Physical_Address_T)
+   procedure Kernel_Main
+     (Hart_Id : Hart_Index_T; DTB_Address : Physical_Address_T)
    with
      No_Return,
      Export,
@@ -43,7 +44,7 @@ private
    --  This function needs to be called before any kernel-level logging can be
    --  performed, as the logging spinlock relies on being able to determine the
    --  current hart id.
-   procedure Initialise_Hart (Hart_Id : Integer);
+   procedure Initialise_Hart (Hart_Id : Hart_Index_T);
 
    procedure Initialise_Filesystem;
 
@@ -96,6 +97,7 @@ private
      (Hart_Id        : Hart_Index_T;
       SATP           : Unsigned_64;
       Stack_Pointer  : Virtual_Address_T;
+      Stack_Size     : Unsigned_64;
       Return_Address : Virtual_Address_T)
    with
      No_Return,

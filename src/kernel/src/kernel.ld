@@ -3,11 +3,20 @@
  *  SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-/** 
- * The size of the boot stacks used for all harts. 
- * 8 stacks of 8KiB each are allocated.
+MAX_HART_COUNT = 8;
+
+BOOT_STACK_SIZE = 8K;
+BOOT_STACKS_RESERVED_SPACE = BOOT_STACK_SIZE * MAX_HART_COUNT;
+
+/* 
+ * Assert that the boot stack size definition in boot-entry.S matches the same
+ * definition here.
  */
-BOOT_STACKS_SIZE = 8K * 8;
+ASSERT (__assert_boot_stack_size == BOOT_STACK_SIZE,
+	"BOOT_STACK_SIZE in boot-entry.S != BOOT_STACK_SIZE in kernel.ld")
+
+HART_EMERGENCY_STACK_SIZE = 4K;
+HART_EMERGENCY_STACK_RESERVED_SPACE = HART_EMERGENCY_STACK_SIZE * MAX_HART_COUNT;
 
 KERNEL_PHYSICAL_MEMORY_ADDRESS = 0x80200000;
 KERNEL_VIRTUAL_MEMORY_ADDRESS = 0xFFFFFFFF00000000;
@@ -32,8 +41,8 @@ SECTIONS
 		*(.boot_data*)
 
 		. = ALIGN (4K);
-		__boot_stacks_bottom = .;
-		. += BOOT_STACKS_SIZE;
+		__boot_stacks_base = .;
+		. += BOOT_STACKS_RESERVED_SPACE;
 		__boot_stacks_top = .;
 
 		. = ALIGN (4K);
@@ -87,6 +96,11 @@ SECTIONS
 		*(COMMON)
 		*(.bss*)
 		*(.sbss*)
+
+		. = ALIGN (4K);
+		__hart_emergency_stacks_base = .;
+		. += HART_EMERGENCY_STACK_RESERVED_SPACE;
+		__hart_emergency_stacks_top = .;
 
 		__bss_end = .;
 	}

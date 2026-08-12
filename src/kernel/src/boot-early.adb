@@ -245,10 +245,10 @@ package body Boot.Early is
       --  statically allocated in the linker script in one block, and mapped
       --  altogether at a fixed address.
       --  These are loaded by each hart in the boot-entry code, e.g.
-      --  SP := __boot_stacks_bottom +
+      --  SP := __boot_stacks_base +
       --    (Hart_ID * BOOT_STACK_SIZE) + BOOT_STACK_SIZE
       Boot_Stacks_Start_Marker : constant Integer
-      with Import, External_Name => "__boot_stacks_bottom";
+      with Import, External_Name => "__boot_stacks_base";
 
       Boot_Stacks_End_Marker : constant Integer
       with Import, External_Name => "__boot_stacks_top";

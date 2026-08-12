@@ -3,6 +3,7 @@
 #  SPDX-License-Identifier: GPL-3.0-or-later
 ###############################################################################
 
+#include "hart.h"
 #include "riscv.h"
 #include "traps.h"
 
@@ -44,6 +45,10 @@ scheduler_load_kernel_context:
 	csrw satp, a0
 	# Refer to: https://blog.stephenmarz.com/2021/02/01/wrong-about-sfence/
 	sfence.vma zero, a1
+
+	# Save the incoming process' kernel stack base into the hart state.
+	ld t0, PCB_OFFSET_KERNEL_STACK_VIRT_ADDR(a2)
+	sd t0, HART_STATE_STACK_LIMIT_OFFSET(tp)
 
 	# Add the offset of the kernel context to the thread pointer.
 	addi a2, a2, PCB_OFFSET_KERNEL_CONTEXT

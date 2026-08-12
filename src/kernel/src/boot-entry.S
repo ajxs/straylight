@@ -8,6 +8,11 @@
 #define BOOT_STACK_SIZE 0x2000
 #define BOOT_STACKS_HIGHER_HALF_BASE 0xFFFFFFFFFF000000
 
+# Export the boot stack size so the kernel linker script can assert that its
+# definition matches the value here.
+.global __assert_boot_stack_size
+.set    __assert_boot_stack_size, BOOT_STACK_SIZE
+
 .section .boot_rodata
 
 # The kernel is linked at a higher-half virtual address, which can't be reached
@@ -40,7 +45,7 @@ _start:
 .option pop
 
 # Setup the boot stack pointer.
-# SP := __boot_stacks_bottom + (Hart_ID * BOOT_STACK_SIZE) + BOOT_STACK_SIZE
+# SP := __boot_stacks_base + (Hart_ID * BOOT_STACK_SIZE) + BOOT_STACK_SIZE
 # It's important to set up the stack this way, because SBI doesn't guarantee
 # that hart 0 will be the boot hart.
 # Realistically, the boot hart will be finished with its boot stack by the time
@@ -49,7 +54,7 @@ _start:
 	li t1, BOOT_STACK_SIZE
 	mul t2, t1, a0
 
-	lla t0, __boot_stacks_bottom
+	lla t0, __boot_stacks_base
 	add t0, t0, t2
 	add t0, t0, t1
 	mv sp, t0
@@ -203,11 +208,11 @@ non_boot_hart_entry:
 	sfence.vma zero, zero
 
 # Setup the boot stack pointer.
-# SP := __boot_stacks_bottom + (Hart_ID * BOOT_STACK_SIZE) + BOOT_STACK_SIZE
+# SP := __boot_stacks_base + (Hart_ID * BOOT_STACK_SIZE) + BOOT_STACK_SIZE
 	li  t1, BOOT_STACK_SIZE
 	mul t2, t1, a0
 
-	lla t0, __boot_stacks_bottom
+	lla t0, __boot_stacks_base
 	add t0, t0, t2
 	add t0, t0, t1
 	mv  sp, t0

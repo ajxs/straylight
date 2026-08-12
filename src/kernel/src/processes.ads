@@ -89,19 +89,20 @@ is
       Kernel_Context      : Kernel_Context_T;
       Trap_Context_Addr   : Virtual_Address_T := Null_Address;
       User_Trap_Stack_Ptr : Virtual_Address_T := Null_Address;
-      Process_Id          : Process_Id_T := 0;
-      Status              : Process_Status_T := Process_Ready;
-      Blocked_By_Channel  : Blocking_Channel_T := 0;
-      --  @TODO: In future, investigate the possibility of storing a process'
-      --  memory space on disk, rather than in the process control block.
-      Memory_Space        : Virtual_Memory_Space_T;
-
-      Stack_Phys_Addr : Physical_Address_T := Null_Physical_Address;
-      Stack_Size      : Storage_Offset := 0;
 
       Kernel_Stack_Phys_Addr : Physical_Address_T := Null_Physical_Address;
       Kernel_Stack_Virt_Addr : Virtual_Address_T := Null_Address;
       Kernel_Stack_Size      : Storage_Offset := 0;
+
+      Process_Id         : Process_Id_T := 0;
+      Status             : Process_Status_T := Process_Ready;
+      Blocked_By_Channel : Blocking_Channel_T := 0;
+      --  @TODO: In future, investigate the possibility of storing a process'
+      --  memory space on disk, rather than in the process control block.
+      Memory_Space       : Virtual_Memory_Space_T;
+
+      Stack_Phys_Addr : Physical_Address_T := Null_Physical_Address;
+      Stack_Size      : Storage_Offset := 0;
 
       Has_Process_Started : Boolean := False;
 
@@ -115,6 +116,18 @@ is
 
       Next_Process : Process_Control_Block_Access := null;
    end record;
+
+   --  The components in this representation clause are those that are
+   --  referenced by the context switch assembly routines (Refer to traps.h).
+   for Process_Control_Block_T use
+     record
+       Kernel_Context         at 0   range 0 .. 895;
+       Trap_Context_Addr      at 112 range 0 .. 63;
+       User_Trap_Stack_Ptr    at 120 range 0 .. 63;
+       Kernel_Stack_Phys_Addr at 128 range 0 .. 63;
+       Kernel_Stack_Virt_Addr at 136 range 0 .. 63;
+       Kernel_Stack_Size      at 144 range 0 .. 63;
+     end record;
 
    ----------------------------------------------------------------------------
    --  Allocates all of the physical memory required for a new process.
