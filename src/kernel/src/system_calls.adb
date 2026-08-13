@@ -189,12 +189,15 @@ package body System_Calls is
       --  that extent avoids assuming the caller mapped a whole framebuffer.
       Validate_User_Buffer : declare
          Bytes_Per_Pixel : constant := 4;
-         Stride          : constant Natural :=
-           Natural (Graphics_Device.Framebuffer_Width) * Bytes_Per_Pixel;
-         End_Offset      : constant Natural :=
-           (Natural (User_Pixel_Data_Y) + Natural (User_Pixel_Data_Height) - 1)
+         Stride          : constant Storage_Count :=
+           Storage_Count (Graphics_Device.Framebuffer_Width) * Bytes_Per_Pixel;
+         End_Offset      : constant Storage_Count :=
+           (Storage_Count (User_Pixel_Data_Y)
+            + Storage_Count (User_Pixel_Data_Height)
+            - 1)
            * Stride
-           + (Natural (User_Pixel_Data_X) + Natural (User_Pixel_Data_Width))
+           + (Storage_Count (User_Pixel_Data_X)
+              + Storage_Count (User_Pixel_Data_Width))
              * Bytes_Per_Pixel;
       begin
          if not Is_Valid_Userspace_Address_Range
@@ -241,7 +244,6 @@ package body System_Calls is
          User_Pixel_Data_Height,
          Result);
       if Is_Error (Result) then
-         --  Error already logged.
          return;
       end if;
 
@@ -255,7 +257,6 @@ package body System_Calls is
          User_Pixel_Data_Height,
          Result);
       if Is_Error (Result) then
-         Log_Error ("Error transferring: " & Result'Image);
          return;
       end if;
 

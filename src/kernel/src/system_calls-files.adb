@@ -2,6 +2,8 @@
 --  Copyright (c) 2026, Ajxs.
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
+with System.Storage_Elements; use System.Storage_Elements;
+
 with Memory; use Memory;
 with RISCV;  use RISCV;
 
@@ -18,30 +20,20 @@ package body System_Calls.Files is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      Maximum_Path_String_Length : constant Integer := 256;
-
       File_Handle : Process_File_Handle_Access := null;
    begin
       Log_Debug ("User Mode Syscall: Open File", Logging_Tags);
 
       Path_String_Address : constant Virtual_Address_T :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
-      Path_String_Length : constant Integer :=
-        Integer (Trap_Context.Gp_Registers (a2));
+      Path_String_Length : constant Unsigned_64 :=
+        Trap_Context.Gp_Registers (a2);
       File_Open_Flags : constant File_Open_Flags_T :=
         Unsigned_64_To_File_Open_Flags (Trap_Context.Gp_Registers (a3));
 
-      if not Is_Valid_Userspace_Address_Range
-               (Path_String_Address, Path_String_Length)
-      then
-         Log_Error ("Invalid non-userspace address range");
-
-         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
-         Result := Syscall_Unsuccessful_Without_Kernel_Error;
-         return;
-      end if;
-
-      if Path_String_Length > Maximum_Path_String_Length then
+      --  Perform this check first, so that we can ensure that the path string
+      --  length won't overflow any further type conversions.
+      if Path_String_Length > Maximum_Path_String_Argument_Length then
          Log_Error
            ("Path length exceeds maximum length: " & Path_String_Length'Image,
             Logging_Tags);
@@ -51,9 +43,19 @@ package body System_Calls.Files is
          return;
       end if;
 
+      if not Is_Valid_Userspace_Address_Range
+               (Path_String_Address, Storage_Count (Path_String_Length))
+      then
+         Log_Error ("Invalid non-userspace address range");
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
       Read_Path_String_And_Open_File : declare
          User_Path_String :
-           constant Filesystem_Path_T (1 .. Path_String_Length)
+           constant Filesystem_Path_T (1 .. Integer (Path_String_Length))
          with
            Import,
            Convention => C,
@@ -63,7 +65,7 @@ package body System_Calls.Files is
          --  Copy the userland path string into a new variable to ensure it is
          --  in the correct format, and within the kernel address space.
          New_Path_String : constant Filesystem_Path_T :=
-           User_Path_String (1 .. Path_String_Length);
+           User_Path_String (1 .. Integer (Path_String_Length));
       begin
          Filesystems.Open_File
            (Process, New_Path_String, File_Open_Flags, File_Handle, Result);
@@ -156,8 +158,7 @@ package body System_Calls.Files is
       Buffer_Address : constant Virtual_Address_T :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a2));
 
-      Bytes_To_Read : constant Natural :=
-        Natural (Trap_Context.Gp_Registers (a3));
+      Bytes_To_Read : constant Unsigned_64 := Trap_Context.Gp_Registers (a3);
       if Bytes_To_Read = 0 then
          Log_Error ("Invalid bytes to read: " & Bytes_To_Read'Image);
          Syscall_Result := Unsigned_64 (Bytes_Read);
@@ -165,7 +166,16 @@ package body System_Calls.Files is
          return;
       end if;
 
-      if not Is_Valid_Userspace_Address_Range (Buffer_Address, Bytes_To_Read)
+      if Bytes_To_Read > Filesystem_Max_Read_Write_Byte_Count then
+         Log_Error ("Invalid bytes to read: " & Bytes_To_Read'Image);
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      if not Is_Valid_Userspace_Address_Range
+               (Buffer_Address, Storage_Count (Bytes_To_Read))
       then
          Log_Error ("Invalid non-userspace address range");
 
@@ -189,7 +199,7 @@ package body System_Calls.Files is
         (Process,
          File_Handle,
          Buffer_Address,
-         Bytes_To_Read,
+         Integer (Bytes_To_Read),
          Bytes_Read,
          Result);
 
@@ -263,8 +273,7 @@ package body System_Calls.Files is
       Buffer_Address : constant Virtual_Address_T :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a2));
 
-      Bytes_To_Write : constant Natural :=
-        Natural (Trap_Context.Gp_Registers (a3));
+      Bytes_To_Write : constant Unsigned_64 := Trap_Context.Gp_Registers (a3);
       if Bytes_To_Write = 0 then
          Log_Error ("Invalid bytes to write: " & Bytes_To_Write'Image);
          Bytes_Written := 0;
@@ -273,7 +282,16 @@ package body System_Calls.Files is
          return;
       end if;
 
-      if not Is_Valid_Userspace_Address_Range (Buffer_Address, Bytes_To_Write)
+      if Bytes_To_Write > Filesystem_Max_Read_Write_Byte_Count then
+         Log_Error ("Invalid bytes to write: " & Bytes_To_Write'Image);
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      if not Is_Valid_Userspace_Address_Range
+               (Buffer_Address, Storage_Count (Bytes_To_Write))
       then
          Log_Error ("Invalid non-userspace address range");
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
@@ -295,7 +313,7 @@ package body System_Calls.Files is
         (Process,
          File_Handle,
          Buffer_Address,
-         Bytes_To_Write,
+         Integer (Bytes_To_Write),
          Bytes_Written,
          Result);
 

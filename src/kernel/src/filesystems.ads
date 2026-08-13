@@ -19,10 +19,16 @@ with Utilities;        use Utilities;
 package Filesystems
   with Preelaborate
 is
-
    Block_Size : constant := 16#1000#;
 
    Filesystem_Node_Name_Max_Byte_Length : constant Integer := 256;
+
+   Filesystem_Max_Read_Write_Byte_Count : constant := 16#7FFF_FFFF#;
+
+   pragma
+     Compile_Time_Error
+       (Filesystem_Max_Read_Write_Byte_Count > Integer'Last,
+        "Filesystem_Max_Read_Write_Byte_Count must fit in Integer");
 
    --  This type is used to represent the *kernel's* internal representation
    --  of a storage device sector. It's independent of any particular device's

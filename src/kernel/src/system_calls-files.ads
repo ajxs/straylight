@@ -41,6 +41,8 @@ is
       Result         : out Function_Result);
 
 private
+   Maximum_Path_String_Argument_Length : constant := 256;
+
    function Unsigned_64_To_File_Open_Flags is new
      Ada.Unchecked_Conversion
        (Source => Unsigned_64,

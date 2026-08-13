@@ -103,16 +103,20 @@ is
    function Convert_Higher_Half_Address_To_Lower
      (Addr : Address) return Address
    is (Addr - Higher_Half_Offset)
-   with Pure_Function;
+   with Inline, Pure_Function;
 
+   --  Note: This implementation ensures that the calculation won't overflow
+   --  the address type range, and wrap back around.
    function Is_Valid_Userspace_Address_Range
-     (Base_Address : Virtual_Address_T; Size : Integer) return Boolean
-   is (Base_Address + Storage_Offset (Size) < User_Address_Space_Limit);
+     (Base_Address : Virtual_Address_T; Size : Storage_Count) return Boolean
+   is (To_Address (Integer_Address'Last) - Size >= Base_Address
+       and then Base_Address + Size <= User_Address_Space_Limit)
+   with Inline, Pure_Function;
 
    function Get_Lower_Physical_Address
      (Addr : Address) return Physical_Address_T
    is (Physical_Address_T (Convert_Higher_Half_Address_To_Lower (Addr)))
-   with Pure_Function;
+   with Inline, Pure_Function;
 
    function Unsigned_32_To_Address (U32 : Unsigned_32) return Address
    is (To_Address (Integer_Address (U32)))
