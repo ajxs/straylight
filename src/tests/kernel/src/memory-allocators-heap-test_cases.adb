@@ -567,7 +567,7 @@ package body Memory.Allocators.Heap.Test_Cases is
         (Virtual_Address  => Null_Address,
          Physical_Address => Null_Physical_Address);
 
-      Block_Area_Size : constant Storage_Offset :=
+      Block_Area_Size : constant Storage_Count :=
         Region_Size - Region_Header_Size;
    begin
       Initialise_Test_Heap (Test_Heap, Heap_Backend'Address, 2 * Region_Size);
@@ -628,11 +628,7 @@ package body Memory.Allocators.Heap.Test_Cases is
 
       --  This request cannot fit in the remaining space of the first region,
       --  so the allocator must traverse into the second region.
-      Allocate
-        (Test_Heap,
-         Integer (Block_Area_Size) - 256,
-         Allocation_Result,
-         Result);
+      Allocate (Test_Heap, Block_Area_Size - 256, Allocation_Result, Result);
       Assert (Result = Success, "Allocation from the second region succeeded");
 
       Assert
