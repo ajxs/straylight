@@ -153,23 +153,4 @@ private
    --  the base table of the new process.
    Kernel_Address_Space : Virtual_Memory_Space_T;
 
-   function Is_Region_Intersecting
-     (Region     : Virtual_Memory_Mapping_T;
-      Start_Addr : Virtual_Address_T;
-      Size       : Memory_Region_Size) return Boolean
-   with Pure_Function;
-
-   function Is_Mapping_List_Empty
-     (Addr_Space : Virtual_Memory_Space_T) return Boolean
-   is (Addr_Space.Memory_Map_List_Head = No_Mapping);
-
-   function Get_Real_Region_Size
-     (Size : Memory_Region_Size) return Memory_Region_Size
-   with Pure_Function;
-
-   procedure Find_Unused_List_Entry_Index
-     (Addr_Space : Virtual_Memory_Space_T;
-      Free_Index : out Map_Index_T;
-      Result     : out Function_Result);
-
 end Memory.Virtual;

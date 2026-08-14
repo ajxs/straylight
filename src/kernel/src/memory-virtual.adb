@@ -21,7 +21,7 @@ package body Memory.Virtual is
       Dest_Addr_Space   : in out Virtual_Memory_Space_T;
       Result            : out Function_Result)
    is
-      Source_Base_Page_Table : Page_Table_T
+      Source_Base_Page_Table : constant Page_Table_T
       with
         Import,
         Alignment => 1,
@@ -104,55 +104,34 @@ package body Memory.Virtual is
       Log_Error ("Memory map exhausted", Logging_Tags);
    end Find_Unused_List_Entry_Index;
 
-   function Get_Real_Region_Size
-     (Size : Memory_Region_Size) return Memory_Region_Size is
+   procedure Get_Real_Mapping_Region_Size
+     (Size      : Memory_Region_Size;
+      Real_Size : out Memory_Region_Size;
+      Result    : out Function_Result) is
    begin
       Modulo : constant Memory_Region_Size := Size mod Small_Page_Size;
       if Modulo /= 0 then
-         return Size - Modulo + Small_Page_Size;
+         Real_Size := Size - Modulo + Small_Page_Size;
+      else
+         Real_Size := Size;
       end if;
 
-      return Size;
+      Result := Success;
    exception
       when Constraint_Error =>
-         return 1;
-   end Get_Real_Region_Size;
+         Log_Error
+           ("Constraint_Error: Get_Real_Mapping_Region_Size", Logging_Tags);
+         Real_Size := 0;
+         Result := Constraint_Exception;
+   end Get_Real_Mapping_Region_Size;
 
-   function Is_Region_Intersecting
-     (Region     : Virtual_Memory_Mapping_T;
-      Start_Addr : Virtual_Address_T;
-      Size       : Memory_Region_Size) return Boolean is
-   begin
-      Test_Region_End : constant Virtual_Address_T := Start_Addr + Size;
-
-      Region_End : constant Virtual_Address_T :=
-        Region.Virtual_Addr + Region.Size;
-
-      Maximum_Start : constant Virtual_Address_T :=
-        (if Region.Virtual_Addr > Start_Addr
-         then Region.Virtual_Addr
-         else Start_Addr);
-
-      Minimum_End : constant Virtual_Address_T :=
-        (if Region_End < Test_Region_End then Region_End else Test_Region_End);
-
-      return Minimum_End > Maximum_Start;
-   end Is_Region_Intersecting;
-
-   procedure Map_Unlocked
-     (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
-      Virtual_Address                : Virtual_Address_T;
+   procedure Validate_Map_Parameters
+     (Virtual_Address                : Virtual_Address_T;
       Physical_Address               : Physical_Address_T;
       Size                           : Memory_Region_Size;
       Region_Flags                   : Memory_Region_Flags_T;
-      Result                         : out Function_Result;
-      Allow_Mapping_Kernel_Addresses : Boolean := False)
-   is
-      VMM_Map renames Virt_Memory_Space.Memory_Map;
-
-      Current_Region  : Map_Index_T := No_Mapping;
-      Previous_Region : Map_Index_T := No_Mapping;
-      New_Index       : Map_Index_T := No_Mapping;
+      Allow_Mapping_Kernel_Addresses : Boolean;
+      Result                         : out Function_Result) is
    begin
       if not Allow_Mapping_Kernel_Addresses
         and then not Is_Valid_Userspace_Address_Range (Virtual_Address, Size)
@@ -189,8 +168,42 @@ package body Memory.Virtual is
          return;
       end if;
 
-      --  Ensures the size of the virtual memory mapping is page aligned.
-      Real_Size : constant Memory_Region_Size := Get_Real_Region_Size (Size);
+      Result := Success;
+   end Validate_Map_Parameters;
+
+   procedure Map_Unlocked
+     (Virt_Memory_Space              : in out Virtual_Memory_Space_T;
+      Virtual_Address                : Virtual_Address_T;
+      Physical_Address               : Physical_Address_T;
+      Size                           : Memory_Region_Size;
+      Region_Flags                   : Memory_Region_Flags_T;
+      Result                         : out Function_Result;
+      Allow_Mapping_Kernel_Addresses : Boolean := False)
+   is
+      VMM_Map renames Virt_Memory_Space.Memory_Map;
+
+      Real_Size : Memory_Region_Size := 0;
+
+      Current_Region  : Map_Index_T := No_Mapping;
+      Previous_Region : Map_Index_T := No_Mapping;
+      New_Index       : Map_Index_T := No_Mapping;
+   begin
+      Validate_Map_Parameters
+        (Virtual_Address,
+         Physical_Address,
+         Size,
+         Region_Flags,
+         Allow_Mapping_Kernel_Addresses,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      --  Gets the real size of memory to map, which is always page aligned.
+      Get_Real_Mapping_Region_Size (Size, Real_Size, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       --  Find the first non-allocated mapping entry and use this for the
       --  new mapping.
@@ -206,8 +219,11 @@ package body Memory.Virtual is
       --  existing mapping.
       Current_Region := Virt_Memory_Space.Memory_Map_List_Head;
       while Current_Region /= No_Mapping loop
-         if Is_Region_Intersecting
-              (VMM_Map (Current_Region), Virtual_Address, Size)
+         if Do_Memory_Regions_Overlap
+              (VMM_Map (Current_Region).Virtual_Addr,
+               VMM_Map (Current_Region).Size,
+               Virtual_Address,
+               Real_Size)
          then
             Log_Error
               ("Regions Intersect: "
