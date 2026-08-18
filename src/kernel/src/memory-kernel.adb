@@ -308,10 +308,7 @@ package body Memory.Kernel is
       Free_Result : Function_Result := Unset;
    begin
       Get_Minimum_Region_Size
-        (Positive (Allocation_Size),
-         Alignment,
-         Minimum_Region_Size_In_Bytes,
-         Result);
+        (Allocation_Size, Alignment, Minimum_Region_Size_In_Bytes, Result);
       if Is_Error (Result) then
          return;
       end if;

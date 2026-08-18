@@ -67,7 +67,7 @@ is
       Alignment         : Storage_Count := 1);
 
    procedure Get_Minimum_Region_Size
-     (Allocation_Size     : Positive;
+     (Allocation_Size     : Storage_Count;
       Alignment           : Storage_Count;
       Minimum_Region_Size : out Storage_Count;
       Result              : out Function_Result);
