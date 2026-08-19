@@ -675,9 +675,7 @@ package body Memory.Physical is
          Move
            (Address (Mapped_New_Address),
             Address (Mapped_Old_Address),
-            Integer
-              (Get_Block_Size_In_Bytes
-                 (PMM_Blocks (Current_Block_Index).Order)));
+            Get_Block_Size_In_Bytes (PMM_Blocks (Current_Block_Index).Order));
       end Move_Memory_To_New_Address;
 
       --  Free the old allocation.

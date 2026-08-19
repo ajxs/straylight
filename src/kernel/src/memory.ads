@@ -158,7 +158,7 @@ is
    ----------------------------------------------------------------------------
    --  Generic memmove import.
    ----------------------------------------------------------------------------
-   procedure Move (Dest : Address; Source : Address; Count : Integer)
+   procedure Move (Dest : Address; Source : Address; Count : Storage_Count)
    with Import, Convention => C, External_Name => "memmove";
 
    ----------------------------------------------------------------------------
