@@ -125,9 +125,7 @@ package body Memory.Kernel is
 
             --  Allocate the physical memory backing the new region.
             Allocate_Physical_Memory
-              (Positive (Region_Size_In_Bytes),
-               Region_Physical_Address,
-               Result);
+              (Region_Size_In_Bytes, Region_Physical_Address, Result);
             if Result = Success then
                --  Reserve the virtual address space for the new region.
                Reserve_Kernel_Page_Pool_Virtual_Address_Space
@@ -148,8 +146,7 @@ package body Memory.Kernel is
                end if;
 
                --  Zero the newly allocated page pool region.
-               Set
-                 (Region_Virtual_Address, 0, Positive (Region_Size_In_Bytes));
+               Set (Region_Virtual_Address, 0, Region_Size_In_Bytes);
 
                Region_Page_Count := Candidate_Page_Count;
 

@@ -1451,7 +1451,7 @@ package body Filesystems.FAT is
             Set
               (Block_Address + Sector_Offset_Within_Block,
                0,
-               Filesystem_Info.Bytes_Per_Sector);
+               Storage_Count (Filesystem_Info.Bytes_Per_Sector));
 
             Write_Block_To_Filesystem_And_Release
               (Filesystem, Writing_Process, Current_Block, Result);

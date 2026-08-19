@@ -40,7 +40,7 @@ package body Processes is
 
    procedure Grow_Process_Heap
      (Process : in out Process_Control_Block_T;
-      Size    : Positive;
+      Size    : Valid_Process_Memory_Region_Size;
       Result  : out Function_Result)
    is
       New_Heap_Memory_Phys_Addr : Physical_Address_T := Null_Physical_Address;
@@ -79,8 +79,7 @@ package body Processes is
             return;
          end if;
 
-         New_Heap_Memory_Virt_Addr :=
-           @ + Storage_Offset (Process.Heap (Index).Size);
+         New_Heap_Memory_Virt_Addr := @ + Process.Heap (Index).Size;
       end loop;
 
       Log_Error ("No free entries to grow userspace heap", Logging_Tags);

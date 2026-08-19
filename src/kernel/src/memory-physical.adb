@@ -9,7 +9,7 @@ package body Memory.Physical is
    PMM_Blocks renames Phys_Memory_Space.Physical_Memory_Blocks;
 
    procedure Allocate_Physical_Memory_Unlocked
-     (Required_Size     : Positive;
+     (Required_Size     : Valid_Physical_Memory_Allocation_Size;
       Allocated_Address : out Physical_Address_T;
       Result            : out Function_Result)
    is
@@ -129,7 +129,7 @@ package body Memory.Physical is
    end Allocate_Physical_Memory_Unlocked;
 
    procedure Allocate_Physical_Memory
-     (Required_Size     : Positive;
+     (Required_Size     : Valid_Physical_Memory_Allocation_Size;
       Allocated_Address : out Physical_Address_T;
       Result            : out Function_Result) is
    begin
@@ -229,7 +229,7 @@ package body Memory.Physical is
 
    procedure Check_For_Intersecting_Blocks
      (Region_Start  : Physical_Address_T;
-      Region_Length : Positive;
+      Region_Length : Storage_Count;
       Result        : out Function_Result)
    is
       Current_Block_Index : Block_Index := No_Block;
@@ -264,19 +264,19 @@ package body Memory.Physical is
 
    procedure Create_Free_Region_Unlocked
      (Region_Start  : Physical_Address_T;
-      Region_Length : Positive;
+      Region_Length : Storage_Count;
       Result        : out Function_Result)
    is
       Current_Block_Index : Block_Index := No_Block;
       Tail_Block_Index    : Block_Index := No_Block;
 
-      Highest_Possible_Order : Natural := Maximum_Block_Order;
-      Current_Block_Addr     : Natural := 0;
+      Highest_Possible_Order : Block_Order := Maximum_Block_Order;
+      Current_Block_Addr     : Storage_Count := 0;
    begin
       --  If the region length is not evenly divisible by the base block
       --  size, then it will end up with wasted space that cannot be
       --  allocated.
-      if Region_Length mod Base_Block_Size /= 0 then
+      if Region_Length = 0 or else Region_Length mod Base_Block_Size /= 0 then
          Log_Error ("Invalid region size", Logging_Tags);
          Result := Invalid_Physical_Memory_Size;
          return;
@@ -336,7 +336,7 @@ package body Memory.Physical is
          end if;
 
          PMM_Blocks (Current_Block_Index) :=
-           (Address    => Region_Start + Storage_Offset (Current_Block_Addr),
+           (Address    => Region_Start + Current_Block_Addr,
             Order      => Highest_Possible_Order,
             Free       => True,
             Next_Block => No_Block,
@@ -370,7 +370,7 @@ package body Memory.Physical is
 
    procedure Create_Free_Physical_Memory_Region
      (Region_Start  : Physical_Address_T;
-      Region_Length : Positive;
+      Region_Length : Storage_Count;
       Result        : out Function_Result) is
    begin
       Acquire_Spinlock (Phys_Memory_Space.Spinlock);
@@ -428,8 +428,7 @@ package body Memory.Physical is
       --  newly divided original block. This size is added to the
       --  previous block's address.
       Next_Block_Address : constant Address :=
-        Address (Block.Address)
-        + Storage_Offset (Get_Block_Size_In_Bytes (Block.Order));
+        Address (Block.Address) + Get_Block_Size_In_Bytes (Block.Order);
 
       --  Iterate through all available physical memory blocks in the
       --  reserved array until an unused entry is found. If it is,
@@ -539,7 +538,8 @@ package body Memory.Physical is
       Release_Spinlock (Phys_Memory_Space.Spinlock);
    end Free_Physical_Memory;
 
-   function Get_Block_Size_In_Bytes (Order : Block_Order) return Natural is
+   function Get_Block_Size_In_Bytes (Order : Block_Order) return Storage_Count
+   is
    begin
       return Base_Block_Size * (2 ** Order);
    exception
@@ -548,8 +548,8 @@ package body Memory.Physical is
    end Get_Block_Size_In_Bytes;
 
    procedure Get_Highest_Possible_Block_Order
-     (Physical_Memory_Length       : Natural;
-      Highest_Possible_Block_Order : out Natural;
+     (Physical_Memory_Length       : Storage_Count;
+      Highest_Possible_Block_Order : out Block_Order;
       Result                       : out Function_Result) is
    begin
       --  Start at the maximum block order and work downwards.
@@ -590,8 +590,8 @@ package body Memory.Physical is
    end Get_List_Tail;
 
    procedure Get_Smallest_Possible_Block_Order
-     (Required_Size                 : Positive;
-      Smallest_Possible_Block_Order : out Natural;
+     (Required_Size                 : Storage_Count;
+      Smallest_Possible_Block_Order : out Block_Order;
       Result                        : out Function_Result) is
    begin
       --  Start at the minimum block order and work upwards.
@@ -614,14 +614,14 @@ package body Memory.Physical is
 
    procedure Reallocate_Unlocked
      (Addr     : in out Physical_Address_T;
-      New_Size : Positive;
+      New_Size : Valid_Physical_Memory_Allocation_Size;
       Result   : out Function_Result)
    is
       New_Address : Physical_Address_T := Null_Physical_Address;
 
       Current_Block_Index : Block_Index := No_Block;
       --  The block order required for the new required size.
-      Required_Order      : Natural := 0;
+      Required_Order      : Block_Order := 0;
    begin
       --  Get the smallest possible block order required for the
       --  newly resized block.
@@ -675,7 +675,9 @@ package body Memory.Physical is
          Move
            (Address (Mapped_New_Address),
             Address (Mapped_Old_Address),
-            New_Size);
+            Integer
+              (Get_Block_Size_In_Bytes
+                 (PMM_Blocks (Current_Block_Index).Order)));
       end Move_Memory_To_New_Address;
 
       --  Free the old allocation.
@@ -695,7 +697,7 @@ package body Memory.Physical is
 
    procedure Reallocate_Physical_Memory
      (Addr     : in out Physical_Address_T;
-      New_Size : Positive;
+      New_Size : Valid_Physical_Memory_Allocation_Size;
       Result   : out Function_Result) is
    begin
       Acquire_Spinlock (Phys_Memory_Space.Spinlock);

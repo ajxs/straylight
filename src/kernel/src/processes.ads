@@ -65,7 +65,7 @@ is
    --  An allocated region of process memory. e.g. The process' heap, or stack.
    type Process_Memory_Region_Allocation_T is record
       Phys_Addr : Physical_Address_T := Null_Physical_Address;
-      Size      : Natural := 0;
+      Size      : Storage_Count := 0;
    end record;
 
    --  A list of non-contiguous regions of allocated physical memory. These
@@ -172,9 +172,12 @@ is
 
    procedure Initialise_Hart_Idle_Process (Hart_Id : Integer);
 
+   subtype Valid_Process_Memory_Region_Size is
+     Storage_Count range 1 .. Storage_Count'Last;
+
    procedure Grow_Process_Heap
      (Process : in out Process_Control_Block_T;
-      Size    : Positive;
+      Size    : Valid_Process_Memory_Region_Size;
       Result  : out Function_Result);
 
 private

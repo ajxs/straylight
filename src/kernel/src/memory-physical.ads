@@ -15,9 +15,11 @@ with Logging;          use Logging;
 package Memory.Physical
   with Preelaborate
 is
+   subtype Valid_Physical_Memory_Allocation_Size is
+     Storage_Count range 1 .. Storage_Count'Last;
 
    procedure Allocate_Physical_Memory
-     (Required_Size     : Positive;
+     (Required_Size     : Valid_Physical_Memory_Allocation_Size;
       Allocated_Address : out Physical_Address_T;
       Result            : out Function_Result);
 
@@ -26,12 +28,12 @@ is
 
    procedure Reallocate_Physical_Memory
      (Addr     : in out Physical_Address_T;
-      New_Size : Positive;
+      New_Size : Valid_Physical_Memory_Allocation_Size;
       Result   : out Function_Result);
 
    procedure Create_Free_Physical_Memory_Region
      (Region_Start  : Physical_Address_T;
-      Region_Length : Positive;
+      Region_Length : Storage_Count;
       Result        : out Function_Result);
 
 private
@@ -93,13 +95,13 @@ private
    Base_Block_Size : constant := 16#1000#;
 
    procedure Get_Highest_Possible_Block_Order
-     (Physical_Memory_Length       : Natural;
-      Highest_Possible_Block_Order : out Natural;
+     (Physical_Memory_Length       : Storage_Count;
+      Highest_Possible_Block_Order : out Block_Order;
       Result                       : out Function_Result);
 
    procedure Get_Smallest_Possible_Block_Order
-     (Required_Size                 : Positive;
-      Smallest_Possible_Block_Order : out Natural;
+     (Required_Size                 : Storage_Count;
+      Smallest_Possible_Block_Order : out Block_Order;
       Result                        : out Function_Result);
 
    function Find_Free_Entry return Block_Index;
@@ -108,10 +110,10 @@ private
 
    procedure Check_For_Intersecting_Blocks
      (Region_Start  : Physical_Address_T;
-      Region_Length : Positive;
+      Region_Length : Storage_Count;
       Result        : out Function_Result);
 
-   function Get_Block_Size_In_Bytes (Order : Block_Order) return Natural
+   function Get_Block_Size_In_Bytes (Order : Block_Order) return Storage_Count
    with Inline, Pure_Function;
 
    --  Checks if the specified region intersects with the given block.
@@ -119,13 +121,13 @@ private
    --  region of memory.
    function Is_Region_Intersecting
      (Start  : Physical_Address_T;
-      Length : Positive;
+      Length : Storage_Count;
       Block  : Physical_Memory_Block_T) return Boolean
    is (Do_Memory_Regions_Overlap
          (Address (Start),
-          Storage_Offset (Length),
+          Length,
           Address (Block.Address),
-          Storage_Offset (Get_Block_Size_In_Bytes (Block.Order))))
+          Get_Block_Size_In_Bytes (Block.Order)))
    with Inline, Pure_Function;
 
    procedure Divide_Physical_Memory_Block
@@ -152,7 +154,7 @@ private
        and then Block.Order = Next_Block.Order
        --  For blocks to be consolidated, they need to be adjacent in memory.
        and then
-         Block.Address + Storage_Offset (Get_Block_Size_In_Bytes (Block.Order))
+         Block.Address + Get_Block_Size_In_Bytes (Block.Order)
          = Next_Block.Address)
    with Pure_Function;
 

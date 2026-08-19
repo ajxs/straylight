@@ -164,7 +164,7 @@ is
    ----------------------------------------------------------------------------
    --  Generic memset import.
    ----------------------------------------------------------------------------
-   procedure Set (Dest : Address; Value : Integer; Size : Integer)
+   procedure Set (Dest : Address; Value : Integer; Size : Storage_Count)
    with Import, Convention => C, External_Name => "memset";
 
    function Do_Memory_Regions_Overlap

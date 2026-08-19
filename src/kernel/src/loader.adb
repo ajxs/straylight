@@ -118,8 +118,17 @@ package body Loader is
 
          Print_ELF64_Program_Header_Info (Program_Header);
 
+         if Program_Header.p_type = PT_LOAD
+           and then Program_Header.p_filesz > Program_Header.p_memsz
+         then
+            Log_Error ("Segment file size exceeds memory size", Logging_Tags);
+            Result := Unhandled_Exception;
+            return;
+         end if;
+
          --  If this segment needs to be loaded.
-         if Program_Header.p_type = PT_LOAD then
+         if Program_Header.p_type = PT_LOAD and then Program_Header.p_memsz > 0
+         then
             Log_Debug ("Allocating segment physical memory...", Logging_Tags);
 
             --  Program_Header.p_vaddr specifies the virtual address at which
@@ -136,9 +145,9 @@ package body Loader is
             Vaddr_Page_Align_Offset : constant Unsigned_64 :=
               Program_Header.p_vaddr mod 16#1000#;
 
-            Total_Mapping_Size : constant Natural :=
-              Natural (Program_Header.p_memsz)
-              + Natural (Vaddr_Page_Align_Offset);
+            Total_Mapping_Size : constant Storage_Count :=
+              Storage_Count (Program_Header.p_memsz)
+              + Storage_Count (Vaddr_Page_Align_Offset);
 
             --  Allocate physical memory for the segment.
             Allocate_Physical_Memory

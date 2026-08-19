@@ -108,8 +108,12 @@ package body Boot is
    begin
       Log_Debug ("Freeing boot memory...", Logging_Tags);
 
-      Free_Physical_Memory_Length : constant Natural :=
-        Natural (Boot_End_Offset'Address - Boot_Start_Offset'Address);
+      Free_Physical_Memory_Length : constant Storage_Offset :=
+        Boot_End_Offset'Address - Boot_Start_Offset'Address;
+
+      if Free_Physical_Memory_Length not in Storage_Count'Range then
+         Panic ("Invalid free physical memory length");
+      end if;
 
       Create_Free_Physical_Memory_Region
         (Get_Lower_Physical_Address (Boot_Start_Offset'Address),
@@ -636,10 +640,12 @@ package body Boot is
    begin
       Log_Debug ("Initialising PMM...", Logging_Tags);
 
-      Free_Physical_Memory_Length : constant Natural :=
-        Natural
-          (To_Address (16#8800_0000#)
-           - (Kernel_End'Address - Higher_Half_Offset));
+      Free_Physical_Memory_Length : constant Storage_Offset :=
+        To_Address (16#8800_0000#) - (Kernel_End'Address - Higher_Half_Offset);
+
+      if Free_Physical_Memory_Length not in Storage_Count'Range then
+         Panic ("Invalid free physical memory length");
+      end if;
 
       Create_Free_Physical_Memory_Region
         (Get_Lower_Physical_Address (Kernel_End'Address),

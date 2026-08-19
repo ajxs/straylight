@@ -378,7 +378,7 @@ package body Memory.Allocators.Heap is
                Logging_Tags_Heap);
 
             --  Zero the new block's memory.
-            Set (Allocation_Result.Virtual_Address, 0, Integer (Size));
+            Set (Allocation_Result.Virtual_Address, 0, Size);
 
             return;
          elsif Is_Error (Result) then
