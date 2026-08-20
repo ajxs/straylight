@@ -47,7 +47,7 @@ package body Locks is
       Lock.Time_Acquired := Get_System_Time;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Acquire_Spinlock");
+         Log_Constraint_Error;
    end Acquire_Spinlock;
 
    procedure Release_Spinlock (Lock : in out Spinlock_T) is
@@ -81,6 +81,6 @@ package body Locks is
       Pop_Interrupts_Off;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Release_Spinlock");
+         Log_Constraint_Error;
    end Release_Spinlock;
 end Locks;

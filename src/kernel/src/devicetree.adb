@@ -34,7 +34,7 @@ package body Devicetree is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Push_Cells_Context");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Push_Cells_Context;
 
@@ -57,7 +57,7 @@ package body Devicetree is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Pop_Cells_Context");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Pop_Cells_Context;
 
@@ -107,9 +107,7 @@ package body Devicetree is
       Result := Success;
    exception
       when others =>
-         Log_Error
-           ("Constraint_Error: Parse_Reserved_Memory_Regions",
-            Devicetree_Logging_Tags);
+         Log_Constraint_Error (Devicetree_Logging_Tags);
          Result := Constraint_Exception;
    end Parse_Reserved_Memory_Regions;
 
@@ -151,7 +149,7 @@ package body Devicetree is
       Result := Success;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Read_Node_Name_String");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Node_Name_String;
 
@@ -196,7 +194,7 @@ package body Devicetree is
       Result := Success;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Read_Property_Name_String");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Property_Name_String;
 
@@ -286,8 +284,7 @@ package body Devicetree is
       Result := Success;
    exception
       when others =>
-         Log_Error
-           ("Constraint_Error: Parse_Devicetree", Devicetree_Logging_Tags);
+         Log_Constraint_Error (Devicetree_Logging_Tags);
 
          Result := Constraint_Exception;
    end Parse_Devicetree;
@@ -338,8 +335,7 @@ package body Devicetree is
       Result := Success;
    exception
       when others =>
-         Log_Error
-           ("Constraint_Error: Parse_Property", Devicetree_Logging_Tags);
+         Log_Constraint_Error (Devicetree_Logging_Tags);
          Result := Constraint_Exception;
    end Parse_Property;
 
@@ -370,7 +366,7 @@ package body Devicetree is
       Result := Success;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Get_Next_Token");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Get_Next_Token;
 
@@ -551,7 +547,7 @@ package body Devicetree is
       Result := Success;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Parse_Structure_Block");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_Structure_Block;
 
@@ -575,7 +571,7 @@ package body Devicetree is
       return True;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Compare_Node_Name");
+         Log_Constraint_Error;
          return False;
    end Compare_Node_Name;
 

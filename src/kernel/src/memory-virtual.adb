@@ -119,8 +119,7 @@ package body Memory.Virtual is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Get_Real_Mapping_Region_Size", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Real_Size := 0;
          Result := Constraint_Exception;
    end Get_Real_Mapping_Region_Size;
@@ -290,8 +289,7 @@ package body Memory.Virtual is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Memory.Virtual.Map_Unlocked", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Map_Unlocked;
 
@@ -384,7 +382,7 @@ package body Memory.Virtual is
       Result := Memory_Block_Not_Found;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Unmap_Unlocked", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Unmap_Unlocked;
 
@@ -434,9 +432,7 @@ package body Memory.Virtual is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Deallocate_Memory_Space_Unlocked",
-            Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Deallocate_Memory_Space_Unlocked;
 
@@ -590,7 +586,7 @@ package body Memory.Virtual is
       Log_Debug ("Initialised kernel address space.", Logging_Tags);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Kernel_Address_Space");
+         Panic_Constraint_Error;
    end Initialise_Kernel_Address_Space;
 
    function Get_Kernel_Address_Space_SATP return Unsigned_64

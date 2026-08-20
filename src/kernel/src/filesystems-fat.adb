@@ -83,7 +83,7 @@ package body Filesystems.FAT is
       Print_FAT_Filesystem_Info (FAT_Filesystem_Info);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Populate_Filesystem_Meta_Info");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Populate_Filesystem_Meta_Info;
 
@@ -99,9 +99,7 @@ package body Filesystems.FAT is
       end if;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Populate_Filesystem_Meta_Info_If_Needed",
-            Logging_Tags_FAT);
+         Log_Constraint_Error (Logging_Tags_FAT);
          Result := Constraint_Exception;
    end Populate_Filesystem_Meta_Info_If_Needed;
 
@@ -171,7 +169,7 @@ package body Filesystems.FAT is
       end case;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_File", Logging_Tags_FAT);
+         Log_Constraint_Error (Logging_Tags_FAT);
          New_Node := null;
          Result := Constraint_Exception;
    end Create_File;
@@ -226,7 +224,7 @@ package body Filesystems.FAT is
       end case;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_File", Logging_Tags_FAT);
+         Log_Constraint_Error (Logging_Tags_FAT);
          Found_Node := null;
          Result := Constraint_Exception;
    end Find_File;
@@ -279,8 +277,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Parse_DOS_Directory_Entry", Logging_Tags_FAT);
+         Log_Constraint_Error (Logging_Tags_FAT);
          Result := Unhandled_Exception;
    end Parse_DOS_Directory_Entry;
 
@@ -316,7 +313,7 @@ package body Filesystems.FAT is
          Logging_Tags_FAT);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Print_FAT_Filesystem_Info");
+         Log_Constraint_Error;
    end Print_FAT_Filesystem_Info;
 
    procedure Parse_Boot_Sector
@@ -417,7 +414,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Parse_Boot_Sector");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_Boot_Sector;
 
@@ -450,7 +447,7 @@ package body Filesystems.FAT is
       end case;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_FAT_Entry");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_FAT_Entry;
 
@@ -478,7 +475,7 @@ package body Filesystems.FAT is
       end case;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_FAT_Entry");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Write_FAT_Entry;
 
@@ -627,7 +624,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Filesystems.FAT.Read_File");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_File;
 
@@ -689,8 +686,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Read_FAT_Filename_Into_Filesystem_Node_Name");
+         Log_Constraint_Error;
 
          Result := Constraint_Exception;
    end Read_FAT_Filename_Into_Filesystem_Node_Name;
@@ -733,8 +729,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Does_FAT_Directory_Entry_Name_Match_Filename");
+         Log_Constraint_Error;
          Match_Found := False;
          Result := Constraint_Exception;
    end Does_FAT_Directory_Entry_Name_Match_Filename;
@@ -868,7 +863,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_File");
+         Log_Constraint_Error;
          Bytes_Written := 0;
          Result := Constraint_Exception;
    end Write_File;
@@ -1074,7 +1069,7 @@ package body Filesystems.FAT is
       Result := File_Not_Found;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Search_FAT_Directory_For_File");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Search_FAT_Directory_For_File;
 
@@ -1101,7 +1096,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Directory_Entry_Sector_And_Index");
+         Log_Constraint_Error;
          Sector_Number := 0;
          Index_Within_Sector := 0;
          Result := Constraint_Exception;
@@ -1384,7 +1379,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_File_Data");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_File_Data;
 
@@ -1490,7 +1485,7 @@ package body Filesystems.FAT is
       end case;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_Free_Cluster");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Find_Free_Cluster;
 
@@ -1527,7 +1522,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Cluster");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Allocate_Cluster;
 
@@ -1697,7 +1692,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_File_Data");
+         Log_Constraint_Error;
          Bytes_Written := 0;
          Result := Constraint_Exception;
    end Write_File_Data;
@@ -1727,9 +1722,7 @@ package body Filesystems.FAT is
         and then New_Size - 1 in Cluster_Lower_Bound .. Cluster_Upper_Bound;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Is_New_File_Size_Within_Same_Cluster",
-            Logging_Tags_FAT);
+         Log_Constraint_Error (Logging_Tags_FAT);
          return False;
    end Is_New_File_Size_Within_Same_Cluster;
 
@@ -1826,9 +1819,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Truncate_File_To_Larger_Size",
-            Logging_Tags_FAT);
+         Log_Constraint_Error (Logging_Tags_FAT);
          Result := Constraint_Exception;
    end Truncate_File_To_Larger_Size;
 
@@ -1930,9 +1921,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Truncate_File_To_Smaller_Size",
-            Logging_Tags_FAT);
+         Log_Constraint_Error (Logging_Tags_FAT);
          Result := Constraint_Exception;
    end Truncate_File_To_Smaller_Size;
 
@@ -2065,7 +2054,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Truncate_File");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Truncate_File;
 

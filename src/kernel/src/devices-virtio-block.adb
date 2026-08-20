@@ -26,7 +26,7 @@ package body Devices.Virtio.Block is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Block_Request_Physical_Address");
+         Log_Constraint_Error;
          Addr := Null_Physical_Address;
          Result := Constraint_Exception;
    end Get_Block_Request_Physical_Address;
@@ -76,7 +76,7 @@ package body Devices.Virtio.Block is
          Unsigned_32 (Sector_Count * Virtio_Block_Sector_Size));
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Sectors");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Sectors;
 
@@ -98,7 +98,7 @@ package body Devices.Virtio.Block is
          Unsigned_32 (Sector_Count * Virtio_Block_Sector_Size));
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_Sectors");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Write_Sectors;
 
@@ -122,7 +122,7 @@ package body Devices.Virtio.Block is
 
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Is_Valid_Sector_Range");
+         Log_Constraint_Error;
          return False;
    end Is_Valid_Sector_Range;
 
@@ -328,7 +328,7 @@ package body Devices.Virtio.Block is
       end Read_Request_Status;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Write_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Write_Unlocked;
 
@@ -386,7 +386,7 @@ package body Devices.Virtio.Block is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Initialise_Block_Device");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Initialise_Block_Device;
 

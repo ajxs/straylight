@@ -80,7 +80,7 @@ package body Utilities is
       end if;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Encode_UCS2_Wide_Char_As_UTF8_Buffer");
+         Log_Constraint_Error;
 
          --  On error, output replacement character U+FFFD
          --  Refer to: https://en.wikipedia.org/wiki/Specials_(Unicode_block)
@@ -99,7 +99,7 @@ package body Utilities is
       end if;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Set_Fixed_Length_String");
+         Log_Constraint_Error;
    end Set_Fixed_Length_String;
 
    function Create_U32_Bitmask_From_Flags
@@ -122,7 +122,7 @@ package body Utilities is
          else C);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: To_Upper");
+         Log_Constraint_Error;
          return ' ';
    end To_Upper;
 
@@ -152,8 +152,7 @@ package body Utilities is
         = Comparison;
    exception
       when others =>
-         Log_Error
-           ("Constraint_Error: Compare_Fixed_Length_String_With_String");
+         Log_Constraint_Error;
          return False;
    end Compare_Fixed_Length_String_With_String;
 

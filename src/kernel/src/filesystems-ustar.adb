@@ -130,7 +130,7 @@ package body Filesystems.UStar is
       Result := File_Not_Found;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Filesystems.UStar.Find_File");
+         Log_Constraint_Error;
          Found_Node := null;
          Result := Constraint_Exception;
    end Find_File;
@@ -328,7 +328,7 @@ package body Filesystems.UStar is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Filesystems.UStar.Read_File");
+         Log_Constraint_Error;
          Bytes_Read := 0;
          Result := Constraint_Exception;
    end Read_File;

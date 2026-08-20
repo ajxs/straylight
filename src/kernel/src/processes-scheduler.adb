@@ -50,7 +50,7 @@ package body Processes.Scheduler is
       end if;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Verify_Context_Switch_Lock_State");
+         Panic_Constraint_Error;
    end Verify_Context_Switch_Lock_State;
 
    procedure Schedule_Next_Process_Unlocked
@@ -139,7 +139,7 @@ package body Processes.Scheduler is
       Next_Process := Hart_Idle_Processes (Get_Current_Hart_Id);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Schedule_Next_Process_Unlocked");
+         Panic_Constraint_Error;
    end Schedule_Next_Process_Unlocked;
 
    procedure Schedule_Next_Process
@@ -175,7 +175,7 @@ package body Processes.Scheduler is
       Acquire_Spinlock (Condition_Lock);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Lock_Process_Waiting_For_Channel");
+         Panic_Constraint_Error;
    end Lock_Process_Waiting_For_Channel;
 
    procedure Print_Process_Switch_Info
@@ -201,7 +201,7 @@ package body Processes.Scheduler is
          Logging_Tags_Scheduler);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Print_Process_Switch_Info");
+         Panic_Constraint_Error;
    end Print_Process_Switch_Info;
 
    procedure Finish_Context_Switch is
@@ -221,7 +221,7 @@ package body Processes.Scheduler is
       end if;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Finish_Context_Switch");
+         Panic_Constraint_Error;
    end Finish_Context_Switch;
 
    procedure Switch_Process_Context
@@ -291,7 +291,7 @@ package body Processes.Scheduler is
       Finish_Context_Switch;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Switch_Process_Context");
+         Panic_Constraint_Error;
    end Switch_Process_Context;
 
    procedure Run (New_Prev_Process_State : Process_Status_T := Process_Ready)
@@ -314,7 +314,7 @@ package body Processes.Scheduler is
       Log_Debug ("Scheduler.Run: Exiting scheduler", Logging_Tags_Scheduler);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Scheduler.Run");
+         Panic_Constraint_Error;
    end Run;
 
    procedure Run_Guarded
@@ -342,7 +342,7 @@ package body Processes.Scheduler is
         ("Scheduler.Run_Guarded: Exiting scheduler", Logging_Tags_Scheduler);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Scheduler.Run_Guarded");
+         Panic_Constraint_Error;
    end Run_Guarded;
 
    procedure Wake_Processes_Waiting_For_Channel_Unlocked
@@ -378,8 +378,7 @@ package body Processes.Scheduler is
          --  If a constraint error occurs while waking processes, it's likely
          --  that the system is in an invalid state. In this case it's better
          --  to panic and halt the system rather than continue.
-         Panic
-           ("Constraint_Error: Wake_Processes_Waiting_For_Channel_Unlocked");
+         Panic_Constraint_Error;
    end Wake_Processes_Waiting_For_Channel_Unlocked;
 
    procedure Wake_Processes_Waiting_For_Channel (Channel : Blocking_Channel_T)

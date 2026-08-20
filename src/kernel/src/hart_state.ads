@@ -3,6 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with GNAT.Source_Info;
 with System;
 
 with Memory;    use Memory;
@@ -67,6 +68,11 @@ is
    Hart_Idle_Processes : array (Hart_Index_T) of Process_Control_Block_Access;
 
    procedure Panic (Message : String := "Kernel Panic")
+   with No_Return;
+
+   procedure Panic_Constraint_Error
+     (File : String := GNAT.Source_Info.File;
+      Line : Positive := GNAT.Source_Info.Line)
    with No_Return;
 
    function Get_Current_Hart_Id return Hart_Index_T

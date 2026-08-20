@@ -3,6 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with GNAT.Source_Info;
+
 package Logging
   with Preelaborate
 is
@@ -52,6 +54,19 @@ is
      (Message : Wide_String; Tags : Log_Tags := Empty_Tag_List);
 
    procedure Log_Error (Message : String; Tags : Log_Tags := Empty_Tag_List);
+
+   ----------------------------------------------------------------------------
+   --  Logs the source location at which a Constraint_Error was handled.
+   --  The File and Line parameter defaults are GNAT intrinsics evaluated at
+   --  the *call site*, so callers shouldn't pass either. Line is a static
+   --  expression, compiling to a bare immediate.
+   --  File is a static string literal, which GNAT emits once per compilation
+   --  unit into a mergeable .rodata.str section.
+   ----------------------------------------------------------------------------
+   procedure Log_Constraint_Error
+     (Tags : Log_Tags := Empty_Tag_List;
+      File : String := GNAT.Source_Info.File;
+      Line : Positive := GNAT.Source_Info.Line);
 
 private
    Active_Logging_Transports : constant array (Log_Transport_T) of Boolean :=

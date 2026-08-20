@@ -89,7 +89,7 @@ package body Traps is
 
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Handle_Supervisor_Mode_Exception");
+         Panic_Constraint_Error;
    end Handle_Supervisor_Mode_Exception;
 
    procedure Handle_External_Interrupt is
@@ -149,7 +149,7 @@ package body Traps is
         (PLIC_Device, Supervisor_Interrupt_Context, Interrupt_ID);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Handle_External_Interrupt");
+         Panic_Constraint_Error;
    end Handle_External_Interrupt;
 
    procedure Handle_Supervisor_Mode_Interrupt
@@ -171,7 +171,7 @@ package body Traps is
       end case;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Handle_Supervisor_Mode_Interrupt");
+         Panic_Constraint_Error;
    end Handle_Supervisor_Mode_Interrupt;
 
    procedure Handle_Supervisor_Mode_Trap
@@ -242,7 +242,7 @@ package body Traps is
 
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Handle_Supervisor_Mode_Trap");
+         Panic_Constraint_Error;
    end Handle_Supervisor_Mode_Trap;
 
    procedure Handle_Timer_Interrupt is
@@ -260,7 +260,7 @@ package body Traps is
         ("Hart#" & Hart_Id'Image & ": Returning from timer IRQ", Logging_Tags);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Handle_Timer_Interrupt");
+         Panic_Constraint_Error;
    end Handle_Timer_Interrupt;
 
    procedure Handle_User_Mode_Exception
@@ -313,7 +313,7 @@ package body Traps is
       end case;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Handle_User_Mode_Exception");
+         Panic_Constraint_Error;
    end Handle_User_Mode_Exception;
 
    procedure Handle_User_Mode_Interrupt (Cause : Unsigned_64) is
@@ -331,7 +331,7 @@ package body Traps is
       end case;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Handle_User_Mode_Interrupt");
+         Panic_Constraint_Error;
    end Handle_User_Mode_Interrupt;
 
    procedure Handle_User_Mode_Trap
@@ -396,7 +396,7 @@ package body Traps is
       end Read_Process_Info;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Handle_User_Mode_Trap");
+         Panic_Constraint_Error;
    end Handle_User_Mode_Trap;
 
    procedure Setup_Next_Timer_Interrupt is
@@ -409,7 +409,7 @@ package body Traps is
 
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Setup_Next_Timer_Interrupt");
+         Panic_Constraint_Error;
    end Setup_Next_Timer_Interrupt;
 
    procedure Ensure_No_Locks_Held_In_Trap is
@@ -424,7 +424,7 @@ package body Traps is
       end if;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Ensure_No_Locks_Held_In_Trap");
+         Panic_Constraint_Error;
    end Ensure_No_Locks_Held_In_Trap;
 
 end Traps;

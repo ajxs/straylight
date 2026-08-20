@@ -126,7 +126,7 @@ package body Processes is
          Logging_Tags);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_And_Map_New_Process_Stack");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Allocate_And_Map_New_Process_Stack;
 
@@ -181,8 +181,7 @@ package body Processes is
 
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Allocate_And_Map_New_Process_Kernel_Stack");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Allocate_And_Map_New_Process_Kernel_Stack;
 
@@ -198,7 +197,7 @@ package body Processes is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Process_Id");
+         Log_Constraint_Error;
          New_Id := 0;
          Result := Constraint_Exception;
    end Allocate_Process_Id_Unlocked;
@@ -231,7 +230,7 @@ package body Processes is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Deallocate_Process_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Deallocate_Process_Unlocked;
 
@@ -338,8 +337,7 @@ package body Processes is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Get_Process_Kernel_Stack_Virtual_Address");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Get_Process_Kernel_Stack_Virtual_Address;
    pragma
@@ -380,7 +378,7 @@ package body Processes is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Add_Process_To_Process_Queue_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Add_Process_To_Process_Queue_Unlocked;
 
@@ -462,7 +460,7 @@ package body Processes is
 
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_New_Process");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Create_New_Process;
 
@@ -576,7 +574,7 @@ package body Processes is
          Process_Stack_Virtual_Address + Curr_Process.all.Stack_Size);
    exception
       when others =>
-         Panic ("Constraint_Error: Process_Start");
+         Panic_Constraint_Error;
    end Process_Start;
 
    procedure Initialise_Hart_Idle_Process (Hart_Id : Integer) is
@@ -595,7 +593,7 @@ package body Processes is
         Address_To_Unsigned_64 (Idle'Address);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Hart_Idle_Process");
+         Panic_Constraint_Error;
    end Initialise_Hart_Idle_Process;
 
 end Processes;

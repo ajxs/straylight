@@ -18,7 +18,7 @@ package body Devices.Ramdisk is
         and then Sector_Index_T (Sector_Count) <= Sector_Limit - Start_Sector;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Is_Valid_Sector_Range");
+         Log_Constraint_Error;
          return False;
    end Is_Valid_Sector_Range;
 
@@ -70,7 +70,7 @@ package body Devices.Ramdisk is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Sectors");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Sectors_Unlocked;
 
@@ -135,7 +135,7 @@ package body Devices.Ramdisk is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_Sectors");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Write_Sectors_Unlocked;
 

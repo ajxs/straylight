@@ -23,7 +23,7 @@ package body Filesystems.Block_Cache is
            > Cache_Entry_Age_Threshold);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Can_Block_Cache_Entry_Be_Invalidated");
+         Log_Constraint_Error;
          return False;
    end Can_Block_Cache_Entry_Be_Invalidated;
 
@@ -79,8 +79,7 @@ package body Filesystems.Block_Cache is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Find_And_Claim_Available_Block_Cache_Entry");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Find_And_Claim_Available_Block_Cache_Entry;
 
@@ -96,7 +95,7 @@ package body Filesystems.Block_Cache is
          and then Cache.Entries (Cache_Index).Block_Number = Block_Number);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Is_Matching_Used_Cache_Entry");
+         Log_Constraint_Error;
          return False;
    end Is_Matching_Used_Cache_Entry;
 
@@ -144,7 +143,7 @@ package body Filesystems.Block_Cache is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Block_Cache_Entry_Data_Address");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Get_Block_Cache_Entry_Data_Address;
    pragma
@@ -310,7 +309,7 @@ package body Filesystems.Block_Cache is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Block_From_Filesystem");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Block_From_Filesystem;
 
@@ -389,7 +388,7 @@ package body Filesystems.Block_Cache is
       end case;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Transfer_Block_Cache_Entry");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Transfer_Block_Cache_Entry;
 
@@ -437,7 +436,7 @@ package body Filesystems.Block_Cache is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Release_Block_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Release_Block_Unlocked;
 
@@ -513,7 +512,7 @@ package body Filesystems.Block_Cache is
 
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_Block_To_Filesystem");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Write_Block_To_Filesystem;
 

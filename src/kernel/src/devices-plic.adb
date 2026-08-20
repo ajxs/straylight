@@ -50,7 +50,7 @@ package body Devices.PLIC is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Set_Interrupt_Priority_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Set_Interrupt_Priority_Unlocked;
 
@@ -112,7 +112,7 @@ package body Devices.PLIC is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Set_IRQ_Enable_State_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Set_IRQ_Enable_State_Unlocked;
    pragma

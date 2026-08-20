@@ -313,9 +313,7 @@ package body Memory.Allocators.Heap is
              Region_Ptr.all.Next_Region);
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Validate_Heap_Memory_Region_Pointer",
-            Logging_Tags_Heap);
+         Log_Constraint_Error (Logging_Tags_Heap);
          return False;
    end Validate_Heap_Memory_Region_Pointer;
 
@@ -395,7 +393,7 @@ package body Memory.Allocators.Heap is
       Result := Not_Enough_Memory_Available;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate", Logging_Tags_Heap);
+         Log_Constraint_Error (Logging_Tags_Heap);
          Result := Constraint_Exception;
    end Allocate_Unlocked;
 
@@ -534,8 +532,7 @@ package body Memory.Allocators.Heap is
       Coalesce_Free_Blocks_In_Region (Memory_Heap_Region, Result);
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Free_Allocation_In_Region", Logging_Tags_Heap);
+         Log_Constraint_Error (Logging_Tags_Heap);
          Result := Constraint_Exception;
    end Free_Allocation_In_Region;
 
@@ -588,7 +585,7 @@ package body Memory.Allocators.Heap is
       Result := Address_Not_In_Heap;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Free", Logging_Tags_Heap);
+         Log_Constraint_Error (Logging_Tags_Heap);
          Result := Constraint_Exception;
    end Free_Unlocked;
 
@@ -654,8 +651,7 @@ package body Memory.Allocators.Heap is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Initialise_New_Region", Logging_Tags_Heap);
+         Log_Constraint_Error (Logging_Tags_Heap);
          Result := Constraint_Exception;
    end Initialise_New_Region;
 
@@ -729,8 +725,7 @@ package body Memory.Allocators.Heap is
       Initialise_New_Region (Virtual_Address, Physical_Address, Size, Result);
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Add_Memory_Region_To_Heap", Logging_Tags_Heap);
+         Log_Constraint_Error (Logging_Tags_Heap);
          Result := Constraint_Exception;
    end Add_Memory_Region_To_Heap_Unlocked;
 
@@ -785,8 +780,7 @@ package body Memory.Allocators.Heap is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Get_Minimum_Region_Size", Logging_Tags_Heap);
+         Log_Constraint_Error (Logging_Tags_Heap);
          Result := Constraint_Exception;
    end Get_Minimum_Region_Size;
 
@@ -808,9 +802,7 @@ package body Memory.Allocators.Heap is
            else Address_To_Unsigned_64 (Next_Region.all'Address));
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Calculate_Region_Header_Checksum",
-            Logging_Tags_Heap);
+         Log_Constraint_Error (Logging_Tags_Heap);
          return 0;
    end Calculate_Region_Header_Checksum;
 

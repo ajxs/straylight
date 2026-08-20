@@ -33,6 +33,16 @@ package body Hart_State is
          end loop;
    end Panic;
 
+   procedure Panic_Constraint_Error
+     (File : String := GNAT.Source_Info.File;
+      Line : Positive := GNAT.Source_Info.Line) is
+   begin
+      Panic ("Constraint_Error at " & File & ":" & Line'Image);
+   exception
+      when Constraint_Error =>
+         Panic ("Constraint_Error in Panic_Constraint_Error");
+   end Panic_Constraint_Error;
+
    procedure Pop_Interrupts_Off is
       Current_Hart_State : Hart_State_Access := null;
    begin
@@ -56,7 +66,7 @@ package body Hart_State is
       end if;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Pop_Interrupts_Off");
+         Panic_Constraint_Error;
    end Pop_Interrupts_Off;
 
    procedure Push_Interrupts_Off is
@@ -78,7 +88,7 @@ package body Hart_State is
         Current_Hart_State.all.Interrupts_Off_Counter + 1;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Push_Interrupts_Off");
+         Panic_Constraint_Error;
    end Push_Interrupts_Off;
 
    procedure Handle_Kernel_Stack_Overflow is

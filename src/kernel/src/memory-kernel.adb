@@ -27,8 +27,7 @@ package body Memory.Kernel is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: " & "Reserve_Virtual_Memory_Space_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Reserve_Virtual_Memory_Space_Unlocked;
 
@@ -71,7 +70,7 @@ package body Memory.Kernel is
    exception
       when Constraint_Error =>
          --  The reserved space is leaked, which is safe.
-         Log_Error ("Constraint_Error: Recover_Virtual_Memory_Space_Unlocked");
+         Log_Constraint_Error;
    end Recover_Virtual_Memory_Space_Unlocked;
 
    procedure Recover_Kernel_Page_Pool_Virtual_Address_Space
@@ -183,7 +182,7 @@ package body Memory.Kernel is
       Free_Physical_Memory (Region_Physical_Address, Free_Result);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Provision_New_Page_Pool_Region");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Provision_New_Page_Pool_Region;
 
@@ -398,7 +397,7 @@ package body Memory.Kernel is
       Free_Pages (Allocation_Result.Virtual_Address, Free_Result);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Grow_Kernel_Heap_And_Allocate");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Grow_Kernel_Heap_And_Allocate;
 

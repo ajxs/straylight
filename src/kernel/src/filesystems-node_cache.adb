@@ -19,7 +19,7 @@ package body Filesystems.Node_Cache is
 
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Add_Filesystem_Node_To_Cache_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Add_Filesystem_Node_To_Cache_Unlocked;
 
@@ -88,8 +88,7 @@ package body Filesystems.Node_Cache is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Create_Filesystem_Node_Cache_Entry_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Create_Filesystem_Node_Cache_Entry_Unlocked;
 
@@ -186,8 +185,7 @@ package body Filesystems.Node_Cache is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Find_Filesystem_Node_In_Cache_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Find_Filesystem_Node_In_Cache_Unlocked;
 
@@ -214,8 +212,7 @@ package body Filesystems.Node_Cache is
       return Cache_Entry.Node.all.Handle_Count = 0;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Can_Filesystem_Cache_Entry_Be_Overwritten");
+         Log_Constraint_Error;
          return False;
    end Can_Filesystem_Cache_Entry_Be_Overwritten;
 
@@ -248,9 +245,7 @@ package body Filesystems.Node_Cache is
       Result := Cache_Entry_Not_Found;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Search_For_Filesystem_Node_In_Cache",
-            Logging_Tags_Node_Cache);
+         Log_Constraint_Error (Logging_Tags_Node_Cache);
          Result := Constraint_Exception;
    end Search_For_Filesystem_Node_In_Cache;
 

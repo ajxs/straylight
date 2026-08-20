@@ -79,8 +79,7 @@ package body Filesystems.Root is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Add_Filesystem_Node_To_Root_Filesystem");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Add_Filesystem_Node_To_Root_Filesystem;
 
@@ -159,7 +158,7 @@ package body Filesystems.Root is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_File");
+         Log_Constraint_Error;
          Filesystem_Node := null;
          Result := Constraint_Exception;
    end Find_File;
@@ -194,7 +193,7 @@ package body Filesystems.Root is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Initialise_Root_Filesystem");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Initialise_Root_Filesystem;
 

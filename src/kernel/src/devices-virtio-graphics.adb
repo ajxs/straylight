@@ -165,8 +165,7 @@ package body Devices.Virtio.Graphics is
       end if;
    exception
       when others =>
-         Log_Error
-           ("Constraint_Error: Attach_Framebuffer_To_Resource_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Attach_Framebuffer_To_Resource_Unlocked;
 
@@ -320,7 +319,7 @@ package body Devices.Virtio.Graphics is
       end if;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Get_Display_Info_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Get_Display_Info_Unlocked;
 
@@ -462,7 +461,7 @@ package body Devices.Virtio.Graphics is
       end if;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Created_2d_Resource_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Created_2d_Resource_Unlocked;
 
@@ -607,7 +606,7 @@ package body Devices.Virtio.Graphics is
       end if;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Set_Scanout_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Set_Scanout_Unlocked;
 
@@ -772,7 +771,7 @@ package body Devices.Virtio.Graphics is
       end if;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Transfer_To_Host_2d_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Transfer_To_Host_2d_Unlocked;
 
@@ -922,7 +921,7 @@ package body Devices.Virtio.Graphics is
       end if;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Resource_Flush_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Resource_Flush_Unlocked;
 

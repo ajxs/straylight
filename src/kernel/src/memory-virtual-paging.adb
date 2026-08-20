@@ -46,8 +46,7 @@ package body Memory.Virtual.Paging is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Allocate_And_Initialise_New_Page_Table");
+         Log_Constraint_Error;
          Table_Physical_Address := Null_Physical_Address;
          Result := Constraint_Exception;
    end Allocate_And_Initialise_New_Page_Table;
@@ -296,7 +295,7 @@ package body Memory.Virtual.Paging is
       Result := Unhandled_Exception;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Memory.Virtual.Paging.Map_Region");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Map_Region;
 
@@ -472,7 +471,7 @@ package body Memory.Virtual.Paging is
       Result := Unhandled_Exception;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Unmap_Region");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Unmap_Region;
 

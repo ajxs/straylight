@@ -76,7 +76,7 @@ package body Filesystems.FAT.FAT16 is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_LFN_Directory_Entry");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Create_LFN_Directory_Entry;
 
@@ -127,7 +127,7 @@ package body Filesystems.FAT.FAT16 is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Scan_Directory_For_Unused_Entries");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Scan_Directory_For_Unused_Entries;
 
@@ -230,8 +230,7 @@ package body Filesystems.FAT.FAT16 is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Search_Root_Directory_For_Unused_Entries");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Search_Root_Directory_For_Unused_Entries;
 
@@ -466,7 +465,7 @@ package body Filesystems.FAT.FAT16 is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_File_In_Root_Directory_FAT16");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Create_File_In_Root_Directory_FAT16;
 
@@ -823,7 +822,7 @@ package body Filesystems.FAT.FAT16 is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_File_In_Directory_FAT16");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Create_File_In_Directory_FAT16;
 
@@ -896,7 +895,7 @@ package body Filesystems.FAT.FAT16 is
       end if;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_File_FAT16");
+         Log_Constraint_Error;
          New_Node := null;
          Result := Constraint_Exception;
    end Create_File_FAT16;
@@ -938,7 +937,7 @@ package body Filesystems.FAT.FAT16 is
 
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_File_FAT16");
+         Log_Constraint_Error;
          Found_Node := null;
          Result := Constraint_Exception;
    end Find_File_FAT16;
@@ -1078,7 +1077,7 @@ package body Filesystems.FAT.FAT16 is
       Result := File_Not_Found;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_File_In_FAT16_Directory");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Find_File_In_FAT16_Directory;
 
@@ -1197,7 +1196,7 @@ package body Filesystems.FAT.FAT16 is
       Result := File_Not_Found;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_File_In_FAT16_Root_Directory");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Find_File_In_FAT16_Root_Directory;
 
@@ -1255,7 +1254,7 @@ package body Filesystems.FAT.FAT16 is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_FAT16_Table_Entry_Sector_Number");
+         Log_Constraint_Error;
          Sector_Number := 0;
          Result := Constraint_Exception;
    end Get_FAT16_Table_Entry_Sector_Number;
@@ -1316,7 +1315,7 @@ package body Filesystems.FAT.FAT16 is
       Release_Block (Filesystem, Block_Number, Result);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_FAT16_Entry");
+         Log_Constraint_Error;
          FAT_Entry := 0;
          Result := Constraint_Exception;
    end Read_FAT16_Entry;
@@ -1374,7 +1373,7 @@ package body Filesystems.FAT.FAT16 is
       end loop;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_FAT16_Entry");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Write_FAT16_Entry;
 
@@ -1473,7 +1472,7 @@ package body Filesystems.FAT.FAT16 is
       Result := No_Free_Clusters;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_Free_Cluster_FAT16");
+         Log_Constraint_Error;
          Free_Cluster := 0;
          Result := Constraint_Exception;
    end Find_Free_Cluster_FAT16;

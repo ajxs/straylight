@@ -32,7 +32,7 @@ package body Devices.UART is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Rx_Data_Available_Interrupt");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Rx_Data_Available_Interrupt;
 
@@ -84,7 +84,7 @@ package body Devices.UART is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Acknowledge_Interrupt");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Acknowledge_Interrupt;
 
@@ -106,7 +106,7 @@ package body Devices.UART is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Ring_Buffer");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Allocate_Ring_Buffer;
 
@@ -363,7 +363,7 @@ package body Devices.UART is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Into_Ring_Buffer");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Into_Ring_Buffer;
 
@@ -398,7 +398,7 @@ package body Devices.UART is
       end;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_All_Incoming_Data");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_All_Incoming_Data_Unlocked;
 
@@ -467,7 +467,7 @@ package body Devices.UART is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Claim_Buffered_Data_Unlocked");
+         Log_Constraint_Error;
          Bytes_Read := 0;
          Result := Constraint_Exception;
    end Claim_Buffered_Data;

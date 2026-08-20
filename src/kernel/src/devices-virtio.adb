@@ -101,7 +101,7 @@ package body Devices.Virtio is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Acknowledge_Interrupt_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Acknowledge_Interrupt_Unlocked;
 
@@ -194,7 +194,7 @@ package body Devices.Virtio is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Descriptors");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Allocate_Descriptors;
 
@@ -269,7 +269,7 @@ package body Devices.Virtio is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Virtio_Device_Resources");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Allocate_Virtio_Device_Resources;
 
@@ -525,9 +525,7 @@ package body Devices.Virtio is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Initialise_MMIO_Device_Unlocked",
-            Logging_Tags_Virtio);
+         Log_Constraint_Error (Logging_Tags_Virtio);
          Result := Constraint_Exception;
    end Initialise_MMIO_Device_Unlocked;
 

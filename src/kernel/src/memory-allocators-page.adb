@@ -38,7 +38,7 @@ package body Memory.Allocators.Page is
       Result := Region_Array_Exhausted;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Add_Region_To_Page_Pool");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Add_Region_To_Page_Pool;
 
@@ -112,7 +112,7 @@ package body Memory.Allocators.Page is
       Result := Not_Enough_Memory_Available;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Allocate_Unlocked;
 

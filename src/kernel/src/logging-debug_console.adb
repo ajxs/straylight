@@ -104,7 +104,7 @@ package body Logging.Debug_Console is
       Release_Spinlock (SBI_Logging_Buffer_Spinlock);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Log_To_Debug_Console");
+         Panic_Constraint_Error;
    end Log_To_Debug_Console;
 
 end Logging.Debug_Console;

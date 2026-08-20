@@ -65,7 +65,7 @@ package body Boot is
         + Stack_Size;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Get_Hart_Emergency_Stack_Top_Address");
+         Panic_Constraint_Error;
    end Get_Hart_Emergency_Stack_Top_Address;
 
    procedure Initialise_Hart_Boot_Secondary_Stack
@@ -127,7 +127,7 @@ package body Boot is
       Log_Debug ("Freed boot memory.", Logging_Tags);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Free_Boot_Memory");
+         Panic_Constraint_Error;
    end Free_Boot_Memory;
 
    procedure Initialise_Devices is
@@ -409,7 +409,7 @@ package body Boot is
       Log_Debug ("Initialised devices.", Logging_Tags);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Devices");
+         Panic_Constraint_Error;
    end Initialise_Devices;
 
    procedure Initialise_Filesystem is
@@ -540,7 +540,7 @@ package body Boot is
       Save_Hart_State_Pointer (Hart_States (Hart_Id)'Address);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Hart");
+         Panic_Constraint_Error;
    end Initialise_Hart;
 
    procedure Initialise_Init_Process is
@@ -564,7 +564,7 @@ package body Boot is
       end if;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Init_Process");
+         Panic_Constraint_Error;
    end Initialise_Init_Process;
 
    procedure Kernel_Main
@@ -629,7 +629,7 @@ package body Boot is
          Initialise_Kernel_Services'Address);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Kernel_Main");
+         Panic_Constraint_Error;
    end Kernel_Main;
 
    procedure Initialise_Physical_Memory_Manager is
@@ -659,7 +659,7 @@ package body Boot is
       Log_Debug ("Initialised PMM.", Logging_Tags);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Physical_Memory_Manager");
+         Panic_Constraint_Error;
    end Initialise_Physical_Memory_Manager;
 
    procedure Initialise_Kernel_Services (Hart_Id : Hart_Index_T) is
@@ -786,7 +786,7 @@ package body Boot is
       end if;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Graphics");
+         Panic_Constraint_Error;
    end Initialise_Graphics;
 
    procedure Start_Init_Process is
@@ -837,7 +837,7 @@ package body Boot is
       Panic ("Init_Process still running after exit.");
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Start_Init_Process");
+         Panic_Constraint_Error;
    end Start_Init_Process;
 
    procedure Wait_For_All_Harts_To_Start is
@@ -930,7 +930,7 @@ package body Boot is
       end loop;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Start_Non_Boot_Harts");
+         Panic_Constraint_Error;
    end Start_Non_Boot_Harts;
 
    procedure Non_Boot_Hart_Entry (Hart_Id : Hart_Index_T) is
@@ -955,7 +955,7 @@ package body Boot is
          Non_Boot_Hart_Start'Address);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Non_Boot_Hart_Entry");
+         Panic_Constraint_Error;
    end Non_Boot_Hart_Entry;
 
    procedure Non_Boot_Hart_Start (Hart_Id : Hart_Index_T) is
@@ -969,6 +969,6 @@ package body Boot is
       Processes.Scheduler.Run;
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Non_Boot_Hart_Start");
+         Panic_Constraint_Error;
    end Non_Boot_Hart_Start;
 end Boot;

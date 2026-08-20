@@ -17,7 +17,7 @@ package body Graphics is
       end loop;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Fill_Framebuffer");
+         Log_Constraint_Error;
    end Fill_Framebuffer;
 
    procedure Transfer_Image_Data
@@ -100,7 +100,7 @@ package body Graphics is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Transfer_Image_Data");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Transfer_Image_Data;
 
@@ -169,7 +169,7 @@ package body Graphics is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_Bitmap_Pixel_Data_Into_Buffer");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Bitmap_Pixel_Data_Into_Buffer;
 
@@ -262,7 +262,7 @@ package body Graphics is
       Result := Success;
    exception
       when others =>
-         Log_Error ("Constraint_Error: Parse_Bitmap");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_Bitmap;
 

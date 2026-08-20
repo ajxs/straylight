@@ -84,7 +84,7 @@ package body System_Calls.Files is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Open_File_Syscall");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Open_File_Syscall;
 
@@ -130,7 +130,7 @@ package body System_Calls.Files is
       Syscall_Result := 0;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Seek_File_Syscall");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Seek_File_Syscall;
 
@@ -206,7 +206,7 @@ package body System_Calls.Files is
       Syscall_Result := Unsigned_64 (Bytes_Read);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Read_File_Syscall");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Read_File_Syscall;
 
@@ -245,7 +245,7 @@ package body System_Calls.Files is
       Syscall_Result := 0;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Close_File_Syscall");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Close_File_Syscall;
 
@@ -320,7 +320,7 @@ package body System_Calls.Files is
       Syscall_Result := Unsigned_64 (Bytes_Written);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Write_File_Syscall");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Write_File_Syscall;
 
@@ -361,7 +361,7 @@ package body System_Calls.Files is
       Syscall_Result := 0;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Truncate_File_Syscall");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Truncate_File_Syscall;
 end System_Calls.Files;

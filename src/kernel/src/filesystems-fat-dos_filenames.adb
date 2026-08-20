@@ -57,9 +57,7 @@ package body Filesystems.FAT.DOS_Filenames is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Convert_Path_String_To_DOS_Format",
-            Logging_Tags_FAT);
+         Log_Constraint_Error (Logging_Tags_FAT);
          Result := Constraint_Exception;
    end Convert_Path_String_To_DOS_Format;
 
@@ -180,7 +178,7 @@ package body Filesystems.FAT.DOS_Filenames is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_DOS_Filename", Logging_Tags_FAT);
+         Log_Constraint_Error (Logging_Tags_FAT);
          Result := Constraint_Exception;
    end Create_DOS_Filename;
 

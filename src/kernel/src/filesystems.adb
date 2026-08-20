@@ -56,7 +56,7 @@ package body Filesystems is
       Next_Token_Byte_Length := End_Index - Start_Index;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Next_Path_Component", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
    end Get_Next_Path_Component;
 
    procedure Find_File
@@ -203,7 +203,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_File");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Find_File;
 
@@ -237,9 +237,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: "
-            & "Create_File_Handle_For_Filesystem_Node_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Create_File_Handle_For_Filesystem_Node_Unlocked;
 
@@ -316,7 +314,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Open_File");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Open_File;
 
@@ -350,8 +348,7 @@ package body Filesystems is
       end case;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Read_File_Node_Type_Device", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Bytes_Read := 0;
          Result := Constraint_Exception;
    end Read_File_Node_Type_Device;
@@ -422,7 +419,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_File_Node_Type_Regular_File");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_File_Node_Type_Regular_File;
 
@@ -492,7 +489,7 @@ package body Filesystems is
          Logging_Tags);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Read_File");
+         Log_Constraint_Error;
          Bytes_Read := 0;
          Result := Constraint_Exception;
    end Read_File;
@@ -520,7 +517,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Seek_File", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Seek_File;
 
@@ -544,7 +541,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Set_Filesystem_Node_Name");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Set_Filesystem_Node_Name;
 
@@ -557,7 +554,7 @@ package body Filesystems is
         and then Filesystem.all.Device.all.Device_Class = Device_Class_Storage;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Is_Valid_Filesystem_Pointer");
+         Log_Constraint_Error;
          return False;
    end Is_Valid_Filesystem_Pointer;
 
@@ -569,7 +566,7 @@ package body Filesystems is
         Block_Index_T ((Natural (Sector_Number) * Sector_Size) / Block_Size);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Sector_To_Block");
+         Log_Constraint_Error;
          return 0;
    end Sector_To_Block;
 
@@ -578,7 +575,7 @@ package body Filesystems is
       return Block_Size / Sector_Size;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_Sectors_Per_Block");
+         Log_Constraint_Error;
          return 0;
    end Get_Sectors_Per_Block;
 
@@ -622,7 +619,7 @@ package body Filesystems is
          Logging_Tags);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Initialise_Block_Cache");
+         Panic_Constraint_Error;
    end Initialise_Block_Cache;
 
    procedure Allocate_Filesystem_Node
@@ -643,7 +640,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Filesystem_Node");
+         Log_Constraint_Error;
          New_Node := null;
          Result := Constraint_Exception;
    end Allocate_Filesystem_Node;
@@ -680,7 +677,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Close_File_Unlocked", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Close_File_Unlocked;
 
@@ -723,8 +720,7 @@ package body Filesystems is
       end case;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Write_File_Node_Type_Device", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Bytes_Written := 0;
          Result := Constraint_Exception;
    end Write_File_Node_Type_Device;
@@ -778,9 +774,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Write_File_Node_Type_Regular_File",
-            Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Bytes_Written := 0;
          Result := Constraint_Exception;
    end Write_File_Node_Type_Regular_File;
@@ -849,7 +843,7 @@ package body Filesystems is
 
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Write_File", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Bytes_Written := 0;
          Result := Constraint_Exception;
    end Write_File;
@@ -885,10 +879,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: "
-            & "Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read",
-            Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Actual_Bytes_To_Read := 0;
          Result := Constraint_Exception;
    end Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read;
@@ -916,8 +907,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Validate_Filesystem_And_Node", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Validate_Filesystem_And_Node;
 
@@ -1022,7 +1012,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_File", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Create_File;
 
@@ -1044,9 +1034,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Get_Sector_Block_Number_And_Offset",
-            Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Block_Number := 0;
          Sector_Offset_Within_Block := 0;
          Result := Constraint_Exception;
@@ -1104,7 +1092,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Truncate_File", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Truncate_File;
 

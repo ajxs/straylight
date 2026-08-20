@@ -123,7 +123,7 @@ package body Memory.Physical is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Allocate_Physical_Memory_Unlocked");
+         Log_Constraint_Error;
          Allocated_Address := Null_Physical_Address;
          Result := Constraint_Exception;
    end Allocate_Physical_Memory_Unlocked;
@@ -222,8 +222,7 @@ package body Memory.Physical is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Consolidate_Free_Physical_Memory_Blocks");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Consolidate_Free_Physical_Memory_Blocks;
 
@@ -258,7 +257,7 @@ package body Memory.Physical is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Check_For_Intersecting_Blocks");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Check_For_Intersecting_Blocks;
 
@@ -364,7 +363,7 @@ package body Memory.Physical is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Create_Free_Region_Unlocked");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Create_Free_Region_Unlocked;
 
@@ -457,8 +456,7 @@ package body Memory.Physical is
       Result := Memory_Map_Array_Exhausted;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Divide_Physical_Memory_Block", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Divide_Physical_Memory_Block;
 
@@ -483,7 +481,7 @@ package body Memory.Physical is
       return No_Block;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Find_Block_With_Address", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          return No_Block;
    end Find_Block_With_Address;
 
@@ -524,7 +522,7 @@ package body Memory.Physical is
       Consolidate_Free_Physical_Memory_Blocks (Result);
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Free");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Free_Physical_Memory_Unlocked;
 
@@ -585,7 +583,7 @@ package body Memory.Physical is
       return Current_Block_Index;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Get_List_Tail", Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          return No_Block;
    end Get_List_Tail;
 

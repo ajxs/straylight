@@ -255,9 +255,7 @@ package body Loader is
       end if;
    exception
       when Constraint_Error =>
-         Log_Error
-           ("Constraint_Error: Load_New_Process_From_Filesystem.",
-            Logging_Tags);
+         Log_Constraint_Error (Logging_Tags);
          Result := Constraint_Exception;
    end Load_New_Process_From_Filesystem;
 

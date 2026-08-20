@@ -122,7 +122,7 @@ package body System_Calls is
 
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_User_Mode_Syscall");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_User_Mode_Syscall;
 
@@ -264,7 +264,7 @@ package body System_Calls is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Error: Handle_Update_Framebuffer_Syscall");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Update_Framebuffer_Syscall;
 

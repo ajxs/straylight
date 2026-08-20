@@ -72,4 +72,18 @@ package body Logging is
       Log_Message (Message, Tags, Log_Level_Error);
    end Log_Error;
 
+   procedure Log_Constraint_Error
+     (Tags : Log_Tags := Empty_Tag_List;
+      File : String := GNAT.Source_Info.File;
+      Line : Positive := GNAT.Source_Info.Line) is
+   begin
+      Log_Message
+        ("Constraint_Error at " & File & ":" & Line'Image,
+         Tags,
+         Log_Level_Error);
+   exception
+      when Constraint_Error =>
+         Log_Error ("Constraint error in Log_Constraint_Error");
+   end Log_Constraint_Error;
+
 end Logging;

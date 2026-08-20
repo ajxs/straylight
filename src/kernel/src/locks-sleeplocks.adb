@@ -40,7 +40,7 @@ package body Locks.Sleeplocks is
       Release_Spinlock (Lock.Spinlock);
    exception
       when Constraint_Error =>
-         Panic ("Constraint_Error: Acquire_Sleeplock");
+         Panic_Constraint_Error;
    end Acquire_Sleeplock;
 
    function Is_Current_Process_Holding_Sleeplock
