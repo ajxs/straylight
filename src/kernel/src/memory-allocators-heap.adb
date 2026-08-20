@@ -393,8 +393,11 @@ package body Memory.Allocators.Heap is
          Curr_Region := Curr_Region.all.Next_Region;
       end loop;
 
-      Log_Error
-        ("Heap exhausted: unable to allocate " & Size'Image & " bytes.");
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Heap exhausted: unable to allocate " & Size'Image & " bytes."));
 
       Result := Not_Enough_Memory_Available;
    exception
