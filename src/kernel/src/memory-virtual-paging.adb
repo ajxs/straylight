@@ -4,6 +4,7 @@
 -------------------------------------------------------------------------------
 
 with Hart_State;      use Hart_State;
+with Logging;         use Logging;
 with Memory.Physical; use Memory.Physical;
 
 package body Memory.Virtual.Paging is
@@ -11,7 +12,10 @@ package body Memory.Virtual.Paging is
      (Table_Physical_Address : out Physical_Address_T;
       Result                 : out Function_Result) is
    begin
-      Log_Debug ("Creating new page table...", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Memory_Page_Walking,
+           Log_Debug ("Creating new page table..."));
 
       --  Allocate the 4KB of physical memory for the new page table.
       Allocate_Physical_Memory
@@ -20,10 +24,12 @@ package body Memory.Virtual.Paging is
          return;
       end if;
 
-      Log_Debug
-        ("Allocated new page table at physical address"
-         & Table_Physical_Address'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Memory_Page_Walking,
+           Log_Debug
+             ("Allocated new page table at physical address"
+              & Table_Physical_Address'Image));
 
       Initialise_New_Table : declare
          --  The new page table, with the physical ad`dress
@@ -41,14 +47,24 @@ package body Memory.Virtual.Paging is
          end loop;
       end Initialise_New_Table;
 
-      Log_Debug ("Created new page table.", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Memory_Page_Walking, Log_Debug ("Created new page table."));
 
       Result := Success;
+
+      --  With debug logging disabled, a Constraint_Error can't be raised in
+      --  this body, and this handler can never be entered.
+      --  Keep this handler here, and supress the warning about this handler
+      --  being unreachable. So that if the debug logging is enabled, the
+      --  kernel will still compile.
+      pragma Warnings (Off, "this handler can never be entered");
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
          Table_Physical_Address := Null_Physical_Address;
          Result := Constraint_Exception;
+         pragma Warnings (On, "this handler can never be entered");
    end Allocate_And_Initialise_New_Page_Table;
 
    function Get_Largest_Page_Size_For_Remaining_Region
@@ -185,21 +201,23 @@ package body Memory.Virtual.Paging is
       Curr_Table_Virtual_Addr  : System.Address := System.Null_Address;
       Curr_Table_Physical_Addr : Physical_Address_T := Null_Physical_Address;
    begin
-      Log_Debug
-        ("Mapping virtual memory region:"
-         & ASCII.LF
-         & "  Base Page Table Addr: "
-         & Base_Page_Table_Address'Image
-         & ASCII.LF
-         & "  Virtual Address: "
-         & Virtual_Address'Image
-         & ASCII.LF
-         & "  Physical Address: "
-         & Physical_Address'Image
-         & ASCII.LF
-         & "  Region Size: "
-         & Region_Size'Image,
-         Logging_Tags_Paging);
+      pragma
+        Debug
+          (Debug_Memory_Page_Walking,
+           Log_Debug
+             ("Mapping virtual memory region:"
+              & ASCII.LF
+              & "  Base Page Table Addr: "
+              & Base_Page_Table_Address'Image
+              & ASCII.LF
+              & "  Virtual Address: "
+              & Virtual_Address'Image
+              & ASCII.LF
+              & "  Physical Address: "
+              & Physical_Address'Image
+              & ASCII.LF
+              & "  Region Size: "
+              & Region_Size'Image));
 
       Curr_Table_Physical_Addr := Base_Page_Table_Address;
       Curr_Table_Virtual_Addr :=
@@ -218,16 +236,18 @@ package body Memory.Virtual.Paging is
             Table_Idx :=
               To_Virtual_Address (Virtual_Address).VPN (Table_Level);
 
-            Log_Debug
-              ("Walking PT level"
-               & Table_Level'Image
-               & ", index"
-               & Table_Idx'Image
-               & ", address"
-               & Curr_Table_Virtual_Addr'Image
-               & ", Physical address"
-               & Curr_Table_Physical_Addr'Image,
-               Logging_Tags_Paging);
+            pragma
+              Debug
+                (Debug_Memory_Page_Walking,
+                 Log_Debug
+                   ("Walking PT level"
+                    & Table_Level'Image
+                    & ", index"
+                    & Table_Idx'Image
+                    & ", address"
+                    & Curr_Table_Virtual_Addr'Image
+                    & ", Physical address"
+                    & Curr_Table_Physical_Addr'Image));
 
             --  If this region is already mapped, then return.
             if Is_Leaf_Entry (Page_Table (Table_Idx)) then
@@ -250,10 +270,12 @@ package body Memory.Virtual.Paging is
                Page_Table (Table_Idx).X := Region_Flags.Execute;
                Page_Table (Table_Idx).U := Region_Flags.User;
 
-               Log_Debug
-                 ("Mapped new virtual memory region at table index "
-                  & Table_Idx'Image,
-                  Logging_Tags_Paging);
+               pragma
+                 Debug
+                   (Debug_Memory_Page_Walking,
+                    Log_Debug
+                      ("Mapped new virtual memory region at table index "
+                       & Table_Idx'Image));
 
                Result := Success;
                return;
@@ -263,11 +285,14 @@ package body Memory.Virtual.Paging is
             --  we're not at the final level for this region size, check
             --  if we need to physically allocate the next table.
             if not Page_Table (Table_Idx).V then
-               Log_Debug
-                 ("Non-leaf entry found. Allocating new page table at index "
-                  & Table_Idx'Image
-                  & "...",
-                  Logging_Tags_Paging);
+               pragma
+                 Debug
+                   (Debug_Memory_Page_Walking,
+                    Log_Debug
+                      ("Non-leaf entry found. Allocating new page table at "
+                       & "index "
+                       & Table_Idx'Image
+                       & "..."));
 
                Allocate_And_Initialise_New_Page_Table
                  (New_Table_Phys_Addr, Result);
@@ -325,15 +350,17 @@ package body Memory.Virtual.Paging is
          return;
       end if;
 
-      Log_Debug
-        ("Unmapping region:"
-         & ASCII.LF
-         & "  Virtual Address: "
-         & Virtual_Address'Image
-         & ASCII.LF
-         & "  Size: "
-         & Size'Image,
-         Logging_Tags_Paging);
+      pragma
+        Debug
+          (Debug_Memory_Page_Walking,
+           Log_Debug
+             ("Unmapping region:"
+              & ASCII.LF
+              & "  Virtual Address: "
+              & Virtual_Address'Image
+              & ASCII.LF
+              & "  Size: "
+              & Size'Image));
 
       --  Loop over the table, freeing entries until we've freed the
       --  specified size.
@@ -396,16 +423,18 @@ package body Memory.Virtual.Paging is
                   Region_Size := Small;
             end case;
 
-            Log_Debug
-              ("Walking PT level"
-               & Table_Level'Image
-               & ", index"
-               & Table_Idx'Image
-               & ", mapped address"
-               & Curr_Table_Virtual_Addr'Image
-               & ", physical address"
-               & Curr_Table_Physical_Addr'Image,
-               Logging_Tags_Paging);
+            pragma
+              Debug
+                (Debug_Memory_Page_Walking,
+                 Log_Debug
+                   ("Walking PT level"
+                    & Table_Level'Image
+                    & ", index"
+                    & Table_Idx'Image
+                    & ", mapped address"
+                    & Curr_Table_Virtual_Addr'Image
+                    & ", physical address"
+                    & Curr_Table_Physical_Addr'Image));
 
             Table_Idx :=
               To_Virtual_Address (Virtual_Address).VPN (Table_Level);
@@ -423,14 +452,16 @@ package body Memory.Virtual.Paging is
             if Is_Leaf_Entry (Page_Table (Table_Idx)) then
                Page_Table (Table_Idx).V := False;
 
-               Log_Debug
-                 ("Unmapped level"
-                  & Table_Level'Image
-                  & " page, mapped address"
-                  & Curr_Table_Virtual_Addr'Image
-                  & ", index"
-                  & Table_Idx'Image,
-                  Logging_Tags_Paging);
+               pragma
+                 Debug
+                   (Debug_Memory_Page_Walking,
+                    Log_Debug
+                      ("Unmapped level"
+                       & Table_Level'Image
+                       & " page, mapped address"
+                       & Curr_Table_Virtual_Addr'Image
+                       & ", index"
+                       & Table_Idx'Image));
 
                --  If this table is now fully free, and it is not a top-level
                --  page table, free the page allocation used to store it.
@@ -438,12 +469,14 @@ package body Memory.Virtual.Paging is
                --  Only level 1 page tables are automatically created or
                --  destroyed by the kernel.
                if Is_Table_Free (Page_Table) and then Table_Level = 1 then
-                  Log_Debug
-                    ("Freeing empty level"
-                     & Table_Level'Image
-                     & " page table at address"
-                     & Curr_Table_Virtual_Addr'Image,
-                     Logging_Tags_Paging);
+                  pragma
+                    Debug
+                      (Debug_Memory_Page_Walking,
+                       Log_Debug
+                         ("Freeing empty level"
+                          & Table_Level'Image
+                          & " page table at address"
+                          & Curr_Table_Virtual_Addr'Image));
 
                   Free_Physical_Memory (Curr_Table_Physical_Addr, Result);
                   if Is_Error (Result) then

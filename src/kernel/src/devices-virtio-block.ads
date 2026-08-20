@@ -8,7 +8,6 @@ with Filesystems; use Filesystems;
 package Devices.Virtio.Block
   with Preelaborate
 is
-
    procedure Initialise_Block_Device
      (Device : in out Device_T; Result : out Function_Result);
 

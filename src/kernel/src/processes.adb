@@ -4,6 +4,7 @@
 -------------------------------------------------------------------------------
 
 with Hart_State;        use Hart_State;
+with Logging;           use Logging;
 with Memory.Allocators; use Memory.Allocators;
 with Memory.Kernel;     use Memory.Kernel;
 with Memory.Physical;   use Memory.Physical;
@@ -15,7 +16,9 @@ package body Processes is
      (New_Process : in out Process_Control_Block_T;
       Result      : out Function_Result) is
    begin
-      Log_Debug ("Allocating new process resources...", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes, Log_Debug ("Allocating new process resources..."));
 
       Create_New_Process_Memory_Space (New_Process.Memory_Space, Result);
       if Is_Error (Result) then
@@ -47,7 +50,10 @@ package body Processes is
       New_Heap_Memory_Virt_Addr : Virtual_Address_T :=
         Process_Heap_Virtual_Address;
    begin
-      Log_Debug ("Allocating process heap physical memory...", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Allocating process heap physical memory..."));
 
       --  Loop through the list until we find a region that isn't mapped.
       --  As the heap is iterated through, the current 'end' of the heap is
@@ -74,7 +80,11 @@ package body Processes is
             Process.Heap (Index) :=
               (Phys_Addr => New_Heap_Memory_Phys_Addr, Size => Size);
 
-            Log_Debug ("Allocated new process heap memory.", Logging_Tags);
+            pragma
+              Debug
+                (Debug_Processes,
+                 Log_Debug ("Allocated new process heap memory."));
+
             Result := Success;
             return;
          end if;
@@ -82,7 +92,7 @@ package body Processes is
          New_Heap_Memory_Virt_Addr := @ + Process.Heap (Index).Size;
       end loop;
 
-      Log_Error ("No free entries to grow userspace heap", Logging_Tags);
+      Log_Error ("No free entries to grow userspace heap");
       Result := No_Free_Entries;
    end Grow_Process_Heap;
 
@@ -90,7 +100,10 @@ package body Processes is
      (New_Process : in out Process_Control_Block_T;
       Result      : out Function_Result) is
    begin
-      Log_Debug ("Allocating process stack physical memory...", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Allocating process stack physical memory..."));
 
       Allocate_Physical_Memory
         (Process_Stack_Size, New_Process.Stack_Phys_Addr, Result);
@@ -115,15 +128,18 @@ package body Processes is
          return;
       end if;
 
-      Log_Debug
-        ("Allocated process stack:"
-         & ASCII.LF
-         & "  Virtual address: "
-         & Process_Stack_Virtual_Address'Image
-         & ASCII.LF
-         & "  Physical address: "
-         & New_Process.Stack_Phys_Addr'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug
+             ("Allocated process stack:"
+              & ASCII.LF
+              & "  Virtual address: "
+              & Process_Stack_Virtual_Address'Image
+              & ASCII.LF
+              & "  Physical address: "
+              & New_Process.Stack_Phys_Addr'Image));
+
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
@@ -136,8 +152,10 @@ package body Processes is
    is
       Kernel_Stack_Phys_Address : Physical_Address_T := Null_Physical_Address;
    begin
-      Log_Debug
-        ("Allocating process kernel stack physical memory...", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Allocating process kernel stack physical memory..."));
 
       Allocate_Physical_Memory
         (Process_Kernel_Stack_Size, Kernel_Stack_Phys_Address, Result);
@@ -174,10 +192,12 @@ package body Processes is
          return;
       end if;
 
-      Log_Debug
-        ("Allocated and mapped process kernel stack: "
-         & New_Process.Kernel_Stack_Virt_Addr'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug
+             ("Allocated and mapped process kernel stack: "
+              & New_Process.Kernel_Stack_Virt_Addr'Image));
 
    exception
       when Constraint_Error =>
@@ -192,7 +212,10 @@ package body Processes is
       New_Id := Next_Process_Id;
       Next_Process_Id := Next_Process_Id + 1;
 
-      Log_Debug ("Allocated new process id:" & New_Id'Image, Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Allocated new process id:" & New_Id'Image));
 
       Result := Success;
    exception
@@ -216,22 +239,34 @@ package body Processes is
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
    begin
-      Log_Debug
-        ("Deallocating process PID#" & Process.Process_Id'Image, Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Deallocating process PID#" & Process.Process_Id'Image));
 
       Deallocate_Process_Resources (Process, Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Log_Debug
-        ("Deallocated process PID#" & Process.Process_Id'Image, Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Deallocated process PID#" & Process.Process_Id'Image));
 
       Result := Success;
+
+      --  With debug logging disabled, a Constraint_Error can't be raised in
+      --  this body, and this handler can never be entered.
+      --  Keep this handler here, and supress the warning about this handler
+      --  being unreachable. So that if the debug logging is enabled, the
+      --  kernel will still compile.
+      pragma Warnings (Off, "this handler can never be entered");
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
+         pragma Warnings (On, "this handler can never be entered");
    end Deallocate_Process_Unlocked;
 
    procedure Deallocate_Process
@@ -250,7 +285,10 @@ package body Processes is
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
    begin
-      Log_Debug ("Freeing process heap physical memory...", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Freeing process heap physical memory..."));
 
       for I in Process.Heap'Range loop
          if Process.Heap (I).Phys_Addr /= Null_Physical_Address then
@@ -261,7 +299,9 @@ package body Processes is
          end if;
       end loop;
 
-      Log_Debug ("Freed process heap physical memory.", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes, Log_Debug ("Freed process heap physical memory."));
 
       Result := Success;
    end Deallocate_Process_Heap;
@@ -271,16 +311,24 @@ package body Processes is
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
    begin
-      Log_Debug ("Freeing process stack physical memory...", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Freeing process stack physical memory..."));
       Free_Physical_Memory (Process.Stack_Phys_Addr, Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Log_Debug ("Freed process stack physical memory.", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Freed process stack physical memory."));
 
-      Log_Debug
-        ("Freeing process kernel stack physical memory.", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Freeing process kernel stack physical memory."));
       Free_Physical_Memory (Process.Kernel_Stack_Phys_Addr, Result);
       if Is_Error (Result) then
          return;
@@ -291,14 +339,19 @@ package body Processes is
          return;
       end if;
 
-      Log_Debug ("Deallocating process address space...", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug ("Deallocating process address space..."));
 
       Deallocate_Memory_Space (Process.Memory_Space, Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Log_Debug ("Deallocated process address space.", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes, Log_Debug ("Deallocated process address space."));
 
       Result := Success;
    end Deallocate_Process_Resources;
@@ -348,19 +401,23 @@ package body Processes is
    is
       Curr_Process, Prev_Process : Process_Control_Block_Access := null;
    begin
-      Log_Debug
-        ("Adding process: "
-         & ASCII.LF
-         & "  PID# "
-         & New_Process.all.Process_Id'Image
-         & ASCII.LF
-         & "  Addr: "
-         & New_Process.all'Address'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug
+             ("Adding process: "
+              & ASCII.LF
+              & "  PID# "
+              & New_Process.all.Process_Id'Image
+              & ASCII.LF
+              & "  Addr: "
+              & New_Process.all'Address'Image));
 
       if Process_Queue = null then
-         Log_Debug
-           ("No processes in list, setting new process as head", Logging_Tags);
+         pragma
+           Debug
+             (Debug_Processes,
+              Log_Debug ("No processes in list, setting new process as head"));
          Process_Queue := New_Process;
          Result := Success;
          return;
@@ -374,7 +431,8 @@ package body Processes is
 
       Prev_Process.all.Next_Process := New_Process;
 
-      Log_Debug ("Added process to end of list", Logging_Tags);
+      pragma
+        Debug (Debug_Processes, Log_Debug ("Added process to end of list"));
       Result := Success;
    exception
       when Constraint_Error =>
@@ -417,15 +475,17 @@ package body Processes is
       New_Process.all.Spinlock.Lock_Id :=
         Lock_Id_Process_Prefix + Lock_Id_T (New_Process.all.Process_Id);
 
-      Log_Debug
-        ("Allocated new process: "
-         & ASCII.LF
-         & "  PID# "
-         & New_Process.all.Process_Id'Image
-         & ASCII.LF
-         & "  Addr: "
-         & Allocation_Result.Virtual_Address'Image,
-         [Log_Tag_Processes]);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug
+             ("Allocated new process: "
+              & ASCII.LF
+              & "  PID# "
+              & New_Process.all.Process_Id'Image
+              & ASCII.LF
+              & "  Addr: "
+              & Allocation_Result.Virtual_Address'Image));
 
       Allocate_And_Map_New_Process_Memory (New_Process.all, Result);
       if Is_Error (Result) then
@@ -469,13 +529,13 @@ package body Processes is
       Curr_Process : Process_Control_Block_Access := null;
       Prev_Process : Process_Control_Block_Access := null;
 
-      Logging_Tags : constant Log_Tags := [Log_Tag_Idle];
    begin
-      Log_Debug ("Cleaning up stopped processes...", Logging_Tags);
+      pragma
+        Debug (Debug_Idle, Log_Debug ("Cleaning up stopped processes..."));
 
       Curr_Process := Process_Queue;
       if Curr_Process = null then
-         Log_Debug ("No processes to clean up.", Logging_Tags);
+         pragma Debug (Debug_Idle, Log_Debug ("No processes to clean up."));
 
          --  This has been placed here temporarily for development purposes.
          --  If there are no running processes, the kernel will panic.
@@ -490,10 +550,13 @@ package body Processes is
             end if;
 
             if Prev_Process = null then
-               Log_Debug ("Cleaning up process at list head...", Logging_Tags);
+               pragma
+                 Debug
+                   (Debug_Idle,
+                    Log_Debug ("Cleaning up process at list head..."));
                Process_Queue := Curr_Process.all.Next_Process;
             else
-               Log_Debug ("Cleaning up process...", Logging_Tags);
+               pragma Debug (Debug_Idle, Log_Debug ("Cleaning up process..."));
                Prev_Process.all.Next_Process := Curr_Process.all.Next_Process;
             end if;
          else
@@ -516,15 +579,14 @@ package body Processes is
    end Cleanup_Stopped_Processes;
 
    procedure Idle is
-      Logging_Tags : constant Log_Tags := [Log_Tag_Idle];
-      Result       : Function_Result := Unset;
+      Result : Function_Result := Unset;
    begin
       --  This is a first-run entry point: release the spinlock of the process
       --  that switched to us, held across its context save.
       Processes.Scheduler.Finish_Context_Switch;
 
       loop
-         Log_Debug ("System Idle.", Logging_Tags);
+         pragma Debug (Debug_Idle, Log_Debug ("System Idle."));
          RISCV.Interrupts.Disable_Supervisor_Interrupts;
 
          Cleanup_Stopped_Processes (Result);
@@ -563,9 +625,12 @@ package body Processes is
          Panic ("Process_Start: No current process.");
       end if;
 
-      Log_Debug
-        ("New process starting with PID#" & Curr_Process.all.Process_Id'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Processes,
+           Log_Debug
+             ("New process starting with PID#"
+              & Curr_Process.all.Process_Id'Image));
 
       --  Run the next process.
       Enter_New_Process

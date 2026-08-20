@@ -12,7 +12,6 @@
 package Filesystems.Root
   with Preelaborate
 is
-
    procedure Add_Filesystem_Node_To_Root_Filesystem
      (Filesystem         : Filesystem_Access;
       Filename           : Filesystem_Path_T;
@@ -35,8 +34,6 @@ is
      (Filesystem : Filesystem_Access; Result : out Function_Result);
 
 private
-   Logging_Tags_FS_Root : constant Log_Tags := [Log_Tag_Filesystems_Root];
-
    --  The maximum filename length for entries in the root filesystem
    --  is 32 characters. This has been drastically reduced from the 256
    --  *wide* characters allowed in an ordinary filesystem node to save the

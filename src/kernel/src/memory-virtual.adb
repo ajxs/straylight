@@ -3,13 +3,17 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Hart_State;      use Hart_State;
+with Logging;         use Logging;
 with Memory.Virtual.Paging;
 with Memory.Physical; use Memory.Physical;
 with RISCV;           use RISCV;
 with RISCV.Paging;    use RISCV.Paging;
-with Hart_State;      use Hart_State;
 
 package body Memory.Virtual is
+   Logging_Enabled : constant Boolean :=
+     Debug_Memory or else Debug_Memory_Virtual;
+
    --  Disallow W^X pages.
    function Validate_Memory_Region_Permissions
      (Region_Flags : Memory_Region_Flags_T) return Boolean
@@ -64,7 +68,10 @@ package body Memory.Virtual is
      (New_Memory_Space : out Virtual_Memory_Space_T;
       Result           : out Function_Result) is
    begin
-      Log_Debug ("Creating new process memory space...", Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("Creating new process memory space..."));
 
       --  Allocate the process' base page table.
       Memory.Virtual.Paging.Allocate_And_Initialise_New_Page_Table
@@ -78,7 +85,9 @@ package body Memory.Virtual is
       --  this field with an invalid value.
       New_Memory_Space.Memory_Map_List_Head := No_Mapping;
 
-      Log_Debug ("Created new process memory space.", Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled, Log_Debug ("Created new process memory space."));
    end Create_New_Process_Memory_Space;
 
    procedure Find_Unused_List_Entry_Index
@@ -101,7 +110,7 @@ package body Memory.Virtual is
       --  array entries are exhausted.
       Free_Index := No_Mapping;
       Result := Memory_Map_Array_Exhausted;
-      Log_Error ("Memory map exhausted", Logging_Tags);
+      Log_Error ("Memory map exhausted");
    end Find_Unused_List_Entry_Index;
 
    procedure Get_Real_Mapping_Region_Size
@@ -119,7 +128,7 @@ package body Memory.Virtual is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Real_Size := 0;
          Result := Constraint_Exception;
    end Get_Real_Mapping_Region_Size;
@@ -135,13 +144,13 @@ package body Memory.Virtual is
       if not Allow_Mapping_Kernel_Addresses
         and then not Is_Valid_Userspace_Address_Range (Virtual_Address, Size)
       then
-         Log_Error ("Invalid non-userspace address range", Logging_Tags);
+         Log_Error ("Invalid non-userspace address range");
          Result := Invalid_Argument;
          return;
       end if;
 
       if not Is_Valid_SV39_Virtual_Address (Virtual_Address) then
-         Log_Error ("Invalid virtual address", Logging_Tags);
+         Log_Error ("Invalid virtual address");
          Result := Invalid_Argument;
          return;
       end if;
@@ -150,19 +159,19 @@ package body Memory.Virtual is
       if not Is_Address_Page_Aligned (Virtual_Address)
         or else not Is_Address_Page_Aligned (Address (Physical_Address))
       then
-         Log_Error ("Invalid non-aligned address", Logging_Tags);
+         Log_Error ("Invalid non-aligned address");
          Result := Invalid_Argument;
          return;
       end if;
 
       if Size = 0 then
-         Log_Error ("Invalid memory size", Logging_Tags);
+         Log_Error ("Invalid memory size");
          Result := Invalid_Argument;
          return;
       end if;
 
       if not Validate_Memory_Region_Permissions (Region_Flags) then
-         Log_Error ("Invalid memory permissions", Logging_Tags);
+         Log_Error ("Invalid memory permissions");
          Result := Invalid_Argument;
          return;
       end if;
@@ -240,21 +249,23 @@ package body Memory.Virtual is
          Current_Region := VMM_Map (Current_Region).Next_Region;
       end loop;
 
-      Log_Debug
-        ("Creating virtual memory mapping:"
-         & ASCII.LF
-         & "  Base Page Table Address: "
-         & Virt_Memory_Space.Base_Page_Table_Addr'Image
-         & ASCII.LF
-         & "  Virtual Address: "
-         & Virtual_Address'Image
-         & ASCII.LF
-         & "  Physical Address: "
-         & Physical_Address'Image
-         & ASCII.LF
-         & "  Real Size: "
-         & Real_Size'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Creating virtual memory mapping:"
+              & ASCII.LF
+              & "  Base Page Table Address: "
+              & Virt_Memory_Space.Base_Page_Table_Addr'Image
+              & ASCII.LF
+              & "  Virtual Address: "
+              & Virtual_Address'Image
+              & ASCII.LF
+              & "  Physical Address: "
+              & Physical_Address'Image
+              & ASCII.LF
+              & "  Real Size: "
+              & Real_Size'Image));
 
       --  Create the corresponding page table entries.
       Memory.Virtual.Paging.Map
@@ -284,12 +295,13 @@ package body Memory.Virtual is
          VMM_Map (Previous_Region).Next_Region := New_Index;
       end if;
 
-      Log_Debug ("Created virtual memory mapping.", Logging_Tags);
+      pragma
+        Debug (Logging_Enabled, Log_Debug ("Created virtual memory mapping."));
 
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Map_Unlocked;
 
@@ -326,8 +338,10 @@ package body Memory.Virtual is
       Current_Region  : Map_Index_T := No_Mapping;
       Previous_Region : Map_Index_T := No_Mapping;
    begin
-      Log_Debug
-        ("Unmapping virtual memory address " & Virt_Addr'Image, Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("Unmapping virtual memory address " & Virt_Addr'Image));
 
       Current_Region := Virt_Memory_Space.Memory_Map_List_Head;
 
@@ -335,21 +349,23 @@ package body Memory.Virtual is
       --  until we find one matching the specified address.
       while Current_Region /= No_Mapping loop
          if VMM_Map (Current_Region).Virtual_Addr = Virt_Addr then
-            Log_Debug
-              ("Unmapping virtual memory region:"
-               & ASCII.LF
-               & "  Base Page Table Address: "
-               & Virt_Memory_Space.Base_Page_Table_Addr'Image
-               & ASCII.LF
-               & "  Virtual Address: "
-               & Virt_Addr'Image
-               & ASCII.LF
-               & "  Physical Address: "
-               & VMM_Map (Current_Region).Physical_Addr'Image
-               & ASCII.LF
-               & "  Real Size: "
-               & VMM_Map (Current_Region).Size'Image,
-               Logging_Tags);
+            pragma
+              Debug
+                (Logging_Enabled,
+                 Log_Debug
+                   ("Unmapping virtual memory region:"
+                    & ASCII.LF
+                    & "  Base Page Table Address: "
+                    & Virt_Memory_Space.Base_Page_Table_Addr'Image
+                    & ASCII.LF
+                    & "  Virtual Address: "
+                    & Virt_Addr'Image
+                    & ASCII.LF
+                    & "  Physical Address: "
+                    & VMM_Map (Current_Region).Physical_Addr'Image
+                    & ASCII.LF
+                    & "  Real Size: "
+                    & VMM_Map (Current_Region).Size'Image));
 
             --  Unmap the page table entries.
             Memory.Virtual.Paging.Unmap
@@ -378,11 +394,11 @@ package body Memory.Virtual is
          Current_Region := VMM_Map (Current_Region).Next_Region;
       end loop;
 
-      Log_Error ("Memory block not found", Logging_Tags);
+      Log_Error ("Memory block not found");
       Result := Memory_Block_Not_Found;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Unmap_Unlocked;
 
@@ -404,10 +420,13 @@ package body Memory.Virtual is
    is
       VMM_Map renames Virt_Memory_Space.Memory_Map;
    begin
-      Log_Debug
-        ("Deallocating virtual memory space with base page table address: "
-         & Virt_Memory_Space.Base_Page_Table_Addr'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Deallocating virtual memory space with base page table "
+              & "address: "
+              & Virt_Memory_Space.Base_Page_Table_Addr'Image));
 
       --  Deallocate all virtual memory mappings.
       --  This will free any allocated physical memory pages as well.
@@ -427,12 +446,14 @@ package body Memory.Virtual is
          return;
       end if;
 
-      Log_Debug ("Deallocated virtual memory space.", Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled, Log_Debug ("Deallocated virtual memory space."));
 
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Deallocate_Memory_Space_Unlocked;
 
@@ -500,7 +521,10 @@ package body Memory.Virtual is
 
       Result : Function_Result := Unset;
    begin
-      Log_Debug ("Initialising kernel address space...", Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("Initialising kernel address space..."));
 
       Create_New_Process_Memory_Space (Kernel_Address_Space, Result);
       if Is_Error (Result) then
@@ -583,7 +607,9 @@ package body Memory.Virtual is
          Panic;
       end if;
 
-      Log_Debug ("Initialised kernel address space.", Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled, Log_Debug ("Initialised kernel address space."));
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;

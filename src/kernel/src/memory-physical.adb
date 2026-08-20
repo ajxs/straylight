@@ -3,9 +3,13 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Logging; use Logging;
 with Memory.Virtual;
 
 package body Memory.Physical is
+   Logging_Enabled : constant Boolean :=
+     Debug_Memory or else Debug_Memory_Physical;
+
    PMM_Blocks renames Phys_Memory_Space.Physical_Memory_Blocks;
 
    procedure Allocate_Physical_Memory_Unlocked
@@ -23,13 +27,16 @@ package body Memory.Physical is
       Best_Fit_Block          : Block_Index := No_Block;
       Allocated_Block         : Block_Index := No_Block;
    begin
-      Log_Debug
-        ("Allocating physical memory block with size " & Required_Size'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Allocating physical memory block with size "
+              & Required_Size'Image));
 
       --  If the list is empty, we know there are no free blocks.
       if Is_List_Empty then
-         Log_Error ("No free physical memory", Logging_Tags);
+         Log_Error ("No free physical memory");
 
          Allocated_Address := Null_Physical_Address;
          Result := Memory_Map_Not_Present;
@@ -42,9 +49,12 @@ package body Memory.Physical is
          return;
       end if;
 
-      Log_Debug
-        ("Smallest possible block order: " & Smallest_Possible_Order'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Smallest possible block order: "
+              & Smallest_Possible_Order'Image));
 
       Current_Block := Phys_Memory_Space.Physical_Memory_Map_List_Head;
 
@@ -53,7 +63,10 @@ package body Memory.Physical is
          if PMM_Blocks (Current_Block).Free then
             --  If we've found a block matching the required size.
             if PMM_Blocks (Current_Block).Order = Smallest_Possible_Order then
-               Log_Debug ("Allocated perfect fit block.", Logging_Tags);
+               pragma
+                 Debug
+                   (Logging_Enabled,
+                    Log_Debug ("Allocated perfect fit block."));
 
                Allocated_Block := Current_Block;
                goto Post_Successful_Allocation;
@@ -78,10 +91,12 @@ package body Memory.Physical is
       --  If there's a block suitable for splitting, begin the process
       --  of splitting this block until it's the ideal size.
       if Best_Fit_Block /= No_Block then
-         Log_Debug
-           ("Dividing best fit block with order: "
-            & PMM_Blocks (Best_Fit_Block).Order'Image,
-            Logging_Tags);
+         pragma
+           Debug
+             (Logging_Enabled,
+              Log_Debug
+                ("Dividing best fit block with order: "
+                 & PMM_Blocks (Best_Fit_Block).Order'Image));
 
          Divide_Block_To_Specified_Order
            (PMM_Blocks (Best_Fit_Block), Smallest_Possible_Order, Result);
@@ -89,16 +104,18 @@ package body Memory.Physical is
             return;
          end if;
 
-         Log_Debug
-           ("Divided best fit block to order: "
-            & PMM_Blocks (Best_Fit_Block).Order'Image,
-            Logging_Tags);
+         pragma
+           Debug
+             (Logging_Enabled,
+              Log_Debug
+                ("Divided best fit block to order: "
+                 & PMM_Blocks (Best_Fit_Block).Order'Image));
 
          Allocated_Block := Best_Fit_Block;
          goto Post_Successful_Allocation;
       end if;
 
-      Log_Error ("No block large enough", Logging_Tags);
+      Log_Error ("No block large enough");
       Allocated_Address := Null_Physical_Address;
       Result := No_Block_Large_Enough;
       return;
@@ -107,18 +124,21 @@ package body Memory.Physical is
       Allocated_Address := PMM_Blocks (Allocated_Block).Address;
       PMM_Blocks (Allocated_Block).Free := False;
 
-      Log_Debug
-        ("Allocated physical memory block"
-         & ASCII.LF
-         & "  Address: "
-         & PMM_Blocks (Allocated_Block).Address'Image
-         & ASCII.LF
-         & "  Order:   "
-         & PMM_Blocks (Allocated_Block).Order'Image
-         & ASCII.LF
-         & "  Size:    "
-         & Get_Block_Size_In_Bytes (PMM_Blocks (Allocated_Block).Order)'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Allocated physical memory block"
+              & ASCII.LF
+              & "  Address: "
+              & PMM_Blocks (Allocated_Block).Address'Image
+              & ASCII.LF
+              & "  Order:   "
+              & PMM_Blocks (Allocated_Block).Order'Image
+              & ASCII.LF
+              & "  Size:    "
+              & Get_Block_Size_In_Bytes
+                  (PMM_Blocks (Allocated_Block).Order)'Image));
 
       Result := Success;
    exception
@@ -246,7 +266,7 @@ package body Memory.Physical is
          if Is_Region_Intersecting
               (Region_Start, Region_Length, PMM_Blocks (Current_Block_Index))
          then
-            Log_Error ("Region overlaps existing region", Logging_Tags);
+            Log_Error ("Region overlaps existing region");
             Result := Region_Is_Overlapping;
             return;
          end if;
@@ -276,35 +296,39 @@ package body Memory.Physical is
       --  size, then it will end up with wasted space that cannot be
       --  allocated.
       if Region_Length = 0 or else Region_Length mod Base_Block_Size /= 0 then
-         Log_Error ("Invalid region size", Logging_Tags);
+         Log_Error ("Invalid region size");
          Result := Invalid_Physical_Memory_Size;
          return;
       end if;
 
-      Log_Debug
-        ("Creating free PMM Region:"
-         & ASCII.LF
-         & "  Address: "
-         & Region_Start'Image
-         & ASCII.LF
-         & "  Size:    "
-         & Region_Length'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Creating free PMM Region:"
+              & ASCII.LF
+              & "  Address: "
+              & Region_Start'Image
+              & ASCII.LF
+              & "  Size:    "
+              & Region_Length'Image));
 
       Check_For_Intersecting_Blocks (Region_Start, Region_Length, Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Log_Debug
-        ("Creating free physical memory region:"
-         & ASCII.LF
-         & "  Address: "
-         & Region_Start'Image
-         & ASCII.LF
-         & "  Size:    "
-         & Region_Length'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Creating free physical memory region:"
+              & ASCII.LF
+              & "  Address: "
+              & Region_Start'Image
+              & ASCII.LF
+              & "  Size:    "
+              & Region_Length'Image));
 
       --  Find the tail of the list, to attach new blocks to.
       --  This will be updated in the block allocation loop below. In the case
@@ -319,7 +343,7 @@ package body Memory.Physical is
          --  If there are no free blocks, return 'Memory_Map_Array_Exhausted'.
          Current_Block_Index := Find_Free_Entry;
          if Current_Block_Index = No_Block then
-            Log_Error ("Memory map array exhausted", Logging_Tags);
+            Log_Error ("Memory map array exhausted");
             Result := Memory_Map_Array_Exhausted;
             return;
          end if;
@@ -341,9 +365,12 @@ package body Memory.Physical is
             Next_Block => No_Block,
             Entry_Used => True);
 
-         Log_Debug
-           ("Initialising block with order " & Highest_Possible_Order'Image,
-            Logging_Tags);
+         pragma
+           Debug
+             (Logging_Enabled,
+              Log_Debug
+                ("Initialising block with order "
+                 & Highest_Possible_Order'Image));
 
          if Is_List_Empty then
             Phys_Memory_Space.Physical_Memory_Map_List_Head :=
@@ -407,19 +434,21 @@ package body Memory.Physical is
         or else Block.Free = False
         or else Block.Order = 0
       then
-         Log_Error ("Block cannot be divided", Logging_Tags);
+         Log_Error ("Block cannot be divided");
          Result := Invalid_Argument;
          return;
       end if;
 
-      Log_Debug
-        ("Dividing block: "
-         & ASCII.LF
-         & "  Address: "
-         & Block.Address'Image
-         & "  Order "
-         & Block.Order'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Dividing block: "
+              & ASCII.LF
+              & "  Address: "
+              & Block.Address'Image
+              & "  Order "
+              & Block.Order'Image));
 
       Block.Order := Block.Order - 1;
 
@@ -452,11 +481,11 @@ package body Memory.Physical is
 
       --  If we've fallen off the end of the loop it means that we've
       --  exhausted all entries in the memory map array.
-      Log_Error ("Memory map array exhausted", Logging_Tags);
+      Log_Error ("Memory map array exhausted");
       Result := Memory_Map_Array_Exhausted;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Divide_Physical_Memory_Block;
 
@@ -481,7 +510,7 @@ package body Memory.Physical is
       return No_Block;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          return No_Block;
    end Find_Block_With_Address;
 
@@ -507,14 +536,15 @@ package body Memory.Physical is
    begin
       Current_Block_Index := Find_Block_With_Address (Addr);
       if Current_Block_Index = No_Block then
-         Log_Error ("Memory block not found", Logging_Tags);
+         Log_Error ("Memory block not found");
          Result := Memory_Block_Not_Found;
          return;
       end if;
 
       PMM_Blocks (Current_Block_Index).Free := True;
 
-      Log_Debug ("Freed block at " & Addr'Image, Logging_Tags);
+      pragma
+        Debug (Logging_Enabled, Log_Debug ("Freed block at " & Addr'Image));
 
       --  Once this block has been freed, consolidate all of the
       --  physical memory blocks, then return.
@@ -583,7 +613,7 @@ package body Memory.Physical is
       return Current_Block_Index;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          return No_Block;
    end Get_List_Tail;
 
@@ -605,7 +635,7 @@ package body Memory.Physical is
 
       --  If we've reached the end of the loop, the physical memory
       --  size is larger than the largest memory block, and is invalid.
-      Log_Error ("No physical memory block large enough", Logging_Tags);
+      Log_Error ("No physical memory block large enough");
       Smallest_Possible_Block_Order := 0;
       Result := Invalid_Physical_Memory_Size;
    end Get_Smallest_Possible_Block_Order;
@@ -645,7 +675,9 @@ package body Memory.Physical is
             return;
          end if;
 
-         Log_Debug ("Divided block for reallocation.", Logging_Tags);
+         pragma
+           Debug
+             (Logging_Enabled, Log_Debug ("Divided block for reallocation."));
 
          Addr := PMM_Blocks (Current_Block_Index).Address;
          Result := Success;
@@ -682,7 +714,10 @@ package body Memory.Physical is
          return;
       end if;
 
-      Log_Debug ("Allocated larger block for reallocation.", Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("Allocated larger block for reallocation."));
 
       Addr := New_Address;
       Result := Success;

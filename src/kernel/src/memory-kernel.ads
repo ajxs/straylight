@@ -1,6 +1,5 @@
 with Function_Results;       use Function_Results;
 with Locks;                  use Locks;
-with Logging;                use Logging;
 with Memory.Allocators;      use Memory.Allocators;
 with Memory.Allocators.Heap; use Memory.Allocators.Heap;
 with Memory.Allocators.Page; use Memory.Allocators.Page;
@@ -39,9 +38,6 @@ is
      (Virtual_Address : Virtual_Address_T; Result : out Function_Result);
 
 private
-   Logging_Tags : constant Log_Tags :=
-     [Log_Tag_Memory, Log_Tag_Memory_Allocators];
-
    Kernel_Heap : Memory_Heap_T :=
      (Memory_Regions_List_Head => null,
       Window_Base              => System'To_Address (Kernel_Heap_Address),

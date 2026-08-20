@@ -5,7 +5,6 @@
 
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
-with Logging;          use Logging;
 with RISCV.Paging;     use RISCV.Paging;
 
 package Memory.Allocators.Page
@@ -92,9 +91,5 @@ is
          Virtual_Address
          < Region.Virtual_Address
            + Storage_Offset (Region.Page_Count * Page_Pool_Page_Size));
-
-private
-   Logging_Tags_Page_Pool : constant Log_Tags :=
-     [Log_Tag_Page_Pool, Log_Tag_Memory, Log_Tag_Memory_Allocators];
 
 end Memory.Allocators.Page;

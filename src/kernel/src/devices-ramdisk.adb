@@ -3,6 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Logging; use Logging;
 with Memory;
 
 package body Devices.Ramdisk is
@@ -47,21 +48,23 @@ package body Devices.Ramdisk is
         Device.Virtual_Address
         + Storage_Offset (Start_Sector * Ramdisk_Sector_Size);
 
-      Log_Debug
-        ("Devices.Ramdisk.Read_Sectors: "
-         & ASCII.LF
-         & "  Device VA: "
-         & Device.Virtual_Address'Image
-         & ASCII.LF
-         & "  Start Sector: "
-         & Start_Sector'Image
-         & ASCII.LF
-         & "  Start Address: "
-         & Start_Address'Image
-         & ASCII.LF
-         & "  Data VA: "
-         & Data_Virtual_Address'Image,
-         Logging_Tags_Ramdisk);
+      pragma
+        Debug
+          (Debug_Devices_Ramdisk,
+           Log_Debug
+             ("Devices.Ramdisk.Read_Sectors: "
+              & ASCII.LF
+              & "  Device VA: "
+              & Device.Virtual_Address'Image
+              & ASCII.LF
+              & "  Start Sector: "
+              & Start_Sector'Image
+              & ASCII.LF
+              & "  Start Address: "
+              & Start_Address'Image
+              & ASCII.LF
+              & "  Data VA: "
+              & Data_Virtual_Address'Image));
 
       Bytes_To_Copy : constant Natural := Ramdisk_Sector_Size * Sector_Count;
 
@@ -112,21 +115,23 @@ package body Devices.Ramdisk is
         Device.Virtual_Address
         + Storage_Offset (Start_Sector * Ramdisk_Sector_Size);
 
-      Log_Debug
-        ("Devices.Ramdisk.Write_Sectors: "
-         & ASCII.LF
-         & "  Device VA: "
-         & Device.Virtual_Address'Image
-         & ASCII.LF
-         & "  Start Sector: "
-         & Start_Sector'Image
-         & ASCII.LF
-         & "  Sector Address: "
-         & Start_Address'Image
-         & ASCII.LF
-         & "  Data VA: "
-         & Data_Virtual_Address'Image,
-         Logging_Tags_Ramdisk);
+      pragma
+        Debug
+          (Debug_Devices_Ramdisk,
+           Log_Debug
+             ("Devices.Ramdisk.Write_Sectors: "
+              & ASCII.LF
+              & "  Device VA: "
+              & Device.Virtual_Address'Image
+              & ASCII.LF
+              & "  Start Sector: "
+              & Start_Sector'Image
+              & ASCII.LF
+              & "  Sector Address: "
+              & Start_Address'Image
+              & ASCII.LF
+              & "  Data VA: "
+              & Data_Virtual_Address'Image));
 
       Bytes_To_Copy : constant Natural := Ramdisk_Sector_Size * Sector_Count;
 

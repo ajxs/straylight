@@ -1,13 +1,11 @@
 with Interfaces; use Interfaces;
 
 with Function_Results; use Function_Results;
-with Logging;          use Logging;
 with Memory;           use Memory;
 
 package Graphics
   with Preelaborate
 is
-
    subtype Colour_T is Unsigned_32;
 
    function Make_Colour
@@ -60,8 +58,6 @@ is
       Result                    : out Function_Result);
 
 private
-   Logging_Tags : constant Log_Tags := [Log_Tag_Graphics];
-
    type Bitmap_Header_T is record
       BfType      : Unsigned_16;
       BfSize      : Unsigned_32;

@@ -7,7 +7,6 @@ with Ada.Unchecked_Conversion;
 with Interfaces; use Interfaces;
 
 with Function_Results; use Function_Results;
-with Logging;          use Logging;
 with Processes;        use Processes;
 
 package System_Calls
@@ -31,9 +30,6 @@ is
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
 private
-   Logging_Tags : constant Log_Tags :=
-     [Log_Tag_Processes, Log_Tag_System_Calls];
-
    procedure Handle_Process_Exit_Syscall
    with No_Return;
 

@@ -15,7 +15,6 @@ with System;
 package MMIO
   with Preelaborate
 is
-
    ----------------------------------------------------------------------------
    --  This function reads a byte from a memory address.
    ----------------------------------------------------------------------------

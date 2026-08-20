@@ -10,7 +10,6 @@ with Memory; use Memory;
 package RISCV.Paging
   with Preelaborate
 is
-
    --  The physical size of small pages in the system.
    Small_Page_Size : constant := 16#1000#;
    --  The physical size of large pages in the system.

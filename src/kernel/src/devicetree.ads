@@ -3,7 +3,6 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Function_Results; use Function_Results;
-with Logging;          use Logging;
 with Utilities;        use Utilities;
 
 package Devicetree
@@ -29,8 +28,6 @@ is
    with Convention => C;
 
 private
-   Devicetree_Logging_Tags : constant Log_Tags := [Log_Tag_Devicetree];
-
    FDT_MAGIC_NUMBER : constant Unsigned_32 := 16#D00D_FEED#;
 
    subtype FDT_Token_T is Unsigned_32;

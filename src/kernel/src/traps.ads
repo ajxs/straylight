@@ -5,7 +5,6 @@
 
 with Interfaces; use Interfaces;
 
-with Logging;   use Logging;
 with Memory;    use Memory;
 with Processes; use Processes;
 
@@ -16,7 +15,6 @@ with Processes; use Processes;
 package Traps
   with Preelaborate
 is
-
    procedure Handle_Supervisor_Mode_Trap
      (Trapping_Process_Addr : Virtual_Address_T;
       Scause                : Unsigned_64;
@@ -40,8 +38,6 @@ is
    procedure Setup_Next_Timer_Interrupt;
 
 private
-   Logging_Tags : constant Log_Tags := [Log_Tag_Traps];
-
    ----------------------------------------------------------------------------
    --  The kernel's 'tick' interval.
    --  The timebase in QEMU's RISC-V virt machine is 10_000_000 Hz,

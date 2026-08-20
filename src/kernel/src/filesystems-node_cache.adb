@@ -1,3 +1,4 @@
+with Logging;       use Logging;
 with Memory.Kernel; use Memory.Kernel;
 with RISCV;
 
@@ -81,9 +82,12 @@ package body Filesystems.Node_Cache is
       Node_Cache_Entries (Cache_Index).Node := New_Node;
       Node_Cache_Entries (Cache_Index).Last_Access := RISCV.Get_System_Time;
 
-      Log_Debug
-        ("Added new filesystem node to cache at index: " & Cache_Index'Image,
-         Logging_Tags_Node_Cache);
+      pragma
+        Debug
+          (Debug_Filesystems_Node_Cache,
+           Log_Debug
+             ("Added new filesystem node to cache at index: "
+              & Cache_Index'Image));
 
       Result := Success;
    exception
@@ -159,11 +163,13 @@ package body Filesystems.Node_Cache is
    is
       Cache_Index : Natural := 0;
    begin
-      Log_Debug
-        ("Searching for filesystem node in cache with name: '"
-         & Filename
-         & "'",
-         Logging_Tags_Node_Cache);
+      pragma
+        Debug
+          (Debug_Filesystems_Node_Cache,
+           Log_Debug
+             ("Searching for filesystem node in cache with name: '"
+              & Filename
+              & "'"));
 
       Search_For_Filesystem_Node_In_Cache
         (Filesystem, Parent_Index, Filename, Cache_Index, Result);
@@ -176,11 +182,13 @@ package body Filesystems.Node_Cache is
 
       Node := Node_Cache_Entries (Cache_Index).Node;
 
-      Log_Debug
-        ("Found node in system cache: '"
-         & Node.all.Filename.Value (1 .. Node.all.Filename.Byte_Length)
-         & "'",
-         Logging_Tags_Node_Cache);
+      pragma
+        Debug
+          (Debug_Filesystems_Node_Cache,
+           Log_Debug
+             ("Found node in system cache: '"
+              & Node.all.Filename.Value (1 .. Node.all.Filename.Byte_Length)
+              & "'"));
 
       Result := Success;
    exception
@@ -245,7 +253,7 @@ package body Filesystems.Node_Cache is
       Result := Cache_Entry_Not_Found;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_Node_Cache);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Search_For_Filesystem_Node_In_Cache;
 

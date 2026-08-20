@@ -7,9 +7,9 @@ with Interfaces;              use Interfaces;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-package RISCV is
-   pragma Pure;
-
+package RISCV
+  with Pure
+is
    type GP_Register_List_T is
      (zero,
       ra,
@@ -67,12 +67,12 @@ package RISCV is
    ----------------------------------------------------------------------------
    --  Scause interrupt cause codes (interrupt bit stripped).
    ----------------------------------------------------------------------------
-   Scause_Supervisor_Software_Interrupt  : constant := 1;
-   Scause_Machine_Software_Interrupt     : constant := 3;
-   Scause_Supervisor_Timer_Interrupt     : constant := 5;
-   Scause_Machine_Timer_Interrupt        : constant := 7;
-   Scause_Supervisor_External_Interrupt  : constant := 9;
-   Scause_Machine_External_Interrupt     : constant := 11;
+   Scause_Supervisor_Software_Interrupt : constant := 1;
+   Scause_Machine_Software_Interrupt    : constant := 3;
+   Scause_Supervisor_Timer_Interrupt    : constant := 5;
+   Scause_Machine_Timer_Interrupt       : constant := 7;
+   Scause_Supervisor_External_Interrupt : constant := 9;
+   Scause_Machine_External_Interrupt    : constant := 11;
 
    function Create_SATP
      (Page_Table_Address : Address; ASID : Unsigned_16) return Unsigned_64

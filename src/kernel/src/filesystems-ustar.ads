@@ -6,7 +6,6 @@
 package Filesystems.UStar
   with Preelaborate
 is
-
    procedure Find_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;
@@ -26,8 +25,6 @@ is
       Result          : out Function_Result);
 
 private
-   Logging_Tags_UStar : constant Log_Tags := [Log_Tag_Filesystems_UStar];
-
    subtype USTAR_Header_Name is String (1 .. 100);
 
    Ustar_Sector_Size : constant := 512;

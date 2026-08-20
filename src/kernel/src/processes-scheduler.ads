@@ -6,7 +6,6 @@
 package Processes.Scheduler
   with Preelaborate
 is
-
    procedure Run (New_Prev_Process_State : Process_Status_T := Process_Ready);
 
    procedure Lock_Process_Waiting_For_Channel
@@ -27,8 +26,6 @@ is
    procedure Finish_Context_Switch;
 
 private
-   Logging_Tags_Scheduler : constant Log_Tags := [Log_Tag_Scheduler];
-
    procedure Schedule_Next_Process
      (Current_Process        : Process_Control_Block_Access;
       Next_Process           : out Process_Control_Block_Access;

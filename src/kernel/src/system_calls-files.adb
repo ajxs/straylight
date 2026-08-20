@@ -4,10 +4,14 @@
 -------------------------------------------------------------------------------
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Memory; use Memory;
-with RISCV;  use RISCV;
+with Logging; use Logging;
+with Memory;  use Memory;
+with RISCV;   use RISCV;
 
 package body System_Calls.Files is
+   Logging_Enabled : constant Boolean :=
+     Debug_Processes or else Debug_System_Calls;
+
    procedure Handle_Open_File_Syscall
      (Process        : in out Process_Control_Block_T;
       Syscall_Result : out Unsigned_64;
@@ -22,7 +26,8 @@ package body System_Calls.Files is
 
       File_Handle : Process_File_Handle_Access := null;
    begin
-      Log_Debug ("User Mode Syscall: Open File", Logging_Tags);
+      pragma
+        Debug (Logging_Enabled, Log_Debug ("User Mode Syscall: Open File"));
 
       Path_String_Address : constant Virtual_Address_T :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
@@ -35,8 +40,7 @@ package body System_Calls.Files is
       --  length won't overflow any further type conversions.
       if Path_String_Length > Maximum_Path_String_Argument_Length then
          Log_Error
-           ("Path length exceeds maximum length: " & Path_String_Length'Image,
-            Logging_Tags);
+           ("Path length exceeds maximum length: " & Path_String_Length'Image);
 
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ENAMETOOLONG);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
@@ -77,7 +81,7 @@ package body System_Calls.Files is
             return;
          end if;
 
-         Log_Debug ("Opened file handle", Logging_Tags);
+         pragma Debug (Logging_Enabled, Log_Debug ("Opened file handle"));
       end Read_Path_String_And_Open_File;
 
       Syscall_Result := Unsigned_64 (File_Handle.all.File_Handle_Id);
@@ -150,7 +154,8 @@ package body System_Calls.Files is
 
       File_Handle : Process_File_Handle_Access := null;
    begin
-      Log_Debug ("User Mode Syscall: Read File", Logging_Tags);
+      pragma
+        Debug (Logging_Enabled, Log_Debug ("User Mode Syscall: Read File"));
 
       File_Handle_Id : constant Process_File_Handle_Id_T :=
         Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
@@ -224,7 +229,8 @@ package body System_Calls.Files is
 
       File_Handle : Process_File_Handle_Access := null;
    begin
-      Log_Debug ("User Mode Syscall: Close File", Logging_Tags);
+      pragma
+        Debug (Logging_Enabled, Log_Debug ("User Mode Syscall: Close File"));
 
       File_Handle_Id : constant Process_File_Handle_Id_T :=
         Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
@@ -265,7 +271,8 @@ package body System_Calls.Files is
 
       File_Handle : Process_File_Handle_Access := null;
    begin
-      Log_Debug ("User Mode Syscall: Write File", Logging_Tags);
+      pragma
+        Debug (Logging_Enabled, Log_Debug ("User Mode Syscall: Write File"));
 
       File_Handle_Id : constant Process_File_Handle_Id_T :=
         Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
@@ -338,7 +345,9 @@ package body System_Calls.Files is
 
       File_Handle : Process_File_Handle_Access := null;
    begin
-      Log_Debug ("User Mode Syscall: Truncate File", Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled, Log_Debug ("User Mode Syscall: Truncate File"));
 
       File_Handle_Id : constant Process_File_Handle_Id_T :=
         Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));

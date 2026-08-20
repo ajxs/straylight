@@ -11,7 +11,6 @@ with System.Storage_Elements; use System.Storage_Elements;
 
 with Devices;          use Devices;
 with Function_Results; use Function_Results;
-with Logging;          use Logging;
 with Memory;           use Memory;
 with Processes;        use Processes;
 with Utilities;        use Utilities;
@@ -268,8 +267,6 @@ is
       Result         : out Function_Result);
 
 private
-   Logging_Tags : constant Log_Tags := [Log_Tag_Filesystems];
-
    Filesystem_Node_Separator : constant Character := '/';
 
    subtype Block_Index_T is Unsigned_64;

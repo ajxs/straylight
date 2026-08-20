@@ -3,7 +3,14 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Logging; use Logging;
+
 package body Memory.Allocators.Page is
+   --  This package logged under more than one tag, so its debug
+   --  output is emitted if any of them is enabled.
+   Logging_Enabled : constant Boolean :=
+     Debug_Page_Pool or else Debug_Memory or else Debug_Memory_Allocators;
+
    procedure Add_Region_To_Page_Pool
      (Page_Pool        : in out Page_Pool_T;
       Virtual_Address  : Virtual_Address_T;
@@ -93,14 +100,16 @@ package body Memory.Allocators.Page is
                     Regions (Curr_Region).Physical_Address
                     + Offset_Within_Region;
 
-                  Log_Debug
-                    ("Memory.Allocators.Page: Allocated "
-                     & Page_Count'Image
-                     & " pages at VAddr: "
-                     & Allocation_Result.Virtual_Address'Image
-                     & ", PAddr: "
-                     & Allocation_Result.Physical_Address'Image,
-                     Logging_Tags_Page_Pool);
+                  pragma
+                    Debug
+                      (Logging_Enabled,
+                       Log_Debug
+                         ("Memory.Allocators.Page: Allocated "
+                          & Page_Count'Image
+                          & " pages at VAddr: "
+                          & Allocation_Result.Virtual_Address'Image
+                          & ", PAddr: "
+                          & Allocation_Result.Physical_Address'Image));
 
                   Result := Success;
                   return;

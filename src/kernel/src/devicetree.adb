@@ -1,4 +1,5 @@
-with Memory; use Memory;
+with Logging; use Logging;
+with Memory;  use Memory;
 
 package body Devicetree is
    --  The current address and size cells context is captured in a stack, so
@@ -27,7 +28,7 @@ package body Devicetree is
          return;
       end if;
 
-      Log_Debug ("Pushing cells context", Devicetree_Logging_Tags);
+      pragma Debug (Debug_Devicetree, Log_Debug ("Pushing cells context"));
 
       Context_Stack (Context_Stack_Ptr) := New_Context;
       Context_Stack_Ptr := Context_Stack_Ptr + 1;
@@ -50,7 +51,7 @@ package body Devicetree is
          return;
       end if;
 
-      Log_Debug ("Popping cells context", Devicetree_Logging_Tags);
+      pragma Debug (Debug_Devicetree, Log_Debug ("Popping cells context"));
 
       Context_Stack_Ptr := Context_Stack_Ptr - 1;
       Popped_Context := Context_Stack (Context_Stack_Ptr);
@@ -68,8 +69,9 @@ package body Devicetree is
    is
       Curr_Offset : Storage_Offset := 0;
    begin
-      Log_Debug
-        ("Parsing Reserved Memory Regions...", Devicetree_Logging_Tags);
+      pragma
+        Debug
+          (Debug_Devicetree, Log_Debug ("Parsing Reserved Memory Regions..."));
 
       loop
          Read_Block : declare
@@ -84,21 +86,21 @@ package body Devicetree is
             --  address and size set to zero.
             exit when Block.Size = 0 and then Block.Addr = 0;
 
-            Log_Debug
-              ("Addr="
-               & Convert_BEU64_To_LEU64 (Block.Addr)'Image
-               & ", Size= "
-               & Convert_BEU64_To_LEU64 (Block.Size)'Image,
-               Devicetree_Logging_Tags);
+            pragma
+              Debug
+                (Debug_Devicetree,
+                 Log_Debug
+                   ("Addr="
+                    & Convert_BEU64_To_LEU64 (Block.Addr)'Image
+                    & ", Size= "
+                    & Convert_BEU64_To_LEU64 (Block.Size)'Image));
 
          end Read_Block;
 
          --  Advance by the size of the reserved memory block structure.
          Curr_Offset := Curr_Offset + 16;
          if Curr_Offset >= Total_Size then
-            Log_Error
-              ("Reserved memory map exceeds total devicetree size.",
-               Devicetree_Logging_Tags);
+            Log_Error ("Reserved memory map exceeds total devicetree size.");
             Result := Unhandled_Exception;
             return;
          end if;
@@ -107,7 +109,7 @@ package body Devicetree is
       Result := Success;
    exception
       when others =>
-         Log_Constraint_Error (Devicetree_Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_Reserved_Memory_Regions;
 
@@ -124,8 +126,7 @@ package body Devicetree is
            Maximum_FDT_String_Length);
 
       if Maximum_Possible_String_Length <= 0 then
-         Log_Error
-           ("Unexpected end of structure block", Devicetree_Logging_Tags);
+         Log_Error ("Unexpected end of structure block");
          Result := Unhandled_Exception;
          return;
       end if;
@@ -168,7 +169,7 @@ package body Devicetree is
            Maximum_FDT_String_Length);
 
       if Maximum_Possible_String_Length <= 0 then
-         Log_Error ("Unexpected end of string table", Devicetree_Logging_Tags);
+         Log_Error ("Unexpected end of string table");
          Result := Unhandled_Exception;
          return;
       end if;
@@ -218,37 +219,40 @@ package body Devicetree is
       Total_Size : constant Storage_Count :=
         Storage_Count (Convert_BEU32_To_LEU32 (Header.Totalsize));
 
-      Log_Debug
-        ("Devicetree Header:"
-         & ASCII.LF
-         & "  Magic:            "
-         & Convert_BEU32_To_LEU32 (Header.Magic)'Image
-         & ASCII.LF
-         & "  Totalsize:        "
-         & Total_Size'Image
-         & ASCII.LF
-         & "  Off_DT_Struct:    "
-         & Convert_BEU32_To_LEU32 (Header.Off_DT_Struct)'Image
-         & ASCII.LF
-         & "  Off_DT_Strings:   "
-         & Convert_BEU32_To_LEU32 (Header.Off_DT_Strings)'Image
-         & ASCII.LF
-         & "  Off_Mem_Rsvmap:   "
-         & Convert_BEU32_To_LEU32 (Header.Off_Mem_Rsvmap)'Image
-         & ASCII.LF
-         & "  Version:          "
-         & Convert_BEU32_To_LEU32 (Header.Version)'Image
-         & ASCII.LF
-         & "  Size_DT_Strings:  "
-         & Convert_BEU32_To_LEU32 (Header.Size_DT_Strings)'Image
-         & ASCII.LF
-         & "  Size_DT_Struct:   "
-         & Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)'Image,
-         Devicetree_Logging_Tags);
+      pragma
+        Debug
+          (Debug_Devicetree,
+           Log_Debug
+             ("Devicetree Header:"
+              & ASCII.LF
+              & "  Magic:            "
+              & Convert_BEU32_To_LEU32 (Header.Magic)'Image
+              & ASCII.LF
+              & "  Totalsize:        "
+              & Total_Size'Image
+              & ASCII.LF
+              & "  Off_DT_Struct:    "
+              & Convert_BEU32_To_LEU32 (Header.Off_DT_Struct)'Image
+              & ASCII.LF
+              & "  Off_DT_Strings:   "
+              & Convert_BEU32_To_LEU32 (Header.Off_DT_Strings)'Image
+              & ASCII.LF
+              & "  Off_Mem_Rsvmap:   "
+              & Convert_BEU32_To_LEU32 (Header.Off_Mem_Rsvmap)'Image
+              & ASCII.LF
+              & "  Version:          "
+              & Convert_BEU32_To_LEU32 (Header.Version)'Image
+              & ASCII.LF
+              & "  Size_DT_Strings:  "
+              & Convert_BEU32_To_LEU32 (Header.Size_DT_Strings)'Image
+              & ASCII.LF
+              & "  Size_DT_Struct:   "
+              & Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)'Image));
 
       if Convert_BEU32_To_LEU32 (Header.Magic) /= FDT_MAGIC_NUMBER then
-         Log_Debug
-           ("Invalid devicetree magic value.", Devicetree_Logging_Tags);
+         pragma
+           Debug
+             (Debug_Devicetree, Log_Debug ("Invalid devicetree magic value."));
          Result := Unhandled_Exception;
          return;
       end if;
@@ -282,11 +286,19 @@ package body Devicetree is
       end if;
 
       Result := Success;
+
+      --  With debug logging disabled, a Constraint_Error can't be raised in
+      --  this body, and this handler can never be entered.
+      --  Keep this handler here, and supress the warning about this handler
+      --  being unreachable. So that if the debug logging is enabled, the
+      --  kernel will still compile.
+      pragma Warnings (Off, "this handler can never be entered");
    exception
       when others =>
-         Log_Constraint_Error (Devicetree_Logging_Tags);
+         Log_Constraint_Error;
 
          Result := Constraint_Exception;
+         pragma Warnings (On, "this handler can never be entered");
    end Parse_Devicetree;
 
    procedure Parse_Property
@@ -326,8 +338,7 @@ package body Devicetree is
       --  (8 bytes) plus the length of the property value.
       Curr_Offset := Curr_Offset + 8 + Storage_Offset (Property_Length);
       if Curr_Offset >= Structure_Block_Size then
-         Log_Error
-           ("Property exceeds structure block size.", Devicetree_Logging_Tags);
+         Log_Error ("Property exceeds structure block size.");
          Result := Unhandled_Exception;
          return;
       end if;
@@ -335,7 +346,7 @@ package body Devicetree is
       Result := Success;
    exception
       when others =>
-         Log_Constraint_Error (Devicetree_Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_Property;
 
@@ -414,7 +425,7 @@ package body Devicetree is
          end if;
 
          if Token_Value = FDT_BEGIN_NODE then
-            Log_Debug ("START STRUCTURE", Devicetree_Logging_Tags);
+            pragma Debug (Debug_Devicetree, Log_Debug ("START STRUCTURE"));
             Node_Name.Byte_Length := 0;
 
             Push_Cells_Context
@@ -441,21 +452,25 @@ package body Devicetree is
                Curr_Offset := Curr_Offset + 1;
             end loop;
 
-            Log_Debug
-              ("  Node Name: '"
-               & Node_Name.Value (1 .. Node_Name.Byte_Length)
-               & "'",
-               Devicetree_Logging_Tags);
+            pragma
+              Debug
+                (Debug_Devicetree,
+                 Log_Debug
+                   ("  Node Name: '"
+                    & Node_Name.Value (1 .. Node_Name.Byte_Length)
+                    & "'"));
 
          elsif Token_Value = FDT_END_NODE then
-            Log_Debug
-              ("Node cells context: ("
-               & "Address_Cells: "
-               & Current_Cells_Context.Address_Cells'Image
-               & ", Size_Cells: "
-               & Current_Cells_Context.Size_Cells'Image
-               & ")",
-               Devicetree_Logging_Tags);
+            pragma
+              Debug
+                (Debug_Devicetree,
+                 Log_Debug
+                   ("Node cells context: ("
+                    & "Address_Cells: "
+                    & Current_Cells_Context.Address_Cells'Image
+                    & ", Size_Cells: "
+                    & Current_Cells_Context.Size_Cells'Image
+                    & ")"));
 
             Pop_Cells_Context
               (Cells_Context_Stack,
@@ -466,7 +481,7 @@ package body Devicetree is
                return;
             end if;
 
-            Log_Debug ("END STRUCTURE", Devicetree_Logging_Tags);
+            pragma Debug (Debug_Devicetree, Log_Debug ("END STRUCTURE"));
          elsif Token_Value = FDT_PROP then
             Parse_Property
               (Structure_Block_Address,
@@ -482,23 +497,27 @@ package body Devicetree is
                return;
             end if;
 
-            Log_Debug ("Property:", Devicetree_Logging_Tags);
+            pragma Debug (Debug_Devicetree, Log_Debug ("Property:"));
 
-            Log_Debug
-              ("  Name: '"
-               & Property_Name.Value (1 .. Property_Name.Byte_Length)
-               & "'",
-               Devicetree_Logging_Tags);
+            pragma
+              Debug
+                (Debug_Devicetree,
+                 Log_Debug
+                   ("  Name: '"
+                    & Property_Name.Value (1 .. Property_Name.Byte_Length)
+                    & "'"));
 
             if Property_Length = 0 then
-               Log_Debug ("  (No Value)", Devicetree_Logging_Tags);
+               pragma Debug (Debug_Devicetree, Log_Debug ("  (No Value)"));
             elsif Is_String_Value (Property_Name) then
                Read_Property_Value : declare
                   Prop_Value : String (1 .. Integer (Property_Length))
                   with Import, Address => Property_Address, Alignment => 1;
                begin
-                  Log_Debug
-                    ("  Value: '" & Prop_Value & "'", Devicetree_Logging_Tags);
+                  pragma
+                    Debug
+                      (Debug_Devicetree,
+                       Log_Debug ("  Value: '" & Prop_Value & "'"));
                end Read_Property_Value;
             end if;
 
@@ -532,14 +551,12 @@ package body Devicetree is
                Curr_Offset := Curr_Offset + 1;
             end loop;
          elsif Token_Value = FDT_NOP then
-            Log_Debug ("NOP", Devicetree_Logging_Tags);
+            pragma Debug (Debug_Devicetree, Log_Debug ("NOP"));
          elsif Token_Value = FDT_END then
-            Log_Debug ("END", Devicetree_Logging_Tags);
+            pragma Debug (Debug_Devicetree, Log_Debug ("END"));
             exit;
          else
-            Log_Error
-              ("Unknown token type: " & Token_Value'Image,
-               Devicetree_Logging_Tags);
+            Log_Error ("Unknown token type: " & Token_Value'Image);
             exit;
          end if;
       end loop;

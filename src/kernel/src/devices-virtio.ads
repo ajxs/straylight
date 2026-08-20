@@ -33,8 +33,6 @@ is
    VIRTIO_F_SUSPEND_RESUME    : constant := 2 ** 10;
 
 private
-   Logging_Tags_Virtio : constant Log_Tags := [Log_Tag_Devices_Virtio];
-
    VIRTQ_DESC_F_NEXT  : constant := 1; --  Chained with another descriptor.
    VIRTQ_DESC_F_WRITE : constant := 2; --  Device writes, as opposed to read.
 

@@ -3,9 +3,9 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package RISCV.Atomics is
-   pragma Pure;
-
+package RISCV.Atomics
+  with Pure
+is
    function Atomic_Swap_And_Return_Unsigned_32
      (Target : not null access Unsigned_32; Value : Unsigned_32)
       return Unsigned_32

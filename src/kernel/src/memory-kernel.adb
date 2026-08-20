@@ -1,7 +1,11 @@
+with Logging;         use Logging;
 with Memory.Physical; use Memory.Physical;
 with Memory.Virtual;  use Memory.Virtual;
 
 package body Memory.Kernel is
+   Logging_Enabled : constant Boolean :=
+     Debug_Memory or else Debug_Memory_Allocators;
+
    --  The offset into the page pool's virtual address window at which the
    --  next growth region will be mapped.
    --  NOTE: This variable is protected by the kernel page pool's spinlock.
@@ -149,11 +153,13 @@ package body Memory.Kernel is
 
                Region_Page_Count := Candidate_Page_Count;
 
-               Log_Debug
-                 ("Provisioned new page pool region of"
-                  & Candidate_Page_Count'Image
-                  & " pages",
-                  Logging_Tags);
+               pragma
+                 Debug
+                   (Logging_Enabled,
+                    Log_Debug
+                      ("Provisioned new page pool region of"
+                       & Candidate_Page_Count'Image
+                       & " pages"));
 
                Result := Success;
                return;
@@ -365,11 +371,13 @@ package body Memory.Kernel is
                   return;
                end if;
 
-               Log_Debug
-                 ("Grew kernel heap by"
-                  & Region_Size_In_Bytes'Image
-                  & " bytes",
-                  Logging_Tags);
+               pragma
+                 Debug
+                   (Logging_Enabled,
+                    Log_Debug
+                      ("Grew kernel heap by"
+                       & Region_Size_In_Bytes'Image
+                       & " bytes"));
 
                return;
             elsif Result = Not_Enough_Memory_Available then
@@ -395,10 +403,18 @@ package body Memory.Kernel is
 
       <<Error_Free_Pages>>
       Free_Pages (Allocation_Result.Virtual_Address, Free_Result);
+
+      --  With debug logging disabled, a Constraint_Error can't be raised in
+      --  this body, and this handler can never be entered.
+      --  Keep this handler here, and supress the warning about this handler
+      --  being unreachable. So that if the debug logging is enabled, the
+      --  kernel will still compile.
+      pragma Warnings (Off, "this handler can never be entered");
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
+         pragma Warnings (On, "this handler can never be entered");
    end Grow_Kernel_Heap_And_Allocate;
 
    procedure Allocate_Kernel_Memory
@@ -472,8 +488,7 @@ package body Memory.Kernel is
          if Is_Error (Grow_Result) then
             --  A failure here won't impact the current allocation, so it's
             --  currently logged and ignored. In future this may be changed.
-            Log_Error
-              ("Failed to grow kernel page pool pre-emptively", Logging_Tags);
+            Log_Error ("Failed to grow kernel page pool pre-emptively");
          end if;
       end if;
    end Allocate_Pages;

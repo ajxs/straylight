@@ -8,6 +8,7 @@ with System.Storage_Elements; use System.Storage_Elements;
 
 with Devices;
 with Devices.Virtio.Graphics;
+with Logging;            use Logging;
 with Memory;             use Memory;
 with RISCV;              use RISCV;
 with Processes.Scheduler;
@@ -15,9 +16,12 @@ with Hart_State;         use Hart_State;
 with System_Calls.Files; use System_Calls.Files;
 
 package body System_Calls is
+   Logging_Enabled : constant Boolean :=
+     Debug_Processes or else Debug_System_Calls;
+
    procedure Handle_Process_Exit_Syscall is
    begin
-      Log_Debug ("User Mode Syscall: Exit", Logging_Tags);
+      pragma Debug (Logging_Enabled, Log_Debug ("User Mode Syscall: Exit"));
 
       --  Exit the process by calling the scheduler, which will set this
       --  process's status to 'stopped', and switch to the next ready process.
@@ -28,7 +32,7 @@ package body System_Calls is
 
    procedure Handle_Process_Yield_Syscall is
    begin
-      Log_Debug ("User Mode Syscall: Yield", Logging_Tags);
+      pragma Debug (Logging_Enabled, Log_Debug ("User Mode Syscall: Yield"));
 
       Processes.Scheduler.Run (Process_Ready);
    end Handle_Process_Yield_Syscall;
@@ -140,7 +144,10 @@ package body System_Calls is
 
       Graphics_Device renames Devices.System_Devices (6);
    begin
-      Log_Debug ("User Mode Syscall: Update Framebuffer", Logging_Tags);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("User Mode Syscall: Update Framebuffer"));
 
       User_Framebuffer_Address : constant Virtual_Address_T :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
@@ -167,7 +174,7 @@ package body System_Calls is
           + Unsigned_64 (User_Pixel_Data_Height)
           > Unsigned_64 (Graphics_Device.Framebuffer_Height)
       then
-         Log_Error ("Framebuffer rectangle out of bounds", Logging_Tags);
+         Log_Error ("Framebuffer rectangle out of bounds");
 
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
@@ -203,7 +210,7 @@ package body System_Calls is
          if not Is_Valid_Userspace_Address_Range
                   (User_Framebuffer_Address, End_Offset)
          then
-            Log_Error ("Invalid non-userspace address range", Logging_Tags);
+            Log_Error ("Invalid non-userspace address range");
             Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
             Result := Syscall_Unsuccessful_Without_Kernel_Error;
             return;

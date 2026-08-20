@@ -6,7 +6,6 @@
 package Devices.Virtio.Graphics
   with Preelaborate
 is
-
    procedure Created_2d_Resource
      (Reading_Process : in out Process_Control_Block_T;
       Device          : in out Device_T;
@@ -57,11 +56,6 @@ is
 private
    Device_Control_Queue_Index : constant := 0;
    Device_Cursor_Queue_Index  : constant := 1;
-
-   Logging_Tags_Virtio_Graphics : constant Log_Tags :=
-     [Log_Tag_Devices,
-      Log_Tag_Devices_Virtio,
-      Log_Tag_Devices_Virtio_Graphics];
 
    type Virtio_Gpu_Format is
      (VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM,

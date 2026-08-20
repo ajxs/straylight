@@ -7,7 +7,6 @@ with Interfaces; use Interfaces;
 with System;     use System;
 
 with Hart_State; use Hart_State;
-with Logging;    use Logging;
 with Memory;     use Memory;
 with Processes;  use Processes;
 
@@ -29,8 +28,6 @@ is
      External_Name => "boot_initialise_kernel_memory";
 
 private
-   Logging_Tags : constant Log_Tags := [Log_Tag_Boot];
-
    procedure Initialise_Kernel_Services (Hart_Id : Hart_Index_T)
    with
      Export,

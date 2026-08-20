@@ -5,6 +5,7 @@
 
 with Filesystems.Block_Cache; use Filesystems.Block_Cache;
 with Filesystems.Node_Cache;  use Filesystems.Node_Cache;
+with Logging;                 use Logging;
 
 package body Filesystems.UStar is
    procedure Find_File
@@ -36,9 +37,10 @@ package body Filesystems.UStar is
          return;
       end if;
 
-      Log_Debug
-        ("Filesystems.UStar.Find_File: Searching for file",
-         Logging_Tags_UStar);
+      pragma
+        Debug
+          (Debug_Filesystems_UStar,
+           Log_Debug ("Filesystems.UStar.Find_File: Searching for file"));
 
       loop
          Get_Sector_Block_Number_And_Offset
@@ -68,9 +70,11 @@ package body Filesystems.UStar is
               Get_UStar_String_Length (Header.Name);
          begin
             if not Is_Valid_Record (Header) then
-               Log_Debug
-                 ("Filesystems.UStar.Find_File: Invalid record reached",
-                  Logging_Tags_UStar);
+               pragma
+                 Debug
+                   (Debug_Filesystems_UStar,
+                    Log_Debug
+                      ("Filesystems.UStar.Find_File: Invalid record reached"));
 
                Release_Block (Filesystem, Block_Number, Result);
 
@@ -84,11 +88,13 @@ package body Filesystems.UStar is
             File_Sector_Size :=
               (File_Size + Ustar_Sector_Size - 1) / Ustar_Sector_Size;
 
-            Log_Debug
-              ("Filesystems.UStar.Find_File: Checking file: '"
-               & Header.Name (1 .. Filename_Length)
-               & "'",
-               Logging_Tags_UStar);
+            pragma
+              Debug
+                (Debug_Filesystems_UStar,
+                 Log_Debug
+                   ("Filesystems.UStar.Find_File: Checking file: '"
+                    & Header.Name (1 .. Filename_Length)
+                    & "'"));
 
             if Filename = Header.Name (1 .. Filename_Length) then
                --  If we have a match, create a filesystem node cache entry.
@@ -176,57 +182,59 @@ package body Filesystems.UStar is
 
    procedure Print_File_Header (Header : Tar_File_Header) is
    begin
-      Log_Debug
-        ("UStar File Header:"
-         & ASCII.LF
-         & "  Name:     "
-         & Header.Name
-         & ASCII.LF
-         & "  Mode:     "
-         & Header.Mode
-         & ASCII.LF
-         & "  Uid:      "
-         & Header.Uid
-         & ASCII.LF
-         & "  Gid:      "
-         & Header.Gid
-         & ASCII.LF
-         & "  Size:     "
-         & Header.Size
-         & ASCII.LF
-         & "  Mtime:    "
-         & Header.Mtime
-         & ASCII.LF
-         & "  Checksum: "
-         & Header.Checksum
-         & ASCII.LF
-         & "  Typeflag: "
-         & Header.Typeflag
-         & ASCII.LF
-         & "  Linkname: "
-         & Header.Linkname
-         & ASCII.LF
-         & "  Magic:    "
-         & Header.Magic
-         & ASCII.LF
-         & "  Version:  "
-         & Header.Version
-         & ASCII.LF
-         & "  Uname:    "
-         & Header.Uname
-         & ASCII.LF
-         & "  Gname:    "
-         & Header.Gname
-         & ASCII.LF
-         & "  Devmajor: "
-         & Header.Devmajor
-         & ASCII.LF
-         & "  Devminor: "
-         & Header.Devminor
-         & ASCII.LF
-         & "  Prefix:   "
-         & Header.Prefix,
-         Logging_Tags_UStar);
+      pragma
+        Debug
+          (Debug_Filesystems_UStar,
+           Log_Debug
+             ("UStar File Header:"
+              & ASCII.LF
+              & "  Name:     "
+              & Header.Name
+              & ASCII.LF
+              & "  Mode:     "
+              & Header.Mode
+              & ASCII.LF
+              & "  Uid:      "
+              & Header.Uid
+              & ASCII.LF
+              & "  Gid:      "
+              & Header.Gid
+              & ASCII.LF
+              & "  Size:     "
+              & Header.Size
+              & ASCII.LF
+              & "  Mtime:    "
+              & Header.Mtime
+              & ASCII.LF
+              & "  Checksum: "
+              & Header.Checksum
+              & ASCII.LF
+              & "  Typeflag: "
+              & Header.Typeflag
+              & ASCII.LF
+              & "  Linkname: "
+              & Header.Linkname
+              & ASCII.LF
+              & "  Magic:    "
+              & Header.Magic
+              & ASCII.LF
+              & "  Version:  "
+              & Header.Version
+              & ASCII.LF
+              & "  Uname:    "
+              & Header.Uname
+              & ASCII.LF
+              & "  Gname:    "
+              & Header.Gname
+              & ASCII.LF
+              & "  Devmajor: "
+              & Header.Devmajor
+              & ASCII.LF
+              & "  Devminor: "
+              & Header.Devminor
+              & ASCII.LF
+              & "  Prefix:   "
+              & Header.Prefix));
    end Print_File_Header;
 
    procedure Read_File
@@ -257,7 +265,9 @@ package body Filesystems.UStar is
          return;
       end if;
 
-      Log_Debug ("Filesystems.UStar.Read_File", Logging_Tags_UStar);
+      pragma
+        Debug
+          (Debug_Filesystems_UStar, Log_Debug ("Filesystems.UStar.Read_File"));
 
       Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read
         (Filesystem_Node,

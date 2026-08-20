@@ -8,7 +8,6 @@ with Interfaces; use Interfaces;
 with ELF;              use ELF;
 with Filesystems;      use Filesystems;
 with Function_Results; use Function_Results;
-with Logging;          use Logging;
 with Memory.Virtual;   use Memory.Virtual;
 with Processes;        use Processes;
 
@@ -22,18 +21,8 @@ is
       Result          : out Function_Result);
 
 private
-   Logging_Tags : constant Log_Tags := [Log_Tag_Loader];
-
    function Validate_Executable_Is_Loadable
      (ELF_Header : Elf64_File_Header_T) return Boolean;
-
-   procedure Print_ELF64_Program_Header_Info
-     (Program_Header : ELF.Elf64_Program_Header_T);
-
-   procedure Print_ELF_Header_Program_Header_Info
-     (ELF_Header : ELF.Elf64_File_Header_T);
-
-   procedure Print_ELF_Header (ELF_Header : ELF.Elf64_File_Header_T);
 
    function Parse_ELF_Program_Header_Flags_Into_Memory_Region_Flags
      (Flags : Unsigned_32) return Memory_Region_Flags_T

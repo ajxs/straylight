@@ -5,6 +5,7 @@
 
 with Memory.Allocators;   use Memory.Allocators;
 with Memory.Kernel;       use Memory.Kernel;
+with Logging;             use Logging;
 with Processes.Scheduler; use Processes.Scheduler;
 with Utilities;           use Utilities;
 
@@ -19,21 +20,31 @@ package body Devices.UART is
          return;
       end if;
 
-      Log_Debug
-        ("UART Rx Data Available Interrupt: "
-         & Integer'Image (Bytes_Read)
-         & " bytes read.",
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Devices,
+           Log_Debug
+             ("UART Rx Data Available Interrupt: "
+              & Integer'Image (Bytes_Read)
+              & " bytes read."));
 
       --  Wake any processes that were waiting for incoming data.
       Wake_Processes_Waiting_For_Channel
         (Address_To_Unsigned_64 (Device'Address));
 
       Result := Success;
+
+      --  With debug logging disabled, a Constraint_Error can't be raised in
+      --  this body, and this handler can never be entered.
+      --  Keep this handler here, and supress the warning about this handler
+      --  being unreachable. So that if the debug logging is enabled, the
+      --  kernel will still compile.
+      pragma Warnings (Off, "this handler can never be entered");
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
+         pragma Warnings (On, "this handler can never be entered");
    end Handle_Rx_Data_Available_Interrupt;
 
    procedure Acknowledge_Interrupt
@@ -45,14 +56,16 @@ package body Devices.UART is
              (Device.Virtual_Address + UART_Reg_Interrupt_Ident_FIFO_Control));
 
       if Interrupt_Status.No_Interrupt_Pending then
-         Log_Debug ("Spurious UART Interrupt.", Logging_Tags);
+         pragma Debug (Debug_Devices, Log_Debug ("Spurious UART Interrupt."));
          Result := Success;
          return;
       end if;
 
       case Interrupt_Status.Interrupt_Source is
          when UART_IRQ_Modem_Status                              =>
-            Log_Debug ("UART Modem Status Interrupt.", Logging_Tags);
+            pragma
+              Debug
+                (Debug_Devices, Log_Debug ("UART Modem Status Interrupt."));
 
             --  Clear the modem status interrupt by reading the modem
             --  status register.
@@ -61,7 +74,10 @@ package body Devices.UART is
             pragma Unreferenced (Modem_Status);
 
          when UART_IRQ_Tx_Holding_Empty                          =>
-            Log_Debug ("UART Tx Holding Empty Interrupt.", Logging_Tags);
+            pragma
+              Debug
+                (Debug_Devices,
+                 Log_Debug ("UART Tx Holding Empty Interrupt."));
 
          --  Interrupt already cleared by read to the IIR register.
 
@@ -72,7 +88,9 @@ package body Devices.UART is
             end if;
 
          when UART_IRQ_Rx_Line_Status                            =>
-            Log_Debug ("UART Rx Line Status Interrupt.", Logging_Tags);
+            pragma
+              Debug
+                (Debug_Devices, Log_Debug ("UART Rx Line Status Interrupt."));
 
             --  Clear the line status interrupt by reading the line
             --  status register.
@@ -314,7 +332,7 @@ package body Devices.UART is
          end if;
       end loop;
 
-      Log_Error ("Timeout while waiting to put byte to UART.", Logging_Tags);
+      Log_Error ("Timeout while waiting to put byte to UART.");
    end Put_Byte;
 
    procedure Read_Into_Ring_Buffer

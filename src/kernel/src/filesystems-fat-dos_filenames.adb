@@ -1,3 +1,5 @@
+with Logging; use Logging;
+
 package body Filesystems.FAT.DOS_Filenames is
    function Is_Valid_DOS_Filename_Character (C : Character) return Boolean
    is (C in 'A' .. 'Z'
@@ -57,7 +59,7 @@ package body Filesystems.FAT.DOS_Filenames is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_FAT);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Convert_Path_String_To_DOS_Format;
 
@@ -95,9 +97,7 @@ package body Filesystems.FAT.DOS_Filenames is
       end if;
 
       if Version > Max_Version then
-         Log_Error
-           ("Version number is too large to fit in the DOS filename.",
-            Logging_Tags_FAT);
+         Log_Error ("Version number is too large to fit in the DOS filename.");
          Result := Invalid_Argument;
          return;
       end if;
@@ -178,7 +178,7 @@ package body Filesystems.FAT.DOS_Filenames is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_FAT);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Create_DOS_Filename;
 

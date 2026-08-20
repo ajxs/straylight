@@ -54,8 +54,6 @@ is
       Result          : out Function_Result);
 
 private
-   Logging_Tags_FAT : constant Log_Tags := [Log_Tag_Filesystems_FAT];
-
    No_Free_Clusters : constant Function_Result := -1234_0000;
 
    Cluster_Marker_EOC_FAT12 : constant := 16#0FF8#;

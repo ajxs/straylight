@@ -5,7 +5,6 @@
 
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
-with Logging;          use Logging;
 
 -------------------------------------------------------------------------------
 --  Contains code and definitions for allocating and deallocating
@@ -37,9 +36,6 @@ is
       Result        : out Function_Result);
 
 private
-   Logging_Tags : constant Log_Tags :=
-     [Log_Tag_Memory, Log_Tag_Memory_Physical];
-
    Maximum_Physical_Memory_Blocks : constant := 1024;
 
    Maximum_Block_Order : constant := 16;

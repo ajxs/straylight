@@ -8,7 +8,6 @@ with RISCV.Paging; use RISCV.Paging;
 private package Memory.Virtual.Paging
   with Preelaborate
 is
-
    procedure Map
      (Base_Page_Table_Address : Physical_Address_T;
       Virtual_Address         : Virtual_Address_T;
@@ -28,8 +27,6 @@ is
       Result                 : out Function_Result);
 
 private
-   Logging_Tags_Paging : constant Log_Tags := [Log_Tag_Memory_Page_Walking];
-
    procedure Map_Region
      (Base_Page_Table_Address : Physical_Address_T;
       Virtual_Address         : Virtual_Address_T;

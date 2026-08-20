@@ -6,7 +6,6 @@
 package RISCV.Interrupts
   with Preelaborate
 is
-
    procedure Disable_Supervisor_Interrupts
    with
      Import,

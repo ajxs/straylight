@@ -1,9 +1,15 @@
+with Logging;             use Logging;
 with Memory.Allocators;   use Memory.Allocators;
 with Memory.Kernel;       use Memory.Kernel;
-with RISCV.Atomics;       use RISCV.Atomics;
 with Processes.Scheduler; use Processes.Scheduler;
+with RISCV.Atomics;       use RISCV.Atomics;
 
 package body Devices.Virtio.Graphics is
+   Logging_Enabled : constant Boolean :=
+     Debug_Devices
+     or else Debug_Devices_Virtio
+     or else Debug_Devices_Virtio_Graphics;
+
    procedure Attach_Framebuffer_To_Resource_Unlocked
      (Reading_Process              : in out Process_Control_Block_T;
       Device                       : in out Device_T;
@@ -24,9 +30,10 @@ package body Devices.Virtio.Graphics is
         Virtio_Gpu_Mem_Entry'Size / 8;
       Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
-      Log_Debug
-        ("Attaching framebuffer to Virtio Graphics Resource",
-         Logging_Tags_Virtio_Graphics);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("Attaching framebuffer to Virtio Graphics Resource"));
 
       Allocate_Descriptors (Device, 3, Descriptor_Indexes, Result);
       if Is_Error (Result) then
@@ -203,9 +210,10 @@ package body Devices.Virtio.Graphics is
       Request_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
       Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
-      Log_Debug
-        ("Getting display info from Virtio Graphics Device",
-         Logging_Tags_Virtio_Graphics);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("Getting display info from Virtio Graphics Device"));
 
       Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
@@ -291,17 +299,19 @@ package body Devices.Virtio.Graphics is
       begin
          for I in Response_Data.Pmodes'Range loop
             if Response_Data.Pmodes (I).Enabled /= 0 then
-               Log_Debug
-                 ("Found enabled display mode: "
-                  & "X="
-                  & Response_Data.Pmodes (I).R.X'Image
-                  & ", Y="
-                  & Response_Data.Pmodes (I).R.Y'Image
-                  & ", Width="
-                  & Response_Data.Pmodes (I).R.Width'Image
-                  & ", Height="
-                  & Response_Data.Pmodes (I).R.Height'Image,
-                  Logging_Tags_Virtio_Graphics);
+               pragma
+                 Debug
+                   (Logging_Enabled,
+                    Log_Debug
+                      ("Found enabled display mode: "
+                       & "X="
+                       & Response_Data.Pmodes (I).R.X'Image
+                       & ", Y="
+                       & Response_Data.Pmodes (I).R.Y'Image
+                       & ", Width="
+                       & Response_Data.Pmodes (I).R.Width'Image
+                       & ", Height="
+                       & Response_Data.Pmodes (I).R.Height'Image));
             end if;
          end loop;
       end Read_Response;

@@ -51,3 +51,4 @@ pragma Restrictions (No_Terminate_Alternatives);
 pragma Restrictions (Simple_Barriers);
 pragma Restrictions (Static_Priorities);
 pragma Restrictions (Static_Storage_Size);
+pragma Debug_Policy (Check);

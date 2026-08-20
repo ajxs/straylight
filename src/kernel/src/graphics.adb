@@ -1,6 +1,8 @@
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
+with Logging; use Logging;
+
 package body Graphics is
    procedure Fill_Framebuffer
      (Framebuffer_Base_Address : Virtual_Address_T;
@@ -202,18 +204,20 @@ package body Graphics is
          return;
       end if;
 
-      Log_Debug
-        ("Bitmap: "
-         & ASCII.LF
-         & "  BfType:    "
-         & Bitmap_Header.BfType'Image
-         & ASCII.LF
-         & "  BfSize:    "
-         & Bitmap_Header.BfSize'Image
-         & ASCII.LF
-         & "  BfOffBits: "
-         & Bitmap_Header.BfOffBits'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Graphics,
+           Log_Debug
+             ("Bitmap: "
+              & ASCII.LF
+              & "  BfType:    "
+              & Bitmap_Header.BfType'Image
+              & ASCII.LF
+              & "  BfSize:    "
+              & Bitmap_Header.BfSize'Image
+              & ASCII.LF
+              & "  BfOffBits: "
+              & Bitmap_Header.BfOffBits'Image));
 
       Pixel_Data_Address :=
         Bitmap_Data_Buffer_Address + Storage_Offset (Bitmap_Header.BfOffBits);
@@ -222,27 +226,29 @@ package body Graphics is
         Positive (Bitmap_Header.BfSize - Bitmap_Header.BfOffBits);
       Pixel_Data_Format := Bitmap_Pixel_Format_RGB;
 
-      Log_Debug
-        ("DIB Header: "
-         & ASCII.LF
-         & "  BiSize:        "
-         & DIB_Header.BiSize'Image
-         & ASCII.LF
-         & "  BiWidth:       "
-         & DIB_Header.BiWidth'Image
-         & ASCII.LF
-         & "  BiHeight:      "
-         & DIB_Header.BiHeight'Image
-         & ASCII.LF
-         & "  BiPlanes:      "
-         & DIB_Header.BiPlanes'Image
-         & ASCII.LF
-         & "  BiBitCount:    "
-         & DIB_Header.BiBitCount'Image
-         & ASCII.LF
-         & "  BiCompression: "
-         & DIB_Header.BiCompression'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Graphics,
+           Log_Debug
+             ("DIB Header: "
+              & ASCII.LF
+              & "  BiSize:        "
+              & DIB_Header.BiSize'Image
+              & ASCII.LF
+              & "  BiWidth:       "
+              & DIB_Header.BiWidth'Image
+              & ASCII.LF
+              & "  BiHeight:      "
+              & DIB_Header.BiHeight'Image
+              & ASCII.LF
+              & "  BiPlanes:      "
+              & DIB_Header.BiPlanes'Image
+              & ASCII.LF
+              & "  BiBitCount:    "
+              & DIB_Header.BiBitCount'Image
+              & ASCII.LF
+              & "  BiCompression: "
+              & DIB_Header.BiCompression'Image));
 
       Width := DIB_Header.BiWidth;
       Height := DIB_Header.BiHeight;

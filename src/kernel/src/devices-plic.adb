@@ -3,6 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with Logging; use Logging;
 with MMIO;
 
 package body Devices.PLIC is

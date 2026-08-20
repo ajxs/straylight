@@ -8,7 +8,6 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Locks;     use Locks;
-with Logging;   use Logging;
 with Memory;    use Memory;
 with Memory.Allocators;
 with Processes; use Processes;
@@ -16,7 +15,6 @@ with Processes; use Processes;
 package Devices
   with Preelaborate
 is
-
    --  Describes the 'class' of the device, which is used to determine
    --  which driver should be used to operate the device.
    type Device_Class_T is
@@ -148,8 +146,5 @@ is
    type Device_Access is access all Device_T;
 
    System_Devices : array (1 .. 16) of aliased Device_T;
-
-private
-   Logging_Tags : constant Log_Tags := [Log_Tag_Devices];
 
 end Devices;

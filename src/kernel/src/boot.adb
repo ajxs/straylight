@@ -18,6 +18,7 @@ with Function_Results;     use Function_Results;
 with Graphics;             use Graphics;
 with Loader;
 with Locks;                use Locks;
+with Logging;              use Logging;
 with Memory.Allocators;    use Memory.Allocators;
 with Memory.Kernel;        use Memory.Kernel;
 with Memory.Physical;      use Memory.Physical;
@@ -106,7 +107,7 @@ package body Boot is
 
       Result : Function_Result := Unset;
    begin
-      Log_Debug ("Freeing boot memory...", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Freeing boot memory..."));
 
       Free_Physical_Memory_Length : constant Storage_Offset :=
         Boot_End_Offset'Address - Boot_Start_Offset'Address;
@@ -124,7 +125,7 @@ package body Boot is
          Panic;
       end if;
 
-      Log_Debug ("Freed boot memory.", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Freed boot memory."));
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
@@ -156,7 +157,7 @@ package body Boot is
 
       Result : Function_Result := Unset;
    begin
-      Log_Debug ("Initialising devices...", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Initialising devices..."));
 
       --  Assign a unique Lock ID to the device spinlocks.
       for I in System_Devices'Range loop
@@ -330,20 +331,22 @@ package body Boot is
 
       for I in System_Devices'Range loop
          if System_Devices (I).Record_Used then
-            Log_Debug
-              ("Mapping Device "
-               & I'Image
-               & ": "
-               & ASCII.LF
-               & "  Class:     "
-               & System_Devices (I).Device_Class'Image
-               & ASCII.LF
-               & "  Virt Addr: "
-               & System_Devices (I).Virtual_Address'Image
-               & ASCII.LF
-               & "  Phys Addr: "
-               & System_Devices (I).Physical_Address'Image,
-               Logging_Tags);
+            pragma
+              Debug
+                (Debug_Boot,
+                 Log_Debug
+                   ("Mapping Device "
+                    & I'Image
+                    & ": "
+                    & ASCII.LF
+                    & "  Class:     "
+                    & System_Devices (I).Device_Class'Image
+                    & ASCII.LF
+                    & "  Virt Addr: "
+                    & System_Devices (I).Virtual_Address'Image
+                    & ASCII.LF
+                    & "  Phys Addr: "
+                    & System_Devices (I).Physical_Address'Image));
 
             --  Map each device into the kernel's address space.
             Map_Kernel_Memory
@@ -376,10 +379,12 @@ package body Boot is
 
             --  If the device has an interrupt line, then enable it.
             if System_Devices (I).Interrupt_Line /= 0 then
-               Log_Debug
-                 ("Setting interrupt line: "
-                  & System_Devices (I).Interrupt_Line'Image,
-                  Logging_Tags);
+               pragma
+                 Debug
+                   (Debug_Boot,
+                    Log_Debug
+                      ("Setting interrupt line: "
+                       & System_Devices (I).Interrupt_Line'Image));
 
                Devices.PLIC.Set_IRQ_Enable_State
                  (APIC_Device,
@@ -406,7 +411,7 @@ package body Boot is
       Devices.PLIC.Set_IRQ_Priority_Threshold
         (APIC_Device, Supervisor_Interrupt_Context, 1);
 
-      Log_Debug ("Initialised devices.", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Initialised devices."));
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
@@ -426,7 +431,7 @@ package body Boot is
       Disk_B_Filesystem_Node_Index  : Filesystem_Node_Index_T := 0;
       UART_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
    begin
-      Log_Debug ("Initialising filesystem...", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Initialising filesystem..."));
 
       Filesystems.Mounted_Filesystems :=
         [others =>
@@ -516,7 +521,7 @@ package body Boot is
          Panic;
       end if;
 
-      Log_Debug ("Initialised filesystem.", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Initialised filesystem."));
    end Initialise_Filesystem;
 
    procedure Initialise_Hart (Hart_Id : Hart_Index_T) is
@@ -580,7 +585,8 @@ package body Boot is
       --  determine the current hart id.
       Initialise_Hart (Hart_Id);
 
-      Log_Debug ("Booting Hart" & Hart_Id'Image & "...", Logging_Tags);
+      pragma
+        Debug (Debug_Boot, Log_Debug ("Booting Hart" & Hart_Id'Image & "..."));
 
       --  The Devicetree blob was mapped into the higher-half address space
       --  at this offset in Boot.Early.Map_Devicetree.
@@ -593,7 +599,9 @@ package body Boot is
          Panic;
       end if;
 
-      Log_Debug ("Initialising core kernel subsystems...", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Boot, Log_Debug ("Initialising core kernel subsystems..."));
 
       Initialise_Physical_Memory_Manager;
 
@@ -612,14 +620,16 @@ package body Boot is
 
       Initialise_Hart_Boot_Secondary_Stack (Hart_Id, Boot_Secondary_Stack_Top);
 
-      Log_Debug ("Initialised boot secondary stack.", Logging_Tags);
+      pragma
+        Debug (Debug_Boot, Log_Debug ("Initialised boot secondary stack."));
 
       --  Once the kernel address space is set up, we can mark this hart as
       --  running. Once all harts are running, the boot memory is no longer
       --  needed, and can be safely freed.
       Hart_States (Hart_Id).Hart_Status := Hart_Status_Running;
 
-      Log_Debug ("Jumping to kernel address space...", Logging_Tags);
+      pragma
+        Debug (Debug_Boot, Log_Debug ("Jumping to kernel address space..."));
 
       Switch_To_Kernel_Address_Space
         (Hart_Id,
@@ -638,7 +648,7 @@ package body Boot is
 
       Result : Function_Result := Unset;
    begin
-      Log_Debug ("Initialising PMM...", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Initialising PMM..."));
 
       Free_Physical_Memory_Length : constant Storage_Offset :=
         To_Address (16#8800_0000#) - (Kernel_End'Address - Higher_Half_Offset);
@@ -656,7 +666,7 @@ package body Boot is
          Panic;
       end if;
 
-      Log_Debug ("Initialised PMM.", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Initialised PMM."));
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
@@ -664,7 +674,7 @@ package body Boot is
 
    procedure Initialise_Kernel_Services (Hart_Id : Hart_Index_T) is
    begin
-      Log_Debug ("Initialising kernel services...", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Initialising kernel services..."));
 
       Initialise_Devices;
 
@@ -682,7 +692,7 @@ package body Boot is
 
       Traps.Setup_Next_Timer_Interrupt;
 
-      Log_Debug ("Set initial system tick.", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Set initial system tick."));
 
       --  The scheduler will jump to the init process.
       Processes.Scheduler.Run;
@@ -707,18 +717,21 @@ package body Boot is
          Panic;
       end if;
 
-      Log_Debug ("Allocating framebuffer memory...", Logging_Tags);
+      pragma
+        Debug (Debug_Boot, Log_Debug ("Allocating framebuffer memory..."));
       Allocate_Kernel_Physical_Memory
         (Framebuffer_Size, Framebuffer_Allocation, Result);
-      Log_Debug
-        ("Allocated framebuffer: "
-         & ASCII.LF
-         & "  Virt Addr: "
-         & Framebuffer_Allocation.Virtual_Address'Image
-         & ASCII.LF
-         & "  Phys Addr: "
-         & Framebuffer_Allocation.Physical_Address'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Boot,
+           Log_Debug
+             ("Allocated framebuffer: "
+              & ASCII.LF
+              & "  Virt Addr: "
+              & Framebuffer_Allocation.Virtual_Address'Image
+              & ASCII.LF
+              & "  Phys Addr: "
+              & Framebuffer_Allocation.Physical_Address'Image));
 
       Graphics_Device.Bus_Info.Virtio.Resource_Id := Resource_Id;
       Graphics_Device.Framebuffer_Addresses := Framebuffer_Allocation;
@@ -795,7 +808,7 @@ package body Boot is
       --  Note: There's no need to release the lock of any previous process
       --  when starting the init process, as it's impossible by design for any
       --  other process to be running at this point in time.
-      Log_Debug ("Starting init process...", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Starting init process..."));
 
       --  The graphics system is initialised here because the Virtio driver
       --  requires a process context to operate in.
@@ -864,7 +877,9 @@ package body Boot is
          end loop;
 
          if All_Harts_Started then
-            Log_Debug ("All harts started successfully.", Logging_Tags);
+            pragma
+              Debug
+                (Debug_Boot, Log_Debug ("All harts started successfully."));
             return;
          end if;
       end loop;
@@ -878,7 +893,7 @@ package body Boot is
 
       SBI_Result : RISCV.SBI.SBI_Result_T;
    begin
-      Log_Debug ("Starting non-boot harts...", Logging_Tags);
+      pragma Debug (Debug_Boot, Log_Debug ("Starting non-boot harts..."));
 
       for Hart_Id in 0 .. Hart_State.Maximum_Harts - 1 loop
          if Hart_Id /= Get_Current_Hart_Id then
@@ -894,9 +909,11 @@ package body Boot is
                if SBI_Result.Error = RISCV.SBI.SBI_ERR_INVALID_PARAM then
                   Hart_States (Hart_Id).Hart_Status := Hart_Status_Invalid;
 
-                  Log_Debug
-                    ("Hart" & Hart_Id'Image & " is not present.",
-                     Logging_Tags);
+                  pragma
+                    Debug
+                      (Debug_Boot,
+                       Log_Debug
+                         ("Hart" & Hart_Id'Image & " is not present."));
                else
                   Log_Error
                     ("Error getting hart"
@@ -905,12 +922,14 @@ package body Boot is
                      & SBI_Result.Error'Image);
                end if;
             else
-               Log_Debug
-                 ("Hart"
-                  & Hart_Id'Image
-                  & " status: "
-                  & SBI_Result.Value'Image,
-                  Logging_Tags);
+               pragma
+                 Debug
+                   (Debug_Boot,
+                    Log_Debug
+                      ("Hart"
+                       & Hart_Id'Image
+                       & " status: "
+                       & SBI_Result.Value'Image));
 
                SBI_Result :=
                  RISCV.SBI.Hart_Start
@@ -942,7 +961,9 @@ package body Boot is
       --  determine the current hart id.
       Initialise_Hart (Hart_Id);
 
-      Log_Debug ("Starting non-boot Hart#" & Hart_Id'Image, Logging_Tags);
+      pragma
+        Debug
+          (Debug_Boot, Log_Debug ("Starting non-boot Hart#" & Hart_Id'Image));
 
       Initialise_Hart_Boot_Secondary_Stack (Hart_Id, Boot_Secondary_Stack_Top);
 
@@ -953,14 +974,24 @@ package body Boot is
          Boot_Secondary_Stack_Top,
          Boot_Secondary_Stack_Size,
          Non_Boot_Hart_Start'Address);
+
+      --  With debug logging disabled, a Constraint_Error can't be raised in
+      --  this body, and this handler can never be entered.
+      --  Keep this handler here, and supress the warning about this handler
+      --  being unreachable. So that if the debug logging is enabled, the
+      --  kernel will still compile.
+      pragma Warnings (Off, "this handler can never be entered");
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
+         pragma Warnings (On, "this handler can never be entered");
    end Non_Boot_Hart_Entry;
 
    procedure Non_Boot_Hart_Start (Hart_Id : Hart_Index_T) is
    begin
-      Log_Debug ("Started non-boot hart#" & Hart_Id'Image, Logging_Tags);
+      pragma
+        Debug
+          (Debug_Boot, Log_Debug ("Started non-boot hart#" & Hart_Id'Image));
 
       Initialise_Hart_Idle_Process (Hart_Id);
 

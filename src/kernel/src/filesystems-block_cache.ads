@@ -59,9 +59,6 @@ is
    System_Block_Cache : Block_Cache_T;
 
 private
-   Logging_Tags_Block_Cache : constant Log_Tags :=
-     [Log_Tag_Filesystems_Block_Cache];
-
    Cache_Entry_Age_Threshold : constant Unsigned_64 := 1000000;
 
    function Is_Matching_Used_Cache_Entry

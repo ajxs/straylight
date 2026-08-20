@@ -5,7 +5,6 @@
 
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
-with Logging;          use Logging;
 
 package Memory.Virtual
   with Preelaborate
@@ -144,9 +143,6 @@ is
      (Addr : Virtual_Address_T; Result : out Function_Result);
 
 private
-   Logging_Tags : constant Log_Tags :=
-     [Log_Tag_Memory, Log_Tag_Memory_Virtual];
-
    --  This address space holds the canonical mapping structures for all
    --  kernel memory. When creating new userspace processes, the page
    --  table entries in this address space's base page table are copied into

@@ -15,7 +15,6 @@ with MMIO;             use MMIO;
 package Devices.UART
   with Preelaborate
 is
-
    ----------------------------------------------------------------------------
    --  The maximum supported baud rate.
    ----------------------------------------------------------------------------

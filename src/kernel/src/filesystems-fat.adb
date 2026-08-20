@@ -7,6 +7,7 @@ with Filesystems.Block_Cache;       use Filesystems.Block_Cache;
 with Filesystems.Node_Cache;        use Filesystems.Node_Cache;
 with Filesystems.FAT.DOS_Filenames; use Filesystems.FAT.DOS_Filenames;
 with Filesystems.FAT.FAT16;         use Filesystems.FAT.FAT16;
+with Logging;                       use Logging;
 with Memory.Kernel;                 use Memory.Kernel;
 
 package body Filesystems.FAT is
@@ -99,7 +100,7 @@ package body Filesystems.FAT is
       end if;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_FAT);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Populate_Filesystem_Meta_Info_If_Needed;
 
@@ -136,14 +137,20 @@ package body Filesystems.FAT is
          New_Node := null;
          return;
       elsif Existing_File /= null then
-         Log_Debug
-           ("File already exists: '" & Filename & "'", Logging_Tags_FAT);
+         pragma
+           Debug
+             (Debug_Filesystems_FAT,
+              Log_Debug ("File already exists: '" & Filename & "'"));
+
          New_Node := null;
          Result := Invalid_Filename;
          return;
       end if;
 
-      Log_Debug ("Creating file: '" & Filename & "'", Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug ("Creating file: '" & Filename & "'"));
 
       Filesystem_Info : FAT_Filesystem_Info_T
       with
@@ -163,13 +170,15 @@ package body Filesystems.FAT is
                Result);
 
          when others         =>
-            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            pragma
+              Debug
+                (Debug_Filesystems_FAT, Log_Error ("FAT type not supported"));
             New_Node := null;
             Result := Not_Supported;
       end case;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_FAT);
+         Log_Constraint_Error;
          New_Node := null;
          Result := Constraint_Exception;
    end Create_File;
@@ -191,7 +200,10 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Log_Debug ("Finding file: '" & Filename & "'", Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug ("Finding file: '" & Filename & "'"));
 
       Populate_Filesystem_Meta_Info_If_Needed
         (Filesystem, Reading_Process, Result);
@@ -218,13 +230,13 @@ package body Filesystems.FAT is
                Result);
 
          when others         =>
-            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            Log_Error ("FAT type not supported");
             Found_Node := null;
             Result := Not_Supported;
       end case;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_FAT);
+         Log_Constraint_Error;
          Found_Node := null;
          Result := Constraint_Exception;
    end Find_File;
@@ -277,43 +289,42 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_FAT);
+         Log_Constraint_Error;
          Result := Unhandled_Exception;
    end Parse_DOS_Directory_Entry;
 
    procedure Print_FAT_Filesystem_Info
      (FAT_Filesystem_Info : FAT_Filesystem_Info_T) is
    begin
-      Log_Debug
-        ("FAT Filesystem Info:"
-         & ASCII.LF
-         & "  FAT12_16_Root_Directory_Sector:  "
-         & FAT_Filesystem_Info.FAT12_16_Root_Directory_Sector'Image
-         & ASCII.LF
-         & "  Sectors_In_Root_Directory:       "
-         & FAT_Filesystem_Info.Sectors_In_Root_Directory'Image
-         & ASCII.LF
-         & "  Bytes_Per_Sector:                "
-         & FAT_Filesystem_Info.Bytes_Per_Sector'Image
-         & ASCII.LF
-         & "  First_FAT_Sector:                "
-         & FAT_Filesystem_Info.First_FAT_Sector'Image
-         & ASCII.LF
-         & "  First_Data_Sector:               "
-         & FAT_Filesystem_Info.First_Data_Sector'Image
-         & ASCII.LF
-         & "  Total_Sectors_In_All_FAT_Tables: "
-         & FAT_Filesystem_Info.Total_Sectors_In_All_FAT_Tables'Image
-         & ASCII.LF
-         & "  FAT_Table_Count:                 "
-         & FAT_Filesystem_Info.FAT_Table_Count'Image
-         & ASCII.LF
-         & "  Sectors_Per_Cluster:             "
-         & FAT_Filesystem_Info.Sectors_Per_Cluster'Image,
-         Logging_Tags_FAT);
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug
+             ("FAT Filesystem Info:"
+              & ASCII.LF
+              & "  FAT12_16_Root_Directory_Sector:  "
+              & FAT_Filesystem_Info.FAT12_16_Root_Directory_Sector'Image
+              & ASCII.LF
+              & "  Sectors_In_Root_Directory:       "
+              & FAT_Filesystem_Info.Sectors_In_Root_Directory'Image
+              & ASCII.LF
+              & "  Bytes_Per_Sector:                "
+              & FAT_Filesystem_Info.Bytes_Per_Sector'Image
+              & ASCII.LF
+              & "  First_FAT_Sector:                "
+              & FAT_Filesystem_Info.First_FAT_Sector'Image
+              & ASCII.LF
+              & "  First_Data_Sector:               "
+              & FAT_Filesystem_Info.First_Data_Sector'Image
+              & ASCII.LF
+              & "  Total_Sectors_In_All_FAT_Tables: "
+              & FAT_Filesystem_Info.Total_Sectors_In_All_FAT_Tables'Image
+              & ASCII.LF
+              & "  FAT_Table_Count:                 "
+              & FAT_Filesystem_Info.FAT_Table_Count'Image
+              & ASCII.LF
+              & "  Sectors_Per_Cluster:             "
+              & FAT_Filesystem_Info.Sectors_Per_Cluster'Image));
    end Print_FAT_Filesystem_Info;
 
    procedure Parse_Boot_Sector
@@ -329,7 +340,8 @@ package body Filesystems.FAT is
         Alignment => 1,
         Address   => Boot_Sector.EBPB_Reserved_Space'Address;
    begin
-      Log_Debug ("Parsing boot sector...", Logging_Tags_FAT);
+      pragma
+        Debug (Debug_Filesystems_FAT, Log_Debug ("Parsing boot sector..."));
 
       --  On FAT32 systems, the 'Total_Sector_Count' field (BPB_TotSec16) is
       --  set to 0, and the actual total sector count is found in the
@@ -374,8 +386,7 @@ package body Filesystems.FAT is
       --  number of data sectors caused by a corrupt BPB.
       if Filesystem_Info.Total_Sector_Count < Overhead_Sectors then
          Log_Error
-           ("Invalid BPB: Total sectors less than reserved + FAT sectors.",
-            Logging_Tags_FAT);
+           ("Invalid BPB: Total sectors less than reserved + FAT sectors.");
 
          Result := Invalid_Filesystem;
          return;
@@ -441,7 +452,7 @@ package body Filesystems.FAT is
             FAT_Entry := Unsigned_32 (FAT16_Table_Entry);
 
          when others         =>
-            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            Log_Error ("FAT type not supported");
             FAT_Entry := 0;
             Result := Not_Supported;
       end case;
@@ -470,7 +481,7 @@ package body Filesystems.FAT is
                Result);
 
          when others         =>
-            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            Log_Error ("FAT type not supported");
             Result := Not_Supported;
       end case;
    exception
@@ -529,9 +540,7 @@ package body Filesystems.FAT is
       --  adding another 13 characters to the name won't exceed the maximum
       --  length of a file name that we can support.
       if Name_offset + 13 > Filename'Length then
-         Log_Error
-           ("LFN entry filename exceeds maximum supported length.",
-            Logging_Tags_FAT);
+         Log_Error ("LFN entry filename exceeds maximum supported length.");
          Result := Invalid_Filename;
          return;
       end if;
@@ -573,7 +582,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint error reading LFN", Logging_Tags_FAT);
+         Log_Error ("Constraint error reading LFN");
          Result := Constraint_Exception;
    end Parse_LFN_Directory_Entry;
 
@@ -633,16 +642,13 @@ package body Filesystems.FAT is
    begin
       if not (Boot_Sector.BPB.Bytes_Per_Sector in 512 | 1024 | 2048 | 4096)
       then
-         Log_Error
-           ("Filesystem Invalid: Invalid sector size.", Logging_Tags_FAT);
+         Log_Error ("Filesystem Invalid: Invalid sector size.");
          Result := Invalid_Filesystem;
          return;
       end if;
 
       if Boot_Sector.BPB.Sectors_Per_Cluster = 0 then
-         Log_Error
-           ("Filesystem Invalid: Sectors per cluster cannot be zero.",
-            Logging_Tags_FAT);
+         Log_Error ("Filesystem Invalid: Sectors per cluster cannot be zero.");
          Result := Invalid_Filesystem;
          return;
       end if;
@@ -714,11 +720,14 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Log_Debug
-        ("Parsed FAT file entry with filename: '"
-         & UTF8_Encoded_Filename.Value (1 .. UTF8_Encoded_Filename.Byte_Length)
-         & "'",
-         Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug
+             ("Parsed FAT file entry with filename: '"
+              & UTF8_Encoded_Filename.Value
+                  (1 .. UTF8_Encoded_Filename.Byte_Length)
+              & "'"));
 
       --  Note that all operations on FAT filesystems are case-insensitive.
       --  As perFAT32 v1.03 spec page 30.
@@ -727,11 +736,6 @@ package body Filesystems.FAT is
           (UTF8_Encoded_Filename, Path_Name, True);
 
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Match_Found := False;
-         Result := Constraint_Exception;
    end Does_FAT_Directory_Entry_Name_Match_Filename;
 
    procedure Write_File
@@ -754,8 +758,7 @@ package body Filesystems.FAT is
         > Unsigned_64 (Unsigned_32'Last)
       then
          Log_Error
-           ("File size after write would exceed maximum supported size.",
-            Logging_Tags_FAT);
+           ("File size after write would exceed maximum supported size.");
 
          Result := Not_Supported;
          return;
@@ -810,9 +813,11 @@ package body Filesystems.FAT is
             return;
          end if;
 
-         Log_Debug
-           ("Allocated first cluster for file: " & Start_Cluster'Image,
-            Logging_Tags_FAT);
+         pragma
+           Debug
+             (Debug_Filesystems_FAT,
+              Log_Debug
+                ("Allocated first cluster for file: " & Start_Cluster'Image));
 
          --  Update the file directory entry with the allocated cluster.
          Directory_Entry.First_Cluster_Low :=
@@ -892,8 +897,10 @@ package body Filesystems.FAT is
       Is_Last_Entry : Boolean := False;
       New_Checksum  : Unsigned_8 := 0;
    begin
-      Log_Debug
-        ("Searching directory for file '" & Filename & "'", Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug ("Searching directory for file '" & Filename & "'"));
 
       Filesystem_Node := null;
 
@@ -904,11 +911,17 @@ package body Filesystems.FAT is
       Last_Entry_Reached := False;
 
       for Dir_Idx in Directory'Range loop
-         Log_Debug
-           ("Scanning directory entry: " & Dir_Idx'Image, Logging_Tags_FAT);
+         pragma
+           Debug
+             (Debug_Filesystems_FAT,
+              Log_Debug ("Scanning directory entry: " & Dir_Idx'Image));
 
          if Is_Last_Directory_Entry (Directory (Dir_Idx)) then
-            Log_Debug ("Reached last directory entry.", Logging_Tags_FAT);
+            pragma
+              Debug
+                (Debug_Filesystems_FAT,
+                 Log_Debug ("Reached last directory entry."));
+
             Last_Entry_Reached := True;
             exit;
          end if;
@@ -941,11 +954,13 @@ package body Filesystems.FAT is
                     and then (New_Checksum = Entry_Long_Filename_Checksum);
 
                   if New_Checksum /= Entry_Long_Filename_Checksum then
-                     Log_Debug
-                       ("Directory entry "
-                        & Dir_Idx'Image
-                        & " checksum does not match expected value.",
-                        Logging_Tags_FAT);
+                     pragma
+                       Debug
+                         (Debug_Filesystems_FAT,
+                          Log_Debug
+                            ("Directory entry "
+                             & Dir_Idx'Image
+                             & " checksum does not match expected value."));
                   end if;
                end if;
             else
@@ -968,8 +983,10 @@ package body Filesystems.FAT is
                     and then (New_Checksum = Entry_Long_Filename_Checksum);
 
                   if not Checksum_Valid then
-                     Log_Debug
-                       ("Filename checksum is invalid.", Logging_Tags_FAT);
+                     pragma
+                       Debug
+                         (Debug_Filesystems_FAT,
+                          Log_Debug ("Filename checksum is invalid."));
                   end if;
                end if;
 
@@ -1026,8 +1043,10 @@ package body Filesystems.FAT is
                   Index_Within_Sector : constant Natural :=
                     (Dir_Idx mod Entries_Per_Sector);
 
-                  Log_Debug
-                    ("Found matching directory entry.", Logging_Tags_FAT);
+                  pragma
+                    Debug
+                      (Debug_Filesystems_FAT,
+                       Log_Debug ("Found matching directory entry."));
 
                   First_Cluster : constant Unsigned_32 :=
                     Get_First_Cluster_Of_Dir_Entry (Directory (Dir_Idx));
@@ -1080,7 +1099,7 @@ package body Filesystems.FAT is
       Result              : out Function_Result) is
    begin
       if Filesystem_Node = null then
-         Log_Error ("Filesystem node is null.", Logging_Tags_FAT);
+         Log_Error ("Filesystem node is null.");
          Sector_Number := 0;
          Index_Within_Sector := 0;
          Result := Invalid_Argument;
@@ -1265,8 +1284,7 @@ package body Filesystems.FAT is
            or else Is_Cluster_Bad (Current_Cluster, Filesystem_Info.FAT_Type)
            or else Is_Cluster_Free (Current_Cluster)
          then
-            Log_Error
-              ("Invalid cluster in file's cluster chain.", Logging_Tags_FAT);
+            Log_Error ("Invalid cluster in file's cluster chain.");
 
             Result := Invalid_Filesystem;
             return;
@@ -1480,7 +1498,7 @@ package body Filesystems.FAT is
             Free_Cluster := Unsigned_32 (FAT16_Free_Cluster);
 
          when others         =>
-            Log_Error ("FAT type not supported", Logging_Tags_FAT);
+            Log_Error ("FAT type not supported");
             Result := Not_Supported;
       end case;
    exception
@@ -1516,14 +1534,12 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Log_Debug
-        ("Allocated new cluster: " & New_Cluster'Image, Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug ("Allocated new cluster: " & New_Cluster'Image));
 
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
    end Allocate_Cluster;
 
    procedure Write_File_Data
@@ -1561,8 +1577,7 @@ package body Filesystems.FAT is
          if Is_Cluster_Bad (Current_Cluster, Filesystem_Info.FAT_Type)
            or else Is_Cluster_Free (Current_Cluster)
          then
-            Log_Error
-              ("Invalid cluster in file's cluster chain.", Logging_Tags_FAT);
+            Log_Error ("Invalid cluster in file's cluster chain.");
 
             Result := Invalid_Filesystem;
             return;
@@ -1722,7 +1737,7 @@ package body Filesystems.FAT is
         and then New_Size - 1 in Cluster_Lower_Bound .. Cluster_Upper_Bound;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_FAT);
+         Log_Constraint_Error;
          return False;
    end Is_New_File_Size_Within_Same_Cluster;
 
@@ -1772,8 +1787,7 @@ package body Filesystems.FAT is
          if Is_Cluster_Bad (Current_Cluster, Filesystem_Info.FAT_Type)
            or else Is_Cluster_Free (Current_Cluster)
          then
-            Log_Error
-              ("Invalid cluster in file's cluster chain.", Logging_Tags_FAT);
+            Log_Error ("Invalid cluster in file's cluster chain.");
 
             Result := Invalid_Filesystem;
             return;
@@ -1819,7 +1833,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_FAT);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Truncate_File_To_Larger_Size;
 
@@ -1851,8 +1865,7 @@ package body Filesystems.FAT is
          if Is_Cluster_Bad (Current_Cluster, Filesystem_Info.FAT_Type)
            or else Is_Cluster_Free (Current_Cluster)
          then
-            Log_Error
-              ("Invalid cluster in file's cluster chain.", Logging_Tags_FAT);
+            Log_Error ("Invalid cluster in file's cluster chain.");
 
             Result := Invalid_Filesystem;
             return;
@@ -1921,7 +1934,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_FAT);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Truncate_File_To_Smaller_Size;
 
@@ -1936,8 +1949,7 @@ package body Filesystems.FAT is
    begin
       if New_Size > Unsigned_64 (Unsigned_32'Last) then
          Log_Error
-           ("New file size is greater than the maximum supported size.",
-            Logging_Tags_FAT);
+           ("New file size is greater than the maximum supported size.");
 
          Result := Invalid_Argument;
          return;

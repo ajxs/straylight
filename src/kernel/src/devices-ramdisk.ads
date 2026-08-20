@@ -62,8 +62,6 @@ is
       Result               : out Function_Result);
 
 private
-   Logging_Tags_Ramdisk : constant Log_Tags := [Log_Tag_Devices_Ramdisk];
-
    Ramdisk_Sector_Size : constant := 512;
 
 end Devices.Ramdisk;

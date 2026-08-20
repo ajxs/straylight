@@ -6,6 +6,7 @@
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
+with Logging;         use Logging;
 with Memory;          use Memory;
 with Memory.Physical; use Memory.Physical;
 with Hart_State;      use Hart_State;
@@ -33,8 +34,10 @@ package body Loader is
       Bytes_To_Read              : Natural := 0;
       Bytes_Read                 : Natural := 0;
    begin
-      Log_Debug
-        ("Loading new process from filesystem: '" & Path & "'", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Loader,
+           Log_Debug ("Loading new process from filesystem: '" & Path & "'"));
 
       Open_File
         (Loading_Process,
@@ -49,7 +52,7 @@ package body Loader is
       end if;
 
       if Result = File_Not_Found then
-         Log_Error ("Executable file not found.", Logging_Tags);
+         Log_Error ("Executable file not found.");
          return;
       end if;
 
@@ -71,20 +74,16 @@ package body Loader is
       if Is_Error (Result) then
          return;
       elsif Bytes_Read /= Bytes_To_Read then
-         Log_Error
-           ("Invalid amount of data read: " & Bytes_Read'Image, Logging_Tags);
+         Log_Error ("Invalid amount of data read: " & Bytes_Read'Image);
          Result := Unhandled_Exception;
          return;
       end if;
 
       if not Validate_Executable_Is_Loadable (ELF_Header) then
-         Log_Error ("Invalid ELF header", Logging_Tags);
+         Log_Error ("Invalid ELF header");
          Result := Unhandled_Exception;
          return;
       end if;
-
-      Print_ELF_Header (ELF_Header);
-      Print_ELF_Header_Program_Header_Info (ELF_Header);
 
       Program_Header_Read_Offset := ELF_Header.e_phoff;
 
@@ -95,7 +94,7 @@ package body Loader is
             return;
          end if;
 
-         Log_Debug ("Reading Program Header...", Logging_Tags);
+         pragma Debug (Debug_Loader, Log_Debug ("Reading Program Header..."));
 
          Bytes_To_Read := Natural (ELF_Header.e_phentsize);
 
@@ -109,19 +108,15 @@ package body Loader is
          if Is_Error (Result) then
             return;
          elsif Bytes_Read /= Bytes_To_Read then
-            Log_Error
-              ("Invalid amount of data read: " & Bytes_Read'Image,
-               Logging_Tags);
+            Log_Error ("Invalid amount of data read: " & Bytes_Read'Image);
             Result := Unhandled_Exception;
             return;
          end if;
 
-         Print_ELF64_Program_Header_Info (Program_Header);
-
          if Program_Header.p_type = PT_LOAD
            and then Program_Header.p_filesz > Program_Header.p_memsz
          then
-            Log_Error ("Segment file size exceeds memory size", Logging_Tags);
+            Log_Error ("Segment file size exceeds memory size");
             Result := Unhandled_Exception;
             return;
          end if;
@@ -129,7 +124,10 @@ package body Loader is
          --  If this segment needs to be loaded.
          if Program_Header.p_type = PT_LOAD and then Program_Header.p_memsz > 0
          then
-            Log_Debug ("Allocating segment physical memory...", Logging_Tags);
+            pragma
+              Debug
+                (Debug_Loader,
+                 Log_Debug ("Allocating segment physical memory..."));
 
             --  Program_Header.p_vaddr specifies the virtual address at which
             --  the loadable segment should be mapped.
@@ -168,15 +166,17 @@ package body Loader is
               Unsigned_64_To_Address
                 (Program_Header.p_vaddr - Vaddr_Page_Align_Offset);
 
-            Log_Debug
-              ("Mapping segment:"
-               & ASCII.LF
-               & "  Addr: "
-               & Current_Segment_Virtual_Address'Image
-               & ASCII.LF
-               & "  Size: "
-               & Program_Header.p_memsz'Image,
-               Logging_Tags);
+            pragma
+              Debug
+                (Debug_Loader,
+                 Log_Debug
+                   ("Mapping segment:"
+                    & ASCII.LF
+                    & "  Addr: "
+                    & Current_Segment_Virtual_Address'Image
+                    & ASCII.LF
+                    & "  Size: "
+                    & Program_Header.p_memsz'Image));
 
             New_Process.all.Memory_Space.Map
               (Current_Segment_Virtual_Address,
@@ -196,14 +196,18 @@ package body Loader is
                  Get_Physical_Address_Virtual_Mapping
                    (Allocated_Physical_Address);
 
-               Log_Debug ("Clearing segment memory...", Logging_Tags);
+               pragma
+                 Debug
+                   (Debug_Loader, Log_Debug ("Clearing segment memory..."));
 
                --  Clear the entire allocation, including alignment padding.
                Set (Region_Address, 0, Total_Mapping_Size);
 
                --  If the segment has data, read this from the disk.
                if Program_Header.p_filesz > 0 then
-                  Log_Debug ("Loading segment data...", Logging_Tags);
+                  pragma
+                    Debug
+                      (Debug_Loader, Log_Debug ("Loading segment data..."));
 
                   Seek_File (Executable_File, Program_Header.p_offset, Result);
                   if Is_Error (Result) then
@@ -226,8 +230,7 @@ package body Loader is
                      return;
                   elsif Bytes_Read /= Bytes_To_Read then
                      Log_Error
-                       ("Invalid amount of data read: " & Bytes_Read'Image,
-                        Logging_Tags);
+                       ("Invalid amount of data read: " & Bytes_Read'Image);
                      Result := Unhandled_Exception;
                      return;
                   end if;
@@ -245,9 +248,11 @@ package body Loader is
       New_Process.all.Process_Entry_Point :=
         Unsigned_64_To_Address (ELF_Header.e_entry);
 
-      Log_Debug
-        ("Finished loading new process. Adding to process queue.",
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Loader,
+           Log_Debug
+             ("Finished loading new process. Adding to process queue."));
 
       Add_Process_To_Process_Queue (New_Process, Result);
       if Is_Error (Result) then
@@ -255,122 +260,9 @@ package body Loader is
       end if;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Load_New_Process_From_Filesystem;
-
-   procedure Print_ELF_Header (ELF_Header : ELF.Elf64_File_Header_T) is
-   begin
-      Log_Debug
-        ("ELF Header:"
-         & ASCII.LF
-         & "  Class:          "
-         & ELF_Header.e_ident.File_Class'Image
-         & ASCII.LF
-         & "  Encoding:       "
-         & ELF_Header.e_ident.File_Encoding'Image
-         & ASCII.LF
-         & "  Version:        "
-         & ELF_Header.e_ident.File_Version'Image
-         & ASCII.LF
-         & "  ABI:            "
-         & ELF_Header.e_ident.File_ABI'Image
-         & ASCII.LF
-         & "  Type:           "
-         & ELF_Header.e_type'Image
-         & ASCII.LF
-         & "  Machine:        "
-         & ELF_Header.e_machine'Image
-         & ASCII.LF
-         & "  File Version:   "
-         & ELF_Header.e_version'Image
-         & ASCII.LF
-         & "  Entry Point:    "
-         & ELF_Header.e_entry'Image
-         & ASCII.LF
-         & "  Header Size:    "
-         & ELF_Header.e_ehsize'Image
-         & ASCII.LF
-         & "  Flags:          "
-         & ELF_Header.e_flags'Image
-         & ASCII.LF
-         & "  Section Headers Offset: "
-         & ELF_Header.e_shoff'Image
-         & ASCII.LF
-         & "  Section Header Size:    "
-         & ELF_Header.e_shentsize'Image
-         & ASCII.LF
-         & "  Section Header Count:   "
-         & ELF_Header.e_shnum'Image
-         & ASCII.LF
-         & "  Section Name Index:     "
-         & ELF_Header.e_shstrndx'Image,
-         Logging_Tags);
-   exception
-      when Constraint_Error =>
-         null;
-   end Print_ELF_Header;
-
-   procedure Print_ELF_Header_Program_Header_Info
-     (ELF_Header : ELF.Elf64_File_Header_T) is
-   begin
-      Log_Debug
-        ("Program Header Info:"
-         & ASCII.LF
-         & "  Program Header Count:   "
-         & ELF_Header.e_phnum'Image
-         & ASCII.LF
-         & "  Program Headers Offset: "
-         & ELF_Header.e_phoff'Image
-         & ASCII.LF
-         & "  Program Header Size:    "
-         & ELF_Header.e_phentsize'Image,
-         Logging_Tags);
-   exception
-      when Constraint_Error =>
-         null;
-   end Print_ELF_Header_Program_Header_Info;
-
-   procedure Print_ELF64_Program_Header_Info
-     (Program_Header : ELF.Elf64_Program_Header_T)
-   is
-      Flags_Read    : constant Boolean :=
-        (Program_Header.p_flags and PF_R) /= 0;
-      Flags_Write   : constant Boolean :=
-        (Program_Header.p_flags and PF_W) /= 0;
-      Flags_Execute : constant Boolean :=
-        (Program_Header.p_flags and PF_X) /= 0;
-   begin
-      Log_Debug
-        ("Program Header:"
-         & ASCII.LF
-         & "  Type:      "
-         & Program_Header.p_type'Image
-         & ASCII.LF
-         & "  File Size: "
-         & Program_Header.p_filesz'Image
-         & ASCII.LF
-         & "  VAddr:     "
-         & Program_Header.p_vaddr'Image
-         & ASCII.LF
-         & "  MemSz:     "
-         & Program_Header.p_memsz'Image
-         & ASCII.LF
-         & "  Flags:     "
-         & ASCII.LF
-         & "    Read:     "
-         & Flags_Read'Image
-         & ASCII.LF
-         & "    Write:    "
-         & Flags_Write'Image
-         & ASCII.LF
-         & "    Execute:  "
-         & Flags_Execute'Image,
-         Logging_Tags);
-   exception
-      when Constraint_Error =>
-         null;
-   end Print_ELF64_Program_Header_Info;
 
    function Validate_Executable_Is_Loadable
      (ELF_Header : Elf64_File_Header_T) return Boolean is

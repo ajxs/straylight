@@ -1,4 +1,11 @@
+with Logging; use Logging;
+
 package body Memory.Allocators.Heap is
+   --  This package logged under more than one tag, so its debug
+   --  output is emitted if any of them is enabled.
+   Logging_Enabled : constant Boolean :=
+     Debug_Heap or else Debug_Memory or else Debug_Memory_Allocators;
+
    function Calculate_Header_Checksum
      (Block_Identity : Unsigned_32;
       Block_Address  : Virtual_Address_T;
@@ -121,7 +128,7 @@ package body Memory.Allocators.Heap is
                    Current_Block_Address,
                    Current_Block.Block_Size)
          then
-            Log_Error ("Invalid heap block encountered.", Logging_Tags_Heap);
+            Log_Error ("Invalid heap block encountered.");
             Result := Region_Not_Mapped;
             return;
          end if;
@@ -267,8 +274,7 @@ package body Memory.Allocators.Heap is
 
       Log_Error
         ("No space in heap region to satisfy allocation request: "
-         & Size'Image,
-         Logging_Tags_Heap);
+         & Size'Image);
 
       Result := No_Space_In_Region;
    exception
@@ -313,7 +319,7 @@ package body Memory.Allocators.Heap is
              Region_Ptr.all.Next_Region);
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_Heap);
+         Log_Constraint_Error;
          return False;
    end Validate_Heap_Memory_Region_Pointer;
 
@@ -328,29 +334,28 @@ package body Memory.Allocators.Heap is
         Memory_Heap.Memory_Regions_List_Head;
    begin
       if not Is_Valid_Alignment (Alignment) then
-         Log_Error
-           ("Invalid alignment argument: " & Alignment'Image,
-            Logging_Tags_Heap);
+         Log_Error ("Invalid alignment argument: " & Alignment'Image);
          Result := Invalid_Argument;
          return;
       end if;
 
-      Log_Debug
-        ("Allocating heap memory:"
-         & ASCII.LF
-         & "  Size:      "
-         & Size'Image
-         & ASCII.LF
-         & "  Alignment: "
-         & Alignment'Image,
-         Logging_Tags_Heap);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Allocating heap memory:"
+              & ASCII.LF
+              & "  Size:      "
+              & Size'Image
+              & ASCII.LF
+              & "  Alignment: "
+              & Alignment'Image));
 
       while Curr_Region /= null loop
          if not Validate_Heap_Memory_Region_Pointer (Memory_Heap, Curr_Region)
          then
             Log_Error
-              ("Invalid heap region header: " & Curr_Region.all'Address'Image,
-               Logging_Tags_Heap);
+              ("Invalid heap region header: " & Curr_Region.all'Address'Image);
 
             Result := Region_Not_Mapped;
             return;
@@ -362,18 +367,20 @@ package body Memory.Allocators.Heap is
          --  If the allocation was successful, or if it failed for a reason
          --  other than heap exhaustion, return.
          if Result = Success then
-            Log_Debug
-              ("Allocated heap memory:"
-               & ASCII.LF
-               & "  VAddr: "
-               & Allocation_Result.Virtual_Address'Image
-               & ASCII.LF
-               & "  PAddr: "
-               & Allocation_Result.Physical_Address'Image
-               & ASCII.LF
-               & "  Size:  "
-               & Size'Image,
-               Logging_Tags_Heap);
+            pragma
+              Debug
+                (Logging_Enabled,
+                 Log_Debug
+                   ("Allocated heap memory:"
+                    & ASCII.LF
+                    & "  VAddr: "
+                    & Allocation_Result.Virtual_Address'Image
+                    & ASCII.LF
+                    & "  PAddr: "
+                    & Allocation_Result.Physical_Address'Image
+                    & ASCII.LF
+                    & "  Size:  "
+                    & Size'Image));
 
             --  Zero the new block's memory.
             Set (Allocation_Result.Virtual_Address, 0, Size);
@@ -387,13 +394,12 @@ package body Memory.Allocators.Heap is
       end loop;
 
       Log_Error
-        ("Heap exhausted: unable to allocate " & Size'Image & " bytes.",
-         Logging_Tags_Heap);
+        ("Heap exhausted: unable to allocate " & Size'Image & " bytes.");
 
       Result := Not_Enough_Memory_Available;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_Heap);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Allocate_Unlocked;
 
@@ -433,8 +439,7 @@ package body Memory.Allocators.Heap is
                    Current_Block.Block_Size)
          then
             Log_Error
-              ("Invalid heap block encountered while coalescing free blocks.",
-               Logging_Tags_Heap);
+              ("Invalid heap block encountered while coalescing free blocks.");
 
             Result := Region_Not_Mapped;
             return;
@@ -514,8 +519,7 @@ package body Memory.Allocators.Heap is
       then
          Log_Error
            ("Attempted to free an unallocated block: "
-            & Allocated_Virtual_Address'Image,
-            Logging_Tags_Heap);
+            & Allocated_Virtual_Address'Image);
 
          Result := Invalid_Argument;
          return;
@@ -532,7 +536,7 @@ package body Memory.Allocators.Heap is
       Coalesce_Free_Blocks_In_Region (Memory_Heap_Region, Result);
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_Heap);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Free_Allocation_In_Region;
 
@@ -545,22 +549,23 @@ package body Memory.Allocators.Heap is
         Memory_Heap.Memory_Regions_List_Head;
    begin
       if Allocated_Virtual_Address = Null_Address then
-         Log_Error ("Attempted to free a null address.", Logging_Tags_Heap);
+         Log_Error ("Attempted to free a null address.");
          Result := Invalid_Argument;
          return;
       end if;
 
-      Log_Debug
-        ("Freeing heap memory: " & Allocated_Virtual_Address'Image,
-         Logging_Tags_Heap);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Freeing heap memory: " & Allocated_Virtual_Address'Image));
 
       while Curr_Region /= null loop
          if not Validate_Heap_Memory_Region_Pointer (Memory_Heap, Curr_Region)
          then
             Log_Error
               ("Invalid heap region header checksum: "
-               & Curr_Region.all'Address'Image,
-               Logging_Tags_Heap);
+               & Curr_Region.all'Address'Image);
 
             Result := Region_Not_Mapped;
             return;
@@ -579,13 +584,12 @@ package body Memory.Allocators.Heap is
 
       Log_Error
         ("Attempted to free an address not in the heap: "
-         & Allocated_Virtual_Address'Image,
-         Logging_Tags_Heap);
+         & Allocated_Virtual_Address'Image);
 
       Result := Address_Not_In_Heap;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_Heap);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Free_Unlocked;
 
@@ -635,23 +639,25 @@ package body Memory.Allocators.Heap is
            Heap_Starting_Block_Address,
            Heap_Starting_Block.Block_Size);
 
-      Log_Debug
-        ("Inserted new heap memory region: "
-         & ASCII.LF
-         & "  VAddr: "
-         & New_Region_Header.Heap_Region_Virt_Addr'Image
-         & ASCII.LF
-         & "  PAddr: "
-         & New_Region_Header.Heap_Region_Phys_Addr'Image
-         & ASCII.LF
-         & "  Size:  "
-         & New_Region_Header.Heap_Region_Size'Image,
-         Logging_Tags_Heap);
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Inserted new heap memory region: "
+              & ASCII.LF
+              & "  VAddr: "
+              & New_Region_Header.Heap_Region_Virt_Addr'Image
+              & ASCII.LF
+              & "  PAddr: "
+              & New_Region_Header.Heap_Region_Phys_Addr'Image
+              & ASCII.LF
+              & "  Size:  "
+              & New_Region_Header.Heap_Region_Size'Image));
 
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_Heap);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Initialise_New_Region;
 
@@ -666,7 +672,7 @@ package body Memory.Allocators.Heap is
         Memory_Heap.Memory_Regions_List_Head;
    begin
       if Size < (Header_Size + Region_Header_Size) then
-         Log_Error ("Region size is too small.", Logging_Tags_Heap);
+         Log_Error ("Region size is too small.");
 
          Result := Invalid_Argument;
          return;
@@ -686,8 +692,7 @@ package body Memory.Allocators.Heap is
             then
                Log_Error
                  ("Invalid heap region header checksum: "
-                  & Curr_Region.all'Address'Image,
-                  Logging_Tags_Heap);
+                  & Curr_Region.all'Address'Image);
 
                Result := Region_Not_Mapped;
                return;
@@ -697,8 +702,7 @@ package body Memory.Allocators.Heap is
                  (Curr_Region.all, Virtual_Address, Physical_Address, Size)
             then
                Log_Error
-                 ("New heap memory region overlaps with existing region.",
-                  Logging_Tags_Heap);
+                 ("New heap memory region overlaps with existing region.");
 
                Result := Region_Is_Overlapping;
                return;
@@ -725,7 +729,7 @@ package body Memory.Allocators.Heap is
       Initialise_New_Region (Virtual_Address, Physical_Address, Size, Result);
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_Heap);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Add_Memory_Region_To_Heap_Unlocked;
 
@@ -780,7 +784,7 @@ package body Memory.Allocators.Heap is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_Heap);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Get_Minimum_Region_Size;
 
@@ -802,7 +806,7 @@ package body Memory.Allocators.Heap is
            else Address_To_Unsigned_64 (Next_Region.all'Address));
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags_Heap);
+         Log_Constraint_Error;
          return 0;
    end Calculate_Region_Header_Checksum;
 

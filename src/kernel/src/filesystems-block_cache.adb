@@ -5,6 +5,7 @@
 
 with Devices.Ramdisk;
 with Devices.Virtio.Block;
+with Logging;             use Logging;
 with Processes.Scheduler; use Processes.Scheduler;
 with RISCV;
 
@@ -45,9 +46,11 @@ package body Filesystems.Block_Cache is
             if Can_Block_Cache_Entry_Be_Invalidated
                  (System_Block_Cache, I, RISCV.Get_System_Time)
             then
-               Log_Debug
-                 ("Invalidating block cache entry at index: " & I'Image,
-                  Logging_Tags_Block_Cache);
+               pragma
+                 Debug
+                   (Debug_Filesystems_Block_Cache,
+                    Log_Debug
+                      ("Invalidating block cache entry at index: " & I'Image));
 
                Cache_Index := I;
 
@@ -55,10 +58,12 @@ package body Filesystems.Block_Cache is
             end if;
          end loop;
 
-         Log_Debug
-           ("No available block cache entries. "
-            & "Waiting for an entry to become available...",
-            Logging_Tags_Block_Cache);
+         pragma
+           Debug
+             (Debug_Filesystems_Block_Cache,
+              Log_Debug
+                ("No available block cache entries. "
+                 & "Waiting for an entry to become available..."));
 
          --  If we couldn't find an unused or invalidatable entry, we need to
          --  wait for an entry to become available.
@@ -169,9 +174,10 @@ package body Filesystems.Block_Cache is
          return;
       end if;
 
-      Log_Debug
-        ("Read_Block_From_Filesystem: " & Block_Number'Image,
-         Logging_Tags_Block_Cache);
+      pragma
+        Debug
+          (Debug_Filesystems_Block_Cache,
+           Log_Debug ("Read_Block_From_Filesystem: " & Block_Number'Image));
 
       --  We read from/into the cache in a loop, so that if reading into a
       --  cache entry fails, we can release the cache lock, and immediately
@@ -187,8 +193,10 @@ package body Filesystems.Block_Cache is
 
          --  Two possible results: Success / Cache_Entry_Not_Found.
          if Result = Success then
-            Log_Debug
-              ("Found existing block in cache.", Logging_Tags_Block_Cache);
+            pragma
+              Debug
+                (Debug_Filesystems_Block_Cache,
+                 Log_Debug ("Found existing block in cache."));
 
             --  Acquire the cache entry's sleeplock.
             --  This means that if this block is currently being used by
@@ -211,9 +219,11 @@ package body Filesystems.Block_Cache is
                       Filesystem,
                       Block_Number)
             then
-               Log_Error
-                 ("Cache entry found but no longer valid. Retrying...",
-                  Logging_Tags_Block_Cache);
+               pragma
+                 Debug
+                   (Debug_Filesystems_Block_Cache,
+                    Log_Error
+                      ("Cache entry found but no longer valid. Retrying..."));
 
                Release_Sleeplock
                  (System_Block_Cache.Entries (Cache_Index).Sleeplock);
@@ -223,9 +233,11 @@ package body Filesystems.Block_Cache is
                exit Read_From_Cache_Loop;
             end if;
          elsif Result = Cache_Entry_Not_Found then
-            Log_Debug
-              ("Block not found in cache; Reading from filesystem...",
-               Logging_Tags_Block_Cache);
+            pragma
+              Debug
+                (Debug_Filesystems_Block_Cache,
+                 Log_Debug
+                   ("Block not found in cache; Reading from filesystem..."));
 
             --  If the block isn't already in the cache, allocate a new cache
             --  entry, then read the data from the filesystem into that entry.
@@ -235,9 +247,14 @@ package body Filesystems.Block_Cache is
                return;
             end if;
 
-            Log_Debug
-              ("Allocating block cache entry at index: " & Cache_Index'Image,
-               Logging_Tags_Block_Cache);
+            pragma
+              Debug
+                (Debug_Filesystems_Block_Cache,
+                 Log_Debug
+                   ("Allocating block cache entry at index: "
+                    & Cache_Index'Image
+
+                   ));
 
             --  Claim the cache entry prior to acquiring the sleeplock, to
             --  ensure there's absolutely no window for another process to
@@ -288,9 +305,7 @@ package body Filesystems.Block_Cache is
 
          Read_Block_Retry_Count := Read_Block_Retry_Count + 1;
          if Read_Block_Retry_Count > Read_Block_Retry_Threshold then
-            Log_Error
-              ("Exceeded retry threshold trying to read block.",
-               Logging_Tags_Block_Cache);
+            Log_Error ("Exceeded retry threshold trying to read block.");
             Result := Unhandled_Exception;
             return;
          end if;
@@ -330,12 +345,14 @@ package body Filesystems.Block_Cache is
       --  sectors, and the ramdisk is implemented with 512-byte sectors.)
       Sector_Size : constant := 512;
    begin
-      Log_Debug
-        ((if Write
-          then "Writing block from cache: "
-          else "Reading block into cache: ")
-         & Block_Number'Image,
-         Logging_Tags_Block_Cache);
+      pragma
+        Debug
+          (Debug_Filesystems_Block_Cache,
+           Log_Debug
+             ((if Write
+               then "Writing block from cache: "
+               else "Reading block into cache: ")
+              & Block_Number'Image));
 
       Get_Block_Cache_Entry_Data_Address
         (Cache, Cache_Index, Data_Addr_Virtual, Data_Addr_Physical, Result);
@@ -406,8 +423,10 @@ package body Filesystems.Block_Cache is
          return;
       end if;
 
-      Log_Debug
-        ("Releasing block: " & Block_Number'Image, Logging_Tags_Block_Cache);
+      pragma
+        Debug
+          (Debug_Filesystems_Block_Cache,
+           Log_Debug ("Releasing block: " & Block_Number'Image));
 
       Find_Existing_Block_In_Cache
         (System_Block_Cache, Filesystem, Block_Number, Cache_Index, Result);
@@ -419,7 +438,10 @@ package body Filesystems.Block_Cache is
          return;
       end if;
 
-      Log_Debug ("Found block to release in cache.", Logging_Tags_Block_Cache);
+      pragma
+        Debug
+          (Debug_Filesystems_Block_Cache,
+           Log_Debug ("Found block to release in cache."));
 
       --  Under some circumstances, such as when reading data into the cache
       --  entry fails, we may want to invalidate the cache entry before
@@ -466,9 +488,10 @@ package body Filesystems.Block_Cache is
          return;
       end if;
 
-      Log_Debug
-        ("Write_Block_To_Filesystem: " & Block_Number'Image,
-         Logging_Tags_Block_Cache);
+      pragma
+        Debug
+          (Debug_Filesystems_Block_Cache,
+           Log_Debug ("Write_Block_To_Filesystem: " & Block_Number'Image));
 
       --  Acquire the block cache spinlock prior to searching the cache.
       --  We need to ensure the block we're looking for isn't being modified
@@ -483,8 +506,7 @@ package body Filesystems.Block_Cache is
       if Is_Error (Result) then
          return;
       elsif Result = Cache_Entry_Not_Found then
-         Log_Error
-           ("Block to write not found in cache.", Logging_Tags_Block_Cache);
+         Log_Error ("Block to write not found in cache.");
          Result := Invalid_Argument;
          return;
       end if;

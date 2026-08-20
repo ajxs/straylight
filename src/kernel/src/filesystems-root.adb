@@ -4,6 +4,7 @@
 -------------------------------------------------------------------------------
 
 with Filesystems.Node_Cache; use Filesystems.Node_Cache;
+with Logging;                use Logging;
 
 package body Filesystems.Root is
    procedure Add_Filesystem_Node_To_Root_Filesystem
@@ -71,10 +72,12 @@ package body Filesystems.Root is
          New_Node_Index := Root_Filesystem.Nodes (New_Entry_Index).Index;
       end;
 
-      Log_Debug
-        ("Added filesystem node to root filesystem with index: "
-         & New_Entry_Index'Image,
-         Logging_Tags_FS_Root);
+      pragma
+        Debug
+          (Debug_Filesystems_Root,
+           Log_Debug
+             ("Added filesystem node to root filesystem with index: "
+              & New_Entry_Index'Image));
 
       Result := Success;
    exception
@@ -117,12 +120,14 @@ package body Filesystems.Root is
       begin
          for Current_Node of Root_Filesystem.Nodes loop
             if Current_Node.Entry_Used then
-               Log_Debug
-                 ("Parsed entry with filename: '"
-                  & Current_Node.Filename
-                      (1 .. Current_Node.Filename_Byte_Length)
-                  & "'",
-                  Logging_Tags_FS_Root);
+               pragma
+                 Debug
+                   (Debug_Filesystems_Root,
+                    Log_Debug
+                      ("Parsed entry with filename: '"
+                       & Current_Node.Filename
+                           (1 .. Current_Node.Filename_Byte_Length)
+                       & "'"));
 
                if Current_Node.Filename
                     (Current_Node.Filename'First
@@ -174,7 +179,10 @@ package body Filesystems.Root is
          return;
       end if;
 
-      Log_Debug ("Initialising root filesystem...", Logging_Tags_FS_Root);
+      pragma
+        Debug
+          (Debug_Filesystems_Root,
+           Log_Debug ("Initialising root filesystem..."));
 
       declare
          Root_Filesystem : Root_Filesystem_T
@@ -189,7 +197,11 @@ package body Filesystems.Root is
          end loop;
       end;
 
-      Log_Debug ("Initialised root filesystem.", Logging_Tags_FS_Root);
+      pragma
+        Debug
+          (Debug_Filesystems_Root,
+           Log_Debug ("Initialised root filesystem."));
+
       Result := Success;
    exception
       when Constraint_Error =>

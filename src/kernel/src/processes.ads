@@ -10,7 +10,6 @@ with Interfaces;              use Interfaces;
 
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
-with Logging;          use Logging;
 with Memory;           use Memory;
 with Memory.Virtual;   use Memory.Virtual;
 with RISCV;
@@ -181,8 +180,6 @@ is
       Result  : out Function_Result);
 
 private
-   Logging_Tags : constant Log_Tags := [Log_Tag_Processes];
-
    Next_Process_Id     : Process_Id_T := 1;
    Process_Id_Spinlock : Spinlock_T :=
      (Locked        => 0,

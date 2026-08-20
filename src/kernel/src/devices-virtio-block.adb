@@ -5,6 +5,7 @@
 
 with Memory.Allocators;   use Memory.Allocators;
 with Memory.Kernel;       use Memory.Kernel;
+with Logging;             use Logging;
 with Processes.Scheduler; use Processes.Scheduler;
 with RISCV.Atomics;       use RISCV.Atomics;
 
@@ -363,8 +364,10 @@ package body Devices.Virtio.Block is
       Device_Configuration_Space : Virtio_Block_Device_Configuration_Space_T
       with Import, Address => Device.Virtual_Address + 16#100#, Alignment => 1;
    begin
-      Log_Debug
-        ("Allocating Block Device Request Array...", Logging_Tags_Virtio);
+      pragma
+        Debug
+          (Debug_Devices_Virtio,
+           Log_Debug ("Allocating Block Device Request Array..."));
 
       Allocate_Kernel_Physical_Memory
         ((Block_Request_T'Size / 8) * Maximum_Virtio_Queue_Length,
@@ -378,7 +381,10 @@ package body Devices.Virtio.Block is
       Device.Bus_Info.Virtio.Block_Request_Array_Addresses :=
         Allocation_Result;
 
-      Log_Debug ("Allocated Block Device Request Array.", Logging_Tags_Virtio);
+      pragma
+        Debug
+          (Debug_Devices_Virtio,
+           Log_Debug ("Allocated Block Device Request Array."));
 
       Device.Bus_Info.Virtio.Total_Sectors :=
         Device_Configuration_Space.Capacity;

@@ -2,7 +2,6 @@ with Ada.Unchecked_Conversion;
 
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
-with Logging;          use Logging;
 
 package Memory.Allocators.Heap
   with Preelaborate
@@ -73,9 +72,6 @@ is
       Result              : out Function_Result);
 
 private
-   Logging_Tags_Heap : constant Log_Tags :=
-     [Log_Tag_Heap, Log_Tag_Memory, Log_Tag_Memory_Allocators];
-
    --  This needs to stay in this package to avoid issues re: strict aliasing.
    --  This automatically suppresses the aliasing optimisations.
    --  refer to: https://gcc.gnu.org/onlinedocs/gcc-9.4.0/

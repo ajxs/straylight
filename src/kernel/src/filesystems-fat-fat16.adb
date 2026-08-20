@@ -1,6 +1,7 @@
 with Filesystems.FAT.DOS_Filenames; use Filesystems.FAT.DOS_Filenames;
 with Filesystems.Block_Cache;       use Filesystems.Block_Cache;
 with Filesystems.Node_Cache;        use Filesystems.Node_Cache;
+with Logging;                       use Logging;
 
 package body Filesystems.FAT.FAT16 is
    procedure Create_LFN_Directory_Entry
@@ -11,12 +12,14 @@ package body Filesystems.FAT.FAT16 is
       LFN_Entry             : out Long_File_Name_Directory_Entry;
       Result                : out Function_Result) is
    begin
-      Log_Debug
-        ("Creating LFN directory entry with sequence number: "
-         & Sequence_Number'Image
-         & " and is_last_entry: "
-         & Is_Last_Entry'Image,
-         Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug
+             ("Creating LFN directory entry with sequence number: "
+              & Sequence_Number'Image
+              & " and is_last_entry: "
+              & Is_Last_Entry'Image));
 
       Filename_Slice_Start : constant Natural := (Sequence_Number - 1) * 13;
       Filename_Slice_Length : constant Natural :=
@@ -32,7 +35,10 @@ package body Filesystems.FAT.FAT16 is
           (Filename'First + Filename_Slice_Start
            .. Filename'First + Filename_Slice_End);
 
-      Log_Debug ("Filename slice: '" & Name_Slice & "'", Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug ("Filename slice: '" & Name_Slice & "'"));
 
       --  (from FAT32 File System Specification v1.03)
       --  "Names are also NUL terminated and padded with 0xFFFF characters in
@@ -89,17 +95,21 @@ package body Filesystems.FAT.FAT16 is
       First_Free_Entry_Index           : in out Natural;
       Result                           : out Function_Result) is
    begin
-      Log_Debug
-        ("Scanning for "
-         & Total_Number_Of_Entries_Required'Image
-         & " free directory entries.",
-         Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug
+             ("Scanning for "
+              & Total_Number_Of_Entries_Required'Image
+              & " free directory entries."));
 
       Parse_Directory_Loop : for Dir_Idx in 0 .. Directory'Length - 1 loop
          if Is_Free_Directory_Entry (Directory (Dir_Idx)) then
-            Log_Debug
-              ("Found free directory entry at idx:" & Dir_Idx'Image,
-               Logging_Tags_FAT);
+            pragma
+              Debug
+                (Debug_Filesystems_FAT,
+                 Log_Debug
+                   ("Found free directory entry at idx:" & Dir_Idx'Image));
 
             if Current_Free_Entry_Count = 0 then
                First_Free_Entry_Index := Dir_Idx + Total_Entries_Parsed;
@@ -113,12 +123,14 @@ package body Filesystems.FAT.FAT16 is
          if Current_Free_Entry_Count = Total_Number_Of_Entries_Required then
             Found_Required_Entries := True;
 
-            Log_Debug
-              ("Found "
-               & Current_Free_Entry_Count'Image
-               & " free directory entries starting at index "
-               & First_Free_Entry_Index'Image,
-               Logging_Tags_FAT);
+            pragma
+              Debug
+                (Debug_Filesystems_FAT,
+                 Log_Debug
+                   ("Found "
+                    & Current_Free_Entry_Count'Image
+                    & " free directory entries starting at index "
+                    & First_Free_Entry_Index'Image));
 
             exit Parse_Directory_Loop;
          end if;
@@ -384,9 +396,12 @@ package body Filesystems.FAT.FAT16 is
                      return;
                   end if;
 
-                  Log_Debug
-                    ("Wrote LFN entry at:" & Index_Within_Current_Block'Image,
-                     Logging_Tags_FAT);
+                  pragma
+                    Debug
+                      (Debug_Filesystems_FAT,
+                       Log_Debug
+                         ("Wrote LFN entry at:"
+                          & Index_Within_Current_Block'Image));
                else
                   Directory (Index_Within_Current_Block) :=
                     (File_Name          => DOS_Filename,
@@ -414,9 +429,12 @@ package body Filesystems.FAT.FAT16 is
                   DOS_Entry_Index_In_Sector :=
                     (Index_Within_Current_Block mod Entries_Per_Sector);
 
-                  Log_Debug
-                    ("Wrote DOS entry at:" & Index_Within_Current_Block'Image,
-                     Logging_Tags_FAT);
+                  pragma
+                    Debug
+                      (Debug_Filesystems_FAT,
+                       Log_Debug
+                         ("Wrote DOS entry at:"
+                          & Index_Within_Current_Block'Image));
                end if;
 
                Current_Updated_Entry_Count := @ + 1;
@@ -520,8 +538,10 @@ package body Filesystems.FAT.FAT16 is
       Current_Cluster := Unsigned_16 (Parent_Node.all.Data_Location);
 
       if Current_Cluster = 0 then
-         Log_Debug
-           ("Directory has no clusters allocated to it.", Logging_Tags_FAT);
+         pragma
+           Debug
+             (Debug_Filesystems_FAT,
+              Log_Debug ("Directory has no clusters allocated to it."));
          Result := No_Free_Entries;
          return;
       end if;
@@ -608,10 +628,12 @@ package body Filesystems.FAT.FAT16 is
          if Is_Cluster_End_Of_Chain
               (Unsigned_32 (Next_Cluster_In_Chain), Filesystem_Info.FAT_Type)
          then
-            Log_Debug
-              ("Reached end of cluster chain while scanning for "
-               & "free directory entries. Allocating next cluster.",
-               Logging_Tags_FAT);
+            pragma
+              Debug
+                (Debug_Filesystems_FAT,
+                 Log_Debug
+                   ("Reached end of cluster chain while scanning for "
+                    & "free directory entries. Allocating next cluster."));
 
             Extend_Cluster_Chain
               (Filesystem,
@@ -739,9 +761,12 @@ package body Filesystems.FAT.FAT16 is
                         return;
                      end if;
 
-                     Log_Debug
-                       ("Wrote LFN entry at:" & Index_Within_Curr_Sector'Image,
-                        Logging_Tags_FAT);
+                     pragma
+                       Debug
+                         (Debug_Filesystems_FAT,
+                          Log_Debug
+                            ("Wrote LFN entry at:"
+                             & Index_Within_Curr_Sector'Image));
                   else
                      Directory (Index_Within_Curr_Sector) :=
                        (File_Name          => DOS_Filename,
@@ -762,9 +787,12 @@ package body Filesystems.FAT.FAT16 is
 
                      DOS_Entry_Index_In_Sector := Index_Within_Curr_Sector;
 
-                     Log_Debug
-                       ("Wrote DOS entry at:" & Index_Within_Curr_Sector'Image,
-                        Logging_Tags_FAT);
+                     pragma
+                       Debug
+                         (Debug_Filesystems_FAT,
+                          Log_Debug
+                            ("Wrote DOS entry at:"
+                             & Index_Within_Curr_Sector'Image));
                   end if;
 
                   Current_Updated_Entry_Count := @ + 1;
@@ -969,7 +997,10 @@ package body Filesystems.FAT.FAT16 is
       Entry_Long_Filename_Checksum : Unsigned_8 := 0;
       Checksum_Valid               : Boolean := False;
    begin
-      Log_Debug ("Finding file in FAT16 directory", Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug ("Finding file in FAT16 directory"));
 
       Directory_Entries_In_Sector : constant Natural :=
         Filesystem_Info.Bytes_Per_Sector / 32;
@@ -1044,11 +1075,18 @@ package body Filesystems.FAT.FAT16 is
             if Is_Error (Result) then
                return;
             elsif Result = Success then
-               Log_Debug ("Found matching file entry.", Logging_Tags_FAT);
+               pragma
+                 Debug
+                   (Debug_Filesystems_FAT,
+                    Log_Debug ("Found matching file entry."));
+
                return;
             elsif Last_Entry_Reached then
-               Log_Debug
-                 ("Last entry in directory reached.", Logging_Tags_FAT);
+               pragma
+                 Debug
+                   (Debug_Filesystems_FAT,
+                    Log_Debug ("Last entry in directory reached."));
+
                exit Follow_Cluster_Chain_Loop;
             end if;
          end loop Read_Sectors_Loop;
@@ -1073,7 +1111,11 @@ package body Filesystems.FAT.FAT16 is
          Current_Cluster := Next_Cluster_In_Chain;
       end loop Follow_Cluster_Chain_Loop;
 
-      Log_Debug ("File not found in FAT directory.", Logging_Tags_FAT);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Log_Debug ("File not found in FAT directory."));
+
       Result := File_Not_Found;
    exception
       when Constraint_Error =>
@@ -1180,10 +1222,18 @@ package body Filesystems.FAT.FAT16 is
          if Is_Error (Result) then
             return;
          elsif Result = Success then
-            Log_Debug ("Found matching file entry.", Logging_Tags_FAT);
+            pragma
+              Debug
+                (Debug_Filesystems_FAT,
+                 Log_Debug ("Found matching file entry."));
+
             return;
          elsif Last_Entry_Reached then
-            Log_Debug ("Last entry in directory reached.", Logging_Tags_FAT);
+            pragma
+              Debug
+                (Debug_Filesystems_FAT,
+                 Log_Debug ("Last entry in directory reached."));
+
             exit Read_Sectors_Loop;
          end if;
 
@@ -1459,9 +1509,11 @@ package body Filesystems.FAT.FAT16 is
          end if;
 
          if Found_Free_Cluster then
-            Log_Debug
-              ("Found free FAT16 cluster: " & Free_Cluster'Image,
-               Logging_Tags_FAT);
+            pragma
+              Debug
+                (Debug_Filesystems_FAT,
+                 Log_Debug
+                   ("Found free FAT16 cluster: " & Free_Cluster'Image));
 
             Result := Success;
             return;

@@ -9,6 +9,7 @@ with Filesystems.FAT;
 with Filesystems.Root;
 with Filesystems.UStar;
 with Filesystems.Node_Cache; use Filesystems.Node_Cache;
+with Logging;                use Logging;
 with Memory.Allocators;      use Memory.Allocators;
 with Memory.Kernel;          use Memory.Kernel;
 with Hart_State;             use Hart_State;
@@ -56,7 +57,7 @@ package body Filesystems is
       Next_Token_Byte_Length := End_Index - Start_Index;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
    end Get_Next_Path_Component;
 
    procedure Find_File
@@ -75,7 +76,10 @@ package body Filesystems is
       Next_Token_End_Index   : Integer := 1;
       Next_Token_Length      : Integer := 1;
    begin
-      Log_Debug ("Filesystems.Find_File: '" & Path & "'", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Filesystems,
+           Log_Debug ("Filesystems.Find_File: '" & Path & "'"));
 
       if Path (Path'First) = Filesystem_Node_Separator then
          --  Absolute path; start at root filesystem.
@@ -103,7 +107,6 @@ package body Filesystems is
             if not Can_Filesystem_Node_Contain_Child_Nodes
                      (Filesystem_Node_Parent.all)
             then
-               Log_Debug ("Unable to traverse node.", Logging_Tags);
                Filesystem_Node := null;
                exit;
             end if;
@@ -116,8 +119,10 @@ package body Filesystems is
            constant Filesystem_Path_T (1 .. Next_Token_Length) :=
              Path (Next_Token_Start_Index .. Next_Token_End_Index - 1);
 
-         Log_Debug
-           ("Current path token: '" & Next_Path_Token & "'", Logging_Tags);
+         pragma
+           Debug
+             (Debug_Filesystems,
+              Log_Debug ("Current path token: '" & Next_Path_Token & "'"));
 
          Find_Filesystem_Node_In_Cache
            (Current_Filesystem,
@@ -170,18 +175,22 @@ package body Filesystems is
          end if;
 
          if Filesystem_Node = null then
-            Log_Debug
-              ("Filesystem node not found for token: '"
-               & Path (Next_Token_Start_Index .. Next_Token_End_Index - 1)
-               & "'",
-               Logging_Tags);
+            pragma
+              Debug
+                (Debug_Filesystems,
+                 Log_Debug
+                   ("Filesystem node not found for token: '"
+                    & Path (Next_Token_Start_Index .. Next_Token_End_Index - 1)
+                    & "'"));
             exit;
          end if;
 
          if Filesystem_Node.all.Node_Type
            = Filesystem_Node_Type_Mounted_Filesystem
          then
-            Log_Debug ("Filesystem node found.", Logging_Tags);
+            pragma
+              Debug (Debug_Filesystems, Log_Debug ("Filesystem node found."));
+
             Current_Filesystem := Filesystem_Node.all.Mounted_Filesystem;
             if Current_Filesystem = null then
                Log_Error ("Mounted filesystem has null filesystem pointer");
@@ -267,26 +276,37 @@ package body Filesystems is
    is
       Filesystem_Node : Filesystem_Node_Access := null;
    begin
-      Log_Debug ("Filesystems.Open_File: '" & Path & "'", Logging_Tags);
+      pragma
+        Debug
+          (Debug_Filesystems,
+           Log_Debug ("Filesystems.Open_File: '" & Path & "'"));
 
       Find_File (Process, Path, Filesystem_Node, Result);
       if Is_Error (Result) then
          File_Handle := null;
          return;
       elsif Result = File_Not_Found then
-         Log_Debug ("File not found: '" & Path & "'", Logging_Tags);
+         pragma
+           Debug
+             (Debug_Filesystems, Log_Debug ("File not found: '" & Path & "'"));
 
          --  If the open mode flags indicate that the missing file should be
          --  created, create it and return the new node, else exit.
          if not File_Open_Flags.Creation_Flags.Create_If_Not_Exist then
-            Log_Debug
-              ("Not creating file because creation flag not set.",
-               Logging_Tags);
+            pragma
+              Debug
+                (Debug_Filesystems,
+                 Log_Debug
+                   ("Not creating file because creation flag not set."));
             File_Handle := null;
             return;
          end if;
 
-         Log_Debug ("Creating missing file: '" & Path & "'", Logging_Tags);
+         pragma
+           Debug
+             (Debug_Filesystems,
+              Log_Debug ("Creating missing file: '" & Path & "'"));
+
          Create_File (Process, Path, Filesystem_Node, Result);
          if Is_Error (Result) then
             File_Handle := null;
@@ -294,7 +314,8 @@ package body Filesystems is
          end if;
       end if;
 
-      Log_Debug ("File found: '" & Path & "'", Logging_Tags);
+      pragma
+        Debug (Debug_Filesystems, Log_Debug ("File found: '" & Path & "'"));
 
       Create_File_Handle_For_Filesystem_Node
         (Process, Filesystem_Node, File_Open_Flags, File_Handle, Result);
@@ -312,10 +333,6 @@ package body Filesystems is
       end if;
 
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
    end Open_File;
 
    procedure Read_File_Node_Type_Device
@@ -348,7 +365,7 @@ package body Filesystems is
       end case;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Bytes_Read := 0;
          Result := Constraint_Exception;
    end Read_File_Node_Type_Device;
@@ -371,7 +388,10 @@ package body Filesystems is
          else Bytes_To_Read);
 
       if Real_Bytes_To_Read = 0 then
-         Log_Debug ("Filesystems.Read_File: No bytes to read.", Logging_Tags);
+         pragma
+           Debug
+             (Debug_Filesystems,
+              Log_Debug ("Filesystems.Read_File: No bytes to read."));
          Bytes_Read := 0;
          Result := Success;
          return;
@@ -431,15 +451,17 @@ package body Filesystems is
       Bytes_Read     : out Natural;
       Result         : out Function_Result) is
    begin
-      Log_Debug
-        ("Filesystems.Read_File: "
-         & ASCII.LF
-         & "  Bytes_To_Read: "
-         & Bytes_To_Read'Image
-         & ASCII.LF
-         & "  File_Position: "
-         & File_Handle.all.Position'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Filesystems,
+           Log_Debug
+             ("Filesystems.Read_File: "
+              & ASCII.LF
+              & "  Bytes_To_Read: "
+              & Bytes_To_Read'Image
+              & ASCII.LF
+              & "  File_Position: "
+              & File_Handle.all.Position'Image));
 
       if File_Handle.all.File_Open_Flags.Access_Mode = Write_Only then
          Log_Error ("File not opened with read permissions");
@@ -484,9 +506,11 @@ package body Filesystems is
             Result := Function_Results.Not_Supported;
       end case;
 
-      Log_Debug
-        ("Filesystems.Read_File: " & Bytes_Read'Image & " bytes read.",
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Filesystems,
+           Log_Debug
+             ("Filesystems.Read_File: " & Bytes_Read'Image & " bytes read."));
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
@@ -503,12 +527,16 @@ package body Filesystems is
    begin
       if New_Offset > File_Handle.all.File.all.File_Size then
          if File_Handle.all.File.all.File_Size = 0 then
-            Log_Debug
-              ("Seek_File: File size is 0, setting offset to 0", Logging_Tags);
+            pragma
+              Debug
+                (Debug_Filesystems,
+                 Log_Debug ("Seek_File: File size is 0, setting offset to 0"));
             Effective_New_Offset := 0;
          else
-            Log_Debug
-              ("Seek_File: New offset is beyond end of file", Logging_Tags);
+            pragma
+              Debug
+                (Debug_Filesystems,
+                 Log_Debug ("Seek_File: New offset is beyond end of file"));
             Effective_New_Offset := File_Handle.all.File.all.File_Size - 1;
          end if;
       end if;
@@ -517,7 +545,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Seek_File;
 
@@ -584,7 +612,8 @@ package body Filesystems is
       Allocation_Result : Memory_Allocation_Result;
       System_Block_Cache renames Filesystems.Block_Cache.System_Block_Cache;
    begin
-      Log_Debug ("Initialising block cache...", Logging_Tags);
+      pragma
+        Debug (Debug_Filesystems, Log_Debug ("Initialising block cache..."));
 
       System_Block_Cache.Spinlock.Lock_Id := Lock_Id_Block_Cache;
 
@@ -608,18 +637,17 @@ package body Filesystems is
       System_Block_Cache.Data_Address_Virtual :=
         Allocation_Result.Virtual_Address;
 
-      Log_Debug
-        ("Initialised block cache:"
-         & ASCII.LF
-         & "  Data Physical Address: "
-         & System_Block_Cache.Data_Address_Physical'Image
-         & ASCII.LF
-         & "  Data Virtual Address:  "
-         & System_Block_Cache.Data_Address_Virtual'Image,
-         Logging_Tags);
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
+      pragma
+        Debug
+          (Debug_Filesystems,
+           Log_Debug
+             ("Initialised block cache:"
+              & ASCII.LF
+              & "  Data Physical Address: "
+              & System_Block_Cache.Data_Address_Physical'Image
+              & ASCII.LF
+              & "  Data Virtual Address:  "
+              & System_Block_Cache.Data_Address_Virtual'Image));
    end Initialise_Block_Cache;
 
    procedure Allocate_Filesystem_Node
@@ -677,7 +705,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Close_File_Unlocked;
 
@@ -720,7 +748,7 @@ package body Filesystems is
       end case;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Bytes_Written := 0;
          Result := Constraint_Exception;
    end Write_File_Node_Type_Device;
@@ -774,7 +802,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Bytes_Written := 0;
          Result := Constraint_Exception;
    end Write_File_Node_Type_Regular_File;
@@ -787,15 +815,17 @@ package body Filesystems is
       Bytes_Written  : out Natural;
       Result         : out Function_Result) is
    begin
-      Log_Debug
-        ("Filesystems.Write_File: "
-         & ASCII.LF
-         & "  Bytes_To_Write: "
-         & Bytes_To_Write'Image
-         & ASCII.LF
-         & "  File_Position:  "
-         & File_Handle.all.Position'Image,
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Filesystems,
+           Log_Debug
+             ("Filesystems.Write_File: "
+              & ASCII.LF
+              & "  Bytes_To_Write: "
+              & Bytes_To_Write'Image
+              & ASCII.LF
+              & "  File_Position:  "
+              & File_Handle.all.Position'Image));
 
       if File_Handle.all.File_Open_Flags.Access_Mode = Read_Only then
          Log_Error ("File not opened with write permissions");
@@ -843,7 +873,7 @@ package body Filesystems is
 
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Bytes_Written := 0;
          Result := Constraint_Exception;
    end Write_File;
@@ -861,8 +891,7 @@ package body Filesystems is
            ("Read offset exceeds file size: "
             & Start_Offset'Image
             & " >= "
-            & Filesystem_Node.all.File_Size'Image,
-            Logging_Tags);
+            & Filesystem_Node.all.File_Size'Image);
 
          Actual_Bytes_To_Read := 0;
          Result := Invalid_Argument;
@@ -879,7 +908,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Actual_Bytes_To_Read := 0;
          Result := Constraint_Exception;
    end Validate_Read_Start_Offset_And_Get_Actual_Bytes_To_Read;
@@ -893,13 +922,13 @@ package body Filesystems is
       if not Is_Valid_Filesystem_Pointer (Filesystem)
         or else Filesystem.all.Filesystem_Type /= Filesystem_Type
       then
-         Log_Error ("Invalid filesystem type", Logging_Tags);
+         Log_Error ("Invalid filesystem type");
          Result := Invalid_Argument;
          return;
       end if;
 
       if Filesystem_Node = null then
-         Log_Error ("Filesystem node is null", Logging_Tags);
+         Log_Error ("Filesystem node is null");
          Result := Invalid_Argument;
          return;
       end if;
@@ -907,7 +936,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Validate_Filesystem_And_Node;
 
@@ -937,27 +966,31 @@ package body Filesystems is
         constant Filesystem_Path_T (1 .. Path'Last - Parent_Path_Length - 1) :=
           Path (Path'First + Parent_Path_Length + 1 .. Path'Last);
 
-      Log_Debug
-        ("Filesystems.Create_File: "
-         & ASCII.LF
-         & "  Parent path: '"
-         & Parent_File_Path
-         & "'"
-         & ASCII.LF
-         & "  Child name: '"
-         & Child_File_Name
-         & "'",
-         Logging_Tags);
+      pragma
+        Debug
+          (Debug_Filesystems,
+           Log_Debug
+             ("Filesystems.Create_File: "
+              & ASCII.LF
+              & "  Parent path: '"
+              & Parent_File_Path
+              & "'"
+              & ASCII.LF
+              & "  Child name: '"
+              & Child_File_Name
+              & "'"));
 
       Find_File (Process, Parent_File_Path, Parent_File_Node, Result);
       if Is_Error (Result) then
          return;
       elsif Result = File_Not_Found then
-         Log_Debug
-           ("Filesystems.Create_File: File not found: '"
-            & Parent_File_Path
-            & "'",
-            Logging_Tags);
+         pragma
+           Debug
+             (Debug_Filesystems,
+              Log_Debug
+                ("Filesystems.Create_File: File not found: '"
+                 & Parent_File_Path
+                 & "'"));
          return;
       end if;
 
@@ -969,11 +1002,13 @@ package body Filesystems is
         or else
           not Can_Filesystem_Node_Contain_Child_Nodes (Parent_File_Node.all)
       then
-         Log_Debug
-           ("Filesystems.Create_File: Node cannot contain child nodes: '"
-            & Parent_File_Path
-            & "'",
-            Logging_Tags);
+         pragma
+           Debug
+             (Debug_Filesystems,
+              Log_Debug
+                ("Filesystems.Create_File: Node cannot contain child nodes: '"
+                 & Parent_File_Path
+                 & "'"));
 
          Result := Invalid_Filename;
          return;
@@ -1012,7 +1047,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Create_File;
 
@@ -1034,7 +1069,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Block_Number := 0;
          Sector_Offset_Within_Block := 0;
          Result := Constraint_Exception;
@@ -1056,8 +1091,7 @@ package body Filesystems is
       then
          Log_Error
            ("Truncate_File: File is not a regular file: "
-            & File_Handle.all.File.all.Node_Type'Image,
-            Logging_Tags);
+            & File_Handle.all.File.all.Node_Type'Image);
 
          Result := Invalid_Argument;
          return;
@@ -1065,8 +1099,7 @@ package body Filesystems is
 
       if New_Size > Maximum_File_Size then
          Log_Error
-           ("Truncate_File: New size is greater than maximum file size",
-            Logging_Tags);
+           ("Truncate_File: New size is greater than maximum file size");
 
          Result := Invalid_Argument;
          return;
@@ -1092,7 +1125,7 @@ package body Filesystems is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Constraint_Error (Logging_Tags);
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Truncate_File;
 
