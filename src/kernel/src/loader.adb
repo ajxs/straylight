@@ -264,20 +264,4 @@ package body Loader is
          Result := Constraint_Exception;
    end Load_New_Process_From_Filesystem;
 
-   function Validate_Executable_Is_Loadable
-     (ELF_Header : Elf64_File_Header_T) return Boolean is
-   begin
-      if not ELF.Validate_Elf_Header_Magic_Number
-               (ELF_Header.e_ident.Magic_Number)
-      then
-         return False;
-      end if;
-
-      if ELF_Header.e_ident.File_Class /= ELFCLASS64 then
-         return False;
-      end if;
-
-      return True;
-   end Validate_Executable_Is_Loadable;
-
 end Loader;
