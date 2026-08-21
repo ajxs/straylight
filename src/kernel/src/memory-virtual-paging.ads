@@ -41,10 +41,4 @@ private
       Region_Size             : out RISCV_Page_Size_T;
       Result                  : out Function_Result);
 
-   function Get_Largest_Page_Size_For_Remaining_Region
-     (Virtual_Address  : Virtual_Address_T;
-      Physical_Address : Physical_Address_T;
-      Remaining_Size   : Storage_Offset) return RISCV_Page_Size_T
-   with Pure_Function;
-
 end Memory.Virtual.Paging;

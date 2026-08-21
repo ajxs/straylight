@@ -70,7 +70,9 @@ package body Memory.Virtual.Paging is
    function Get_Largest_Page_Size_For_Remaining_Region
      (Virtual_Address  : Virtual_Address_T;
       Physical_Address : Physical_Address_T;
-      Remaining_Size   : Storage_Offset) return RISCV_Page_Size_T is
+      Remaining_Size   : Storage_Offset) return RISCV_Page_Size_T
+   with Pure_Function
+   is
    begin
       --  Ensure the virtual and physical addresses are properly page aligned.
       --  Section 4.4.1 of the privileged spec specifies that 'megapages',
