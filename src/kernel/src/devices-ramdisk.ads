@@ -61,7 +61,4 @@ is
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result);
 
-private
-   Ramdisk_Sector_Size : constant := 512;
-
 end Devices.Ramdisk;

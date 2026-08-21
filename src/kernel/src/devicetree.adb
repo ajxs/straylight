@@ -210,49 +210,50 @@ package body Devicetree is
          Compare_Fixed_Length_String_With_String
            (Property_Name, "device_type"));
 
+   procedure Print_Devicetree_Header (Header : FDT_Header_T) is
+   begin
+      Log_Debug
+        ("Devicetree Header:"
+         & ASCII.LF
+         & "  Magic:            "
+         & Convert_BEU32_To_LEU32 (Header.Magic)'Image
+         & ASCII.LF
+         & "  Totalsize:        "
+         & Convert_BEU32_To_LEU32 (Header.Totalsize)'Image
+         & ASCII.LF
+         & "  Off_DT_Struct:    "
+         & Convert_BEU32_To_LEU32 (Header.Off_DT_Struct)'Image
+         & ASCII.LF
+         & "  Off_DT_Strings:   "
+         & Convert_BEU32_To_LEU32 (Header.Off_DT_Strings)'Image
+         & ASCII.LF
+         & "  Off_Mem_Rsvmap:   "
+         & Convert_BEU32_To_LEU32 (Header.Off_Mem_Rsvmap)'Image
+         & ASCII.LF
+         & "  Version:          "
+         & Convert_BEU32_To_LEU32 (Header.Version)'Image
+         & ASCII.LF
+         & "  Size_DT_Strings:  "
+         & Convert_BEU32_To_LEU32 (Header.Size_DT_Strings)'Image
+         & ASCII.LF
+         & "  Size_DT_Struct:   "
+         & Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)'Image);
+
+   exception
+      when others =>
+         Log_Constraint_Error;
+   end Print_Devicetree_Header;
+
    procedure Parse_Devicetree
      (DTB_Address : Address; Result : out Function_Result)
    is
       Header : constant FDT_Header_T
       with Import, Address => DTB_Address, Alignment => 1;
    begin
-      Total_Size : constant Storage_Count :=
-        Storage_Count (Convert_BEU32_To_LEU32 (Header.Totalsize));
-
-      pragma
-        Debug
-          (Debug_Devicetree,
-           Log_Debug
-             ("Devicetree Header:"
-              & ASCII.LF
-              & "  Magic:            "
-              & Convert_BEU32_To_LEU32 (Header.Magic)'Image
-              & ASCII.LF
-              & "  Totalsize:        "
-              & Total_Size'Image
-              & ASCII.LF
-              & "  Off_DT_Struct:    "
-              & Convert_BEU32_To_LEU32 (Header.Off_DT_Struct)'Image
-              & ASCII.LF
-              & "  Off_DT_Strings:   "
-              & Convert_BEU32_To_LEU32 (Header.Off_DT_Strings)'Image
-              & ASCII.LF
-              & "  Off_Mem_Rsvmap:   "
-              & Convert_BEU32_To_LEU32 (Header.Off_Mem_Rsvmap)'Image
-              & ASCII.LF
-              & "  Version:          "
-              & Convert_BEU32_To_LEU32 (Header.Version)'Image
-              & ASCII.LF
-              & "  Size_DT_Strings:  "
-              & Convert_BEU32_To_LEU32 (Header.Size_DT_Strings)'Image
-              & ASCII.LF
-              & "  Size_DT_Struct:   "
-              & Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)'Image));
+      pragma Debug (Debug_Devicetree, Print_Devicetree_Header (Header));
 
       if Convert_BEU32_To_LEU32 (Header.Magic) /= FDT_MAGIC_NUMBER then
-         pragma
-           Debug
-             (Debug_Devicetree, Log_Debug ("Invalid devicetree magic value."));
+         Log_Error ("Invalid devicetree magic value.");
          Result := Unhandled_Exception;
          return;
       end if;
@@ -270,7 +271,9 @@ package body Devicetree is
         + Storage_Offset (Convert_BEU32_To_LEU32 (Header.Off_DT_Struct));
 
       Parse_Reserved_Memory_Regions
-        (Reserved_Mem_Map_Address, Total_Size, Result);
+        (Reserved_Mem_Map_Address,
+         Storage_Count (Convert_BEU32_To_LEU32 (Header.Totalsize)),
+         Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -286,19 +289,6 @@ package body Devicetree is
       end if;
 
       Result := Success;
-
-      --  With debug logging disabled, a Constraint_Error can't be raised in
-      --  this body, and this handler can never be entered.
-      --  Keep this handler here, and supress the warning about this handler
-      --  being unreachable. So that if the debug logging is enabled, the
-      --  kernel will still compile.
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when others =>
-         Log_Constraint_Error;
-
-         Result := Constraint_Exception;
-         pragma Warnings (On, "this handler can never be entered");
    end Parse_Devicetree;
 
    procedure Parse_Property

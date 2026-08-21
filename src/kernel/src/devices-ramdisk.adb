@@ -7,6 +7,8 @@ with Logging; use Logging;
 with Memory;
 
 package body Devices.Ramdisk is
+   Ramdisk_Sector_Size : constant := 512;
+
    function Is_Valid_Sector_Range
      (Device : Device_T; Start_Sector : Sector_Index_T; Sector_Count : Natural)
       return Boolean is

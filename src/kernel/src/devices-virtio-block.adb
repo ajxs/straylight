@@ -74,11 +74,7 @@ package body Devices.Virtio.Block is
          Start_Sector,
          False,
          Result,
-         Unsigned_32 (Sector_Count * Virtio_Block_Sector_Size));
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
+         Unsigned_32 (Sector_Count) * Virtio_Block_Sector_Size);
    end Read_Sectors;
 
    procedure Write_Sectors
@@ -96,11 +92,7 @@ package body Devices.Virtio.Block is
          Start_Sector,
          True,
          Result,
-         Unsigned_32 (Sector_Count * Virtio_Block_Sector_Size));
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
+         Unsigned_32 (Sector_Count) * Virtio_Block_Sector_Size);
    end Write_Sectors;
 
    function Is_Valid_Sector_Range
@@ -114,7 +106,7 @@ package body Devices.Virtio.Block is
       --  e.g. Conversion to a signed type like 'Natural' for arithmetic will
       --  greatly reduce the range of valid sectors.
       Sector_Count : constant Sector_Index_T :=
-        Sector_Index_T (Data_Length / Virtio_Block_Sector_Size);
+        Sector_Index_T (Data_Length) / Virtio_Block_Sector_Size;
 
       return
         Start_Sector <= Device.Bus_Info.Virtio.Total_Sectors
