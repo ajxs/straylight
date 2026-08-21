@@ -31,9 +31,6 @@ private
       Next_Process           : out Process_Control_Block_Access;
       New_Prev_Process_State : Process_Status_T);
 
-   procedure Print_Process_Switch_Info
-     (Prev_Process, Next_Process : Process_Control_Block_Access);
-
    procedure Switch_Process_Context
      (Prev_Process, Next_Process : Process_Control_Block_Access);
 

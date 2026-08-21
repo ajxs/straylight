@@ -180,63 +180,6 @@ package body Filesystems.UStar is
       return Result;
    end Octal_To_Unsigned_64;
 
-   procedure Print_File_Header (Header : Tar_File_Header) is
-   begin
-      pragma
-        Debug
-          (Debug_Filesystems_UStar,
-           Log_Debug
-             ("UStar File Header:"
-              & ASCII.LF
-              & "  Name:     "
-              & Header.Name
-              & ASCII.LF
-              & "  Mode:     "
-              & Header.Mode
-              & ASCII.LF
-              & "  Uid:      "
-              & Header.Uid
-              & ASCII.LF
-              & "  Gid:      "
-              & Header.Gid
-              & ASCII.LF
-              & "  Size:     "
-              & Header.Size
-              & ASCII.LF
-              & "  Mtime:    "
-              & Header.Mtime
-              & ASCII.LF
-              & "  Checksum: "
-              & Header.Checksum
-              & ASCII.LF
-              & "  Typeflag: "
-              & Header.Typeflag
-              & ASCII.LF
-              & "  Linkname: "
-              & Header.Linkname
-              & ASCII.LF
-              & "  Magic:    "
-              & Header.Magic
-              & ASCII.LF
-              & "  Version:  "
-              & Header.Version
-              & ASCII.LF
-              & "  Uname:    "
-              & Header.Uname
-              & ASCII.LF
-              & "  Gname:    "
-              & Header.Gname
-              & ASCII.LF
-              & "  Devmajor: "
-              & Header.Devmajor
-              & ASCII.LF
-              & "  Devminor: "
-              & Header.Devminor
-              & ASCII.LF
-              & "  Prefix:   "
-              & Header.Prefix));
-   end Print_File_Header;
-
    procedure Read_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;

@@ -194,30 +194,24 @@ package body Processes.Scheduler is
    is
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
    begin
-      pragma
-        Debug
-          (Debug_Scheduler,
-           Log_Debug
-             ("Scheduler.Run: "
-              & (if Prev_Process /= null
-                 then
-                   "Old PID#"
-                   & Prev_Process.all.Process_Id'Image
-                   & (if Prev_Process = Hart_Idle_Processes (Hart_Id)
-                      then " (Idle)"
-                      else "")
-                 else "No previous process")
-              & ", New PID#"
-              & Next_Process.all.Process_Id'Image
-              & (if Next_Process = Hart_Idle_Processes (Hart_Id)
+      Log_Debug
+        ("Scheduler.Run: "
+         & (if Prev_Process /= null
+            then
+              "Old PID#"
+              & Prev_Process.all.Process_Id'Image
+              & (if Prev_Process = Hart_Idle_Processes (Hart_Id)
                  then " (Idle)"
-                 else "")));
-
-      pragma Warnings (Off, "this handler can never be entered");
+                 else "")
+            else "No previous process")
+         & ", New PID#"
+         & Next_Process.all.Process_Id'Image
+         & (if Next_Process = Hart_Idle_Processes (Hart_Id)
+            then " (Idle)"
+            else ""));
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
-         pragma Warnings (On, "this handler can never be entered");
    end Print_Process_Switch_Info;
 
    procedure Finish_Context_Switch is
@@ -267,7 +261,10 @@ package body Processes.Scheduler is
    begin
       Verify_Context_Switch_Lock_State (Prev_Process);
 
-      Print_Process_Switch_Info (Prev_Process, Next_Process);
+      pragma
+        Debug
+          (Debug_Scheduler,
+           Print_Process_Switch_Info (Prev_Process, Next_Process));
 
       --  Record the process we are switching away from. Its spinlock was
       --  acquired in Schedule_Next_Process, and is held across the save below.

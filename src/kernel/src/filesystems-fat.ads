@@ -469,9 +469,6 @@ private
       Checksum        : out Unsigned_8;
       Result          : out Function_Result);
 
-   procedure Print_FAT_Filesystem_Info
-     (FAT_Filesystem_Info : FAT_Filesystem_Info_T);
-
    procedure Read_FAT_Entry
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;

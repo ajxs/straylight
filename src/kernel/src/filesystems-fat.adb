@@ -11,6 +11,40 @@ with Logging;                       use Logging;
 with Memory.Kernel;                 use Memory.Kernel;
 
 package body Filesystems.FAT is
+   procedure Print_FAT_Filesystem_Info
+     (FAT_Filesystem_Info : FAT_Filesystem_Info_T) is
+   begin
+      Log_Debug
+        ("FAT Filesystem Info:"
+         & ASCII.LF
+         & "  FAT12_16_Root_Directory_Sector:  "
+         & FAT_Filesystem_Info.FAT12_16_Root_Directory_Sector'Image
+         & ASCII.LF
+         & "  Sectors_In_Root_Directory:       "
+         & FAT_Filesystem_Info.Sectors_In_Root_Directory'Image
+         & ASCII.LF
+         & "  Bytes_Per_Sector:                "
+         & FAT_Filesystem_Info.Bytes_Per_Sector'Image
+         & ASCII.LF
+         & "  First_FAT_Sector:                "
+         & FAT_Filesystem_Info.First_FAT_Sector'Image
+         & ASCII.LF
+         & "  First_Data_Sector:               "
+         & FAT_Filesystem_Info.First_Data_Sector'Image
+         & ASCII.LF
+         & "  Total_Sectors_In_All_FAT_Tables: "
+         & FAT_Filesystem_Info.Total_Sectors_In_All_FAT_Tables'Image
+         & ASCII.LF
+         & "  FAT_Table_Count:                 "
+         & FAT_Filesystem_Info.FAT_Table_Count'Image
+         & ASCII.LF
+         & "  Sectors_Per_Cluster:             "
+         & FAT_Filesystem_Info.Sectors_Per_Cluster'Image);
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+   end Print_FAT_Filesystem_Info;
+
    procedure Parse_And_Validate_Boot_Sector
      (Boot_Sector         : aliased Boot_Sector_T;
       FAT_Filesystem_Info : out FAT_Filesystem_Info_T;
@@ -81,7 +115,10 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Print_FAT_Filesystem_Info (FAT_Filesystem_Info);
+      pragma
+        Debug
+          (Debug_Filesystems_FAT,
+           Print_FAT_Filesystem_Info (FAT_Filesystem_Info));
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
@@ -292,40 +329,6 @@ package body Filesystems.FAT is
          Log_Constraint_Error;
          Result := Unhandled_Exception;
    end Parse_DOS_Directory_Entry;
-
-   procedure Print_FAT_Filesystem_Info
-     (FAT_Filesystem_Info : FAT_Filesystem_Info_T) is
-   begin
-      pragma
-        Debug
-          (Debug_Filesystems_FAT,
-           Log_Debug
-             ("FAT Filesystem Info:"
-              & ASCII.LF
-              & "  FAT12_16_Root_Directory_Sector:  "
-              & FAT_Filesystem_Info.FAT12_16_Root_Directory_Sector'Image
-              & ASCII.LF
-              & "  Sectors_In_Root_Directory:       "
-              & FAT_Filesystem_Info.Sectors_In_Root_Directory'Image
-              & ASCII.LF
-              & "  Bytes_Per_Sector:                "
-              & FAT_Filesystem_Info.Bytes_Per_Sector'Image
-              & ASCII.LF
-              & "  First_FAT_Sector:                "
-              & FAT_Filesystem_Info.First_FAT_Sector'Image
-              & ASCII.LF
-              & "  First_Data_Sector:               "
-              & FAT_Filesystem_Info.First_Data_Sector'Image
-              & ASCII.LF
-              & "  Total_Sectors_In_All_FAT_Tables: "
-              & FAT_Filesystem_Info.Total_Sectors_In_All_FAT_Tables'Image
-              & ASCII.LF
-              & "  FAT_Table_Count:                 "
-              & FAT_Filesystem_Info.FAT_Table_Count'Image
-              & ASCII.LF
-              & "  Sectors_Per_Cluster:             "
-              & FAT_Filesystem_Info.Sectors_Per_Cluster'Image));
-   end Print_FAT_Filesystem_Info;
 
    procedure Parse_Boot_Sector
      (Boot_Sector     : Boot_Sector_T;

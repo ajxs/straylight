@@ -52,8 +52,6 @@ private
 
    function Octal_To_Unsigned_64 (Octal_String : String) return Unsigned_64;
 
-   procedure Print_File_Header (Header : Tar_File_Header);
-
    function Get_UStar_String_Length (Str : USTAR_Header_Name) return Integer;
 
    function Is_Valid_Record (Header : Tar_File_Header) return Boolean
