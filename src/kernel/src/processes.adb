@@ -3,11 +3,10 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Hart_State;        use Hart_State;
-with Logging;           use Logging;
-with Memory.Allocators; use Memory.Allocators;
-with Memory.Kernel;     use Memory.Kernel;
-with Memory.Physical;   use Memory.Physical;
+with Hart_State;      use Hart_State;
+with Logging;         use Logging;
+with Memory.Kernel;   use Memory.Kernel;
+with Memory.Physical; use Memory.Physical;
 with Processes.Scheduler;
 with RISCV.Interrupts;
 
@@ -427,18 +426,17 @@ package body Processes is
      (New_Process : out Process_Control_Block_Access;
       Result      : out Function_Result)
    is
-      Allocation_Result : Memory_Allocation_Result;
+      New_Process_Addr : Virtual_Address_T := Null_Address;
    begin
-      Allocate_Kernel_Physical_Memory
-        (Process_Control_Block_T'Size / 8, Allocation_Result, Result);
+      Allocate_Kernel_Memory
+        (Process_Control_Block_T'Size / 8, New_Process_Addr, Result);
       if Is_Error (Result) then
          Log_Error ("Failed to allocate process memory");
          return;
       end if;
 
       New_Process :=
-        Convert_Address_To_Process_Control_Block_Access
-          (Allocation_Result.Virtual_Address);
+        Convert_Address_To_Process_Control_Block_Access (New_Process_Addr);
 
       Allocate_Process_Id (New_Process.all.Process_Id, Result);
       --  Error already printed.
@@ -459,7 +457,7 @@ package body Processes is
               & New_Process.all.Process_Id'Image
               & ASCII.LF
               & "  Addr: "
-              & Allocation_Result.Virtual_Address'Image));
+              & New_Process_Addr'Image));
 
       Allocate_And_Map_New_Process_Memory (New_Process.all, Result);
       if Is_Error (Result) then
