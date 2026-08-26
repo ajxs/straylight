@@ -238,35 +238,18 @@ package body Processes is
    procedure Deallocate_Process_Unlocked
      (Process : in out Process_Control_Block_T; Result : out Function_Result)
    is
+      procedure Log_Process_Deallocation is
+      begin
+         Log_Debug ("Deallocating process PID#" & Process.Process_Id'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Process_Deallocation;
    begin
-      pragma
-        Debug
-          (Debug_Processes,
-           Log_Debug ("Deallocating process PID#" & Process.Process_Id'Image));
+      pragma Debug (Debug_Processes, Log_Process_Deallocation);
 
+      --  Result set by this call.
       Deallocate_Process_Resources (Process, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      pragma
-        Debug
-          (Debug_Processes,
-           Log_Debug ("Deallocated process PID#" & Process.Process_Id'Image));
-
-      Result := Success;
-
-      --  With debug logging disabled, a Constraint_Error can't be raised in
-      --  this body, and this handler can never be entered.
-      --  Keep this handler here, and supress the warning about this handler
-      --  being unreachable. So that if the debug logging is enabled, the
-      --  kernel will still compile.
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
-         pragma Warnings (On, "this handler can never be entered");
    end Deallocate_Process_Unlocked;
 
    procedure Deallocate_Process
@@ -323,11 +306,6 @@ package body Processes is
       pragma
         Debug
           (Debug_Processes,
-           Log_Debug ("Freed process stack physical memory."));
-
-      pragma
-        Debug
-          (Debug_Processes,
            Log_Debug ("Freeing process kernel stack physical memory."));
       Free_Physical_Memory (Process.Kernel_Stack_Phys_Addr, Result);
       if Is_Error (Result) then
@@ -348,10 +326,6 @@ package body Processes is
       if Is_Error (Result) then
          return;
       end if;
-
-      pragma
-        Debug
-          (Debug_Processes, Log_Debug ("Deallocated process address space."));
 
       Result := Success;
    end Deallocate_Process_Resources;

@@ -14,37 +14,27 @@ package body Devices.UART is
      (Device : in out Device_T; Result : out Function_Result)
    is
       Bytes_Read : Integer := 0;
+
+      procedure Log_Bytes_Read (Bytes_Read_To_Log : Integer) is
+      begin
+         Log_Debug ("Bytes read: " & Bytes_Read_To_Log'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Bytes_Read;
    begin
       Read_All_Incoming_Data (Device, Bytes_Read, Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      pragma
-        Debug
-          (Debug_Devices,
-           Log_Debug
-             ("UART Rx Data Available Interrupt: "
-              & Integer'Image (Bytes_Read)
-              & " bytes read."));
+      pragma Debug (Debug_Devices, Log_Bytes_Read (Bytes_Read));
 
       --  Wake any processes that were waiting for incoming data.
       Wake_Processes_Waiting_For_Channel
         (Address_To_Unsigned_64 (Device'Address));
 
       Result := Success;
-
-      --  With debug logging disabled, a Constraint_Error can't be raised in
-      --  this body, and this handler can never be entered.
-      --  Keep this handler here, and supress the warning about this handler
-      --  being unreachable. So that if the debug logging is enabled, the
-      --  kernel will still compile.
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
-         pragma Warnings (On, "this handler can never be entered");
    end Handle_Rx_Data_Available_Interrupt;
 
    procedure Acknowledge_Interrupt

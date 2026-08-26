@@ -10,7 +10,18 @@ with Memory.Physical; use Memory.Physical;
 package body Memory.Virtual.Paging is
    procedure Allocate_And_Initialise_New_Page_Table
      (Table_Physical_Address : out Physical_Address_T;
-      Result                 : out Function_Result) is
+      Result                 : out Function_Result)
+   is
+      procedure Log_New_Table_Allocated
+        (New_Table_Physical_Address : Physical_Address_T) is
+      begin
+         Log_Debug
+           ("Allocated new page table at physical address"
+            & New_Table_Physical_Address'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_New_Table_Allocated;
    begin
       pragma
         Debug
@@ -27,9 +38,7 @@ package body Memory.Virtual.Paging is
       pragma
         Debug
           (Debug_Memory_Page_Walking,
-           Log_Debug
-             ("Allocated new page table at physical address"
-              & Table_Physical_Address'Image));
+           Log_New_Table_Allocated (Table_Physical_Address));
 
       Initialise_New_Table : declare
          --  The new page table, with the physical ad`dress
@@ -52,19 +61,6 @@ package body Memory.Virtual.Paging is
           (Debug_Memory_Page_Walking, Log_Debug ("Created new page table."));
 
       Result := Success;
-
-      --  With debug logging disabled, a Constraint_Error can't be raised in
-      --  this body, and this handler can never be entered.
-      --  Keep this handler here, and supress the warning about this handler
-      --  being unreachable. So that if the debug logging is enabled, the
-      --  kernel will still compile.
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Table_Physical_Address := Null_Physical_Address;
-         Result := Constraint_Exception;
-         pragma Warnings (On, "this handler can never be entered");
    end Allocate_And_Initialise_New_Page_Table;
 
    function Get_Largest_Page_Size_For_Remaining_Region

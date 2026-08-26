@@ -723,15 +723,6 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      pragma
-        Debug
-          (Debug_Filesystems_FAT,
-           Log_Debug
-             ("Parsed FAT file entry with filename: '"
-              & UTF8_Encoded_Filename.Value
-                  (1 .. UTF8_Encoded_Filename.Byte_Length)
-              & "'"));
-
       --  Note that all operations on FAT filesystems are case-insensitive.
       --  As perFAT32 v1.03 spec page 30.
       Match_Found :=
@@ -1515,7 +1506,15 @@ package body Filesystems.FAT is
       Writing_Process : in out Process_Control_Block_T;
       Filesystem_Info : FAT_Filesystem_Info_T;
       New_Cluster     : out Unsigned_32;
-      Result          : out Function_Result) is
+      Result          : out Function_Result)
+   is
+      procedure Log_Allocated_Cluster (Cluster : Unsigned_32) is
+      begin
+         Log_Debug ("Allocated new cluster: " & Cluster'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Allocated_Cluster;
    begin
       Find_Free_Cluster
         (Filesystem, Writing_Process, Filesystem_Info, New_Cluster, Result);
@@ -1538,11 +1537,7 @@ package body Filesystems.FAT is
       end if;
 
       pragma
-        Debug
-          (Debug_Filesystems_FAT,
-           Log_Debug ("Allocated new cluster: " & New_Cluster'Image));
-
-      Result := Success;
+        Debug (Debug_Filesystems_FAT, Log_Allocated_Cluster (New_Cluster));
    end Allocate_Cluster;
 
    procedure Write_File_Data

@@ -308,6 +308,14 @@ package body Memory.Kernel is
       Minimum_Region_Size_In_Bytes : Storage_Count := 1;
 
       Free_Result : Function_Result := Unset;
+
+      procedure Log_Grew_By (Region_Size : Storage_Count) is
+      begin
+         Log_Debug ("Grew kernel heap by" & Region_Size'Image & " bytes");
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Grew_By;
    begin
       Get_Minimum_Region_Size
         (Allocation_Size, Alignment, Minimum_Region_Size_In_Bytes, Result);
@@ -372,12 +380,7 @@ package body Memory.Kernel is
                end if;
 
                pragma
-                 Debug
-                   (Logging_Enabled,
-                    Log_Debug
-                      ("Grew kernel heap by"
-                       & Region_Size_In_Bytes'Image
-                       & " bytes"));
+                 Debug (Logging_Enabled, Log_Grew_By (Region_Size_In_Bytes));
 
                return;
             elsif Result = Not_Enough_Memory_Available then
@@ -403,18 +406,6 @@ package body Memory.Kernel is
 
       <<Error_Free_Pages>>
       Free_Pages (Allocation_Result.Virtual_Address, Free_Result);
-
-      --  With debug logging disabled, a Constraint_Error can't be raised in
-      --  this body, and this handler can never be entered.
-      --  Keep this handler here, and supress the warning about this handler
-      --  being unreachable. So that if the debug logging is enabled, the
-      --  kernel will still compile.
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
-         pragma Warnings (On, "this handler can never be entered");
    end Grow_Kernel_Heap_And_Allocate;
 
    procedure Allocate_Kernel_Memory

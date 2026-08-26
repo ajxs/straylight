@@ -157,36 +157,30 @@ package body Processes.Scheduler is
    procedure Lock_Process_Waiting_For_Channel
      (Channel        : Blocking_Channel_T;
       Condition_Lock : in out Spinlock_T;
-      Process        : in out Process_Control_Block_T) is
+      Process        : in out Process_Control_Block_T)
+   is
+      procedure Log_Process_Blocked is
+      begin
+         Log_Debug
+           ("Process PID#"
+            & Process.Process_Id'Image
+            & " now blocked waiting for channel: "
+            & Channel'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Process_Blocked;
    begin
       Acquire_Spinlock (Process.Spinlock);
       Process.Blocked_By_Channel := Channel;
       Release_Spinlock (Process.Spinlock);
 
-      pragma
-        Debug
-          (Debug_Scheduler,
-           Log_Debug
-             ("Process "
-              & Process.Process_Id'Image
-              & " now blocked on channel: "
-              & Channel'Image));
+      pragma Debug (Debug_Scheduler, Log_Process_Blocked);
 
       Run_Guarded (Process_Blocked_Waiting_For_Response, Condition_Lock);
 
       --  Control will return to this point once the process is awakened.
       Acquire_Spinlock (Condition_Lock);
-
-      --  With debug logging disabled, a Constraint_Error can't be raised in
-      --  this body, and this handler can never be entered.
-      --  Keep this handler here, and supress the warning about this handler
-      --  being unreachable. So that if the debug logging is enabled, the
-      --  kernel will still compile.
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-         pragma Warnings (On, "this handler can never be entered");
    end Lock_Process_Waiting_For_Channel;
 
    procedure Print_Process_Switch_Info
@@ -366,12 +360,26 @@ package body Processes.Scheduler is
      (Channel : Blocking_Channel_T)
    is
       Curr_Process : Process_Control_Block_Access := null;
+
+      procedure Log_Waking_Process is
+      begin
+         Log_Debug ("Waking processes waiting for channel: " & Channel'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Waking_Process;
+
+      procedure Log_Waking_Process_By_PID
+        (Waking_Process : Process_Control_Block_Access) is
+      begin
+         Log_Debug
+           ("Waking process with PID#" & Waking_Process.all.Process_Id'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Waking_Process_By_PID;
    begin
-      pragma
-        Debug
-          (Debug_Scheduler,
-           Log_Debug
-             ("Waking processes waiting for channel: " & Channel'Image));
+      pragma Debug (Debug_Scheduler, Log_Waking_Process);
 
       Curr_Process := Process_Queue;
       while Curr_Process /= null loop
@@ -382,10 +390,7 @@ package body Processes.Scheduler is
          then
             pragma
               Debug
-                (Debug_Scheduler,
-                 Log_Debug
-                   ("Waking process with PID#"
-                    & Curr_Process.all.Process_Id'Image));
+                (Debug_Scheduler, Log_Waking_Process_By_PID (Curr_Process));
 
             Curr_Process.all.Status := Process_Ready;
             Curr_Process.all.Blocked_By_Channel := 0;
@@ -395,15 +400,12 @@ package body Processes.Scheduler is
 
          Curr_Process := Curr_Process.all.Next_Process;
       end loop;
-
-      pragma Warnings (Off, "this handler can never be entered");
    exception
       when Constraint_Error =>
          --  If a constraint error occurs while waking processes, it's likely
          --  that the system is in an invalid state. In this case it's better
          --  to panic and halt the system rather than continue.
          Panic_Constraint_Error;
-         pragma Warnings (On, "this handler can never be entered");
    end Wake_Processes_Waiting_For_Channel_Unlocked;
 
    procedure Wake_Processes_Waiting_For_Channel (Channel : Blocking_Channel_T)

@@ -1421,6 +1421,10 @@ package body Filesystems.FAT.FAT16 is
             return;
          end if;
       end loop;
+
+      --  Explicitly set the result to Success here to handle the *unlikely*
+      --  case where the loop above doesn't execute at all.
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;

@@ -954,6 +954,14 @@ package body Boot is
 
    procedure Non_Boot_Hart_Entry (Hart_Id : Hart_Index_T) is
       Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
+
+      procedure Log_Hart is
+      begin
+         Log_Debug ("Starting non-boot Hart#" & Hart_Id'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Hart;
    begin
       --  This needs to be the first function called on each hart to set up
       --  the hart's state structure. This needs be called before any logging
@@ -961,9 +969,7 @@ package body Boot is
       --  determine the current hart id.
       Initialise_Hart (Hart_Id);
 
-      pragma
-        Debug
-          (Debug_Boot, Log_Debug ("Starting non-boot Hart#" & Hart_Id'Image));
+      pragma Debug (Debug_Boot, Log_Hart);
 
       Initialise_Hart_Boot_Secondary_Stack (Hart_Id, Boot_Secondary_Stack_Top);
 
@@ -974,17 +980,6 @@ package body Boot is
          Boot_Secondary_Stack_Top,
          Boot_Secondary_Stack_Size,
          Non_Boot_Hart_Start'Address);
-
-      --  With debug logging disabled, a Constraint_Error can't be raised in
-      --  this body, and this handler can never be entered.
-      --  Keep this handler here, and supress the warning about this handler
-      --  being unreachable. So that if the debug logging is enabled, the
-      --  kernel will still compile.
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-         pragma Warnings (On, "this handler can never be entered");
    end Non_Boot_Hart_Entry;
 
    procedure Non_Boot_Hart_Start (Hart_Id : Hart_Index_T) is

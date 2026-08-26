@@ -275,20 +275,34 @@ package body Filesystems is
       Result          : out Function_Result)
    is
       Filesystem_Node : Filesystem_Node_Access := null;
+
+      procedure Print_File_Found_Status (Found : Boolean) is
+      begin
+         Log_Debug
+           ((if Found then "File found: '" else "File not found: '")
+            & Path
+            & "'");
+      exception
+         when Constraint_Error =>
+            null;
+      end Print_File_Found_Status;
+
+      procedure Log_Open_File is
+      begin
+         Log_Debug ("Filesystems.Open_File: '" & Path & "'");
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Open_File;
    begin
-      pragma
-        Debug
-          (Debug_Filesystems,
-           Log_Debug ("Filesystems.Open_File: '" & Path & "'"));
+      pragma Debug (Debug_Filesystems, Log_Open_File);
 
       Find_File (Process, Path, Filesystem_Node, Result);
       if Is_Error (Result) then
          File_Handle := null;
          return;
       elsif Result = File_Not_Found then
-         pragma
-           Debug
-             (Debug_Filesystems, Log_Debug ("File not found: '" & Path & "'"));
+         pragma Debug (Debug_Filesystems, Print_File_Found_Status (False));
 
          --  If the open mode flags indicate that the missing file should be
          --  created, create it and return the new node, else exit.
@@ -303,9 +317,7 @@ package body Filesystems is
          end if;
 
          pragma
-           Debug
-             (Debug_Filesystems,
-              Log_Debug ("Creating missing file: '" & Path & "'"));
+           Debug (Debug_Filesystems, Log_Debug ("Creating missing file."));
 
          Create_File (Process, Path, Filesystem_Node, Result);
          if Is_Error (Result) then
@@ -314,8 +326,7 @@ package body Filesystems is
          end if;
       end if;
 
-      pragma
-        Debug (Debug_Filesystems, Log_Debug ("File found: '" & Path & "'"));
+      pragma Debug (Debug_Filesystems, Print_File_Found_Status (True));
 
       Create_File_Handle_For_Filesystem_Node
         (Process, Filesystem_Node, File_Open_Flags, File_Handle, Result);
@@ -636,18 +647,6 @@ package body Filesystems is
         Allocation_Result.Physical_Address;
       System_Block_Cache.Data_Address_Virtual :=
         Allocation_Result.Virtual_Address;
-
-      pragma
-        Debug
-          (Debug_Filesystems,
-           Log_Debug
-             ("Initialised block cache:"
-              & ASCII.LF
-              & "  Data Physical Address: "
-              & System_Block_Cache.Data_Address_Physical'Image
-              & ASCII.LF
-              & "  Data Virtual Address:  "
-              & System_Block_Cache.Data_Address_Virtual'Image));
    end Initialise_Block_Cache;
 
    procedure Allocate_Filesystem_Node

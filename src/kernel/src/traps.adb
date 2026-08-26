@@ -158,7 +158,15 @@ package body Traps is
    end Handle_External_Interrupt;
 
    procedure Handle_Supervisor_Mode_Interrupt
-     (Cause : Unsigned_64; Sepc : Virtual_Address_T; Stval : Unsigned_64) is
+     (Cause : Unsigned_64; Sepc : Virtual_Address_T; Stval : Unsigned_64)
+   is
+      procedure Log_Cause is
+      begin
+         Log_Debug ("Supervisor Mode: Other Interrupt: " & Cause'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Cause;
    begin
       pragma Unreferenced (Sepc, Stval);
 
@@ -170,30 +178,17 @@ package body Traps is
             Handle_External_Interrupt;
 
          when others                               =>
-            pragma
-              Debug
-                (Debug_Traps,
-                 Log_Debug
-                   ("Supervisor Mode: Other Interrupt: " & Cause'Image));
+            pragma Debug (Debug_Traps, Log_Cause);
       end case;
-
-      --  With debug logging disabled, a Constraint_Error can't be raised in
-      --  this body, and this handler can never be entered.
-      --  Keep this handler here, and supress the warning about this handler
-      --  being unreachable. So that if the debug logging is enabled, the
-      --  kernel will still compile.
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-         pragma Warnings (On, "this handler can never be entered");
    end Handle_Supervisor_Mode_Interrupt;
 
-   procedure Handle_Supervisor_Mode_Trap
-     (Trapping_Process_Addr : Virtual_Address_T;
+   procedure Log_Trap_Info
+     (Supervisor_Mode       : Boolean;
+      Trapping_Process_Addr : Virtual_Address_T;
       Scause                : Unsigned_64;
       Sepc                  : Virtual_Address_T;
-      Stval                 : Unsigned_64)
+      Stval                 : Unsigned_64;
+      Entering              : Boolean)
    is
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
 
@@ -213,31 +208,64 @@ package body Traps is
          end Get_Process_Id;
       end if;
 
+      if Entering then
+         Log_Debug
+           ((if Supervisor_Mode
+             then "Traps.Handle_Supervisor_Mode_Trap:"
+             else "Traps.Handle_User_Mode_Trap:")
+            & ASCII.LF
+            & "  Hart#      "
+            & Hart_Id'Image
+            & ASCII.LF
+            & "  PID#       "
+            & Process_Id_String
+            & ASCII.LF
+            & "  Interrupt: "
+            & Trap_Is_Interrupt'Image
+            & ASCII.LF
+            & "  Cause:     "
+            & Cause'Image
+            & ASCII.LF
+            & "  Sepc:      "
+            & Sepc'Image
+            & ASCII.LF
+            & "  Stval:     "
+            & Stval'Image);
+      else
+         Log_Debug
+           ((if Supervisor_Mode
+             then "Traps.Handle_Supervisor_Mode_Trap: Returning from trap:"
+             else "Traps.Handle_User_Mode_Trap: Returning from trap:")
+            & ASCII.LF
+            & "  Hart#  "
+            & Hart_Id'Image
+            & ASCII.LF
+            & "  PID#   "
+            & Process_Id_String
+            & ASCII.LF
+            & "  Cause: "
+            & Cause'Image);
+      end if;
+   exception
+      when Constraint_Error =>
+         null;
+   end Log_Trap_Info;
+
+   procedure Handle_Supervisor_Mode_Trap
+     (Trapping_Process_Addr : Virtual_Address_T;
+      Scause                : Unsigned_64;
+      Sepc                  : Virtual_Address_T;
+      Stval                 : Unsigned_64)
+   is
+      Cause : constant Unsigned_64 := Get_Cause (Scause);
+   begin
       pragma
         Debug
           (Debug_Traps,
-           Log_Debug
-             ("Traps.Handle_Supervisor_Mode_Trap:"
-              & ASCII.LF
-              & "  Hart#      "
-              & Hart_Id'Image
-              & ASCII.LF
-              & "  PID#       "
-              & Process_Id_String
-              & ASCII.LF
-              & "  Interrupt: "
-              & Trap_Is_Interrupt'Image
-              & ASCII.LF
-              & "  Cause:     "
-              & Cause'Image
-              & ASCII.LF
-              & "  Sepc:      "
-              & Sepc'Image
-              & ASCII.LF
-              & "  Stval:     "
-              & Stval'Image));
+           Log_Trap_Info
+             (True, Trapping_Process_Addr, Scause, Sepc, Stval, True));
 
-      if Trap_Is_Interrupt then
+      if Is_Interrupt (Scause) then
          Handle_Supervisor_Mode_Interrupt (Cause, Sepc, Stval);
       else
          Handle_Supervisor_Mode_Exception
@@ -247,48 +275,32 @@ package body Traps is
       pragma
         Debug
           (Debug_Traps,
-           Log_Debug
-             ("Traps.Handle_Supervisor_Mode_Trap: Returning from trap:"
-              & ASCII.LF
-              & "  Hart#  "
-              & Hart_Id'Image
-              & ASCII.LF
-              & "  PID#   "
-              & Process_Id_String
-              & ASCII.LF
-              & "  Cause: "
-              & Get_Cause (Scause)'Image));
-
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-         pragma Warnings (On, "this handler can never be entered");
+           Log_Trap_Info
+             (True, Trapping_Process_Addr, Scause, Sepc, Stval, False));
    end Handle_Supervisor_Mode_Trap;
 
-   procedure Handle_Timer_Interrupt is
+   procedure Log_Timer_Interrupt_Scheduling (Entering : Boolean) is
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
+   begin
+      if Entering then
+         Log_Debug ("Hart#" & Hart_Id'Image & ": Scheduling from timer IRQ");
+      else
+         Log_Debug ("Hart#" & Hart_Id'Image & ": Returning from timer IRQ");
+      end if;
+   exception
+      when Constraint_Error =>
+         null;
+   end Log_Timer_Interrupt_Scheduling;
+
+   procedure Handle_Timer_Interrupt is
    begin
       Setup_Next_Timer_Interrupt;
 
-      pragma
-        Debug
-          (Debug_Traps,
-           Log_Debug
-             ("Hart#" & Hart_Id'Image & ": Scheduling from timer IRQ"));
+      pragma Debug (Debug_Traps, Log_Timer_Interrupt_Scheduling (True));
 
       Scheduler.Run (Process_Ready);
 
-      pragma
-        Debug
-          (Debug_Traps,
-           Log_Debug ("Hart#" & Hart_Id'Image & ": Returning from timer IRQ"));
-
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-         pragma Warnings (On, "this handler can never be entered");
+      pragma Debug (Debug_Traps, Log_Timer_Interrupt_Scheduling (False));
    end Handle_Timer_Interrupt;
 
    procedure Handle_User_Mode_Exception
@@ -345,6 +357,13 @@ package body Traps is
    end Handle_User_Mode_Exception;
 
    procedure Handle_User_Mode_Interrupt (Cause : Unsigned_64) is
+      procedure Log_Cause is
+      begin
+         Log_Debug ("User Mode: Other Interrupt: " & Cause'Image);
+      exception
+         when Constraint_Error =>
+            null;
+      end Log_Cause;
    begin
       case Cause is
          when Scause_Supervisor_Timer_Interrupt    =>
@@ -354,17 +373,8 @@ package body Traps is
             Handle_External_Interrupt;
 
          when others                               =>
-            pragma
-              Debug
-                (Debug_Traps,
-                 Log_Debug ("User Mode: Other Interrupt: " & Cause'Image));
+            pragma Debug (Debug_Traps, Log_Cause);
       end case;
-
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-         pragma Warnings (On, "this handler can never be entered");
    end Handle_User_Mode_Interrupt;
 
    procedure Handle_User_Mode_Trap
@@ -373,11 +383,7 @@ package body Traps is
       Sepc                  : Virtual_Address_T;
       Stval                 : Unsigned_64)
    is
-      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
-
       Cause : constant Unsigned_64 := Get_Cause (Scause);
-
-      Trap_Is_Interrupt : constant Boolean := Is_Interrupt (Scause);
    begin
       --  If we're in user mode, and there's no actual process running, this
       --  indicates some serious problem has occurred. In this case, panic.
@@ -392,28 +398,10 @@ package body Traps is
          pragma
            Debug
              (Debug_Traps,
-              Log_Debug
-                ("Traps.Handle_User_Mode_Trap:"
-                 & ASCII.LF
-                 & "  Hart#      "
-                 & Hart_Id'Image
-                 & ASCII.LF
-                 & "  Interrupt: "
-                 & Trap_Is_Interrupt'Image
-                 & ASCII.LF
-                 & "  Cause:     "
-                 & Cause'Image
-                 & ASCII.LF
-                 & "  PID#       "
-                 & Trapping_Process.Process_Id'Image
-                 & ASCII.LF
-                 & "  Sepc:      "
-                 & Sepc'Image
-                 & ASCII.LF
-                 & "  Stval:     "
-                 & Stval'Image));
+              Log_Trap_Info
+                (False, Trapping_Process_Addr, Scause, Sepc, Stval, True));
 
-         if Trap_Is_Interrupt then
+         if Is_Interrupt (Scause) then
             Handle_User_Mode_Interrupt (Cause);
          else
             Handle_User_Mode_Exception (Trapping_Process, Cause, Sepc, Stval);
@@ -422,21 +410,9 @@ package body Traps is
          pragma
            Debug
              (Debug_Traps,
-              Log_Debug
-                ("Traps.Handle_User_Mode_Trap: Returning from trap"
-                 & ASCII.LF
-                 & "  Hart#  "
-                 & Hart_Id'Image
-                 & ASCII.LF
-                 & "  PID#   "
-                 & Trapping_Process.Process_Id'Image));
+              Log_Trap_Info
+                (False, Trapping_Process_Addr, Scause, Sepc, Stval, False));
       end Read_Process_Info;
-
-      pragma Warnings (Off, "this handler can never be entered");
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-         pragma Warnings (On, "this handler can never be entered");
    end Handle_User_Mode_Trap;
 
    procedure Setup_Next_Timer_Interrupt is
