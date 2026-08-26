@@ -579,14 +579,14 @@ package body Boot is
 
       Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
    begin
+      pragma
+        Debug (Debug_Boot, Log_Debug ("Booting Hart" & Hart_Id'Image & "..."));
+
       --  This needs to be the first function called on each hart to set up
       --  the hart's state structure. This needs be called before any logging
       --  can take place, since the spinlock mechanism requires being able to
       --  determine the current hart id.
       Initialise_Hart (Hart_Id);
-
-      pragma
-        Debug (Debug_Boot, Log_Debug ("Booting Hart" & Hart_Id'Image & "..."));
 
       --  The Devicetree blob was mapped into the higher-half address space
       --  at this offset in Boot.Early.Map_Devicetree.

@@ -121,16 +121,14 @@ is
    ----------------------------------------------------------------------------
    procedure Copy_Kernel_Memory_Mappings_Into_Address_Space
      (Source_Addr_Space : Virtual_Memory_Space_T;
-      Dest_Addr_Space   : in out Virtual_Memory_Space_T;
-      Result            : out Function_Result);
+      Dest_Addr_Space   : in out Virtual_Memory_Space_T);
 
    ----------------------------------------------------------------------------
    --  Copies all canonical kernel memory mappings from the kernel's
    --  address space into the destination address space's page tables.
    ----------------------------------------------------------------------------
    procedure Copy_Canonical_Kernel_Memory_Mappings_Into_Address_Space
-     (Dest_Addr_Space : in out Virtual_Memory_Space_T;
-      Result          : out Function_Result);
+     (Dest_Addr_Space : in out Virtual_Memory_Space_T);
 
    procedure Map_Kernel_Memory
      (Virtual_Addr  : Virtual_Address_T;

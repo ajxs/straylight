@@ -468,11 +468,7 @@ package body Processes is
       end if;
 
       Copy_Canonical_Kernel_Memory_Mappings_Into_Address_Space
-        (New_Process.all.Memory_Space, Result);
-      if Is_Error (Result) then
-         Log_Error ("Failed to copy kernel memory mappings");
-         return;
-      end if;
+        (New_Process.all.Memory_Space);
 
       New_Process.all.Memory_Space.Address_Space_ID :=
         Unsigned_16 (New_Process.all.Process_Id);

@@ -22,8 +22,7 @@ package body Memory.Virtual is
 
    procedure Copy_Kernel_Memory_Mappings_Into_Address_Space
      (Source_Addr_Space : Virtual_Memory_Space_T;
-      Dest_Addr_Space   : in out Virtual_Memory_Space_T;
-      Result            : out Function_Result)
+      Dest_Addr_Space   : in out Virtual_Memory_Space_T)
    is
       Source_Base_Page_Table : constant Page_Table_T
       with
@@ -51,17 +50,14 @@ package body Memory.Virtual is
          Destination_Base_Page_Table (I) := Source_Base_Page_Table (I);
       end loop;
 
-      Result := Success;
-
       Release_Spinlock (Dest_Addr_Space.Spinlock);
    end Copy_Kernel_Memory_Mappings_Into_Address_Space;
 
    procedure Copy_Canonical_Kernel_Memory_Mappings_Into_Address_Space
-     (Dest_Addr_Space : in out Virtual_Memory_Space_T;
-      Result          : out Function_Result) is
+     (Dest_Addr_Space : in out Virtual_Memory_Space_T) is
    begin
       Copy_Kernel_Memory_Mappings_Into_Address_Space
-        (Kernel_Address_Space, Dest_Addr_Space, Result);
+        (Kernel_Address_Space, Dest_Addr_Space);
    end Copy_Canonical_Kernel_Memory_Mappings_Into_Address_Space;
 
    procedure Create_New_Process_Memory_Space
