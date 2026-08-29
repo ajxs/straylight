@@ -4,9 +4,10 @@
 -------------------------------------------------------------------------------
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Logging; use Logging;
-with Memory;  use Memory;
-with RISCV;   use RISCV;
+with Logging;            use Logging;
+with Memory;             use Memory;
+with RISCV;              use RISCV;
+with System_Calls.Errno; use System_Calls.Errno;
 
 package body System_Calls.Files is
    Logging_Enabled : constant Boolean :=
@@ -238,8 +239,6 @@ package body System_Calls.Files is
       Find_File_Handle
         (Process.Process_Id, File_Handle_Id, File_Handle, Result);
       if Is_Error (Result) then
-         Log_Error ("Error finding file handle: " & Result'Image);
-
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EBADF);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
@@ -281,17 +280,16 @@ package body System_Calls.Files is
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a2));
 
       Bytes_To_Write : constant Unsigned_64 := Trap_Context.Gp_Registers (a3);
+
+      --  It's important to validate the number of bytes to write before
+      --  attempting to cast it to any other type, otherwise it could raise
+      --  a Constraint_Error exception, and lead to a panic.
       if Bytes_To_Write = 0 then
-         Log_Error ("Invalid bytes to write: " & Bytes_To_Write'Image);
          Bytes_Written := 0;
-         Syscall_Result := Unsigned_64 (Bytes_Written);
+         Syscall_Result := 0;
          Result := Success;
          return;
-      end if;
-
-      if Bytes_To_Write > Filesystem_Max_Read_Write_Byte_Count then
-         Log_Error ("Invalid bytes to write: " & Bytes_To_Write'Image);
-
+      elsif Bytes_To_Write > Filesystem_Max_Read_Write_Byte_Count then
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
@@ -323,6 +321,25 @@ package body System_Calls.Files is
          Integer (Bytes_To_Write),
          Bytes_Written,
          Result);
+      if Result = Not_Supported then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ENOTSUP);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Result = File_Not_Writeable then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EBADF);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Result = Invalid_File_Size then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Result = Invalid_Filesystem then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EIO);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Is_Error (Result) then
+         return;
+      end if;
 
       Syscall_Result := Unsigned_64 (Bytes_Written);
    exception
@@ -355,7 +372,6 @@ package body System_Calls.Files is
       Find_File_Handle
         (Process.Process_Id, File_Handle_Id, File_Handle, Result);
       if Is_Error (Result) then
-         Log_Error ("Error finding file handle: " & Result'Image);
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EBADF);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
@@ -363,9 +379,30 @@ package body System_Calls.Files is
 
       New_End_Of_File : constant Unsigned_64 := Trap_Context.Gp_Registers (a2);
 
-      --  Result set by this call.
+      --  Validate the incoming new file size before casting it.
+      if New_End_Of_File > Maximum_File_Size then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
       Filesystems.Truncate_File
         (Process, File_Handle, New_End_Of_File, Result);
+      if Result = Invalid_File_Type or else Result = Invalid_File_Size then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Result = File_Not_Writeable then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EBADF);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Result = Not_Supported then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ENOTSUP);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Is_Error (Result) then
+         return;
+      end if;
 
       Syscall_Result := 0;
    exception

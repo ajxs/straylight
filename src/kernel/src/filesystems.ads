@@ -20,6 +20,8 @@ package Filesystems
 is
    Block_Size : constant := 16#1000#;
 
+   Maximum_File_Size : constant Unsigned_64 := 16#1_0000_0000#; -- 4GB
+
    Filesystem_Node_Name_Max_Byte_Length : constant Integer := 256;
 
    Filesystem_Max_Read_Write_Byte_Count : constant := 16#7FFF_FFFF#;
@@ -270,8 +272,6 @@ private
    Filesystem_Node_Separator : constant Character := '/';
 
    subtype Block_Index_T is Unsigned_64;
-
-   Maximum_File_Size : constant Unsigned_64 := 16#1_0000_0000#; -- 4GB
 
    type Process_File_Handle_Array is
      array (1 .. 64) of aliased Process_File_Handle_T;

@@ -53,6 +53,9 @@ package Function_Results is
    Cache_Entry_Not_Found : constant := 1777_0002;
    Invalid_Filesystem    : constant := -1777_0003;
    Invalid_Filename      : constant := -1777_0004;
+   Invalid_File_Size     : constant := -1777_0005;
+   Invalid_File_Type     : constant := -1777_0006;
+   File_Not_Writeable    : constant := -1777_0007;
 
    Syscall_Unsuccessful_Without_Kernel_Error : constant := 8888_0000;
 

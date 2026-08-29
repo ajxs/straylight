@@ -267,6 +267,21 @@ package body Filesystems is
       Release_Spinlock (Open_Files_Spinlock);
    end Create_File_Handle_For_Filesystem_Node;
 
+   function Does_File_Handle_Pointer_Point_To_Regular_File
+     (File_Handle : Process_File_Handle_Access) return Boolean is
+   begin
+      return
+        File_Handle /= null
+        and then File_Handle.all.File /= null
+        and then
+          File_Handle.all.File.all.Node_Type
+          = Filesystem_Node_Type_Regular_File;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         return False;
+   end Does_File_Handle_Pointer_Point_To_Regular_File;
+
    procedure Open_File
      (Process         : in out Process_Control_Block_T;
       Path            : Filesystem_Path_T;
@@ -335,7 +350,10 @@ package body Filesystems is
          return;
       end if;
 
-      if File_Open_Flags.Creation_Flags.Truncate_Existing then
+      --  Only a regular file will be truncated.
+      if File_Open_Flags.Creation_Flags.Truncate_Existing
+        and then Does_File_Handle_Pointer_Point_To_Regular_File (File_Handle)
+      then
          Truncate_File (Process, File_Handle, 0, Result);
          if Is_Error (Result) then
             File_Handle := null;
@@ -783,10 +801,6 @@ package body Filesystems is
                Result);
 
          when others              =>
-            Log_Error
-              ("Unsupported filesystem type: "
-               & File_Handle.all.File.all.Parent_Filesystem.all
-                   .Filesystem_Type'Image);
             Result := Not_Supported;
       end case;
 
@@ -829,17 +843,22 @@ package body Filesystems is
       if File_Handle.all.File_Open_Flags.Access_Mode = Read_Only then
          Log_Error ("File not opened with write permissions");
          Bytes_Written := 0;
-         Result := Invalid_Argument;
+         Result := File_Not_Writeable;
          return;
       end if;
 
-      if Bytes_To_Write > Maximum_File_Write_Size or else Bytes_To_Write = 0
-      then
+      if Bytes_To_Write = 0 then
+         Bytes_Written := 0;
+         Result := Success;
+         return;
+      end if;
+
+      if Bytes_To_Write > Maximum_File_Write_Size then
          Log_Error
            ("Filesystems.Write_File: Invalid Bytes_To_Write: "
             & Bytes_To_Write'Image);
          Bytes_Written := 0;
-         Result := Invalid_Argument;
+         Result := Invalid_File_Size;
          return;
       end if;
 
@@ -1080,27 +1099,23 @@ package body Filesystems is
       New_Size    : Unsigned_64;
       Result      : out Function_Result) is
    begin
-      if New_Size = File_Handle.all.File.all.File_Size then
-         Result := Success;
+      if File_Handle.all.File_Open_Flags.Access_Mode = Read_Only then
+         Result := File_Not_Writeable;
          return;
       end if;
 
       if File_Handle.all.File.all.Node_Type
         /= Filesystem_Node_Type_Regular_File
       then
-         Log_Error
-           ("Truncate_File: File is not a regular file: "
-            & File_Handle.all.File.all.Node_Type'Image);
-
-         Result := Invalid_Argument;
+         Result := Invalid_File_Type;
          return;
       end if;
 
-      if New_Size > Maximum_File_Size then
-         Log_Error
-           ("Truncate_File: New size is greater than maximum file size");
-
-         Result := Invalid_Argument;
+      if New_Size = File_Handle.all.File.all.File_Size then
+         Result := Success;
+         return;
+      elsif New_Size > Maximum_File_Size then
+         Result := Invalid_File_Size;
          return;
       end if;
 

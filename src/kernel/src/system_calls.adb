@@ -13,6 +13,7 @@ with Memory;             use Memory;
 with RISCV;              use RISCV;
 with Processes.Scheduler;
 with Hart_State;         use Hart_State;
+with System_Calls.Errno; use System_Calls.Errno;
 with System_Calls.Files; use System_Calls.Files;
 
 package body System_Calls is
