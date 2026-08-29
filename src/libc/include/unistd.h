@@ -7,4 +7,8 @@ int close(int fd);
 
 ssize_t read(int fildes, void *buf, size_t nbyte);
 
+int truncate(const char *path, off_t length);
+
+int ftruncate(int fd, off_t length);
+
 #endif
