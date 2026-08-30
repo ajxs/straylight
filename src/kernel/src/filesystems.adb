@@ -412,15 +412,9 @@ package body Filesystems is
           (File_Handle.all.File.all.File_Size - File_Handle.all.Position);
 
       Real_Bytes_To_Read : constant Natural :=
-        (if Bytes_To_Read > Remaining_Bytes_In_File
-         then Remaining_Bytes_In_File
-         else Bytes_To_Read);
+        Natural'Min (Bytes_To_Read, Remaining_Bytes_In_File);
 
       if Real_Bytes_To_Read = 0 then
-         pragma
-           Debug
-             (Debug_Filesystems,
-              Log_Debug ("Filesystems.Read_File: No bytes to read."));
          Bytes_Read := 0;
          Result := Success;
          return;
@@ -493,18 +487,23 @@ package body Filesystems is
               & File_Handle.all.Position'Image));
 
       if File_Handle.all.File_Open_Flags.Access_Mode = Write_Only then
-         Log_Error ("File not opened with read permissions");
          Bytes_Read := 0;
-         Result := Invalid_Argument;
+         Result := Invalid_File_Permissions;
          return;
       end if;
 
-      if Bytes_To_Read > Maximum_File_Read_Size or else Bytes_To_Read = 0 then
-         Log_Error
-           ("Filesystems.Read_File: Invalid Bytes_To_Read: "
-            & Bytes_To_Read'Image);
+      --  Note: In future it might make sense to move this check to _after_
+      --  the file type dispatching, to ensure that the file type is validated
+      --  before the no-op return.
+      if Bytes_To_Read = 0 then
          Bytes_Read := 0;
-         Result := Invalid_Argument;
+         Result := Success;
+         return;
+      end if;
+
+      if Bytes_To_Read > Maximum_File_Read_Size then
+         Bytes_Read := 0;
+         Result := Invalid_File_Size;
          return;
       end if;
 
@@ -532,7 +531,7 @@ package body Filesystems is
               ("Unsupported node type for reading: "
                & File_Handle.all.File.all.Node_Type'Image);
             Bytes_Read := 0;
-            Result := Function_Results.Not_Supported;
+            Result := Not_Supported;
       end case;
 
       pragma
@@ -550,27 +549,16 @@ package body Filesystems is
    procedure Seek_File
      (File_Handle : Process_File_Handle_Access;
       New_Offset  : Unsigned_64;
-      Result      : out Function_Result)
-   is
-      Effective_New_Offset : Unsigned_64 := New_Offset;
+      Result      : out Function_Result) is
    begin
-      if New_Offset > File_Handle.all.File.all.File_Size then
-         if File_Handle.all.File.all.File_Size = 0 then
-            pragma
-              Debug
-                (Debug_Filesystems,
-                 Log_Debug ("Seek_File: File size is 0, setting offset to 0"));
-            Effective_New_Offset := 0;
-         else
-            pragma
-              Debug
-                (Debug_Filesystems,
-                 Log_Debug ("Seek_File: New offset is beyond end of file"));
-            Effective_New_Offset := File_Handle.all.File.all.File_Size - 1;
-         end if;
-      end if;
+      --  Ensure that we can't seek past the last valid index into the file.
+      File_Handle.all.Position :=
+        Unsigned_64'Min
+          ((if File_Handle.all.File.all.File_Size = 0
+            then 0
+            else File_Handle.all.File.all.File_Size),
+           New_Offset);
 
-      File_Handle.all.Position := Effective_New_Offset;
       Result := Success;
    exception
       when Constraint_Error =>
@@ -841,12 +829,14 @@ package body Filesystems is
               & File_Handle.all.Position'Image));
 
       if File_Handle.all.File_Open_Flags.Access_Mode = Read_Only then
-         Log_Error ("File not opened with write permissions");
          Bytes_Written := 0;
-         Result := File_Not_Writeable;
+         Result := Invalid_File_Permissions;
          return;
       end if;
 
+      --  Note: In future it might make sense to move this check to _after_
+      --  the file type dispatching, to ensure that the file type is validated
+      --  before the no-op return.
       if Bytes_To_Write = 0 then
          Bytes_Written := 0;
          Result := Success;
@@ -854,9 +844,6 @@ package body Filesystems is
       end if;
 
       if Bytes_To_Write > Maximum_File_Write_Size then
-         Log_Error
-           ("Filesystems.Write_File: Invalid Bytes_To_Write: "
-            & Bytes_To_Write'Image);
          Bytes_Written := 0;
          Result := Invalid_File_Size;
          return;
@@ -903,14 +890,8 @@ package body Filesystems is
       Actual_Bytes_To_Read : out Natural;
       Result               : out Function_Result) is
    begin
-      --  Validate that the read doesn't exceed the file size.
+      --  Validate that the start offset is within the file size.
       if Start_Offset >= Filesystem_Node.all.File_Size then
-         Log_Error
-           ("Read offset exceeds file size: "
-            & Start_Offset'Image
-            & " >= "
-            & Filesystem_Node.all.File_Size'Image);
-
          Actual_Bytes_To_Read := 0;
          Result := Invalid_Argument;
          return;
@@ -918,10 +899,9 @@ package body Filesystems is
 
       --  Truncate the read if it would exceed the file size.
       Actual_Bytes_To_Read :=
-        (if Start_Offset + Unsigned_64 (Bytes_To_Read)
-           > Filesystem_Node.all.File_Size
-         then Natural (Filesystem_Node.all.File_Size - Start_Offset)
-         else Bytes_To_Read);
+        Natural'Min
+          (Natural (Filesystem_Node.all.File_Size - Start_Offset),
+           Bytes_To_Read);
 
       Result := Success;
    exception
@@ -1100,7 +1080,7 @@ package body Filesystems is
       Result      : out Function_Result) is
    begin
       if File_Handle.all.File_Open_Flags.Access_Mode = Read_Only then
-         Result := File_Not_Writeable;
+         Result := Invalid_File_Permissions;
          return;
       end if;
 

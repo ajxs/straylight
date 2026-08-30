@@ -20,7 +20,7 @@ package Filesystems
 is
    Block_Size : constant := 16#1000#;
 
-   Maximum_File_Size : constant := 16#1_0000_0000#; -- 4GB
+   Maximum_File_Size : constant := 16#FFFF_FFFF#; -- (4GB - 1 byte)
 
    Filesystem_Node_Name_Max_Byte_Length : constant Integer := 256;
 

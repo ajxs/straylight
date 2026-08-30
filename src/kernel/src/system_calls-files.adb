@@ -200,7 +200,6 @@ package body System_Calls.Files is
          return;
       end if;
 
-      --  Result set by this call.
       Filesystems.Read_File
         (Process,
          File_Handle,
@@ -208,6 +207,25 @@ package body System_Calls.Files is
          Integer (Bytes_To_Read),
          Bytes_Read,
          Result);
+      if Result = Not_Supported then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ENOTSUP);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Result = Invalid_File_Permissions then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EBADF);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Result = Invalid_File_Size then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Result = Device_IO_Error or else Result = Invalid_Filesystem then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EIO);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Is_Error (Result) then
+         return;
+      end if;
 
       Syscall_Result := Unsigned_64 (Bytes_Read);
    exception
@@ -325,7 +343,7 @@ package body System_Calls.Files is
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ENOTSUP);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
-      elsif Result = File_Not_Writeable then
+      elsif Result = Invalid_File_Permissions then
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EBADF);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
@@ -333,7 +351,7 @@ package body System_Calls.Files is
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
-      elsif Result = Invalid_Filesystem then
+      elsif Result = Device_IO_Error or else Result = Invalid_Filesystem then
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EIO);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
@@ -399,12 +417,16 @@ package body System_Calls.Files is
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
-      elsif Result = File_Not_Writeable then
+      elsif Result = Invalid_File_Permissions then
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EBADF);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
       elsif Result = Not_Supported then
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ENOTSUP);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Result = Device_IO_Error or else Result = Invalid_Filesystem then
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EIO);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
       elsif Is_Error (Result) then

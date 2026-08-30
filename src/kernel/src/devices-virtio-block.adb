@@ -298,25 +298,17 @@ package body Devices.Virtio.Block is
              Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
 
-         VIRTIO_BLK_S_OK     : constant := 0;
-         VIRTIO_BLK_S_IOERR  : constant := 1;
-         VIRTIO_BLK_S_UNSUPP : constant := 2;
+         VIRTIO_BLK_S_OK : constant := 0;
       begin
          case Request_Status_Array (Descriptor_Indexes (0)) is
-            when VIRTIO_BLK_S_OK     =>
+            when VIRTIO_BLK_S_OK =>
                Result := Success;
 
-            when VIRTIO_BLK_S_IOERR  =>
-               Log_Error ("I/O Error on Virtio Block Device");
+            when others          =>
+               Log_Error
+                 ("I/O Error on Virtio Block Device: "
+                  & Request_Status_Array (Descriptor_Indexes (0))'Image);
                Result := Device_IO_Error;
-
-            when VIRTIO_BLK_S_UNSUPP =>
-               Log_Error ("Unsupported Operation on Virtio Block Device");
-               Result := Operation_Unsupported;
-
-            when others              =>
-               Log_Error ("Unknown Status on Virtio Block Device");
-               Result := Unhandled_Exception;
          end case;
       end Read_Request_Status;
    exception

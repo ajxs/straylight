@@ -1947,10 +1947,7 @@ package body Filesystems.FAT is
    begin
       --  Ensure the new file size is within the maximum file size supported.
       if New_Size > Storage_Count (Unsigned_32'Last) then
-         Log_Error
-           ("New file size is greater than the maximum supported size.");
-
-         Result := Invalid_Argument;
+         Result := Invalid_File_Size;
          return;
       elsif Unsigned_64 (New_Size) = Filesystem_Node.all.File_Size then
          --  If the size hasn't changed, there's nothing to do.
