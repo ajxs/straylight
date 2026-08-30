@@ -120,7 +120,7 @@ package body Filesystems.Block_Cache is
          end if;
       end loop;
 
-      Result := Cache_Entry_Not_Found;
+      Result := Not_Found;
    end Find_Existing_Block_In_Cache;
 
    pragma
@@ -191,7 +191,7 @@ package body Filesystems.Block_Cache is
          Find_Existing_Block_In_Cache
            (System_Block_Cache, Filesystem, Block_Number, Cache_Index, Result);
 
-         --  Two possible results: Success / Cache_Entry_Not_Found.
+         --  Two possible results: Success / Not_Found.
          if Result = Success then
             pragma
               Debug
@@ -232,7 +232,7 @@ package body Filesystems.Block_Cache is
                Release_Spinlock (System_Block_Cache.Spinlock);
                exit Read_From_Cache_Loop;
             end if;
-         elsif Result = Cache_Entry_Not_Found then
+         elsif Result = Not_Found then
             pragma
               Debug
                 (Debug_Filesystems_Block_Cache,
@@ -432,10 +432,6 @@ package body Filesystems.Block_Cache is
         (System_Block_Cache, Filesystem, Block_Number, Cache_Index, Result);
       if Is_Error (Result) then
          return;
-      elsif Result = Cache_Entry_Not_Found then
-         Log_Error ("Block to release not found in cache.");
-         Result := Invalid_Argument;
-         return;
       end if;
 
       pragma
@@ -504,10 +500,6 @@ package body Filesystems.Block_Cache is
       Release_Spinlock (System_Block_Cache.Spinlock);
 
       if Is_Error (Result) then
-         return;
-      elsif Result = Cache_Entry_Not_Found then
-         Log_Error ("Block to write not found in cache.");
-         Result := Invalid_Argument;
          return;
       end if;
 

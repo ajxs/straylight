@@ -151,7 +151,7 @@ package body Filesystems.Node_Cache is
       end loop;
 
       Log_Error ("No free cache entry found");
-      Result := Cache_Exhausted;
+      Result := No_Free_Entries;
    end Find_Free_Cache_Entry;
 
    procedure Find_Filesystem_Node_In_Cache_Unlocked
