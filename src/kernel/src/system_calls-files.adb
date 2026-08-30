@@ -348,6 +348,12 @@ package body System_Calls.Files is
          Result := Constraint_Exception;
    end Handle_Write_File_Syscall;
 
+   --  Determines whether an incoming file size argument is safe to cast to
+   --  the type used internally to denote file sizes.
+   function Is_Incoming_File_Size_Argument_Safe_To_Cast
+     (Incoming_File_Size : Unsigned_64) return Boolean
+   is (Incoming_File_Size <= Unsigned_64 (Storage_Count'Last));
+
    procedure Handle_Truncate_File_Syscall
      (Process        : in out Process_Control_Block_T;
       Syscall_Result : out Unsigned_64;
@@ -379,15 +385,16 @@ package body System_Calls.Files is
 
       New_End_Of_File : constant Unsigned_64 := Trap_Context.Gp_Registers (a2);
 
-      --  Validate the incoming new file size before casting it.
-      if New_End_Of_File > Maximum_File_Size then
+      --  Validate that the incoming new file size won't raise a constraint
+      --  error before casting it.
+      if not Is_Incoming_File_Size_Argument_Safe_To_Cast (New_End_Of_File) then
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
       end if;
 
       Filesystems.Truncate_File
-        (Process, File_Handle, New_End_Of_File, Result);
+        (Process, File_Handle, Storage_Count (New_End_Of_File), Result);
       if Result = Invalid_File_Type or else Result = Invalid_File_Size then
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EINVAL);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;

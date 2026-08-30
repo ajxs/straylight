@@ -1096,7 +1096,7 @@ package body Filesystems is
    procedure Truncate_File
      (Process     : in out Process_Control_Block_T;
       File_Handle : Process_File_Handle_Access;
-      New_Size    : Unsigned_64;
+      New_Size    : Storage_Count;
       Result      : out Function_Result) is
    begin
       if File_Handle.all.File_Open_Flags.Access_Mode = Read_Only then
@@ -1111,7 +1111,7 @@ package body Filesystems is
          return;
       end if;
 
-      if New_Size = File_Handle.all.File.all.File_Size then
+      if Unsigned_64 (New_Size) = File_Handle.all.File.all.File_Size then
          Result := Success;
          return;
       elsif New_Size > Maximum_File_Size then
@@ -1122,7 +1122,7 @@ package body Filesystems is
       case File_Handle.all.File.all.Parent_Filesystem.all.Filesystem_Type is
          when Filesystem_Type_FAT =>
             Filesystems.FAT.Truncate_File
-              (Process, File_Handle.all.File, New_Size, Result);
+              (Process, File_Handle.all.File, Unsigned_64 (New_Size), Result);
 
          when others              =>
             Log_Error

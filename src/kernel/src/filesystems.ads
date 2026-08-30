@@ -20,7 +20,7 @@ package Filesystems
 is
    Block_Size : constant := 16#1000#;
 
-   Maximum_File_Size : constant Unsigned_64 := 16#1_0000_0000#; -- 4GB
+   Maximum_File_Size : constant := 16#1_0000_0000#; -- 4GB
 
    Filesystem_Node_Name_Max_Byte_Length : constant Integer := 256;
 
@@ -238,7 +238,7 @@ is
    procedure Truncate_File
      (Process     : in out Process_Control_Block_T;
       File_Handle : Process_File_Handle_Access;
-      New_Size    : Unsigned_64;
+      New_Size    : Storage_Count;
       Result      : out Function_Result);
 
    procedure Close_File
