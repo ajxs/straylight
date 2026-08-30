@@ -49,7 +49,6 @@ package Function_Results is
 
    --  Filesystem function result codes.
    File_Not_Found           : constant := 1777_0000;
-   Cache_Entry_Not_Found    : constant := 1777_0002;
    Invalid_Filesystem       : constant := -1777_0003;
    Invalid_Filename         : constant := -1777_0004;
    Invalid_File_Size        : constant := -1777_0005;

@@ -173,7 +173,7 @@ package body Filesystems.Node_Cache is
 
       Search_For_Filesystem_Node_In_Cache
         (Filesystem, Parent_Index, Filename, Cache_Index, Result);
-      if Is_Error (Result) or else Result = Cache_Entry_Not_Found then
+      if Is_Error (Result) then
          Node := null;
          return;
       end if;
@@ -250,7 +250,7 @@ package body Filesystems.Node_Cache is
          end if;
       end loop;
 
-      Result := Cache_Entry_Not_Found;
+      Result := Not_Found;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;

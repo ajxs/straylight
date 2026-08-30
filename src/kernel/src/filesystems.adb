@@ -130,11 +130,7 @@ package body Filesystems is
             Next_Path_Token,
             Filesystem_Node,
             Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         if Result = Cache_Entry_Not_Found then
+         if Result = Not_Found then
             case Current_Filesystem.all.Filesystem_Type is
                when Filesystem_Type_UStar =>
                   Filesystems.UStar.Find_File
@@ -172,6 +168,8 @@ package body Filesystems is
             if Is_Error (Result) then
                return;
             end if;
+         elsif Is_Error (Result) then
+            return;
          end if;
 
          if Filesystem_Node = null then
