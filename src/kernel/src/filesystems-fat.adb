@@ -1939,19 +1939,20 @@ package body Filesystems.FAT is
    procedure Truncate_File
      (Writing_Process : in out Process_Control_Block_T;
       Filesystem_Node : Filesystem_Node_Access;
-      New_Size        : Unsigned_64;
+      New_Size        : Storage_Count;
       Result          : out Function_Result)
    is
       Directory_Entry : FAT_Directory_Entry_T;
       First_Cluster   : Unsigned_32 := 0;
    begin
-      if New_Size > Unsigned_64 (Unsigned_32'Last) then
+      --  Ensure the new file size is within the maximum file size supported.
+      if New_Size > Storage_Count (Unsigned_32'Last) then
          Log_Error
            ("New file size is greater than the maximum supported size.");
 
          Result := Invalid_Argument;
          return;
-      elsif New_Size = Filesystem_Node.all.File_Size then
+      elsif Unsigned_64 (New_Size) = Filesystem_Node.all.File_Size then
          --  If the size hasn't changed, there's nothing to do.
          Result := Success;
          return;
@@ -2001,15 +2002,17 @@ package body Filesystems.FAT is
       --  file size, then we don't need to modify the cluster chain at all,
       --  since the data will still fit within the current cluster.
       if not Is_New_File_Size_Within_Same_Cluster
-               (Cluster_Size_In_Bytes, Filesystem_Node.all.File_Size, New_Size)
+               (Cluster_Size_In_Bytes,
+                Filesystem_Node.all.File_Size,
+                Unsigned_64 (New_Size))
       then
-         if New_Size < Filesystem_Node.all.File_Size then
+         if Unsigned_64 (New_Size) < Filesystem_Node.all.File_Size then
             Truncate_File_To_Smaller_Size
               (Writing_Process,
                Filesystem_Info,
                Cluster_Size_In_Bytes,
                Filesystem_Node,
-               New_Size,
+               Unsigned_64 (New_Size),
                Result);
             if Is_Error (Result) then
                return;
@@ -2020,7 +2023,7 @@ package body Filesystems.FAT is
                Filesystem_Info,
                Cluster_Size_In_Bytes,
                Filesystem_Node,
-               New_Size,
+               Unsigned_64 (New_Size),
                First_Cluster,
                Result);
             if Is_Error (Result) then
@@ -2059,7 +2062,7 @@ package body Filesystems.FAT is
          return;
       end if;
 
-      Filesystem_Node.all.File_Size := New_Size;
+      Filesystem_Node.all.File_Size := Unsigned_64 (New_Size);
 
       Result := Success;
    exception

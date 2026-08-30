@@ -50,7 +50,7 @@ is
    procedure Truncate_File
      (Writing_Process : in out Process_Control_Block_T;
       Filesystem_Node : Filesystem_Node_Access;
-      New_Size        : Unsigned_64;
+      New_Size        : Storage_Count;
       Result          : out Function_Result);
 
 private

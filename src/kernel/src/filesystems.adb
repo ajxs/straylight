@@ -1122,7 +1122,7 @@ package body Filesystems is
       case File_Handle.all.File.all.Parent_Filesystem.all.Filesystem_Type is
          when Filesystem_Type_FAT =>
             Filesystems.FAT.Truncate_File
-              (Process, File_Handle.all.File, Unsigned_64 (New_Size), Result);
+              (Process, File_Handle.all.File, New_Size, Result);
 
          when others              =>
             Log_Error
