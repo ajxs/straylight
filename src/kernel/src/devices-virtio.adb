@@ -157,7 +157,7 @@ package body Devices.Virtio is
       end loop;
 
       Log_Error ("No remaining Virtio Descriptors");
-      Result := No_Remaining_Virtio_Descriptors;
+      Result := Unhandled_Exception;
    exception
       when Constraint_Error =>
          Log_Error ("Constraint Error allocating descriptor");

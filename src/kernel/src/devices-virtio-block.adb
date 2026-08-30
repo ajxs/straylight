@@ -165,7 +165,7 @@ package body Devices.Virtio.Block is
       then
          Log_Error
            ("Read_Write: Attempt to write to read-only Virtio Block Device");
-         Result := Operation_Unsupported;
+         Result := Not_Supported;
          return;
       end if;
 
