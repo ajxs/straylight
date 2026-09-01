@@ -169,11 +169,23 @@ is
 
    function Do_Memory_Regions_Overlap
      (Region1_Start  : Address;
-      Region1_Length : Storage_Offset;
+      Region1_Length : Storage_Count;
       Region2_Start  : Address;
-      Region2_Length : Storage_Offset) return Boolean
+      Region2_Length : Storage_Count) return Boolean
    is ((Region1_Start < Region2_Start + Region2_Length)
        and then (Region2_Start < Region1_Start + Region1_Length))
    with Pure_Function;
 
+   function Is_Address_Range_Within_Region
+     (Address_Range_Start  : Address;
+      Address_Range_Length : Storage_Count;
+      Region_Start         : Address;
+      Region_Length        : Storage_Count) return Boolean
+   with Pure_Function;
+
+   function Is_Address_Within_Region
+     (Addr : Address; Region_Start : Address; Region_Length : Storage_Count)
+      return Boolean
+   is (Addr >= Region_Start and then Addr < Region_Start + Region_Length)
+   with Pure_Function;
 end Memory;

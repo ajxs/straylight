@@ -1,3 +1,4 @@
+with Hart_State;      use Hart_State;
 with Logging;         use Logging;
 with Memory.Physical; use Memory.Physical;
 with Memory.Virtual;  use Memory.Virtual;
@@ -372,8 +373,9 @@ package body Memory.Kernel is
                   Allocation_Result,
                   Result,
                   Alignment);
-
-               if Is_Error (Result) then
+               if Result = Heap_Corrupt then
+                  Panic ("Kernel heap is corrupt");
+               elsif Is_Error (Result) then
                   --  The region is already mapped, so its physical memory
                   --  can't be returned to the page pool.
                   return;
@@ -432,6 +434,9 @@ package body Memory.Kernel is
       Alignment         : Storage_Count := 1) is
    begin
       Kernel_Heap.Allocate (Size, Allocation_Result, Result, Alignment);
+      if Result = Heap_Corrupt then
+         Panic ("Kernel heap is corrupt");
+      end if;
 
       --  If the allocation can't be fulfilled, attempt to grow the heap,
       --  then retry the allocation.
@@ -489,6 +494,9 @@ package body Memory.Kernel is
       Result                    : out Function_Result) is
    begin
       Kernel_Heap.Free (Allocated_Virtual_Address, Result);
+      if Result = Heap_Corrupt then
+         Panic ("Kernel heap is corrupt");
+      end if;
    end Free_Kernel_Memory;
 
    procedure Free_Pages

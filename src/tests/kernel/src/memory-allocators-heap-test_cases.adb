@@ -481,9 +481,11 @@ package body Memory.Allocators.Heap.Test_Cases is
       Allocated_Address : Virtual_Address_T := Null_Address;
    begin
       --  A region lying outside the heap's window must be rejected by the
-      --  bounds check, before its header is read.
+      --  bounds check, before it's added.
       Initialise_Test_Heap
-        (Test_Heap, Heap_Backend'Address + 16#1_0000#, Heap_Backend_Size);
+        (Test_Heap,
+         Heap_Backend'Address + Heap_Backend_Size,
+         Heap_Backend_Size);
 
       Add_Memory_Region_To_Heap
         (Test_Heap,
@@ -491,12 +493,9 @@ package body Memory.Allocators.Heap.Test_Cases is
          Null_Physical_Address,
          Heap_Backend_Size,
          Result);
-      Assert (Result = Success, "Adding memory region succeeded");
-
-      Allocate (Test_Heap, 16#100#, Allocation_Result, Result);
       Assert
-        (Result = Region_Not_Mapped,
-         "Region outside the heap window is rejected");
+        (Result = Address_Not_In_Heap,
+         "Adding memory region outside the heap window should fail");
 
       --  With a window that covers the region, the same allocation succeeds.
       Initialise_Test_Heap
@@ -525,12 +524,12 @@ package body Memory.Allocators.Heap.Test_Cases is
 
          Allocate (Test_Heap, 16#100#, Allocation_Result, Result);
          Assert
-           (Result = Region_Not_Mapped,
+           (Result = Heap_Corrupt,
             "Corrupted region size is detected when allocating");
 
          Free (Test_Heap, Allocated_Address, Result);
          Assert
-           (Result = Region_Not_Mapped,
+           (Result = Heap_Corrupt,
             "Corrupted region size is detected when freeing");
 
          Region_Header.Heap_Region_Size := Region_Header.Heap_Region_Size + 1;
@@ -545,7 +544,7 @@ package body Memory.Allocators.Heap.Test_Cases is
 
          Allocate (Test_Heap, 16#100#, Allocation_Result, Result);
          Assert
-           (Result = Region_Not_Mapped,
+           (Result = Heap_Corrupt,
             "Corrupted region checksum is detected when allocating");
       end Corrupt_Region_Header;
 

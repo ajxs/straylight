@@ -37,6 +37,7 @@ package Function_Results is
    Region_Is_Overlapping               : constant := -7777_0027;
    Region_Array_Exhausted              : constant := -7777_0025;
    No_Space_In_Region                  : constant := 7777_0027;
+   Heap_Corrupt                        : constant := -7777_0028;
 
    --  Process function result codes.
    Maximum_Process_Count_Reached : constant := -5555_0000;

@@ -8,16 +8,15 @@
 MAKEFLAGS += --warn-undefined-variables
 MAKEFLAGS += --no-builtin-rules
 
-.PHONY: all clean debug emu userspace test_disk
+.PHONY: all bios clean connect-to-debug-socket debug emu emu-log emu-socket \
+	kernel libc libs libstraylight test_disk userspace
 
 KERNEL_DIR      := kernel
 KERNEL_BINARY   := ${KERNEL_DIR}/bin/straylight.elf
 
 LIBSTRAYLIGHT_DIR    := libstraylight
-LIBSTRAYLIGHT_BINARY := ${LIBSTRAYLIGHT_DIR}/lib/libstraylight.a
 
 LIBC_DIR             := libc
-LIBC_BINARY          := ${LIBC_DIR}/straylight_libc.a
 
 SERIAL_FILENAME := serial.log
 
@@ -68,9 +67,9 @@ QEMU_SERIAL_OUTPUT_DEBUG := file:${SERIAL_FILENAME}
 
 QEMU_LOG_FILE            := qemu.log
 
-all: ${KERNEL_BINARY} ${USERSPACE_IMG}
+all: kernel userspace
 
-libs: ${LIBSTRAYLIGHT_BINARY} ${LIBC_BINARY}
+libs: libstraylight libc
 
 clean:
 	alr -C "${KERNEL_DIR}" clean
@@ -107,26 +106,18 @@ emu-socket: kernel ${BIOS}
 		${QEMU_DISPLAY_FLAGS} \
 		-serial ${QEMU_SERIAL_SOCKET_OUTPUT}
 
-kernel: ${KERNEL_BINARY}
-
-libstraylight: ${LIBSTRAYLIGHT_BINARY}
-
-libc: ${LIBC_BINARY}
-
 bios: ${BIOS}
 
-userspace: ${USERSPACE_IMG}
-
-${KERNEL_BINARY}: ${USERSPACE_IMG}
+kernel: userspace
 	alr -C "${KERNEL_DIR}" build
 
-${LIBSTRAYLIGHT_BINARY}: ${LIBC_BINARY}
+libstraylight: libc
 	alr -C "${LIBSTRAYLIGHT_DIR}" build
 
-${LIBC_BINARY}: 
+libc:
 	make -C "${LIBC_DIR}"
 
-${USERSPACE_IMG}: libstraylight
+userspace: libstraylight
 	make -C "${USERSPACE_DIR}"
 
 ${BIOS}:
