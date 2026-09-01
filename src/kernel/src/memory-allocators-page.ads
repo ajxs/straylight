@@ -83,13 +83,4 @@ is
       Virtual_Address : Virtual_Address_T;
       Result          : out Function_Result);
 
-   function Is_Virtual_Address_In_Region
-     (Region : Page_Pool_Region_T; Virtual_Address : Virtual_Address_T)
-      return Boolean
-   is (Virtual_Address >= Region.Virtual_Address
-       and then
-         Virtual_Address
-         < Region.Virtual_Address
-           + Storage_Offset (Region.Page_Count * Page_Pool_Page_Size));
-
 end Memory.Allocators.Page;

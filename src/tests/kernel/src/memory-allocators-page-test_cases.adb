@@ -262,7 +262,7 @@ package body Memory.Allocators.Page.Test_Cases is
 
       Free (Test_Pool, To_Address (16#5000_0000#), Result);
       Assert
-        (Result = Invalid_Argument,
+        (Result = Address_Not_In_Heap,
          "Freeing an address outside any region fails");
 
       Free (Test_Pool, Test_Region_Virt_Address + 1, Result);
@@ -272,18 +272,19 @@ package body Memory.Allocators.Page.Test_Cases is
 
       Free (Test_Pool, Test_Region_Virt_Address + Page_Offset (1), Result);
       Assert
-        (Result = Invalid_Argument, "Freeing an address inside a run fails");
+        (Result = Address_Not_In_Heap,
+         "Freeing an address inside a run fails");
 
       Free (Test_Pool, Test_Region_Virt_Address + Page_Offset (4), Result);
       Assert
-        (Result = Invalid_Argument,
+        (Result = Address_Not_In_Heap,
          "Freeing an address which was never allocated fails");
 
       Free (Test_Pool, Test_Region_Virt_Address, Result);
       Assert (Result = Success, "Freeing the allocated run succeeds");
 
       Free (Test_Pool, Test_Region_Virt_Address, Result);
-      Assert (Result = Invalid_Argument, "Double free fails");
+      Assert (Result = Address_Not_In_Heap, "Double free fails");
 
       Assert
         (Test_Pool.Free_Page_Count = 8,

@@ -11,6 +11,15 @@ package body Memory.Allocators.Page is
    Logging_Enabled : constant Boolean :=
      Debug_Page_Pool or else Debug_Memory or else Debug_Memory_Allocators;
 
+   function Is_Virtual_Address_In_Region
+     (Region : Page_Pool_Region_T; Virtual_Address : Virtual_Address_T)
+      return Boolean
+   is (Virtual_Address >= Region.Virtual_Address
+       and then
+         Virtual_Address
+         < Region.Virtual_Address
+           + Storage_Offset (Region.Page_Count * Page_Pool_Page_Size));
+
    procedure Add_Region_To_Page_Pool
      (Page_Pool        : in out Page_Pool_T;
       Virtual_Address  : Virtual_Address_T;
@@ -171,8 +180,13 @@ package body Memory.Allocators.Page is
             --  This rejects double-frees and addresses inside a run.
             if Regions (Curr_Region).Page_Statuses (First_Page) /= Run_Start
             then
-               Log_Error ("Free: Address is not the start of an allocation");
-               Result := Invalid_Argument;
+               pragma
+                 Debug
+                   (Logging_Enabled,
+                    Log_Debug
+                      ("Free: Address is not the start of an allocation"));
+
+               Result := Address_Not_In_Heap;
                return;
             end if;
 
@@ -199,11 +213,16 @@ package body Memory.Allocators.Page is
          end if;
       end loop;
 
-      Log_Error ("Free: Virtual address not found in any allocated region");
-      Result := Invalid_Argument;
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug
+             ("Free: Virtual address not found in any allocated region"));
 
+      Result := Address_Not_In_Heap;
    exception
       when Constraint_Error =>
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Free_Unlocked;
 
