@@ -36,10 +36,10 @@ package body Memory.Physical is
 
       --  If the list is empty, we know there are no free blocks.
       if Is_List_Empty then
-         Log_Error ("No free physical memory");
+         Log_Error ("PMM not initialised");
 
          Allocated_Address := Null_Physical_Address;
-         Result := Memory_Map_Not_Present;
+         Result := Not_Initialised;
          return;
       end if;
 
@@ -115,7 +115,8 @@ package body Memory.Physical is
          goto Post_Successful_Allocation;
       end if;
 
-      Log_Error ("No block large enough");
+      pragma Debug (Logging_Enabled, Log_Debug ("No block large enough"));
+
       Allocated_Address := Null_Physical_Address;
       Result := No_Block_Large_Enough;
       return;
@@ -266,7 +267,11 @@ package body Memory.Physical is
          if Is_Region_Intersecting
               (Region_Start, Region_Length, PMM_Blocks (Current_Block_Index))
          then
-            Log_Error ("Region overlaps existing region");
+            pragma
+              Debug
+                (Logging_Enabled,
+                 Log_Debug ("Region overlaps existing region"));
+
             Result := Region_Is_Overlapping;
             return;
          end if;
@@ -296,7 +301,8 @@ package body Memory.Physical is
       --  size, then it will end up with wasted space that cannot be
       --  allocated.
       if Region_Length = 0 or else Region_Length mod Base_Block_Size /= 0 then
-         Log_Error ("Invalid region size");
+         pragma Debug (Logging_Enabled, Log_Debug ("Invalid region size"));
+
          Result := Invalid_Physical_Memory_Size;
          return;
       end if;
@@ -343,7 +349,10 @@ package body Memory.Physical is
          --  If there are no free blocks, return 'Memory_Map_Array_Exhausted'.
          Current_Block_Index := Find_Free_Entry;
          if Current_Block_Index = No_Block then
-            Log_Error ("Memory map array exhausted");
+            pragma
+              Debug
+                (Logging_Enabled, Log_Debug ("Memory map array exhausted"));
+
             Result := Memory_Map_Array_Exhausted;
             return;
          end if;
@@ -434,7 +443,8 @@ package body Memory.Physical is
         or else Block.Free = False
         or else Block.Order = 0
       then
-         Log_Error ("Block cannot be divided");
+         pragma Debug (Logging_Enabled, Log_Debug ("Block cannot be divided"));
+
          Result := Invalid_Argument;
          return;
       end if;
@@ -481,7 +491,8 @@ package body Memory.Physical is
 
       --  If we've fallen off the end of the loop it means that we've
       --  exhausted all entries in the memory map array.
-      Log_Error ("Memory map array exhausted");
+      pragma Debug (Logging_Enabled, Log_Debug ("Memory map array exhausted"));
+
       Result := Memory_Map_Array_Exhausted;
    exception
       when Constraint_Error =>
@@ -536,7 +547,8 @@ package body Memory.Physical is
    begin
       Current_Block_Index := Find_Block_With_Address (Addr);
       if Current_Block_Index = No_Block then
-         Log_Error ("Memory block not found");
+         pragma Debug (Logging_Enabled, Log_Debug ("Memory block not found"));
+
          Result := Memory_Block_Not_Found;
          return;
       end if;
@@ -635,7 +647,11 @@ package body Memory.Physical is
 
       --  If we've reached the end of the loop, the physical memory
       --  size is larger than the largest memory block, and is invalid.
-      Log_Error ("No physical memory block large enough");
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("No physical memory block large enough"));
+
       Smallest_Possible_Block_Order := 0;
       Result := Invalid_Physical_Memory_Size;
    end Get_Smallest_Possible_Block_Order;
@@ -660,6 +676,8 @@ package body Memory.Physical is
 
       Current_Block_Index := Find_Block_With_Address (Addr);
       if Current_Block_Index = No_Block then
+         pragma Debug (Logging_Enabled, Log_Debug ("Memory block not found"));
+
          Result := Memory_Block_Not_Found;
          return;
       end if;

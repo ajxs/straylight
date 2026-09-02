@@ -31,7 +31,6 @@ package Function_Results is
    Memory_Block_Cannot_Be_Consolidated : constant := 7777_0019;
    Memory_Block_Not_Found              : constant := -7777_0020;
    Memory_Map_Array_Exhausted          : constant := -7777_0021;
-   Memory_Map_Not_Present              : constant := -7777_0022;
    Region_Not_Free                     : constant := -7777_0023;
    Region_Not_Mapped                   : constant := -7777_0024;
    Region_Is_Overlapping               : constant := -7777_0027;

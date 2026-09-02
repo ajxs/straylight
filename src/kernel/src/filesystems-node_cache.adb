@@ -150,7 +150,11 @@ package body Filesystems.Node_Cache is
          end if;
       end loop;
 
-      Log_Error ("No free cache entry found");
+      pragma
+        Debug
+          (Debug_Filesystems_Node_Cache,
+           Log_Debug ("No free cache entry found"));
+
       Result := No_Free_Entries;
    end Find_Free_Cache_Entry;
 

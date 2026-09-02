@@ -104,9 +104,10 @@ package body Memory.Virtual is
 
       --  If we reach this statement, we can infer that the mapping
       --  array entries are exhausted.
+      pragma Debug (Debug_Memory_Virtual, Log_Debug ("Memory map exhausted"));
+
       Free_Index := No_Mapping;
       Result := Memory_Map_Array_Exhausted;
-      Log_Error ("Memory map exhausted");
    end Find_Unused_List_Entry_Index;
 
    procedure Get_Real_Mapping_Region_Size
@@ -140,13 +141,18 @@ package body Memory.Virtual is
       if not Allow_Mapping_Kernel_Addresses
         and then not Is_Valid_Userspace_Address_Range (Virtual_Address, Size)
       then
-         Log_Error ("Invalid non-userspace address range");
+         pragma
+           Debug
+             (Debug_Memory_Virtual,
+              Log_Debug ("Invalid non-userspace address range"));
          Result := Invalid_Argument;
          return;
       end if;
 
       if not Is_Valid_SV39_Virtual_Address (Virtual_Address) then
-         Log_Error ("Invalid virtual address");
+         pragma
+           Debug (Debug_Memory_Virtual, Log_Debug ("Invalid virtual address"));
+
          Result := Invalid_Argument;
          return;
       end if;
@@ -155,19 +161,27 @@ package body Memory.Virtual is
       if not Is_Address_Page_Aligned (Virtual_Address)
         or else not Is_Address_Page_Aligned (Address (Physical_Address))
       then
-         Log_Error ("Invalid non-aligned address");
+         pragma
+           Debug
+             (Debug_Memory_Virtual, Log_Debug ("Invalid non-aligned address"));
+
          Result := Invalid_Argument;
          return;
       end if;
 
       if Size = 0 then
-         Log_Error ("Invalid memory size");
+         pragma
+           Debug (Debug_Memory_Virtual, Log_Debug ("Invalid memory size"));
+
          Result := Invalid_Argument;
          return;
       end if;
 
       if not Validate_Memory_Region_Permissions (Region_Flags) then
-         Log_Error ("Invalid memory permissions");
+         pragma
+           Debug
+             (Debug_Memory_Virtual, Log_Debug ("Invalid memory permissions"));
+
          Result := Invalid_Argument;
          return;
       end if;
@@ -229,14 +243,18 @@ package body Memory.Virtual is
                Virtual_Address,
                Real_Size)
          then
-            Log_Error
-              ("Regions Intersect: "
-               & ASCII.LF
-               & "  New VAddr: "
-               & Virtual_Address'Image
-               & ASCII.LF
-               & "  Intersecting Region VAddr: "
-               & VMM_Map (Current_Region).Virtual_Addr'Image);
+            pragma
+              Debug
+                (Debug_Memory_Virtual,
+                 Log_Debug
+                   ("Regions Intersect: "
+                    & ASCII.LF
+                    & "  New VAddr: "
+                    & Virtual_Address'Image
+                    & ASCII.LF
+                    & "  Intersecting Region VAddr: "
+                    & VMM_Map (Current_Region).Virtual_Addr'Image));
+
             Result := Region_Not_Free;
             return;
          end if;
@@ -390,7 +408,9 @@ package body Memory.Virtual is
          Current_Region := VMM_Map (Current_Region).Next_Region;
       end loop;
 
-      Log_Error ("Memory block not found");
+      pragma
+        Debug (Debug_Memory_Virtual, Log_Debug ("Memory block not found"));
+
       Result := Memory_Block_Not_Found;
    exception
       when Constraint_Error =>

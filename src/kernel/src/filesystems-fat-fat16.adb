@@ -233,8 +233,12 @@ package body Filesystems.FAT.FAT16 is
       end loop Read_Sectors_Loop;
 
       if not Found_Required_Entries then
-         Log_Error
-           ("Not enough free directory entries found in root directory.");
+         pragma
+           Debug
+             (Debug_Filesystems_FAT,
+              Log_Debug
+                ("Not enough free directory entries in root directory."));
+
          Result := No_Free_Entries;
          return;
       end if;
@@ -657,7 +661,12 @@ package body Filesystems.FAT.FAT16 is
       end loop Follow_Cluster_Chain_Loop;
 
       if not Found_Required_Entries then
-         Log_Error ("Not enough free directory entries found in directory.");
+         pragma
+           Debug
+             (Debug_Filesystems_FAT,
+              Log_Debug
+                ("Not enough free directory entries in root directory."));
+
          Result := No_Free_Entries;
          return;
       end if;

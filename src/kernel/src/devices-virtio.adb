@@ -340,7 +340,7 @@ package body Devices.Virtio is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Exception: Free_Descriptor");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Free_Descriptor;
 
@@ -378,7 +378,7 @@ package body Devices.Virtio is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Exception: Free_Descriptor_Chain");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Free_Descriptor_Chain;
 

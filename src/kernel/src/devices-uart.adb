@@ -383,14 +383,10 @@ package body Devices.UART is
       Bytes_Read := 0;
       Result := Unset;
 
-      if Device.Ring_Buffer_Address = Null_Address then
+      if Device.Ring_Buffer_Size = 0
+        or else Device.Ring_Buffer_Address = Null_Address
+      then
          Log_Error ("Attempted to read from uninitialised UART ring buffer.");
-         Result := Not_Initialised;
-         return;
-      end if;
-
-      if Device.Ring_Buffer_Size = 0 then
-         Log_Error ("Attempted to read from UART ring buffer with size 0.");
          Result := Not_Initialised;
          return;
       end if;

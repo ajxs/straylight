@@ -112,14 +112,12 @@ package body Memory.Virtual.Paging is
       if not Is_Address_Page_Aligned (Virtual_Address)
         or else not Is_Address_Page_Aligned (Address (Physical_Address))
       then
-         Log_Error ("Invalid non-aligned address");
          Result := Invalid_Non_Aligned_Address;
          return;
       end if;
 
       --  If the specified region size is not page aligned, exit.
       if Size mod RISCV.Paging.Small_Page_Size /= 0 then
-         Log_Error ("Invalid physical memory size");
          Result := Invalid_Physical_Memory_Size;
          return;
       end if;
@@ -184,7 +182,7 @@ package body Memory.Virtual.Paging is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint_Exception: Memory.Virtual.Paging.Map");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Map;
 
@@ -249,7 +247,6 @@ package body Memory.Virtual.Paging is
 
             --  If this region is already mapped, then return.
             if Is_Leaf_Entry (Page_Table (Table_Idx)) then
-               Log_Error ("Region not free");
                Result := Region_Not_Free;
                return;
             end if;
@@ -337,13 +334,11 @@ package body Memory.Virtual.Paging is
    begin
       --  Ensure that we're unmapping a page aligned addresses.
       if not Is_Address_Page_Aligned (Virtual_Address) then
-         Log_Error ("Invalid non-aligned address");
          Result := Invalid_Non_Aligned_Address;
          return;
       end if;
       --  If the specified region size is not page aligned, exit.
       if Size mod RISCV.Paging.Small_Page_Size /= 0 then
-         Log_Error ("Invalid memory size");
          Result := Invalid_Physical_Memory_Size;
          return;
       end if;
@@ -382,7 +377,7 @@ package body Memory.Virtual.Paging is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constaint_error: Unmap");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Unmap;
 
@@ -439,7 +434,6 @@ package body Memory.Virtual.Paging is
 
             --  If there is no entry at this virtual address, exit.
             if not Page_Table (Table_Idx).V then
-               Log_Error ("Region not mapped");
                Result := Region_Not_Mapped;
                return;
             end if;
@@ -498,7 +492,8 @@ package body Memory.Virtual.Paging is
       --  This point should not be reached, consider it an unhandled
       --  exceptional scenario. This means we could neither find an
       --  unmapped region, nor a mapped one.
-      Log_Error ("Unhandled_Exception");
+      Log_Error ("Unable to unmap region");
+
       Result := Unhandled_Exception;
    exception
       when Constraint_Error =>

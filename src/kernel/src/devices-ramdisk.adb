@@ -33,15 +33,11 @@ package body Devices.Ramdisk is
       Result               : out Function_Result) is
    begin
       if Sector_Count = 0 then
-         Log_Error ("Read_Sectors: Sector_Count is zero");
          Result := Invalid_Argument;
          return;
       end if;
 
       if not Is_Valid_Sector_Range (Device, Start_Sector, Sector_Count) then
-         Log_Error
-           ("Read_Sectors: Sector range out of bounds: " & Start_Sector'Image);
-
          Result := Sector_Out_Of_Bounds;
          return;
       end if;
@@ -99,16 +95,11 @@ package body Devices.Ramdisk is
       Result               : out Function_Result) is
    begin
       if Sector_Count = 0 then
-         Log_Error ("Write_Sectors: Sector_Count is zero");
          Result := Invalid_Argument;
          return;
       end if;
 
       if not Is_Valid_Sector_Range (Device, Start_Sector, Sector_Count) then
-         Log_Error
-           ("Write_Sectors: Sector range out of bounds: "
-            & Start_Sector'Image);
-
          Result := Sector_Out_Of_Bounds;
          return;
       end if;

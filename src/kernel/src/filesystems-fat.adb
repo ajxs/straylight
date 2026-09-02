@@ -210,6 +210,7 @@ package body Filesystems.FAT is
             pragma
               Debug
                 (Debug_Filesystems_FAT, Log_Error ("FAT type not supported"));
+
             New_Node := null;
             Result := Not_Supported;
       end case;
@@ -267,7 +268,10 @@ package body Filesystems.FAT is
                Result);
 
          when others         =>
-            Log_Error ("FAT type not supported");
+            pragma
+              Debug
+                (Debug_Filesystems_FAT, Log_Error ("FAT type not supported"));
+
             Found_Node := null;
             Result := Not_Supported;
       end case;
@@ -455,7 +459,10 @@ package body Filesystems.FAT is
             FAT_Entry := Unsigned_32 (FAT16_Table_Entry);
 
          when others         =>
-            Log_Error ("FAT type not supported");
+            pragma
+              Debug
+                (Debug_Filesystems_FAT, Log_Error ("FAT type not supported"));
+
             FAT_Entry := 0;
             Result := Not_Supported;
       end case;
@@ -484,7 +491,10 @@ package body Filesystems.FAT is
                Result);
 
          when others         =>
-            Log_Error ("FAT type not supported");
+            pragma
+              Debug
+                (Debug_Filesystems_FAT, Log_Error ("FAT type not supported"));
+
             Result := Not_Supported;
       end case;
    exception
@@ -585,7 +595,7 @@ package body Filesystems.FAT is
       Result := Success;
    exception
       when Constraint_Error =>
-         Log_Error ("Constraint error reading LFN");
+         Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_LFN_Directory_Entry;
 
@@ -754,7 +764,7 @@ package body Filesystems.FAT is
          Log_Error
            ("File size after write would exceed maximum supported size.");
 
-         Result := Not_Supported;
+         Result := Invalid_File_Size;
          return;
       end if;
 
@@ -1492,7 +1502,10 @@ package body Filesystems.FAT is
             Free_Cluster := Unsigned_32 (FAT16_Free_Cluster);
 
          when others         =>
-            Log_Error ("FAT type not supported");
+            pragma
+              Debug
+                (Debug_Filesystems_FAT, Log_Error ("FAT type not supported"));
+
             Result := Not_Supported;
       end case;
    exception

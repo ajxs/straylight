@@ -3,7 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Memory.Allocators;   use Memory.Allocators;
 with Memory.Kernel;       use Memory.Kernel;
 with Logging;             use Logging;
 with Processes.Scheduler; use Processes.Scheduler;
@@ -142,19 +141,16 @@ package body Devices.Virtio.Block is
       with Import, Alignment => 1, Address => Device.Virtual_Address;
    begin
       if Data_Length = 0 then
-         Log_Error ("Read_Write: 0 data length");
          Result := Invalid_Argument;
          return;
       end if;
 
       if Data_Length mod Virtio_Block_Sector_Size /= 0 then
-         Log_Error ("Read_Write: Data length not a multiple of sector size");
          Result := Invalid_Argument;
          return;
       end if;
 
       if not Is_Valid_Sector_Range (Device, Sector, Data_Length) then
-         Log_Error ("Read_Write: Sector index out of bounds: " & Sector'Image);
          Result := Sector_Out_Of_Bounds;
          return;
       end if;
@@ -163,8 +159,12 @@ package body Devices.Virtio.Block is
       if Write
         and then (Device_Registers.Device_Features and VIRTIO_BLK_F_RO) /= 0
       then
-         Log_Error
-           ("Read_Write: Attempt to write to read-only Virtio Block Device");
+         pragma
+           Debug
+             (Debug_Devices_Virtio,
+              Log_Error
+                ("Read_Write: Attempt to write to read-only Virtio Device"));
+
          Result := Not_Supported;
          return;
       end if;
@@ -343,8 +343,6 @@ package body Devices.Virtio.Block is
    procedure Initialise_Block_Device
      (Device : in out Device_T; Result : out Function_Result)
    is
-      Allocation_Result : Memory_Allocation_Result;
-
       Device_Configuration_Space : Virtio_Block_Device_Configuration_Space_T
       with Import, Address => Device.Virtual_Address + 16#100#, Alignment => 1;
    begin
@@ -355,15 +353,12 @@ package body Devices.Virtio.Block is
 
       Allocate_Kernel_Physical_Memory
         ((Block_Request_T'Size / 8) * Maximum_Virtio_Queue_Length,
-         Allocation_Result,
+         Device.Bus_Info.Virtio.Block_Request_Array_Addresses,
          Result);
       if Is_Error (Result) then
          Log_Error ("Error allocating block request memory: " & Result'Image);
          return;
       end if;
-
-      Device.Bus_Info.Virtio.Block_Request_Array_Addresses :=
-        Allocation_Result;
 
       pragma
         Debug

@@ -25,16 +25,15 @@ package body Filesystems.Root is
       then
          Log_Error ("Invalid root filesystem");
          New_Node_Index := 0;
-         Result := Invalid_Argument;
+         Result := Invalid_Filesystem;
          return;
       end if;
 
       if Filename'Length = 0
         or else Filename'Length > Maximum_Root_Filesystem_Filename_Length
       then
-         Log_Error ("Invalid filename length");
          New_Node_Index := 0;
-         Result := Invalid_Argument;
+         Result := Invalid_Filename;
          return;
       end if;
 
@@ -175,7 +174,7 @@ package body Filesystems.Root is
         or else Filesystem.all.Filesystem_Type /= Filesystem_Type_Root
       then
          Log_Error ("Invalid root filesystem");
-         Result := Invalid_Argument;
+         Result := Invalid_Filesystem;
          return;
       end if;
 
@@ -199,8 +198,7 @@ package body Filesystems.Root is
 
       pragma
         Debug
-          (Debug_Filesystems_Root,
-           Log_Debug ("Initialised root filesystem."));
+          (Debug_Filesystems_Root, Log_Debug ("Initialised root filesystem."));
 
       Result := Success;
    exception
