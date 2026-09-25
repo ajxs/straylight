@@ -372,14 +372,14 @@ package body Filesystems is
    begin
       case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
          when Device_Class_Serial =>
-            Data_To_Read : Byte_Array_T (1 .. Bytes_To_Read)
+            Data_To_Read : Storage_Array (1 .. Storage_Count (Bytes_To_Read))
             with Import, Alignment => 1, Address => Buffer_Address;
 
             Devices.UART.Read_Bytes
               (File_Handle.all.File.all.Mounted_Device.all,
                Process,
                Data_To_Read,
-               Bytes_Read,
+               Storage_Count (Bytes_Read),
                Result);
 
          when others              =>
@@ -734,7 +734,7 @@ package body Filesystems is
 
       case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
          when Device_Class_Serial =>
-            Data_To_Write : Byte_Array_T (1 .. Bytes_To_Write)
+            Data_To_Write : Storage_Array (1 .. Storage_Count (Bytes_To_Write))
             with Import, Alignment => 1, Address => Buffer_Address;
 
             Put_Bytes

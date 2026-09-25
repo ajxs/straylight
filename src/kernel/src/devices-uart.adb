@@ -301,10 +301,10 @@ package body Devices.UART is
          Port_Interrupt_Status_To_Byte (Interrupt_Status));
    end Set_Interrupt_Generation;
 
-   procedure Put_Bytes (Device : Device_T; Data : Byte_Array_T) is
+   procedure Put_Bytes (Device : Device_T; Data : Storage_Array) is
    begin
       Print_Loop : for C of Data loop
-         Put_Byte (Device, C);
+         Put_Byte (Device, Unsigned_8 (C));
       end loop Print_Loop;
    end Put_Bytes;
 
@@ -327,7 +327,7 @@ package body Devices.UART is
 
    procedure Read_Into_Ring_Buffer
      (Device      : in out Device_T;
-      Ring_Buffer : in out Byte_Array_T;
+      Ring_Buffer : in out Storage_Array;
       Bytes_Read  : out Integer;
       Result      : out Function_Result)
    is
@@ -354,7 +354,8 @@ package body Devices.UART is
          --  until space is available.
          if not Buffer_Is_Full then
             --  Store the incoming byte in the ring buffer.
-            Ring_Buffer (Device.Ring_Buffer_Offset_Write) := Incoming_Byte;
+            Ring_Buffer (Device.Ring_Buffer_Offset_Write) :=
+              Storage_Element (Incoming_Byte);
 
             Device.Ring_Buffer_Offset_Write :=
               (Device.Ring_Buffer_Offset_Write + 1)
@@ -392,7 +393,7 @@ package body Devices.UART is
       end if;
 
       declare
-         Ring_Buffer : Byte_Array_T (0 .. Device.Ring_Buffer_Size - 1)
+         Ring_Buffer : Storage_Array (0 .. Device.Ring_Buffer_Size - 1)
          with Import, Alignment => 1, Address => Device.Ring_Buffer_Address;
       begin
          Read_Into_Ring_Buffer (Device, Ring_Buffer, Bytes_Read, Result);
@@ -418,8 +419,8 @@ package body Devices.UART is
 
    procedure Claim_Buffered_Data
      (Device     : in out Device_T;
-      Buffer     : out Byte_Array_T;
-      Bytes_Read : out Natural;
+      Buffer     : out Storage_Array;
+      Bytes_Read : out Storage_Count;
       Result     : out Function_Result) is
    begin
       Bytes_Read := 0;
@@ -433,7 +434,7 @@ package body Devices.UART is
          return;
       end if;
 
-      Ring_Buffer : Byte_Array_T (0 .. Device.Ring_Buffer_Size - 1)
+      Ring_Buffer : Storage_Array (0 .. Device.Ring_Buffer_Size - 1)
       with Import, Alignment => 1, Address => Device.Ring_Buffer_Address;
 
       while Bytes_Read < Buffer'Length
@@ -445,14 +446,14 @@ package body Devices.UART is
          --  capacity. This requires at most two iterations, one to copy the
          --  first contiguous run, and one to copy the second contiguous run
          --  if the ring buffer wraps around.
-         Available_Bytes : constant Natural :=
+         Available_Bytes : constant Storage_Count :=
            (if Device.Ring_Buffer_Offset_Read < Device.Ring_Buffer_Offset_Write
             then
               Device.Ring_Buffer_Offset_Write - Device.Ring_Buffer_Offset_Read
             else Device.Ring_Buffer_Size - Device.Ring_Buffer_Offset_Read);
 
-         Number_Of_Bytes_To_Copy : constant Natural :=
-           Natural'Min (Available_Bytes, Buffer'Length - Bytes_Read);
+         Number_Of_Bytes_To_Copy : constant Storage_Count :=
+           Storage_Count'Min (Available_Bytes, Buffer'Length - Bytes_Read);
 
          Buffer
            (Buffer'First + Bytes_Read
@@ -479,8 +480,8 @@ package body Devices.UART is
    procedure Read_Bytes
      (Device     : in out Device_T;
       Process    : in out Process_Control_Block_T;
-      Buffer     : out Byte_Array_T;
-      Bytes_Read : out Natural;
+      Buffer     : out Storage_Array;
+      Bytes_Read : out Storage_Count;
       Result     : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);

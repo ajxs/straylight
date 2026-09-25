@@ -113,6 +113,12 @@ is
 
    type Device_T
      (Device_Class : Device_Class_T := Device_Class_None;
+      Device_Bus   : Device_Bus_T := Device_Bus_Memory_Mapped);
+
+   type Device_Access is access all Device_T;
+
+   type Device_T
+     (Device_Class : Device_Class_T := Device_Class_None;
       Device_Bus   : Device_Bus_T := Device_Bus_Memory_Mapped)
    is record
       Virtual_Address    : Virtual_Address_T;
@@ -133,17 +139,15 @@ is
 
          when Device_Class_Serial =>
             Ring_Buffer_Address      : Virtual_Address_T := Null_Address;
-            Ring_Buffer_Size         : Natural := 0;
-            Ring_Buffer_Offset_Read  : Natural := 0;
-            Ring_Buffer_Offset_Write : Natural := 0;
+            Ring_Buffer_Size         : Storage_Count := 0;
+            Ring_Buffer_Offset_Read  : Storage_Offset := 0;
+            Ring_Buffer_Offset_Write : Storage_Offset := 0;
 
          when others =>
             null;
       end case;
 
    end record;
-
-   type Device_Access is access all Device_T;
 
    System_Devices : array (1 .. 16) of aliased Device_T;
 
