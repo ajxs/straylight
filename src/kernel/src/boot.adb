@@ -6,6 +6,7 @@
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Devices;              use Devices;
+with Devices.Console;
 with Devices.Virtio;       use Devices.Virtio;
 with Devices.Virtio.Block; use Devices.Virtio.Block;
 with Devices.Virtio.Graphics;
@@ -202,17 +203,21 @@ package body Boot is
         Device_Virtual_Address + UART_Device.Memory_Size;
 
       Console_Device :=
-        (Device_Class           => Device_Class_Console,
-         Device_Bus             => Device_Bus_None,
-         Memory_Size            => 0,
-         Virtual_Address        => Null_Address,
-         Physical_Address       => Null_Physical_Address,
-         Interrupt_Line         => 0,
-         Interrupt_Priority     => 0,
-         Spinlock               => Locks.Null_Spinlock,
-         Record_Used            => True,
-         Bus_Info               => (Device_Bus => Device_Bus_None),
-         Console_Backend_Device => UART_Device'Access);
+        (Device_Class             => Device_Class_Console,
+         Device_Bus               => Device_Bus_None,
+         Memory_Size              => 0,
+         Virtual_Address          => Null_Address,
+         Physical_Address         => Null_Physical_Address,
+         Interrupt_Line           => 0,
+         Interrupt_Priority       => 0,
+         Spinlock                 => Locks.Null_Spinlock,
+         Record_Used              => True,
+         Bus_Info                 => (Device_Bus => Device_Bus_None),
+         Line_Buffer_Address      => Null_Address,
+         Line_Buffer_Size         => 0,
+         Line_Buffer_Offset_Read  => 0,
+         Line_Buffer_Offset_Write => 0,
+         Console_Backend_Device   => UART_Device'Access);
 
       Disk_Device_Driver_Features : constant Virtio_Device_Features_Pages_T :=
         [not Create_U32_Bitmask_From_Flags
@@ -391,6 +396,11 @@ package body Boot is
 
                Devices.UART.Set_Interrupt_Generation
                  (UART_Device, Devices.UART.Rx_Data_Available, True);
+            elsif System_Devices (I).Device_Class = Device_Class_Console then
+               Devices.Console.Initialise (System_Devices (I), Result);
+               if Is_Error (Result) then
+                  Panic;
+               end if;
             end if;
 
             --  If the device has an interrupt line, then enable it.

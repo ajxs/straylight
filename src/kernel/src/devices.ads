@@ -145,6 +145,11 @@ is
             Ring_Buffer_Offset_Write : Storage_Offset := 0;
 
          when Device_Class_Console =>
+            Line_Buffer_Address      : Virtual_Address_T := Null_Address;
+            Line_Buffer_Size         : Storage_Count := 0;
+            Line_Buffer_Offset_Read  : Storage_Offset := 0;
+            Line_Buffer_Offset_Write : Storage_Offset := 0;
+
             Console_Backend_Device : Device_Access := null;
 
          when others =>
