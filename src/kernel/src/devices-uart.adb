@@ -15,14 +15,15 @@ package body Devices.UART is
 
    function Is_Device_Initialised (Device : Device_T) return Boolean is
    begin
-      return Device.Ring_Buffer_Address /= Null_Address;
+      return
+        Device.Ring_Buffer_Address /= Null_Address
+        and then Device.Ring_Buffer_Size /= 0;
    exception
       when Constraint_Error =>
          return False;
    end Is_Device_Initialised;
 
-   function Is_Device_Correct_And_Initialised
-     (Device : Device_T) return Boolean
+   function Is_Device_Valid_And_Initialised (Device : Device_T) return Boolean
    is (Is_Correct_Device_Class (Device)
        and then Is_Device_Initialised (Device));
 
@@ -196,7 +197,7 @@ package body Devices.UART is
    begin
       for I in 1 .. Timeout loop
          if not Is_Rx_Empty (Device) then
-            return Read_Byte (Device);
+            return Read_Byte_From_Device (Device);
          end if;
       end loop;
 
@@ -319,7 +320,7 @@ package body Devices.UART is
 
    procedure Put_Bytes (Device : Device_T; Data : Storage_Array) is
    begin
-      if not Is_Device_Correct_And_Initialised (Device) then
+      if not Is_Device_Valid_And_Initialised (Device) then
          return;
       end if;
 
@@ -368,7 +369,7 @@ package body Devices.UART is
 
       while not Is_Rx_Empty (Device) loop
          --  Read incoming data even if the buffer is full to flush the FIFO.
-         Incoming_Byte := Read_Byte (Device);
+         Incoming_Byte := Read_Byte_From_Device (Device);
 
          --  If the driver buffer is full, incoming bytes will be dropped
          --  until space is available.
@@ -402,25 +403,19 @@ package body Devices.UART is
       Result     : out Function_Result) is
    begin
       Bytes_Read := 0;
-      Result := Unset;
 
-      if Device.Ring_Buffer_Size = 0
-        or else Device.Ring_Buffer_Address = Null_Address
-      then
-         Log_Error ("Attempted to read from uninitialised UART ring buffer.");
+      if not Is_Device_Valid_And_Initialised (Device) then
          Result := Not_Initialised;
          return;
       end if;
 
-      declare
-         Ring_Buffer : Storage_Array (0 .. Device.Ring_Buffer_Size - 1)
-         with Import, Alignment => 1, Address => Device.Ring_Buffer_Address;
-      begin
-         Read_Into_Ring_Buffer (Device, Ring_Buffer, Bytes_Read, Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-      end;
+      Ring_Buffer : Storage_Array (0 .. Device.Ring_Buffer_Size - 1)
+      with Import, Alignment => 1, Address => Device.Ring_Buffer_Address;
+
+      Read_Into_Ring_Buffer (Device, Ring_Buffer, Bytes_Read, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
@@ -444,12 +439,8 @@ package body Devices.UART is
       Result     : out Function_Result) is
    begin
       Bytes_Read := 0;
-      Result := Unset;
 
-      if Device.Ring_Buffer_Address = Null_Address
-        or else Device.Ring_Buffer_Size = 0
-      then
-         Log_Error ("Attempted to read from uninitialised UART ring buffer.");
+      if not Is_Device_Valid_And_Initialised (Device) then
          Result := Not_Initialised;
          return;
       end if;
@@ -497,6 +488,25 @@ package body Devices.UART is
          Result := Constraint_Exception;
    end Claim_Buffered_Data;
 
+   procedure Read_Byte
+     (Device  : in out Device_T;
+      Process : in out Process_Control_Block_T;
+      Byte    : out Unsigned_8;
+      Result  : out Function_Result)
+   is
+      Buffer     : Storage_Array (0 .. 0);
+      Bytes_Read : Storage_Count := 0;
+   begin
+      Read_Bytes (Device, Process, Buffer, Bytes_Read, Result);
+      if Is_Error (Result) then
+         Byte := 0;
+         return;
+      end if;
+
+      Byte := Unsigned_8 (Buffer (0));
+      Result := Success;
+   end Read_Byte;
+
    procedure Read_Bytes
      (Device     : in out Device_T;
       Process    : in out Process_Control_Block_T;
@@ -504,6 +514,12 @@ package body Devices.UART is
       Bytes_Read : out Storage_Count;
       Result     : out Function_Result) is
    begin
+      if Buffer'Length = 0 then
+         Result := Invalid_Argument;
+         Bytes_Read := 0;
+         return;
+      end if;
+
       Acquire_Spinlock (Device.Spinlock);
 
       loop

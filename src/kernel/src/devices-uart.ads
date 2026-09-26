@@ -79,6 +79,12 @@ is
       Bytes_Read : out Storage_Count;
       Result     : out Function_Result);
 
+   procedure Read_Byte
+     (Device  : in out Device_T;
+      Process : in out Process_Control_Block_T;
+      Byte    : out Unsigned_8;
+      Result  : out Function_Result);
+
 private
    --  Register offsets.
    UART_Reg_Rx_Buffer_Tx_Holding         : constant := 0;
@@ -191,11 +197,11 @@ private
    function Wait_For_Byte
      (Device : Device_T; Timeout : Positive := 1_000) return Unsigned_8;
 
-   function Read_Byte (Device : Device_T) return Unsigned_8
+   function Read_Byte_From_Device (Device : Device_T) return Unsigned_8
    is (Read_Unsigned_8 (Device.Virtual_Address));
 
    function Read_Character (Device : Device_T) return Character
-   is (Character'Val (Read_Byte (Device)));
+   is (Character'Val (Read_Byte_From_Device (Device)));
 
    procedure Read_All_Incoming_Data
      (Device     : in out Device_T;
