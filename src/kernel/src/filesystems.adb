@@ -3,7 +3,8 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Devices.UART;           use Devices.UART;
+with Devices.Console;
+with Devices.UART;
 with Filesystems.Block_Cache;
 with Filesystems.FAT;
 with Filesystems.Root;
@@ -370,11 +371,11 @@ package body Filesystems is
       Bytes_Read     : out Natural;
       Result         : out Function_Result) is
    begin
-      case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
-         when Device_Class_Serial =>
-            Data_To_Read : Storage_Array (1 .. Storage_Count (Bytes_To_Read))
-            with Import, Alignment => 1, Address => Buffer_Address;
+      Data_To_Read : Storage_Array (1 .. Storage_Count (Bytes_To_Read))
+      with Import, Alignment => 1, Address => Buffer_Address;
 
+      case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
+         when Device_Class_Serial  =>
             Devices.UART.Read_Bytes
               (File_Handle.all.File.all.Mounted_Device.all,
                Process,
@@ -382,7 +383,15 @@ package body Filesystems is
                Storage_Count (Bytes_Read),
                Result);
 
-         when others              =>
+         when Device_Class_Console =>
+            Devices.Console.Read_Bytes
+              (File_Handle.all.File.all.Mounted_Device.all,
+               Process,
+               Data_To_Read,
+               Storage_Count (Bytes_Read),
+               Result);
+
+         when others               =>
             Log_Error
               ("Unsupported device class: "
                & File_Handle.all.File.all.Mounted_Device.all
@@ -733,16 +742,25 @@ package body Filesystems is
       Bytes_Written := 0;
 
       case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
-         when Device_Class_Serial =>
+         when Device_Class_Serial  =>
             Data_To_Write : Storage_Array (1 .. Storage_Count (Bytes_To_Write))
             with Import, Alignment => 1, Address => Buffer_Address;
 
-            Put_Bytes
+            Devices.UART.Put_Bytes
               (File_Handle.all.File.all.Mounted_Device.all, Data_To_Write);
             Bytes_Written := Bytes_To_Write;
             Result := Success;
 
-         when others              =>
+         when Device_Class_Console =>
+            Data_To_Write : Storage_Array (1 .. Storage_Count (Bytes_To_Write))
+            with Import, Alignment => 1, Address => Buffer_Address;
+
+            Devices.Console.Put_Bytes
+              (File_Handle.all.File.all.Mounted_Device.all, Data_To_Write);
+            Bytes_Written := Bytes_To_Write;
+            Result := Success;
+
+         when others               =>
             Log_Error
               ("Unsupported device class: "
                & File_Handle.all.File.all.Mounted_Device.all

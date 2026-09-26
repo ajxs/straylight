@@ -146,6 +146,7 @@ package body Boot is
       Root_Filesystem_Memory_Device renames System_Devices (4);
       Disk_B_Device renames System_Devices (5);
       Graphics_Device renames System_Devices (6);
+      Console_Device renames System_Devices (7);
 
       Default_Unallocated_Addresses :
         constant Virtio_Resource_Allocated_Addresses_T :=
@@ -199,6 +200,19 @@ package body Boot is
 
       Device_Virtual_Address :=
         Device_Virtual_Address + UART_Device.Memory_Size;
+
+      Console_Device :=
+        (Device_Class           => Device_Class_Console,
+         Device_Bus             => Device_Bus_None,
+         Memory_Size            => 0,
+         Virtual_Address        => Null_Address,
+         Physical_Address       => Null_Physical_Address,
+         Interrupt_Line         => 0,
+         Interrupt_Priority     => 0,
+         Spinlock               => Locks.Null_Spinlock,
+         Record_Used            => True,
+         Bus_Info               => (Device_Bus => Device_Bus_None),
+         Console_Backend_Device => UART_Device'Access);
 
       Disk_Device_Driver_Features : constant Virtio_Device_Features_Pages_T :=
         [not Create_U32_Bitmask_From_Flags
@@ -348,16 +362,18 @@ package body Boot is
                     & "  Phys Addr: "
                     & System_Devices (I).Physical_Address'Image));
 
-            --  Map each device into the kernel's address space.
-            Map_Kernel_Memory
-              (System_Devices (I).Virtual_Address,
-               System_Devices (I).Physical_Address,
-               System_Devices (I).Memory_Size,
-               (True, True, False, False),
-               Result);
-            if Is_Error (Result) then
-               --  Error already printed.
-               Panic;
+            if System_Devices (I).Memory_Size /= 0 then
+               --  Map each device into the kernel's address space.
+               Map_Kernel_Memory
+                 (System_Devices (I).Virtual_Address,
+                  System_Devices (I).Physical_Address,
+                  System_Devices (I).Memory_Size,
+                  (True, True, False, False),
+                  Result);
+               if Is_Error (Result) then
+                  --  Error already printed.
+                  Panic;
+               end if;
             end if;
 
             --  Initialise devices.
@@ -422,6 +438,7 @@ package body Boot is
       Disk_B_Device renames System_Devices (5);
       Root_Filesystem_Memory_Device renames System_Devices (4);
       UART_Device renames System_Devices (2);
+      Console_Device renames System_Devices (7);
 
       Result : Function_Result := Unset;
 
@@ -430,6 +447,7 @@ package body Boot is
       Disk_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
       Disk_B_Filesystem_Node_Index  : Filesystem_Node_Index_T := 0;
       UART_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
+      Console_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
    begin
       pragma Debug (Debug_Boot, Log_Debug ("Initialising filesystem..."));
 
@@ -517,6 +535,18 @@ package body Boot is
          Result,
          Filesystem_Node_Type_Device,
          Mounted_Device => UART_Device'Access);
+      if Is_Error (Result) then
+         Panic;
+      end if;
+
+      Add_Filesystem_Node_To_Root_Filesystem
+        (Filesystems.System_Root_Filesystem,
+         "Console",
+         Devices_Filesystem_Node_Index,
+         Console_Filesystem_Node_Index,
+         Result,
+         Filesystem_Node_Type_Device,
+         Mounted_Device => Console_Device'Access);
       if Is_Error (Result) then
          Panic;
       end if;

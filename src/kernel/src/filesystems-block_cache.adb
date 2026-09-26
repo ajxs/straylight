@@ -402,6 +402,11 @@ package body Filesystems.Block_Cache is
                   Data_Addr_Virtual,
                   Result);
             end if;
+
+         when others                   =>
+            Log_Error ("Unsupported device bus");
+            Result := Not_Supported;
+
       end case;
    exception
       when Constraint_Error =>

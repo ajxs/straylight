@@ -19,6 +19,7 @@ is
    --  which driver should be used to operate the device.
    type Device_Class_T is
      (Device_Class_None,
+      Device_Class_Console,
       Device_Class_Graphics,
       Device_Class_Network,
       Device_Class_Interrupt_Controller,
@@ -27,7 +28,8 @@ is
 
    --  Describes how the device is physically attached to the system, and how
    --  the kernel should communicate with it.
-   type Device_Bus_T is (Device_Bus_Memory_Mapped, Device_Bus_Virtio_MMIO);
+   type Device_Bus_T is
+     (Device_Bus_None, Device_Bus_Memory_Mapped, Device_Bus_Virtio_MMIO);
 
    type Virtio_Device_Type_T is
      (Virtio_Device_Type_Block,
@@ -98,9 +100,8 @@ is
       end case;
    end record;
 
-   type Device_Bus_Info_T
-     (Device_Bus : Device_Bus_T := Device_Bus_Memory_Mapped)
-   is record
+   type Device_Bus_Info_T (Device_Bus : Device_Bus_T := Device_Bus_None) is
+   record
       case Device_Bus is
          when Device_Bus_Virtio_MMIO =>
             Virtio : Device_Bus_Info_Virtio_T;
@@ -113,13 +114,13 @@ is
 
    type Device_T
      (Device_Class : Device_Class_T := Device_Class_None;
-      Device_Bus   : Device_Bus_T := Device_Bus_Memory_Mapped);
+      Device_Bus   : Device_Bus_T := Device_Bus_None);
 
    type Device_Access is access all Device_T;
 
    type Device_T
      (Device_Class : Device_Class_T := Device_Class_None;
-      Device_Bus   : Device_Bus_T := Device_Bus_Memory_Mapped)
+      Device_Bus   : Device_Bus_T := Device_Bus_None)
    is record
       Virtual_Address    : Virtual_Address_T;
       Physical_Address   : Physical_Address_T;
@@ -142,6 +143,9 @@ is
             Ring_Buffer_Size         : Storage_Count := 0;
             Ring_Buffer_Offset_Read  : Storage_Offset := 0;
             Ring_Buffer_Offset_Write : Storage_Offset := 0;
+
+         when Device_Class_Console =>
+            Console_Backend_Device : Device_Access := null;
 
          when others =>
             null;

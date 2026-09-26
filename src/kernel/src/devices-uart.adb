@@ -10,6 +10,22 @@ with Processes.Scheduler; use Processes.Scheduler;
 with Utilities;           use Utilities;
 
 package body Devices.UART is
+   function Is_Correct_Device_Class (Device : Device_T) return Boolean
+   is (Device.Device_Class = Device_Class_Serial);
+
+   function Is_Device_Initialised (Device : Device_T) return Boolean is
+   begin
+      return Device.Ring_Buffer_Address /= Null_Address;
+   exception
+      when Constraint_Error =>
+         return False;
+   end Is_Device_Initialised;
+
+   function Is_Device_Correct_And_Initialised
+     (Device : Device_T) return Boolean
+   is (Is_Correct_Device_Class (Device)
+       and then Is_Device_Initialised (Device));
+
    procedure Handle_Rx_Data_Available_Interrupt
      (Device : in out Device_T; Result : out Function_Result)
    is
@@ -303,6 +319,10 @@ package body Devices.UART is
 
    procedure Put_Bytes (Device : Device_T; Data : Storage_Array) is
    begin
+      if not Is_Device_Correct_And_Initialised (Device) then
+         return;
+      end if;
+
       Print_Loop : for C of Data loop
          Put_Byte (Device, Unsigned_8 (C));
       end loop Print_Loop;
