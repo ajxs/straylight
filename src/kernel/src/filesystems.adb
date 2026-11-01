@@ -369,11 +369,16 @@ package body Filesystems is
       Buffer_Address : Virtual_Address_T;
       Bytes_To_Read  : Natural;
       Bytes_Read     : out Natural;
-      Result         : out Function_Result) is
-   begin
+      Result         : out Function_Result)
+   is
+      --  This overlay is declared here rather than after 'begin' so that it
+      --  is frozen, and its address set, before any statement that uses it.
+      --  When declared after 'begin', GNAT freezes it at its first use, which
+      --  is inside the first case alternative, leaving the address unset in
+      --  every other alternative.
       Data_To_Read : Storage_Array (1 .. Storage_Count (Bytes_To_Read))
       with Import, Alignment => 1, Address => Buffer_Address;
-
+   begin
       case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
          when Device_Class_Serial  =>
             Devices.UART.Read_Bytes
