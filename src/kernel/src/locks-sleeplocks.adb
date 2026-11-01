@@ -36,8 +36,8 @@ package body Locks.Sleeplocks is
       Lock.Locked := Sleeplock_Magic_Number;
       Lock.Process_Id := Process_Id;
 
-      Acquire_Spinlock (Condition_Lock);
       Release_Spinlock (Lock.Spinlock);
+      Acquire_Spinlock (Condition_Lock);
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
