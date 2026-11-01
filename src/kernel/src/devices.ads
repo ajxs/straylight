@@ -151,6 +151,18 @@ is
             Line_Buffer_Offset_Write     : Storage_Offset := 0;
             Line_Buffer_Offset_Committed : Storage_Offset := 0;
 
+            --  This flag is used to control access to the line read operation.
+            --  Because the line reading procedure releases the spinlock while
+            --  it's waiting for input, the spinlock alone isn't enough to
+            --  ensure that another process doesn't 'steal' incoming bytes from
+            --  another process that's waiting to receive input.
+            --  Once one process is waiting to receive a line, another
+            --  process must sleep on this device's 'channel' until the
+            --  current read call returns.
+            Line_Read_In_Progress : Boolean := False;
+
+            --  The backend device responsible for handling the actual byte
+            --  input and output for the console.
             Console_Backend_Device : Device_Access := null;
 
          when others =>

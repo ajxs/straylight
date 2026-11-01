@@ -218,6 +218,7 @@ package body Boot is
          Line_Buffer_Offset_Read      => 0,
          Line_Buffer_Offset_Write     => 0,
          Line_Buffer_Offset_Committed => 0,
+         Line_Read_In_Progress        => False,
          Console_Backend_Device       => UART_Device'Access);
 
       Disk_Device_Driver_Features : constant Virtio_Device_Features_Pages_T :=
