@@ -880,6 +880,12 @@ package body Boot is
       --     "/Devices/Disk/Programs/print_random_words.elf",
       --     Result);
 
+      Loader.Load_New_Process_From_Filesystem
+        (Init_Process.all, "/Devices/Disk/Programs/simple_shell.elf", Result);
+      if Is_Error (Result) then
+         Panic;
+      end if;
+
       --  Wait for all the harts to start before freeing the boot memory.
       --  Since their boot stacks are in the boot memory region that would be
       --  freed here.
