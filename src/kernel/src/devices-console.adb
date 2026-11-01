@@ -44,6 +44,7 @@ package body Devices.Console is
       Device.Line_Buffer_Size := 4096;
       Device.Line_Buffer_Offset_Read := 0;
       Device.Line_Buffer_Offset_Write := 0;
+      Device.Line_Buffer_Offset_Committed := 0;
 
       Result := Success;
    exception
@@ -51,40 +52,6 @@ package body Devices.Console is
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Allocate_Line_Buffer;
-
-   procedure Read_Bytes
-     (Device     : in out Device_T;
-      Process    : in out Process_Control_Block_T;
-      Buffer     : out Storage_Array;
-      Bytes_Read : out Storage_Count;
-      Result     : out Function_Result) is
-   begin
-      if not Is_Device_Valid_And_Initialised (Device) then
-         Result := Not_Initialised;
-         Bytes_Read := 0;
-         return;
-      end if;
-
-      case Device.Console_Backend_Device.all.Device_Class is
-         when Device_Class_Serial =>
-            Devices.UART.Read_Bytes
-              (Device.Console_Backend_Device.all,
-               Process,
-               Buffer,
-               Bytes_Read,
-               Result);
-
-         when others              =>
-            Bytes_Read := 0;
-            Result := Not_Supported;
-      end case;
-
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Bytes_Read := 0;
-         Result := Constraint_Exception;
-   end Read_Bytes;
 
    procedure Put_Bytes_Unlocked (Device : Device_T; Data : Storage_Array) is
    begin
@@ -106,6 +73,182 @@ package body Devices.Console is
       when Constraint_Error =>
          Log_Constraint_Error;
    end Put_Bytes_Unlocked;
+
+   function Is_Printable (Byte : Unsigned_8) return Boolean
+   is (Byte in 16#20# .. 16#7E#);
+
+   ----------------------------------------------------------------------------
+   --  Implementation Notes:
+   --   - Must be called with the device spinlock held.
+   --     This ensures that the echoed output doesn't land in another process'
+   --     console output.
+   --   - Control characters aren't echoed, since a serial terminal would act
+   --     on them instead of displaying them.
+   ----------------------------------------------------------------------------
+   procedure Echo_Byte (Device : Device_T; Byte : Unsigned_8) is
+   begin
+      if Character'Val (Byte) = ASCII.LF then
+         Put_Bytes_Unlocked (Device, [16#0D#, 16#0A#]);
+      elsif Is_Printable (Byte) then
+         Put_Bytes_Unlocked (Device, [1 => Storage_Element (Byte)]);
+      end if;
+   end Echo_Byte;
+
+   function Is_Backspace (Byte : Unsigned_8) return Boolean
+   is (Byte in Character'Pos (ASCII.BS) | Character'Pos (ASCII.DEL));
+
+   procedure Read_Line_Unlocked
+     (Device     : in out Device_T;
+      Process    : in out Process_Control_Block_T;
+      Buffer     : out Storage_Array;
+      Bytes_Read : out Storage_Count;
+      Result     : out Function_Result)
+   is
+      Incoming_Byte : Unsigned_8 := 0;
+   begin
+      Bytes_Read := 0;
+
+      Read_Line_Buffer : declare
+         Line_Buffer : Storage_Array (0 .. Device.Line_Buffer_Size - 1)
+         with Import, Alignment => 1, Address => Device.Line_Buffer_Address;
+      begin
+         --  If there is no unread committed line, read a new line from the
+         --  backend device. The line is only made available to the caller
+         --  once it has been terminated with a newline or terminated with
+         --  Ctrl+D.
+         if Device.Line_Buffer_Offset_Read
+           = Device.Line_Buffer_Offset_Committed
+         then
+            Device.Line_Buffer_Offset_Read := 0;
+            Device.Line_Buffer_Offset_Write := 0;
+            Device.Line_Buffer_Offset_Committed := 0;
+
+            loop
+               Release_Spinlock (Device.Spinlock);
+
+               case Device.Console_Backend_Device.all.Device_Class is
+                  when Device_Class_Serial =>
+                     Devices.UART.Read_Byte
+                       (Device.Console_Backend_Device.all,
+                        Process,
+                        Incoming_Byte,
+                        Result);
+
+                  when others              =>
+                     Result := Not_Supported;
+               end case;
+
+               Acquire_Spinlock (Device.Spinlock);
+
+               if Is_Error (Result) then
+                  return;
+               end if;
+
+               --  Terminals send a carriage return for the Enter key.
+               --  Convert that to a line feed character.
+               if Character'Val (Incoming_Byte) = ASCII.CR then
+                  Incoming_Byte := Character'Pos (ASCII.LF);
+               end if;
+
+               --  Ctrl+D ends the read without being stored. On an empty line
+               --  this returns zero bytes, which signals end-of-file.
+               exit when Incoming_Byte = Character'Pos (ASCII.EOT);
+
+               if Is_Backspace (Incoming_Byte) then
+                  if Device.Line_Buffer_Offset_Write
+                    > Device.Line_Buffer_Offset_Committed
+                  then
+                     Device.Line_Buffer_Offset_Write :=
+                       Device.Line_Buffer_Offset_Write - 1;
+
+                     Put_Bytes_Unlocked
+                       (Device,
+                        [Character'Pos (ASCII.BS),
+                         Character'Pos (' '),
+                         Character'Pos (ASCII.BS)]);
+                  end if;
+               elsif Character'Val (Incoming_Byte) = ASCII.LF
+                 or else
+                   (Is_Printable (Incoming_Byte)
+                    and then
+                      Device.Line_Buffer_Offset_Write
+                      < Device.Line_Buffer_Size - 1)
+               then
+                  --  The last byte of the line buffer is reserved for the
+                  --  newline, so that a line is always able to be terminated.
+                  --  Any bytes received after the buffer is full are
+                  --  discarded.
+
+                  Line_Buffer (Device.Line_Buffer_Offset_Write) :=
+                    Storage_Element (Incoming_Byte);
+
+                  Device.Line_Buffer_Offset_Write :=
+                    Device.Line_Buffer_Offset_Write + 1;
+
+                  Echo_Byte (Device, Incoming_Byte);
+               end if;
+
+               exit when Character'Val (Incoming_Byte) = ASCII.LF;
+            end loop;
+
+            Device.Line_Buffer_Offset_Committed :=
+              Device.Line_Buffer_Offset_Write;
+         end if;
+
+         --  Copy as much of the committed line as will fit in the caller's
+         --  buffer. Any remainder is returned by subsequent calls.
+         Number_Of_Bytes_To_Copy : constant Storage_Count :=
+           Storage_Count'Min
+             (Device.Line_Buffer_Offset_Committed
+              - Device.Line_Buffer_Offset_Read,
+              Buffer'Length);
+
+         Buffer (Buffer'First .. Buffer'First + Number_Of_Bytes_To_Copy - 1) :=
+           Line_Buffer
+             (Device.Line_Buffer_Offset_Read
+              .. Device.Line_Buffer_Offset_Read + Number_Of_Bytes_To_Copy - 1);
+
+         Device.Line_Buffer_Offset_Read :=
+           Device.Line_Buffer_Offset_Read + Number_Of_Bytes_To_Copy;
+
+         Bytes_Read := Number_Of_Bytes_To_Copy;
+      end Read_Line_Buffer;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Bytes_Read := 0;
+         Result := Constraint_Exception;
+   end Read_Line_Unlocked;
+
+   procedure Read_Line
+     (Device     : in out Device_T;
+      Process    : in out Process_Control_Block_T;
+      Buffer     : out Storage_Array;
+      Bytes_Read : out Storage_Count;
+      Result     : out Function_Result) is
+   begin
+      if not Is_Device_Valid_And_Initialised (Device) then
+         Result := Not_Initialised;
+         Bytes_Read := 0;
+         return;
+      end if;
+
+      Acquire_Spinlock (Device.Spinlock);
+      Read_Line_Unlocked (Device, Process, Buffer, Bytes_Read, Result);
+      Release_Spinlock (Device.Spinlock);
+   end Read_Line;
+
+   procedure Read_Bytes
+     (Device     : in out Device_T;
+      Process    : in out Process_Control_Block_T;
+      Buffer     : out Storage_Array;
+      Bytes_Read : out Storage_Count;
+      Result     : out Function_Result) is
+   begin
+      Read_Line (Device, Process, Buffer, Bytes_Read, Result);
+   end Read_Bytes;
 
    procedure Put_Bytes (Device : in out Device_T; Data : Storage_Array) is
    begin

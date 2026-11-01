@@ -74,6 +74,18 @@ Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Bo
 4. Ramdisk (root filesystem memory device)
 5. VirtIO block B (UStar disk, `virtio-mmio-bus.1`)
 6. VirtIO GPU (`virtio-mmio-bus.2`)
+7. Console (backed by the UART)
+
+### Console
+`Devices.Console` is a line-buffered terminal layer over a backend device. Only a serial backend is implemented. It is mounted at `/Devices/Console`, and libc opens it as `stdin`, `stdout`, and `stderr`.
+
+Reads block until a line is complete. `Read_Line_Unlocked` does the input processing that a Linux tty layer would:
+- CR is converted to LF, since terminals send CR for the Enter key.
+- LF and printable ASCII (`0x20`–`0x7E`) are stored and echoed. Other bytes are dropped, so the line buffer always matches the screen.
+- Backspace (`0x08` or `0x7F`) erases the last uncommitted byte.
+- Ctrl+D ends the read without being stored. On an empty line this returns 0 bytes, which libc treats as EOF.
+
+The line buffer is 4096 bytes. Its last byte is reserved for the newline, so input past that point is discarded. Only one process can safely read at a time: the buffer and its offsets belong to the device, and the spinlock is released while waiting for input, so concurrent readers corrupt each other's lines.
 
 ### Filesystem
 A root virtual filesystem (`Filesystems.Root`) sits at the top. Two real filesystems are mounted under `/Devices/`:
