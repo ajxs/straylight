@@ -1,12 +1,12 @@
 with AUnit;
 with AUnit.Simple_Test_Cases; use AUnit.Simple_Test_Cases;
 
-package Memory.Allocators.Page.Test_Cases is
+package Memory.Page_Pool_Allocator.Test_Cases is
    type Test_Add_Region is new Test_Case with null record;
 
    overriding
    function Name (T : Test_Add_Region) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Page.Add_Region_To_Page_Pool"));
+   is (AUnit.Format ("Memory.Page_Pool_Allocator.Add_Region_To_Page_Pool"));
 
    overriding
    procedure Run_Test (T : in out Test_Add_Region);
@@ -15,7 +15,7 @@ package Memory.Allocators.Page.Test_Cases is
 
    overriding
    function Name (T : Test_Allocate) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Page.Allocate"));
+   is (AUnit.Format ("Memory.Page_Pool_Allocator.Allocate"));
 
    overriding
    procedure Run_Test (T : in out Test_Allocate);
@@ -25,7 +25,8 @@ package Memory.Allocators.Page.Test_Cases is
    overriding
    function Name
      (T : Test_Allocate_Multiple_Regions) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Page.Allocate (Multiple Regions)"));
+   is (AUnit.Format
+         ("Memory.Page_Pool_Allocator.Allocate (Multiple Regions)"));
 
    overriding
    procedure Run_Test (T : in out Test_Allocate_Multiple_Regions);
@@ -34,7 +35,7 @@ package Memory.Allocators.Page.Test_Cases is
 
    overriding
    function Name (T : Test_Free) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Page.Free"));
+   is (AUnit.Format ("Memory.Page_Pool_Allocator.Free"));
 
    overriding
    procedure Run_Test (T : in out Test_Free);
@@ -43,9 +44,9 @@ package Memory.Allocators.Page.Test_Cases is
 
    overriding
    function Name (T : Test_Free_Invalid) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Page.Free (Invalid Address)"));
+   is (AUnit.Format ("Memory.Page_Pool_Allocator.Free (Invalid Address)"));
 
    overriding
    procedure Run_Test (T : in out Test_Free_Invalid);
 
-end Memory.Allocators.Page.Test_Cases;
+end Memory.Page_Pool_Allocator.Test_Cases;

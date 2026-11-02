@@ -1,10 +1,8 @@
 -------------------------------------------------------------------------------
---  Copyright (c) 2025, Ajxs.
+--  Copyright (c) 2026, Ajxs.
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-package Memory.Allocators
-  with Preelaborate
-is
+with AUnit.Test_Suites; use AUnit.Test_Suites;
 
-end Memory.Allocators;
+function Memory.Page_Pool_Allocator_Test_Suite return Access_Test_Suite;

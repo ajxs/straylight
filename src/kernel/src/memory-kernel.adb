@@ -1,9 +1,23 @@
-with Hart_State;      use Hart_State;
-with Logging;         use Logging;
-with Memory.Physical; use Memory.Physical;
-with Memory.Virtual;  use Memory.Virtual;
+with Hart_State;                 use Hart_State;
+with Logging;                    use Logging;
+with Locks;                      use Locks;
+with Memory.Heap_Allocator;      use Memory.Heap_Allocator;
+with Memory.Page_Pool_Allocator; use Memory.Page_Pool_Allocator;
+with Memory.Physical;            use Memory.Physical;
+with Memory.Virtual;             use Memory.Virtual;
 
 package body Memory.Kernel is
+   Kernel_Heap : Memory_Heap_T :=
+     (Memory_Regions_List_Head => null,
+      Window_Base              => System'To_Address (Kernel_Heap_Address),
+      Window_Size              => Kernel_Heap_Address_Space_Size,
+      Spinlock                 =>
+        (Lock_Id => Lock_Id_Kernel_Heap, others => <>));
+
+   Kernel_Page_Pool : Page_Pool_T :=
+     (Spinlock => (Lock_Id => Lock_Id_Kernel_Page_Pool, others => <>),
+      others   => <>);
+
    Logging_Enabled : constant Boolean :=
      Debug_Memory or else Debug_Memory_Allocators;
 
@@ -332,11 +346,11 @@ package body Memory.Kernel is
       --  Query each of the possible region sizes, until one is accepted
       --  by the kernel page pool.
       for Region_Page_Count of Growth_Region_Page_Counts loop
-         if Storage_Count (Region_Page_Count) * Kernel_Page_Pool_Page_Size
+         if Storage_Count (Region_Page_Count) * Page_Pool_Page_Size
            >= Minimum_Region_Size_In_Bytes
          then
             Region_Size_In_Bytes :=
-              Storage_Count (Region_Page_Count) * Kernel_Page_Pool_Page_Size;
+              Storage_Count (Region_Page_Count) * Page_Pool_Page_Size;
 
             --  Allocate the physical memory backing the new region from the
             --  kernel page pool.

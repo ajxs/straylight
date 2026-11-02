@@ -5,7 +5,7 @@
 
 with Logging; use Logging;
 
-package body Memory.Allocators.Page is
+package body Memory.Page_Pool_Allocator is
    --  This package logged under more than one tag, so its debug
    --  output is emitted if any of them is enabled.
    Logging_Enabled : constant Boolean :=
@@ -113,7 +113,7 @@ package body Memory.Allocators.Page is
                     Debug
                       (Logging_Enabled,
                        Log_Debug
-                         ("Memory.Allocators.Page: Allocated "
+                         ("Memory.Page_Pool_Allocator: Allocated "
                           & Page_Count'Image
                           & " pages at VAddr: "
                           & Allocation_Result.Virtual_Address'Image
@@ -262,4 +262,4 @@ package body Memory.Allocators.Page is
       Release_Spinlock (Page_Pool.Spinlock);
    end Add_Region_To_Page_Pool_And_Allocate;
 
-end Memory.Allocators.Page;
+end Memory.Page_Pool_Allocator;

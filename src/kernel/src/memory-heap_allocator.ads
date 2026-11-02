@@ -3,7 +3,7 @@ with Ada.Unchecked_Conversion;
 with Function_Results; use Function_Results;
 with Locks;            use Locks;
 
-package Memory.Allocators.Heap
+private package Memory.Heap_Allocator
   with Preelaborate
 is
    type Heap_Memory_Region_T;
@@ -173,4 +173,4 @@ private
            (Region_Address, Region_Physical_Address, Region_Size, Next_Region))
    with Inline;
 
-end Memory.Allocators.Heap;
+end Memory.Heap_Allocator;

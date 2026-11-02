@@ -1,13 +1,13 @@
 with AUnit;
 with AUnit.Simple_Test_Cases; use AUnit.Simple_Test_Cases;
 
-package Memory.Allocators.Heap.Test_Cases is
+package Memory.Heap_Allocator.Test_Cases is
    type Test_Calculate_Header_Checksum is new Test_Case with null record;
 
    overriding
    function Name
      (T : Test_Calculate_Header_Checksum) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Heap.Calculate_Header_Checksum"));
+   is (AUnit.Format ("Memory.Heap_Allocator.Calculate_Header_Checksum"));
 
    overriding
    procedure Run_Test (T : in out Test_Calculate_Header_Checksum);
@@ -16,7 +16,7 @@ package Memory.Allocators.Heap.Test_Cases is
 
    overriding
    function Name (T : Test_Allocate) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Heap.Allocate"));
+   is (AUnit.Format ("Memory.Heap_Allocator.Allocate"));
 
    overriding
    procedure Run_Test (T : in out Test_Allocate);
@@ -25,7 +25,7 @@ package Memory.Allocators.Heap.Test_Cases is
 
    overriding
    function Name (T : Test_Allocate_Aligned) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Heap.Allocate (Aligned)"));
+   is (AUnit.Format ("Memory.Heap_Allocator.Allocate (Aligned)"));
 
    overriding
    procedure Run_Test (T : in out Test_Allocate_Aligned);
@@ -34,7 +34,7 @@ package Memory.Allocators.Heap.Test_Cases is
 
    overriding
    function Name (T : Test_Allocate_Aligned_Exact) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Heap.Allocate (Aligned, Exact)"));
+   is (AUnit.Format ("Memory.Heap_Allocator.Allocate (Aligned, Exact)"));
 
    overriding
    procedure Run_Test (T : in out Test_Allocate_Aligned_Exact);
@@ -44,7 +44,7 @@ package Memory.Allocators.Heap.Test_Cases is
    overriding
    function Name
      (T : Test_Allocate_Invalid_Alignment) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Heap.Allocate (Invalid Alignment)"));
+   is (AUnit.Format ("Memory.Heap_Allocator.Allocate (Invalid Alignment)"));
 
    overriding
    procedure Run_Test (T : in out Test_Allocate_Invalid_Alignment);
@@ -56,7 +56,7 @@ package Memory.Allocators.Heap.Test_Cases is
    function Name
      (T : Test_Calculate_Region_Header_Checksum) return AUnit.Message_String
    is (AUnit.Format
-         ("Memory.Allocators.Heap.Calculate_Region_Header_Checksum"));
+         ("Memory.Heap_Allocator.Calculate_Region_Header_Checksum"));
 
    overriding
    procedure Run_Test (T : in out Test_Calculate_Region_Header_Checksum);
@@ -66,7 +66,7 @@ package Memory.Allocators.Heap.Test_Cases is
    overriding
    function Name
      (T : Test_Region_Header_Validation) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Heap.Region Header Validation"));
+   is (AUnit.Format ("Memory.Heap_Allocator.Region Header Validation"));
 
    overriding
    procedure Run_Test (T : in out Test_Region_Header_Validation);
@@ -75,7 +75,7 @@ package Memory.Allocators.Heap.Test_Cases is
 
    overriding
    function Name (T : Test_Multiple_Regions) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Heap.Multiple Regions"));
+   is (AUnit.Format ("Memory.Heap_Allocator.Multiple Regions"));
 
    overriding
    procedure Run_Test (T : in out Test_Multiple_Regions);
@@ -84,9 +84,9 @@ package Memory.Allocators.Heap.Test_Cases is
 
    overriding
    function Name (T : Test_Add_Overlapping_Region) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Allocators.Heap.Add_Memory_Region_To_Heap"));
+   is (AUnit.Format ("Memory.Heap_Allocator.Add_Memory_Region_To_Heap"));
 
    overriding
    procedure Run_Test (T : in out Test_Add_Overlapping_Region);
 
-end Memory.Allocators.Heap.Test_Cases;
+end Memory.Heap_Allocator.Test_Cases;

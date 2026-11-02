@@ -2,7 +2,7 @@ with GNAT.Source_Info;
 
 with Logging; use Logging;
 
-package body Memory.Allocators.Heap is
+package body Memory.Heap_Allocator is
    --  This package logged under more than one tag, so its debug
    --  output is emitted if any of them is enabled.
    Logging_Enabled : constant Boolean :=
@@ -875,4 +875,4 @@ package body Memory.Allocators.Heap is
          return 0;
    end Calculate_Region_Header_Checksum;
 
-end Memory.Allocators.Heap;
+end Memory.Heap_Allocator;

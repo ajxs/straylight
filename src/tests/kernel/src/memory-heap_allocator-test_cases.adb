@@ -1,8 +1,8 @@
 with AUnit.Assertions; use AUnit.Assertions;
 
-with Memory.Allocators.Heap.Test_Utils; use Memory.Allocators.Heap.Test_Utils;
+with Memory.Heap_Allocator.Test_Utils; use Memory.Heap_Allocator.Test_Utils;
 
-package body Memory.Allocators.Heap.Test_Cases is
+package body Memory.Heap_Allocator.Test_Cases is
    overriding
    procedure Run_Test (T : in out Test_Calculate_Header_Checksum) is
       Block_Address : constant Virtual_Address_T := To_Address (16#C000_0000#);
@@ -679,4 +679,4 @@ package body Memory.Allocators.Heap.Test_Cases is
 
    end Run_Test;
 
-end Memory.Allocators.Heap.Test_Cases;
+end Memory.Heap_Allocator.Test_Cases;

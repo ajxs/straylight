@@ -1,4 +1,4 @@
-package body Memory.Allocators.Heap.Test_Utils is
+package body Memory.Heap_Allocator.Test_Utils is
    function Get_Block_Count_In_Heap_Memory_Region
      (Heap_Region : Heap_Memory_Region_T) return Natural
    is
@@ -126,4 +126,4 @@ package body Memory.Allocators.Heap.Test_Utils is
       Memory_Heap.Window_Size := Window_Size;
    end Initialise_Test_Heap;
 
-end Memory.Allocators.Heap.Test_Utils;
+end Memory.Heap_Allocator.Test_Utils;

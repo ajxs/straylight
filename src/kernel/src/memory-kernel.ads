@@ -1,13 +1,14 @@
-with Function_Results;       use Function_Results;
-with Locks;                  use Locks;
-with Memory.Allocators.Heap; use Memory.Allocators.Heap;
-with Memory.Allocators.Page; use Memory.Allocators.Page;
+with Function_Results; use Function_Results;
+
+-------------------------------------------------------------------------------
+--  This package provides a front-end for kernel memory allocation.
+--  The actual memory allocation back-end implementation is encapsulated in
+--  the package body.
+-------------------------------------------------------------------------------
 
 package Memory.Kernel
   with Preelaborate
 is
-   Kernel_Page_Pool_Page_Size : constant := Page_Pool_Page_Size;
-
    --  Allocates kernel heap memory, returning both the virtual and physical
    --  addresses of the allocated region.
    --  This is generally used for any kernel memory that needs DMA access
@@ -35,17 +36,5 @@ is
 
    procedure Free_Pages
      (Virtual_Address : Virtual_Address_T; Result : out Function_Result);
-
-private
-   Kernel_Heap : Memory_Heap_T :=
-     (Memory_Regions_List_Head => null,
-      Window_Base              => System'To_Address (Kernel_Heap_Address),
-      Window_Size              => Kernel_Heap_Address_Space_Size,
-      Spinlock                 =>
-        (Lock_Id => Lock_Id_Kernel_Heap, others => <>));
-
-   Kernel_Page_Pool : Page_Pool_T :=
-     (Spinlock => (Lock_Id => Lock_Id_Kernel_Page_Pool, others => <>),
-      others   => <>);
 
 end Memory.Kernel;

@@ -1,6 +1,6 @@
 with AUnit.Assertions; use AUnit.Assertions;
 
-package body Memory.Allocators.Page.Test_Cases is
+package body Memory.Page_Pool_Allocator.Test_Cases is
    --  The page pool performs no accesses to the memory it manages, so the
    --  regions used in these tests are backed by fabricated addresses.
    Test_Region_Virt_Address : constant Virtual_Address_T :=
@@ -283,4 +283,4 @@ package body Memory.Allocators.Page.Test_Cases is
          "Free page count is unaffected by rejected frees");
    end Run_Test;
 
-end Memory.Allocators.Page.Test_Cases;
+end Memory.Page_Pool_Allocator.Test_Cases;

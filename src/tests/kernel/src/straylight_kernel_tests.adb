@@ -8,8 +8,8 @@ with AUnit.Run;
 
 with Utilities_Test_Suite;
 with Memory_Test_Suite;
-with Memory_Allocators_Heap_Test_Suite;
-with Memory_Allocators_Page_Test_Suite;
+with Memory.Heap_Allocator_Test_Suite;
+with Memory.Page_Pool_Allocator_Test_Suite;
 
 procedure Straylight_Kernel_Tests is
    procedure Utilities_Test_Runner is new
@@ -19,10 +19,10 @@ procedure Straylight_Kernel_Tests is
      AUnit.Run.Test_Runner (Memory_Test_Suite);
 
    procedure Heap_Test_Runner is new
-     AUnit.Run.Test_Runner (Memory_Allocators_Heap_Test_Suite);
+     AUnit.Run.Test_Runner (Memory.Heap_Allocator_Test_Suite);
 
    procedure Page_Test_Runner is new
-     AUnit.Run.Test_Runner (Memory_Allocators_Page_Test_Suite);
+     AUnit.Run.Test_Runner (Memory.Page_Pool_Allocator_Test_Suite);
 
    Reporter : AUnit.Reporter.Text.Text_Reporter;
 begin

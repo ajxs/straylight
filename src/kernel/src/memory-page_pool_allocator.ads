@@ -7,7 +7,7 @@ with Function_Results; use Function_Results;
 with Locks;            use Locks;
 with RISCV.Paging;     use RISCV.Paging;
 
-package Memory.Allocators.Page
+private package Memory.Page_Pool_Allocator
   with Preelaborate
 is
    Page_Pool_Page_Size : constant := Small_Page_Size;
@@ -83,4 +83,4 @@ is
       Virtual_Address : Virtual_Address_T;
       Result          : out Function_Result);
 
-end Memory.Allocators.Page;
+end Memory.Page_Pool_Allocator;

@@ -1,4 +1,4 @@
-package Memory.Allocators.Heap.Test_Utils
+package Memory.Heap_Allocator.Test_Utils
   with Preelaborate
 is
    type Block_Info_T is record
@@ -32,4 +32,4 @@ is
       Window_Base : Virtual_Address_T;
       Window_Size : Storage_Offset);
 
-end Memory.Allocators.Heap.Test_Utils;
+end Memory.Heap_Allocator.Test_Utils;
