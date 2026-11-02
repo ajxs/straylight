@@ -329,22 +329,6 @@ package body Processes is
       Result := Success;
    end Deallocate_Process_Resources;
 
-   function Find_Running_Process_With_Id
-     (Process_Id : Process_Id_T) return Process_Control_Block_Access
-   is
-      Current_Process : Process_Control_Block_Access := Process_Queue;
-   begin
-      while Current_Process /= null loop
-         if Current_Process.all.Process_Id = Process_Id then
-            return Current_Process;
-         end if;
-
-         Current_Process := Current_Process.all.Next_Process;
-      end loop;
-
-      return null;
-   end Find_Running_Process_With_Id;
-
    pragma
      Warnings
        (Off, "pragma Restrictions (No_Exception_Propagation) in effect");

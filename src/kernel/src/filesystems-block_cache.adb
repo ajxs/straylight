@@ -206,7 +206,7 @@ package body Filesystems.Block_Cache is
             Acquire_Sleeplock
               (System_Block_Cache.Entries (Cache_Index).Sleeplock,
                System_Block_Cache.Spinlock,
-               Reading_Process.Process_Id);
+               Reading_Process);
 
             --  Test whether the cache entry we previously found is no longer
             --  valid. This could happen if another process released the cache
@@ -272,7 +272,7 @@ package body Filesystems.Block_Cache is
             Acquire_Sleeplock
               (System_Block_Cache.Entries (Cache_Index).Sleeplock,
                System_Block_Cache.Spinlock,
-               Reading_Process.Process_Id);
+               Reading_Process);
 
             Release_Spinlock (System_Block_Cache.Spinlock);
 

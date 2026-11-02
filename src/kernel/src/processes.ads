@@ -155,9 +155,6 @@ is
          (Address (Process.Memory_Space.Base_Page_Table_Addr),
           Process.Memory_Space.Address_Space_ID));
 
-   function Find_Running_Process_With_Id
-     (Process_Id : Process_Id_T) return Process_Control_Block_Access;
-
    procedure Allocate_Process_Id
      (New_Id : out Process_Id_T; Result : out Function_Result);
 
