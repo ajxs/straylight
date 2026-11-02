@@ -61,7 +61,7 @@ package body Memory.Allocators.Page is
    procedure Allocate_Unlocked
      (Page_Pool         : in out Page_Pool_T;
       Page_Count        : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result)
    is
       Regions renames Page_Pool.Page_Pool_Regions;
@@ -137,7 +137,7 @@ package body Memory.Allocators.Page is
    procedure Allocate
      (Page_Pool         : in out Page_Pool_T;
       Page_Count        : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result) is
    begin
       Acquire_Spinlock (Page_Pool.Spinlock);
@@ -244,7 +244,7 @@ package body Memory.Allocators.Page is
       Physical_Address      : Physical_Address_T;
       New_Page_Count        : Positive;
       Allocation_Page_Count : Positive;
-      Allocation_Result     : out Memory_Allocation_Result;
+      Allocation_Result     : out Virtual_Physical_Address_Pair_T;
       Result                : out Function_Result) is
    begin
       Acquire_Spinlock (Page_Pool.Spinlock);

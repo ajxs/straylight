@@ -3,7 +3,6 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Memory.Allocators;   use Memory.Allocators;
 with Memory.Kernel;       use Memory.Kernel;
 with Logging;             use Logging;
 with Processes.Scheduler; use Processes.Scheduler;
@@ -116,7 +115,7 @@ package body Devices.UART is
    procedure Allocate_Ring_Buffer
      (Device : in out Device_T; Result : out Function_Result)
    is
-      Allocation_Result : Memory_Allocation_Result;
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
       Allocate_Pages (1, Allocation_Result, Result);
       if Is_Error (Result) then

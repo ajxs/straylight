@@ -80,9 +80,7 @@ package body Memory.Allocators.Heap.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
 
       Blocks_Total_Size : Storage_Offset := 0;
 
@@ -223,9 +221,7 @@ package body Memory.Allocators.Heap.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
 
       Alignment : constant Storage_Offset := 64;
    begin
@@ -289,9 +285,7 @@ package body Memory.Allocators.Heap.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
 
       Alignment : constant Storage_Offset := 16;
    begin
@@ -346,9 +340,7 @@ package body Memory.Allocators.Heap.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
       Initialise_Test_Heap
         (Test_Heap, Heap_Backend'Address, Heap_Backend_Size);
@@ -474,9 +466,7 @@ package body Memory.Allocators.Heap.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
 
       Allocated_Address : Virtual_Address_T := Null_Address;
    begin
@@ -562,9 +552,7 @@ package body Memory.Allocators.Heap.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
 
       Block_Area_Size : constant Storage_Count :=
         Region_Size - Region_Header_Size;

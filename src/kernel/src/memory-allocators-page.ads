@@ -59,7 +59,7 @@ is
    procedure Allocate
      (Page_Pool         : in out Page_Pool_T;
       Page_Count        : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result);
 
    procedure Add_Region_To_Page_Pool
@@ -75,7 +75,7 @@ is
       Physical_Address      : Physical_Address_T;
       New_Page_Count        : Positive;
       Allocation_Page_Count : Positive;
-      Allocation_Result     : out Memory_Allocation_Result;
+      Allocation_Result     : out Virtual_Physical_Address_Pair_T;
       Result                : out Function_Result);
 
    procedure Free

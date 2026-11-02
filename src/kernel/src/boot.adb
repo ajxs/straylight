@@ -20,7 +20,6 @@ with Graphics;             use Graphics;
 with Loader;
 with Locks;                use Locks;
 with Logging;              use Logging;
-with Memory.Allocators;    use Memory.Allocators;
 with Memory.Kernel;        use Memory.Kernel;
 with Memory.Physical;      use Memory.Physical;
 with Memory.Virtual;       use Memory.Virtual;
@@ -150,9 +149,7 @@ package body Boot is
       Console_Device renames System_Devices (7);
 
       Default_Unallocated_Addresses :
-        constant Virtio_Resource_Allocated_Addresses_T :=
-          (Virtual_Address  => Null_Address,
-           Physical_Address => Null_Physical_Address);
+        constant Virtual_Physical_Address_Pair_T := (others => <>);
 
       Root_Filesystem_Physical_Address : Physical_Address_T :=
         Null_Physical_Address;
@@ -725,7 +722,7 @@ package body Boot is
       Framebuffer_Size   : constant :=
         Framebuffer_Width * Framebuffer_Height * 4;
 
-      Framebuffer_Allocation : Memory_Allocation_Result;
+      Framebuffer_Allocation : Virtual_Physical_Address_Pair_T;
 
       Graphics_Device renames Devices.System_Devices (6);
    begin
@@ -737,8 +734,13 @@ package body Boot is
 
       pragma
         Debug (Debug_Boot, Log_Debug ("Allocating framebuffer memory..."));
+
       Allocate_Kernel_Physical_Memory
         (Framebuffer_Size, Framebuffer_Allocation, Result);
+      if Is_Error (Result) then
+         Panic;
+      end if;
+
       pragma
         Debug
           (Debug_Boot,

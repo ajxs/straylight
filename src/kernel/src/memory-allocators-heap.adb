@@ -143,7 +143,7 @@ package body Memory.Allocators.Heap is
    procedure Allocate_In_Region
      (Region            : Heap_Memory_Region_T;
       Size              : Storage_Count;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1)
    is
@@ -361,7 +361,7 @@ package body Memory.Allocators.Heap is
    procedure Allocate_Unlocked
      (Memory_Heap       : in out Memory_Heap_T;
       Size              : Storage_Count;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1)
    is
@@ -455,7 +455,7 @@ package body Memory.Allocators.Heap is
    procedure Allocate
      (Memory_Heap       : in out Memory_Heap_T;
       Size              : Storage_Count;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1) is
    begin
@@ -819,7 +819,7 @@ package body Memory.Allocators.Heap is
       Physical_Address  : Physical_Address_T;
       Region_Size       : Storage_Count;
       Allocation_Size   : Storage_Count;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1) is
    begin

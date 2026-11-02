@@ -10,7 +10,6 @@ with System.Storage_Elements; use System.Storage_Elements;
 with Locks;            use Locks;
 with Locks.Sleeplocks; use Locks.Sleeplocks;
 with Memory;           use Memory;
-with Memory.Allocators;
 with Processes;        use Processes;
 
 package Devices
@@ -44,13 +43,6 @@ is
    type Virtio_Descriptor_Status_Array_T is
      array (Virtio_Descriptor_Array_Index_T) of Boolean;
 
-   --  The kernel is mapped into the higher-half, and needs to operate on
-   --  virtual addresses. However, devices operate on physical addresses, so
-   --  the kernel needs to maintain both virtual and physical addresses for
-   --  Virtio devices resources.
-   subtype Virtio_Resource_Allocated_Addresses_T is
-     Memory.Allocators.Memory_Allocation_Result;
-
    type Virtio_Device_Request_Info_T is record
       Channel : Blocking_Channel_T := 0;
    end record;
@@ -73,14 +65,18 @@ is
       --  During feature negotiation, this field will be combined with the
       --  device's supported features to determine the final set of active
       --  features.
-      Driver_Features        : Virtio_Device_Features_Pages_T := [others => 0];
-      Request_Info           : Request_Info_Array_T :=
-        [others => (Channel => 0)];
-      Request_Status_Array   : Virtio_Resource_Allocated_Addresses_T;
+      Driver_Features : Virtio_Device_Features_Pages_T := [others => 0];
+      Request_Info    : Request_Info_Array_T := [others => (Channel => 0)];
+
+      --  The kernel is mapped into the higher-half, and needs to operate on
+      --  virtual addresses. However, devices operate on physical addresses, so
+      --  the kernel needs to maintain both virtual and physical addresses for
+      --  Virtio devices resources.
+      Request_Status_Array   : Virtual_Physical_Address_Pair_T;
       Request_Serviced_Index : Virtio_Descriptor_Array_Index_T := 0;
-      Q_Used                 : Virtio_Resource_Allocated_Addresses_T;
-      Q_Available            : Virtio_Resource_Allocated_Addresses_T;
-      Q_Descriptor           : Virtio_Resource_Allocated_Addresses_T;
+      Q_Used                 : Virtual_Physical_Address_Pair_T;
+      Q_Available            : Virtual_Physical_Address_Pair_T;
+      Q_Descriptor           : Virtual_Physical_Address_Pair_T;
       Descriptor_Status      : Virtio_Descriptor_Status_Array_T;
 
       case Device_Type is
@@ -88,8 +84,7 @@ is
             --  This array holds the Virtio block device request structures.
             --  This needs to be allocated by the kernel at runtime, because
             --  it needs to have a physical address for the device to access.
-            Block_Request_Array_Addresses :
-              Virtio_Resource_Allocated_Addresses_T;
+            Block_Request_Array_Addresses : Virtual_Physical_Address_Pair_T;
 
             Total_Sectors : Unsigned_64 := 0;
 
@@ -135,7 +130,7 @@ is
 
       case Device_Class is
          when Device_Class_Graphics =>
-            Framebuffer_Addresses : Virtio_Resource_Allocated_Addresses_T;
+            Framebuffer_Addresses : Virtual_Physical_Address_Pair_T;
             Framebuffer_Width     : Unsigned_32 := 0;
             Framebuffer_Height    : Unsigned_32 := 0;
 

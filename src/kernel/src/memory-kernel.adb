@@ -226,7 +226,7 @@ package body Memory.Kernel is
    --  pool's spinlock.
    procedure Grow_Kernel_Page_Pool_And_Allocate
      (Allocation_Page_Count : Positive;
-      Allocation_Result     : out Memory_Allocation_Result;
+      Allocation_Result     : out Virtual_Physical_Address_Pair_T;
       Result                : out Function_Result)
    is
       Region_Virtual_Address  : Virtual_Address_T;
@@ -294,7 +294,7 @@ package body Memory.Kernel is
    --  which triggered the growth.
    procedure Grow_Kernel_Heap_And_Allocate
      (Allocation_Size   : Storage_Count;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1)
    is
@@ -302,7 +302,7 @@ package body Memory.Kernel is
         constant array (Positive range <>) of Positive :=
           [Max_Page_Pool_Region_Size, 256, 64];
 
-      Pages_Allocation_Result : Memory_Allocation_Result;
+      Pages_Allocation_Result : Virtual_Physical_Address_Pair_T;
       Region_Virtual_Address  : Virtual_Address_T := Null_Address;
 
       Region_Size_In_Bytes         : Storage_Count := 1;
@@ -416,7 +416,7 @@ package body Memory.Kernel is
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1)
    is
-      Allocation_Result : Memory_Allocation_Result;
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
       Allocate_Kernel_Physical_Memory
         (Size, Allocation_Result, Result, Alignment);
@@ -429,7 +429,7 @@ package body Memory.Kernel is
 
    procedure Allocate_Kernel_Physical_Memory
      (Size              : Storage_Count;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1) is
    begin
@@ -448,7 +448,7 @@ package body Memory.Kernel is
 
    procedure Allocate_Pages
      (Number_of_Pages   : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result)
    is
       --  When the pool's free page count falls below this threshold after an

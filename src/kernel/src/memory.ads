@@ -35,17 +35,22 @@ is
    function "-" (Left, Right : Physical_Address_T) return Storage_Offset;
    pragma Import (Intrinsic, "-");
 
+   --  https://en.wikibooks.org/wiki/Ada_Programming/Attributes/%27To_Address
+   Null_Physical_Address : constant Physical_Address_T :=
+     Physical_Address_T (System'To_Address (0));
+
    subtype Virtual_Address_T is Address;
+
+   type Virtual_Physical_Address_Pair_T is record
+      Virtual_Address  : Virtual_Address_T := System.Null_Address;
+      Physical_Address : Physical_Address_T := Null_Physical_Address;
+   end record;
 
    --  This is kept as a constant because it's used in address arithmetic.
    Higher_Half_Offset : constant := 16#FFFF_FFFF_0000_0000#;
 
    --  This is kept as a constant because it's used in address arithmetic.
    Physical_Memory_Map_Address : constant := 16#FFFF_FFD8_0000_0000#;
-
-   --  https://en.wikibooks.org/wiki/Ada_Programming/Attributes/%27To_Address
-   Null_Physical_Address : constant Physical_Address_T :=
-     Physical_Address_T (System'To_Address (0));
 
    Kernel_Address_Space_Start : constant Virtual_Address_T :=
      To_Address (16#FFFF_FFC0_0000_0000#);

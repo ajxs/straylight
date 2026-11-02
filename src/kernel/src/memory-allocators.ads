@@ -6,9 +6,5 @@
 package Memory.Allocators
   with Preelaborate
 is
-   type Memory_Allocation_Result is record
-      Virtual_Address  : Virtual_Address_T := System.Null_Address;
-      Physical_Address : Physical_Address_T := Null_Physical_Address;
-   end record;
 
 end Memory.Allocators;

@@ -72,9 +72,7 @@ package body Memory.Allocators.Page.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
       Add_Region_To_Page_Pool
         (Test_Pool,
@@ -139,9 +137,7 @@ package body Memory.Allocators.Page.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
       --  Two virtually adjacent regions of four pages each.
       --  Allocations must never span a region boundary, even when the
@@ -194,9 +190,7 @@ package body Memory.Allocators.Page.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
 
       First_Allocation_Address : Virtual_Address_T := Null_Address;
    begin
@@ -245,9 +239,7 @@ package body Memory.Allocators.Page.Test_Cases is
 
       Result : Function_Result := Unset;
 
-      Allocation_Result : Memory_Allocation_Result :=
-        (Virtual_Address  => Null_Address,
-         Physical_Address => Null_Physical_Address);
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
       Add_Region_To_Page_Pool
         (Test_Pool,

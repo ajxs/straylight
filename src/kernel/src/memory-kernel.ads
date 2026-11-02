@@ -1,6 +1,5 @@
 with Function_Results;       use Function_Results;
 with Locks;                  use Locks;
-with Memory.Allocators;      use Memory.Allocators;
 with Memory.Allocators.Heap; use Memory.Allocators.Heap;
 with Memory.Allocators.Page; use Memory.Allocators.Page;
 
@@ -15,7 +14,7 @@ is
    --  by a device, like filesystem buffers.
    procedure Allocate_Kernel_Physical_Memory
      (Size              : Storage_Count;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result;
       Alignment         : Storage_Count := 1);
 
@@ -31,7 +30,7 @@ is
 
    procedure Allocate_Pages
      (Number_of_Pages   : Positive;
-      Allocation_Result : out Memory_Allocation_Result;
+      Allocation_Result : out Virtual_Physical_Address_Pair_T;
       Result            : out Function_Result);
 
    procedure Free_Pages

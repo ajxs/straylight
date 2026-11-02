@@ -5,7 +5,6 @@
 
 with Devices.Virtio.Block; use Devices.Virtio.Block;
 with Logging;              use Logging;
-with Memory.Allocators;    use Memory.Allocators;
 with Memory.Kernel;        use Memory.Kernel;
 with Processes.Scheduler;  use Processes.Scheduler;
 with RISCV.Atomics;        use RISCV.Atomics;
@@ -214,7 +213,7 @@ package body Devices.Virtio is
    procedure Allocate_Virtio_Device_Resources
      (Device : in out Device_T; Result : out Function_Result)
    is
-      Allocation_Result : Memory_Allocation_Result;
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
       if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
          Log_Error ("Device not Virtio MMIO");

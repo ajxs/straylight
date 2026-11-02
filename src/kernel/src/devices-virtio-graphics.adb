@@ -1,5 +1,4 @@
 with Logging;             use Logging;
-with Memory.Allocators;   use Memory.Allocators;
 with Memory.Kernel;       use Memory.Kernel;
 with Processes.Scheduler; use Processes.Scheduler;
 with RISCV.Atomics;       use RISCV.Atomics;
@@ -22,7 +21,7 @@ package body Devices.Virtio.Graphics is
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
-      Resource_Allocation : Memory_Allocation_Result;
+      Resource_Allocation : Virtual_Physical_Address_Pair_T;
    begin
       Request_Size_Attach_Backing : constant Storage_Count :=
         Request_Resource_Attach_Backing'Size / 8;
@@ -201,7 +200,7 @@ package body Devices.Virtio.Graphics is
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
-      Resource_Allocation : Memory_Allocation_Result;
+      Resource_Allocation : Virtual_Physical_Address_Pair_T;
    begin
       Request_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
       Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
@@ -347,7 +346,7 @@ package body Devices.Virtio.Graphics is
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
-      Resource_Allocation : Memory_Allocation_Result;
+      Resource_Allocation : Virtual_Physical_Address_Pair_T;
    begin
       Request_Size : constant Storage_Count :=
         Request_Resource_Create_2D'Size / 8;
@@ -489,7 +488,7 @@ package body Devices.Virtio.Graphics is
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
-      Resource_Allocation : Memory_Allocation_Result;
+      Resource_Allocation : Virtual_Physical_Address_Pair_T;
    begin
       Request_Size : constant Storage_Count := Request_Set_Scanout'Size / 8;
       Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
@@ -639,7 +638,7 @@ package body Devices.Virtio.Graphics is
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
-      Resource_Allocation : Memory_Allocation_Result;
+      Resource_Allocation : Virtual_Physical_Address_Pair_T;
    begin
       Request_Size : constant Storage_Count :=
         Request_Transfer_To_Host_2D'Size / 8;
@@ -795,7 +794,7 @@ package body Devices.Virtio.Graphics is
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
-      Resource_Allocation : Memory_Allocation_Result;
+      Resource_Allocation : Virtual_Physical_Address_Pair_T;
    begin
       Request_Size : constant Storage_Count := Request_Resource_Flush'Size / 8;
       Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;

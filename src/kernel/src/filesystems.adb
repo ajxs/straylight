@@ -11,7 +11,6 @@ with Filesystems.Root;
 with Filesystems.UStar;
 with Filesystems.Node_Cache; use Filesystems.Node_Cache;
 with Logging;                use Logging;
-with Memory.Allocators;      use Memory.Allocators;
 with Memory.Kernel;          use Memory.Kernel;
 with Hart_State;             use Hart_State;
 
@@ -638,7 +637,7 @@ package body Filesystems is
 
    procedure Initialise_Block_Cache is
       Result            : Function_Result := Unset;
-      Allocation_Result : Memory_Allocation_Result;
+      Allocation_Result : Virtual_Physical_Address_Pair_T;
       System_Block_Cache renames Filesystems.Block_Cache.System_Block_Cache;
    begin
       pragma
