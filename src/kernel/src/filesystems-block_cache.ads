@@ -35,16 +35,19 @@ is
       Block_Number    : Block_Index_T;
       Result          : out Function_Result);
 
-   --  The block cache entries don't require an individual spinlock.
-   --  The block cache as a whole is protected by a single spinlock. No
-   --  individual entry can be modified without holding the main block cache
-   --  spinlock.
    type Block_Cache_Entry_T is record
-      Sleeplock    : Sleeplock_T;
-      Filesystem   : Filesystem_Access := null;
-      Block_Number : Block_Index_T := 0;
-      Last_Access  : Unsigned_64 := 0;
-      Entry_Used   : Boolean := False;
+      Sleeplock       : Sleeplock_T;
+      Filesystem      : Filesystem_Access := null;
+      Block_Number    : Block_Index_T := 0;
+      Last_Access     : Unsigned_64 := 0;
+      Entry_Used      : Boolean := False;
+      --  The number of processes holding or waiting for this entry.
+      --  An entry can only be reclaimed when this is zero.
+      Reference_Count : Natural := 0;
+      --  Whether this entry actually holds valid data for the specified block.
+      --  Once an entry is claimed, this field is protected by its sleeplock,
+      --  not the cache spinlock.
+      Data_Valid      : Boolean := False;
    end record;
 
    type Block_Cache_Entry_Array_T is array (1 .. 64) of Block_Cache_Entry_T;
@@ -67,9 +70,6 @@ private
       Filesystem   : Filesystem_Access;
       Block_Number : Block_Index_T) return Boolean
    with Inline;
-
-   procedure Find_And_Claim_Available_Block_Cache_Entry
-     (Cache_Index : out Positive; Result : out Function_Result);
 
    procedure Get_Block_Cache_Entry_Data_Address
      (Cache                 : Block_Cache_T;
