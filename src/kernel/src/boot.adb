@@ -161,12 +161,6 @@ package body Boot is
    begin
       pragma Debug (Debug_Boot, Log_Debug ("Initialising devices..."));
 
-      --  Assign a unique Lock ID to the device spinlocks.
-      for I in System_Devices'Range loop
-         System_Devices (I).Spinlock.Lock_Id :=
-           Lock_Id_Devices_Prefix + Lock_Id_T (I);
-      end loop;
-
       APIC_Device :=
         (Device_Class       => Device_Class_Interrupt_Controller,
          Device_Bus         => Device_Bus_Memory_Mapped,
@@ -354,6 +348,10 @@ package body Boot is
         Device_Virtual_Address + Graphics_Device.Memory_Size;
 
       for I in System_Devices'Range loop
+         --  Assign a unique Lock ID to the device spinlocks.
+         System_Devices (I).Spinlock.Lock_Id :=
+           Lock_Id_Devices_Prefix + Lock_Id_T (I);
+
          if System_Devices (I).Record_Used then
             pragma
               Debug
