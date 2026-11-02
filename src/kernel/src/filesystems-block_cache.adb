@@ -95,9 +95,6 @@ package body Filesystems.Block_Cache is
       Result := Not_Found;
    end Find_Existing_Block_In_Cache;
 
-   pragma
-     Warnings
-       (Off, "pragma Restrictions (No_Exception_Propagation) in effect");
    procedure Get_Block_Cache_Entry_Data_Address
      (Cache                 : Block_Cache_T;
       Cache_Index           : Positive;
@@ -111,20 +108,14 @@ package body Filesystems.Block_Cache is
       end if;
 
       Cache_Entry_Offset : constant Storage_Offset :=
-        Storage_Offset (Block_Size * (Cache_Index - 1));
+        Block_Size * Storage_Offset (Cache_Index - 1);
 
       Data_Address_Virtual := Cache.Data_Address_Virtual + Cache_Entry_Offset;
       Data_Address_Physical :=
         Cache.Data_Address_Physical + Cache_Entry_Offset;
 
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
    end Get_Block_Cache_Entry_Data_Address;
-   pragma
-     Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
 
    procedure Read_Block_From_Filesystem
      (Filesystem           : Filesystem_Access;
