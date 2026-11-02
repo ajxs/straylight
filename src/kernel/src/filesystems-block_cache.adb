@@ -33,10 +33,11 @@ package body Filesystems.Block_Cache is
       --  and a reference count of zero will be chosen.
       for I in System_Block_Cache.Entries'Range loop
          if System_Block_Cache.Entries (I).Reference_Count = 0 then
-            if System_Block_Cache.Entries (I).Last_Access < Lowest_Access_Time
+            if System_Block_Cache.Entries (I).Last_Access_Time
+              < Lowest_Access_Time
             then
                Lowest_Access_Time :=
-                 System_Block_Cache.Entries (I).Last_Access;
+                 System_Block_Cache.Entries (I).Last_Access_Time;
                Best_Eviction_Candidate_Index := I;
             end if;
          end if;
@@ -62,8 +63,8 @@ package body Filesystems.Block_Cache is
       System_Block_Cache.Entries (Cache_Index).Entry_Used := True;
       System_Block_Cache.Entries (Cache_Index).Filesystem := Filesystem;
       System_Block_Cache.Entries (Cache_Index).Block_Number := Block_Number;
-      System_Block_Cache.Entries (Cache_Index).Data_Valid := False;
-      System_Block_Cache.Entries (Cache_Index).Last_Access :=
+      System_Block_Cache.Entries (Cache_Index).Data_Is_Valid := False;
+      System_Block_Cache.Entries (Cache_Index).Last_Access_Time :=
         RISCV.Get_System_Time;
 
       Result := Success;
@@ -215,8 +216,8 @@ package body Filesystems.Block_Cache is
 
       Release_Spinlock (System_Block_Cache.Spinlock);
 
-      if not System_Block_Cache.Entries (Cache_Index).Data_Valid then
-         Transfer_Block_Cache_Entry
+      if not System_Block_Cache.Entries (Cache_Index).Data_Is_Valid then
+         Read_Write_Block_Cache_Entry_Data
            (System_Block_Cache,
             Filesystem,
             Reading_Process,
@@ -240,7 +241,7 @@ package body Filesystems.Block_Cache is
             return;
          end if;
 
-         System_Block_Cache.Entries (Cache_Index).Data_Valid := True;
+         System_Block_Cache.Entries (Cache_Index).Data_Is_Valid := True;
       end if;
 
       Get_Block_Cache_Entry_Data_Address
@@ -260,7 +261,7 @@ package body Filesystems.Block_Cache is
          Result := Constraint_Exception;
    end Read_Block_From_Filesystem;
 
-   procedure Transfer_Block_Cache_Entry
+   procedure Read_Write_Block_Cache_Entry_Data
      (Cache        : in out Block_Cache_T;
       Filesystem   : Filesystem_Access;
       Process      : in out Process_Control_Block_T;
@@ -344,7 +345,7 @@ package body Filesystems.Block_Cache is
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
-   end Transfer_Block_Cache_Entry;
+   end Read_Write_Block_Cache_Entry_Data;
 
    procedure Release_Block_Unlocked
      (Filesystem             : Filesystem_Access;
@@ -383,11 +384,11 @@ package body Filesystems.Block_Cache is
       System_Block_Cache.Entries (Cache_Index).Reference_Count :=
         System_Block_Cache.Entries (Cache_Index).Reference_Count - 1;
 
-      System_Block_Cache.Entries (Cache_Index).Last_Access :=
+      System_Block_Cache.Entries (Cache_Index).Last_Access_Time :=
         RISCV.Get_System_Time;
 
       if Invalidate_Cache_Entry then
-         System_Block_Cache.Entries (Cache_Index).Data_Valid := False;
+         System_Block_Cache.Entries (Cache_Index).Data_Is_Valid := False;
 
          --  Any processes still waiting for this entry will retry the read.
          if System_Block_Cache.Entries (Cache_Index).Reference_Count = 0 then
@@ -460,7 +461,7 @@ package body Filesystems.Block_Cache is
          return;
       end if;
 
-      Transfer_Block_Cache_Entry
+      Read_Write_Block_Cache_Entry_Data
         (System_Block_Cache,
          Filesystem,
          Writing_Process,

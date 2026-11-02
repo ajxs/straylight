@@ -36,18 +36,18 @@ is
       Result          : out Function_Result);
 
    type Block_Cache_Entry_T is record
-      Sleeplock       : Sleeplock_T;
-      Filesystem      : Filesystem_Access := null;
-      Block_Number    : Block_Index_T := 0;
-      Last_Access     : Unsigned_64 := 0;
-      Entry_Used      : Boolean := False;
+      Sleeplock        : Sleeplock_T;
+      Filesystem       : Filesystem_Access := null;
+      Block_Number     : Block_Index_T := 0;
+      Last_Access_Time : Unsigned_64 := 0;
+      Entry_Used       : Boolean := False;
       --  The number of processes holding or waiting for this entry.
       --  An entry can only be reclaimed when this is zero.
-      Reference_Count : Natural := 0;
+      Reference_Count  : Natural := 0;
       --  Whether this entry actually holds valid data for the specified block.
       --  Once an entry is claimed, this field is protected by its sleeplock,
       --  not the cache spinlock.
-      Data_Valid      : Boolean := False;
+      Data_Is_Valid    : Boolean := False;
    end record;
 
    type Block_Cache_Entry_Array_T is array (1 .. 64) of Block_Cache_Entry_T;
@@ -86,7 +86,7 @@ private
    --  Transfers a single block between a cache entry and the underlying
    --  storage device: reads the block into the cache entry, or writes the
    --  cache entry's contents out to the device.
-   procedure Transfer_Block_Cache_Entry
+   procedure Read_Write_Block_Cache_Entry_Data
      (Cache        : in out Block_Cache_T;
       Filesystem   : Filesystem_Access;
       Process      : in out Process_Control_Block_T;
