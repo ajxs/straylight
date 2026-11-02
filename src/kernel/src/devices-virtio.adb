@@ -38,10 +38,13 @@ package body Devices.Virtio is
 
          while Device.Bus_Info.Virtio.Request_Serviced_Index /= Q_Used.Index
          loop
-
+            --  Get the index of the next used descriptor in the queue.
             Queue_Index : constant Unsigned_16 :=
               Device.Bus_Info.Virtio.Request_Serviced_Index
               mod Maximum_Virtio_Queue_Length;
+
+            Descriptor_Index : constant Unsigned_32 :=
+              Q_Used.Ring (Queue_Index).Id;
 
             --  Verify that the status byte has been cleared by the device,
             --  indicating that the request was successful.
@@ -56,7 +59,8 @@ package body Devices.Virtio is
                  Alignment => 1;
             begin
                Status_Byte : constant Unsigned_8 :=
-                 Request_Status_Array (Queue_Index);
+                 Request_Status_Array
+                   (Virtio_Descriptor_Array_Index_T (Descriptor_Index));
 
                --  The status byte is cleared by the device. If a value other
                --  than zero is encountered here, an error has occurred.
@@ -66,9 +70,6 @@ package body Devices.Virtio is
                   return;
                end if;
             end Check_Request_Status;
-
-            Descriptor_Index : constant Unsigned_32 :=
-              Q_Used.Ring (Queue_Index).Id;
 
             pragma
               Debug
