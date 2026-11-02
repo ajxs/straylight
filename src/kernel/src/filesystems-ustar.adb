@@ -23,6 +23,8 @@ package body Filesystems.UStar is
       Sector_Offset_Within_Block : Storage_Count := 0;
 
       File_Sector_Size : Unsigned_64 := 0;
+
+      Release_Block_Result : Function_Result := Unset;
    begin
       --  Note that the parent node isn't meaningful for a UStar filesystem,
       --  since it doesn't have a hierarchical structure, but it's still
@@ -110,8 +112,8 @@ package body Filesystems.UStar is
                if Is_Error (Result) then
                   Found_Node := null;
 
-                  Release_Block (Filesystem, Block_Number, Result);
-
+                  Release_Block
+                    (Filesystem, Block_Number, Release_Block_Result);
                   return;
                end if;
 
@@ -120,12 +122,19 @@ package body Filesystems.UStar is
                    (Header.Typeflag);
 
                Release_Block (Filesystem, Block_Number, Result);
+               if Is_Error (Result) then
+                  return;
+               end if;
+
                Result := Success;
                return;
             end if;
          end;
 
          Release_Block (Filesystem, Block_Number, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
 
          --  Each file's data is contained right after the header sector,
          --  so skip over the data sectors to get to the next header.
