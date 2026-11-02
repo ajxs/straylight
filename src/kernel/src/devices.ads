@@ -7,10 +7,11 @@ with Interfaces;              use Interfaces;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Locks;     use Locks;
-with Memory;    use Memory;
+with Locks;            use Locks;
+with Locks.Sleeplocks; use Locks.Sleeplocks;
+with Memory;           use Memory;
 with Memory.Allocators;
-with Processes; use Processes;
+with Processes;        use Processes;
 
 package Devices
   with Preelaborate
@@ -151,15 +152,15 @@ is
             Line_Buffer_Offset_Write     : Storage_Offset := 0;
             Line_Buffer_Offset_Committed : Storage_Offset := 0;
 
-            --  This flag is used to control access to the line read operation.
+            --  This lock is used to control access to the line read operation.
             --  Because the line reading procedure releases the spinlock while
             --  it's waiting for input, the spinlock alone isn't enough to
             --  ensure that another process doesn't 'steal' incoming bytes from
             --  another process that's waiting to receive input.
             --  Once one process is waiting to receive a line, another
-            --  process must sleep on this device's 'channel' until the
-            --  current read call returns.
-            Line_Read_In_Progress : Boolean := False;
+            --  process must sleep on this lock until the current read call
+            --  returns.
+            Line_Read_Lock : Sleeplock_T;
 
             --  The backend device responsible for handling the actual byte
             --  input and output for the console.

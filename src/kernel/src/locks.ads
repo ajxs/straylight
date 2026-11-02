@@ -22,6 +22,7 @@ is
    Lock_Id_Kernel_Page_Pool         : constant Lock_Id_T := 7;
    Lock_Id_Kernel_Heap              : constant Lock_Id_T := 8;
    Lock_Id_Physical_Memory          : constant Lock_Id_T := 9;
+   Lock_Id_Console_Line_Read        : constant Lock_Id_T := 10;
    Lock_Id_Devices_Prefix           : constant Lock_Id_T := 1_000;
    Lock_Id_Block_Cache_Entry_Prefix : constant Lock_Id_T := 2_000;
    Lock_Id_Process_Prefix           : constant Lock_Id_T := 3_000;

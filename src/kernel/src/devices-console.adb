@@ -1,9 +1,8 @@
 with Devices.UART;
-with Hart_State;          use Hart_State;
-with Logging;             use Logging;
-with Memory.Allocators;   use Memory.Allocators;
-with Memory.Kernel;       use Memory.Kernel;
-with Processes.Scheduler; use Processes.Scheduler;
+with Hart_State;        use Hart_State;
+with Logging;           use Logging;
+with Memory.Allocators; use Memory.Allocators;
+with Memory.Kernel;     use Memory.Kernel;
 
 package body Devices.Console is
    function Is_Correct_Device_Class (Device : Device_T) return Boolean is
@@ -100,6 +99,11 @@ package body Devices.Console is
    function Is_Backspace (Byte : Unsigned_8) return Boolean
    is (Byte in Character'Pos (ASCII.BS) | Character'Pos (ASCII.DEL));
 
+   ----------------------------------------------------------------------------
+   --  Implementation Notes:
+   --   - Must be called with the device spinlock and the line read sleeplock
+   --     held. The spinlock is released while waiting for input.
+   ----------------------------------------------------------------------------
    procedure Read_Line_Unlocked
      (Device     : in out Device_T;
       Process    : in out Process_Control_Block_T;
@@ -225,37 +229,6 @@ package body Devices.Console is
          Result := Constraint_Exception;
    end Read_Line_Unlocked;
 
-   ----------------------------------------------------------------------------
-   --  Implementation Notes:
-   --   - Must be called with the device spinlock held.
-   ----------------------------------------------------------------------------
-   procedure Wait_For_Console_And_Read_Line
-     (Device     : in out Device_T;
-      Process    : in out Process_Control_Block_T;
-      Buffer     : out Storage_Array;
-      Bytes_Read : out Storage_Count;
-      Result     : out Function_Result) is
-   begin
-      while Device.Line_Read_In_Progress loop
-         Lock_Process_Waiting_For_Channel
-           (Address_To_Unsigned_64 (Device'Address), Device.Spinlock, Process);
-      end loop;
-
-      Device.Line_Read_In_Progress := True;
-
-      Read_Line_Unlocked (Device, Process, Buffer, Bytes_Read, Result);
-
-      Device.Line_Read_In_Progress := False;
-
-      Wake_Processes_Waiting_For_Channel
-        (Address_To_Unsigned_64 (Device'Address));
-   exception
-      when Constraint_Error =>
-         --  Because a constraint error in this procedure would potentially
-         --  deadlock other processes waiting for this device, panic.
-         Panic_Constraint_Error;
-   end Wait_For_Console_And_Read_Line;
-
    procedure Read_Line
      (Device     : in out Device_T;
       Process    : in out Process_Control_Block_T;
@@ -270,9 +243,17 @@ package body Devices.Console is
       end if;
 
       Acquire_Spinlock (Device.Spinlock);
-      Wait_For_Console_And_Read_Line
-        (Device, Process, Buffer, Bytes_Read, Result);
+      Acquire_Sleeplock (Device.Line_Read_Lock, Device.Spinlock, Process);
+
+      Read_Line_Unlocked (Device, Process, Buffer, Bytes_Read, Result);
+
+      Release_Sleeplock (Device.Line_Read_Lock);
       Release_Spinlock (Device.Spinlock);
+   exception
+      when Constraint_Error =>
+         --  Because a constraint error in this procedure would potentially
+         --  deadlock other processes waiting for this device, panic.
+         Panic_Constraint_Error;
    end Read_Line;
 
    procedure Read_Bytes

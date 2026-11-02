@@ -85,7 +85,7 @@ Reads block until a line is complete. `Read_Line_Unlocked` does the input proces
 - Backspace (`0x08` or `0x7F`) erases the last uncommitted byte.
 - Ctrl+D ends the read without being stored. On an empty line this returns 0 bytes, which libc treats as EOF.
 
-The line buffer is 4096 bytes. Its last byte is reserved for the newline, so input past that point is discarded. `Line_Read_In_Progress` allows one read at a time, so other readers sleep until the current `read` returns. This isn't fair: a process that keeps reading can starve the others.
+The line buffer is 4096 bytes. Its last byte is reserved for the newline, so input past that point is discarded. `Line_Read_Lock` allows one read at a time, so other readers sleep until the current `read` returns. This isn't fair: a process that keeps reading can starve the others.
 
 ### Filesystem
 A root virtual filesystem (`Filesystems.Root`) sits at the top. Two real filesystems are mounted under `/Devices/`:
