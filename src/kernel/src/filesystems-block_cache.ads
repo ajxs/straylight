@@ -62,13 +62,6 @@ is
    System_Block_Cache : Block_Cache_T;
 
 private
-   procedure Find_Existing_Block_In_Cache
-     (Cache        : in out Block_Cache_T;
-      Filesystem   : Filesystem_Access;
-      Block_Number : Block_Index_T;
-      Cache_Index  : out Positive;
-      Result       : out Function_Result);
-
    --  Transfers a single block between a cache entry and the underlying
    --  storage device: reads the block into the cache entry, or writes the
    --  cache entry's contents out to the device.

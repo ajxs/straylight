@@ -99,22 +99,14 @@ package body Filesystems.Block_Cache is
      (Cache                 : Block_Cache_T;
       Cache_Index           : Positive;
       Data_Address_Virtual  : out Virtual_Address_T;
-      Data_Address_Physical : out Physical_Address_T;
-      Result                : out Function_Result) is
+      Data_Address_Physical : out Physical_Address_T) is
    begin
-      if Cache_Index > Cache.Entries'Last then
-         Result := Invalid_Argument;
-         return;
-      end if;
-
       Cache_Entry_Offset : constant Storage_Offset :=
         Block_Size * Storage_Offset (Cache_Index - 1);
 
       Data_Address_Virtual := Cache.Data_Address_Virtual + Cache_Entry_Offset;
       Data_Address_Physical :=
         Cache.Data_Address_Physical + Cache_Entry_Offset;
-
-      Result := Success;
    end Get_Block_Cache_Entry_Data_Address;
 
    procedure Read_Block_From_Filesystem
@@ -225,11 +217,7 @@ package body Filesystems.Block_Cache is
         (System_Block_Cache,
          Cache_Index,
          Data_Virtual_Address,
-         Cache_Entry_Addr_Physical,
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
+         Cache_Entry_Addr_Physical);
 
       Result := Success;
    exception
@@ -265,10 +253,7 @@ package body Filesystems.Block_Cache is
               & Block_Number'Image));
 
       Get_Block_Cache_Entry_Data_Address
-        (Cache, Cache_Index, Data_Addr_Virtual, Data_Addr_Physical, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
+        (Cache, Cache_Index, Data_Addr_Virtual, Data_Addr_Physical);
 
       Start_Sector : constant Sector_Index_T :=
         (Block_Number * Block_Size) / Sector_Size;
