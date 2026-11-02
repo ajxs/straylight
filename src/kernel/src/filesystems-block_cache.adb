@@ -74,22 +74,6 @@ package body Filesystems.Block_Cache is
          Result := Constraint_Exception;
    end Find_And_Claim_Available_Block_Cache_Entry;
 
-   function Is_Matching_Used_Cache_Entry
-     (Cache        : Block_Cache_T;
-      Cache_Index  : Positive;
-      Filesystem   : Filesystem_Access;
-      Block_Number : Block_Index_T) return Boolean is
-   begin
-      return
-        (Cache.Entries (Cache_Index).Entry_Used
-         and then Cache.Entries (Cache_Index).Filesystem = Filesystem
-         and then Cache.Entries (Cache_Index).Block_Number = Block_Number);
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         return False;
-   end Is_Matching_Used_Cache_Entry;
-
    procedure Find_Existing_Block_In_Cache
      (Cache        : in out Block_Cache_T;
       Filesystem   : Filesystem_Access;
@@ -98,7 +82,9 @@ package body Filesystems.Block_Cache is
       Result       : out Function_Result) is
    begin
       for I in Cache.Entries'Range loop
-         if Is_Matching_Used_Cache_Entry (Cache, I, Filesystem, Block_Number)
+         if Cache.Entries (I).Entry_Used
+           and then Cache.Entries (I).Filesystem = Filesystem
+           and then Cache.Entries (I).Block_Number = Block_Number
          then
             Cache_Index := I;
             Result := Success;

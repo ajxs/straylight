@@ -62,13 +62,6 @@ is
    System_Block_Cache : Block_Cache_T;
 
 private
-   function Is_Matching_Used_Cache_Entry
-     (Cache        : Block_Cache_T;
-      Cache_Index  : Positive;
-      Filesystem   : Filesystem_Access;
-      Block_Number : Block_Index_T) return Boolean
-   with Inline;
-
    procedure Get_Block_Cache_Entry_Data_Address
      (Cache                 : Block_Cache_T;
       Cache_Index           : Positive;
