@@ -162,58 +162,39 @@ package body Boot is
       pragma Debug (Debug_Boot, Log_Debug ("Initialising devices..."));
 
       APIC_Device :=
-        (Device_Class       => Device_Class_Interrupt_Controller,
-         Device_Bus         => Device_Bus_Memory_Mapped,
-         Memory_Size        => 16#4000000#,
-         Virtual_Address    => Device_Virtual_Address,
-         Physical_Address   => Physical_Address_T (To_Address (16#C00_0000#)),
-         Interrupt_Line     => 0,
-         Interrupt_Priority => 0,
-         Spinlock           => Locks.Null_Spinlock,
-         Record_Used        => True,
-         Bus_Info           => (Device_Bus => Device_Bus_Memory_Mapped));
+        (Device_Class     => Device_Class_Interrupt_Controller,
+         Device_Bus       => Device_Bus_Memory_Mapped,
+         Memory_Size      => 16#4000000#,
+         Virtual_Address  => Device_Virtual_Address,
+         Physical_Address => Physical_Address_T (To_Address (16#C00_0000#)),
+         Record_Used      => True,
+         others           => <>);
 
       Device_Virtual_Address :=
         Device_Virtual_Address + APIC_Device.Memory_Size;
 
       UART_Device :=
-        (Device_Class             => Device_Class_Serial,
-         Device_Bus               => Device_Bus_Memory_Mapped,
-         Memory_Size              => 16#1000#,
-         Virtual_Address          => Device_Virtual_Address,
-         Physical_Address         =>
-           Physical_Address_T (To_Address (16#1000_0000#)),
-         Interrupt_Line           => 10,
-         Interrupt_Priority       => 7,
-         Spinlock                 => Locks.Null_Spinlock,
-         Record_Used              => True,
-         Bus_Info                 => (Device_Bus => Device_Bus_Memory_Mapped),
-         Ring_Buffer_Address      => Null_Address,
-         Ring_Buffer_Size         => 0,
-         Ring_Buffer_Offset_Read  => 0,
-         Ring_Buffer_Offset_Write => 0);
+        (Device_Class       => Device_Class_Serial,
+         Device_Bus         => Device_Bus_Memory_Mapped,
+         Memory_Size        => 16#1000#,
+         Virtual_Address    => Device_Virtual_Address,
+         Physical_Address   => Physical_Address_T (To_Address (16#1000_0000#)),
+         Interrupt_Line     => 10,
+         Interrupt_Priority => 7,
+         Record_Used        => True,
+         others             => <>);
 
       Device_Virtual_Address :=
         Device_Virtual_Address + UART_Device.Memory_Size;
 
       Console_Device :=
-        (Device_Class                 => Device_Class_Console,
-         Device_Bus                   => Device_Bus_None,
-         Memory_Size                  => 0,
-         Virtual_Address              => Null_Address,
-         Physical_Address             => Null_Physical_Address,
-         Interrupt_Line               => 0,
-         Interrupt_Priority           => 0,
-         Spinlock                     => Locks.Null_Spinlock,
-         Record_Used                  => True,
-         Bus_Info                     => (Device_Bus => Device_Bus_None),
-         Line_Buffer_Address          => Null_Address,
-         Line_Buffer_Size             => 0,
-         Line_Buffer_Offset_Read      => 0,
-         Line_Buffer_Offset_Write     => 0,
-         Line_Buffer_Offset_Committed => 0,
-         Line_Read_Lock               => <>,
-         Console_Backend_Device       => UART_Device'Access);
+        (Device_Class           => Device_Class_Console,
+         Device_Bus             => Device_Bus_None,
+         Virtual_Address        => Null_Address,
+         Physical_Address       => Null_Physical_Address,
+         Record_Used            => True,
+         Console_Backend_Device => UART_Device'Access,
+         others                 => <>);
 
       Console_Device.Line_Read_Lock.Spinlock.Lock_Id :=
         Lock_Id_Console_Line_Read;
@@ -272,16 +253,13 @@ package body Boot is
       end if;
 
       Root_Filesystem_Memory_Device :=
-        (Device_Class       => Device_Class_Storage,
-         Device_Bus         => Device_Bus_Memory_Mapped,
-         Memory_Size        => 16#1000#,
-         Virtual_Address    => Device_Virtual_Address,
-         Physical_Address   => Root_Filesystem_Physical_Address,
-         Interrupt_Line     => 0,
-         Interrupt_Priority => 0,
-         Spinlock           => Locks.Null_Spinlock,
-         Record_Used        => True,
-         Bus_Info           => (Device_Bus => Device_Bus_Memory_Mapped));
+        (Device_Class     => Device_Class_Storage,
+         Device_Bus       => Device_Bus_Memory_Mapped,
+         Memory_Size      => 16#1000#,
+         Virtual_Address  => Device_Virtual_Address,
+         Physical_Address => Root_Filesystem_Physical_Address,
+         Record_Used      => True,
+         others           => <>);
 
       Device_Virtual_Address :=
         Device_Virtual_Address + Root_Filesystem_Memory_Device.Memory_Size;
@@ -575,15 +553,12 @@ package body Boot is
         External_Name => "store_hart_state_pointer";
    begin
       Hart_States (Hart_Id) :=
-        (Current_Process                            => null,
-         Hart_Id                                    => Hart_Id,
-         Interrupts_Off_Counter                     => 0,
+        (Hart_Id                                    => Hart_Id,
          Interrupts_Enabled_Before_Initial_Push_Off => False,
          Hart_Status                                => Hart_Status_Initialised,
-         Previous_Process                           => null,
          Emergency_Stack_Top                        =>
            Get_Hart_Emergency_Stack_Top_Address (Hart_Id),
-         Stack_Limit                                => Null_Address);
+         others                                     => <>);
 
       Save_Hart_State_Pointer (Hart_States (Hart_Id)'Address);
    exception

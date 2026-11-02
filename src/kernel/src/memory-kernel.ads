@@ -43,24 +43,10 @@ private
       Window_Base              => System'To_Address (Kernel_Heap_Address),
       Window_Size              => Kernel_Heap_Address_Space_Size,
       Spinlock                 =>
-        (Locked        => 0,
-         Time_Acquired => 0,
-         Hart_Id       => No_Hart_Id,
-         Lock_Id       => Lock_Id_Kernel_Heap));
+        (Lock_Id => Lock_Id_Kernel_Heap, others => <>));
 
    Kernel_Page_Pool : Page_Pool_T :=
-     (Page_Pool_Regions =>
-        [others =>
-           (Virtual_Address  => System'To_Address (0),
-            Physical_Address => Physical_Address_T (System'To_Address (0)),
-            Page_Statuses    => [others => Free],
-            Page_Count       => 0,
-            Allocated        => False)],
-      Free_Page_Count   => 0,
-      Spinlock          =>
-        (Locked        => 0,
-         Time_Acquired => 0,
-         Hart_Id       => No_Hart_Id,
-         Lock_Id       => Lock_Id_Kernel_Page_Pool));
+     (Spinlock => (Lock_Id => Lock_Id_Kernel_Page_Pool, others => <>),
+      others   => <>);
 
 end Memory.Kernel;

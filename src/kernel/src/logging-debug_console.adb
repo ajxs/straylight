@@ -34,10 +34,7 @@ package body Logging.Debug_Console is
    SBI_Logging_Buffer : String (1 .. SBI_Log_Buffer_Length);
 
    SBI_Logging_Buffer_Spinlock : Spinlock_T :=
-     (Locked        => 0,
-      Time_Acquired => 0,
-      Hart_Id       => No_Hart_Id,
-      Lock_Id       => Lock_Id_SBI_Log_Buffer);
+     (Lock_Id => Lock_Id_SBI_Log_Buffer, others => <>);
 
    procedure Print_String_To_SBI_Console (Message : String) is
       Print_Index : Integer := 1;

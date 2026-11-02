@@ -53,14 +53,13 @@ package body Filesystems.Root is
          end if;
 
          Root_Filesystem.Nodes (New_Entry_Index) :=
-           (Entry_Used           => True,
-            Index                => Filesystem_Node_Index_T (New_Entry_Index),
-            Parent_Index         => Parent_Index,
-            Filename             => [others => Character'Val (0)],
-            Filename_Byte_Length => 0,
-            Node_Type            => Node_Type,
-            Mounted_Device       => Mounted_Device,
-            Mounted_Filesystem   => Mounted_Filesystem);
+           (Entry_Used         => True,
+            Index              => Filesystem_Node_Index_T (New_Entry_Index),
+            Parent_Index       => Parent_Index,
+            Node_Type          => Node_Type,
+            Mounted_Device     => Mounted_Device,
+            Mounted_Filesystem => Mounted_Filesystem,
+            others             => <>);
 
          Root_Filesystem.Nodes (New_Entry_Index).Filename
            (1 .. Filename'Length) :=

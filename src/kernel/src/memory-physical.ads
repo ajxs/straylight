@@ -70,19 +70,8 @@ private
    end record;
 
    Phys_Memory_Space : Physical_Memory_Space_T :=
-     (Physical_Memory_Blocks        =>
-        [others =>
-           (Address    => Physical_Address_T (System'To_Address (0)),
-            Order      => Maximum_Block_Order,
-            Free       => False,
-            Next_Block => No_Block,
-            Entry_Used => False)],
-      Physical_Memory_Map_List_Head => No_Block,
-      Spinlock                      =>
-        (Locked        => 0,
-         Time_Acquired => 0,
-         Hart_Id       => No_Hart_Id,
-         Lock_Id       => Lock_Id_Physical_Memory));
+     (Spinlock => (Lock_Id => Lock_Id_Physical_Memory, others => <>),
+      others   => <>);
 
    ----------------------------------------------------------------------------
    --  The base block size.

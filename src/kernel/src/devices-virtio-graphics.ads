@@ -151,10 +151,10 @@ private
 
    type Virtio_Gpu_Ctrl_Hdr is record
       Ctrl_Type : Gpu_Ctrl_Type;  -- 32-bit enum per spec
-      Flags     : Unsigned_32;
-      Fence_Id  : Unsigned_64;
-      Ctx_Id    : Unsigned_32;
-      Padding   : Unsigned_32;
+      Flags     : Unsigned_32 := 0;
+      Fence_Id  : Unsigned_64 := 0;
+      Ctx_Id    : Unsigned_32 := 0;
+      Padding   : Unsigned_32 := 0;
    end record
    with Convention => C;
 

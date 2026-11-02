@@ -69,10 +69,7 @@ package body Filesystems.FAT.FAT16 is
             Hidden       => True,
             System_Entry => True,
             Volume_Label => True,
-            Directory    => False,
-            Archive      => False,
-            Device       => False,
-            Reserved     => False),
+            others       => False),
          Entry_Type    => 0,
          Checksum      => DOS_Filename_Checksum,
          Name_2        => Wide_Name (6 .. 11),
@@ -408,19 +405,13 @@ package body Filesystems.FAT.FAT16 is
                           & Index_Within_Current_Block'Image));
                else
                   Directory (Index_Within_Current_Block) :=
-                    (File_Name          => DOS_Filename,
-                     File_Ext           => DOS_Extension,
-                     Attributes         => (others => False),
-                     Reserved           => 0,
-                     Creation_Seconds   => 0,
-                     Creation_Time      => 0,
-                     Creation_Date      => 0,
-                     Last_Accessed_Date => 0,
-                     First_Cluster_High => 0,
-                     Last_Modified_Time => 0,
-                     Last_Modified_Date => 0,
-                     First_Cluster_Low  => 0,
-                     File_Size          => 0);
+                    (File_Name        => DOS_Filename,
+                     File_Ext         => DOS_Extension,
+                     Attributes       => (others => False),
+                     Reserved         => 0,
+                     Creation_Seconds => 0,
+                     File_Size        => 0,
+                     others           => 0);
 
                   --  Save the sector index of the newly created DOS directory
                   --  entry, and its index within that sector. These are used
@@ -778,19 +769,13 @@ package body Filesystems.FAT.FAT16 is
                              & Index_Within_Curr_Sector'Image));
                   else
                      Directory (Index_Within_Curr_Sector) :=
-                       (File_Name          => DOS_Filename,
-                        File_Ext           => DOS_Extension,
-                        Attributes         => (others => False),
-                        Reserved           => 0,
-                        Creation_Seconds   => 0,
-                        Creation_Time      => 0,
-                        Creation_Date      => 0,
-                        Last_Accessed_Date => 0,
-                        First_Cluster_High => 0,
-                        Last_Modified_Time => 0,
-                        Last_Modified_Date => 0,
-                        First_Cluster_Low  => 0,
-                        File_Size          => 0);
+                       (File_Name        => DOS_Filename,
+                        File_Ext         => DOS_Extension,
+                        Attributes       => (others => False),
+                        Reserved         => 0,
+                        Creation_Seconds => 0,
+                        File_Size        => 0,
+                        others           => 0);
 
                      DOS_Entry_Sector := Current_Sector;
 

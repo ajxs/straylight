@@ -279,10 +279,7 @@ private
    Open_Files : Process_File_Handle_Array;
 
    Open_Files_Spinlock : Spinlock_T :=
-     (Locked        => 0,
-      Time_Acquired => 0,
-      Hart_Id       => No_Hart_Id,
-      Lock_Id       => Lock_Id_Open_Files);
+     (Lock_Id => Lock_Id_Open_Files, others => <>);
 
    Maximum_File_Read_Size  : constant := 16#60_000#;
    Maximum_File_Write_Size : constant := 16#60_000#;

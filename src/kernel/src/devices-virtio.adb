@@ -390,13 +390,7 @@ package body Devices.Virtio is
 
       Queue_Size_Maximum : Unsigned_32 := 0;
 
-      Status : Virtio_Device_Status_T :=
-        (Acknowledge        => False,
-         Driver             => False,
-         Driver_OK          => False,
-         Features_OK        => False,
-         Device_Needs_Reset => False,
-         Failed             => False);
+      Status : Virtio_Device_Status_T := (others => False);
 
       Device_Features : Virtio_Device_Features_Pages_T := [others => 0];
    begin

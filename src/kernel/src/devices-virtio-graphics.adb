@@ -64,11 +64,7 @@ package body Devices.Virtio.Graphics is
       begin
          Request_Data :=
            (Hdr         =>
-              (Ctrl_Type => Cmd_Resource_Attach_Backing,
-               Flags     => 0,
-               Fence_Id  => 0,
-               Ctx_Id    => 0,
-               Padding   => 0),
+              (Ctrl_Type => Cmd_Resource_Attach_Backing, others => <>),
             Resource_Id => Resource_Id,
             Num_Entries => 1);
 
@@ -233,12 +229,7 @@ package body Devices.Virtio.Graphics is
            Address   => Resource_Allocation.Virtual_Address,
            Alignment => 1;
       begin
-         Request_Data :=
-           (Ctrl_Type => Cmd_Get_Display_Info,
-            Flags     => 0,
-            Fence_Id  => 0,
-            Ctx_Id    => 0,
-            Padding   => 0);
+         Request_Data := (Ctrl_Type => Cmd_Get_Display_Info, others => <>);
       end Setup_Request;
 
       Setup_Queues : declare
@@ -381,12 +372,7 @@ package body Devices.Virtio.Graphics is
            Alignment => 1;
       begin
          Request_Data :=
-           (Hdr         =>
-              (Ctrl_Type => Cmd_Resource_Create_2D,
-               Flags     => 0,
-               Fence_Id  => 0,
-               Ctx_Id    => 0,
-               Padding   => 0),
+           (Hdr         => (Ctrl_Type => Cmd_Resource_Create_2D, others => <>),
             Resource_Id => Resource_Id,
             Format      => VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM,
             Width       => Device.Framebuffer_Width,
@@ -527,12 +513,7 @@ package body Devices.Virtio.Graphics is
            Alignment => 1;
       begin
          Request_Data :=
-           (Hdr         =>
-              (Ctrl_Type => Cmd_Set_Scanout,
-               Flags     => 0,
-               Fence_Id  => 0,
-               Ctx_Id    => 0,
-               Padding   => 0),
+           (Hdr         => (Ctrl_Type => Cmd_Set_Scanout, others => <>),
             Scanout_Id  => Scanout_Id,
             Resource_Id => Resource_Id,
             R           => (X => 0, Y => 0, Width => Width, Height => Height));
@@ -684,11 +665,7 @@ package body Devices.Virtio.Graphics is
       begin
          Request_Data :=
            (Hdr         =>
-              (Ctrl_Type => Cmd_Transfer_To_Host_2D,
-               Flags     => 0,
-               Fence_Id  => 0,
-               Ctx_Id    => 0,
-               Padding   => 0),
+              (Ctrl_Type => Cmd_Transfer_To_Host_2D, others => <>),
             R           => (X => X, Y => Y, Width => Width, Height => Height),
             --  Byte offset of the rectangle's top-left pixel within the
             --  linear backing framebuffer. The device reads rows sequentially
@@ -842,12 +819,7 @@ package body Devices.Virtio.Graphics is
            Alignment => 1;
       begin
          Request_Data :=
-           (Hdr         =>
-              (Ctrl_Type => Cmd_Resource_Flush,
-               Flags     => 0,
-               Fence_Id  => 0,
-               Ctx_Id    => 0,
-               Padding   => 0),
+           (Hdr         => (Ctrl_Type => Cmd_Resource_Flush, others => <>),
             R           => (X => X, Y => Y, Width => Width, Height => Height),
             Resource_Id => Resource_Id,
             Padding     => 0);
