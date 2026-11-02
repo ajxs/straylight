@@ -10,28 +10,14 @@ with Processes.Scheduler; use Processes.Scheduler;
 with RISCV;
 
 package body Filesystems.Block_Cache is
-   function Can_Block_Cache_Entry_Be_Invalidated
-     (Cache        : Block_Cache_T;
-      Cache_Index  : Positive;
-      Current_Time : Unsigned_64) return Boolean is
-   begin
-      return
-        (Cache.Entries (Cache_Index).Entry_Used
-         and then Cache.Entries (Cache_Index).Reference_Count = 0
-         and then
-           (Current_Time - Cache.Entries (Cache_Index).Last_Access)
-           > Cache_Entry_Age_Threshold);
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         return False;
-   end Can_Block_Cache_Entry_Be_Invalidated;
-
    procedure Find_And_Claim_Available_Block_Cache_Entry
      (Filesystem   : Filesystem_Access;
       Block_Number : Block_Index_T;
       Cache_Index  : out Positive;
-      Result       : out Function_Result) is
+      Result       : out Function_Result)
+   is
+      Best_Eviction_Candidate_Index : Natural := 0;
+      Lowest_Access_Time            : Unsigned_64 := Unsigned_64'Last;
    begin
       --  Search for an unused entry.
       for I in System_Block_Cache.Entries'Range loop
@@ -42,22 +28,31 @@ package body Filesystems.Block_Cache is
          end if;
       end loop;
 
-      --  Search for an entry that can be invalidated.
+      --  If no unused entry was found, search for an entry that can be
+      --  evicted. The available cache entry with the lowest last access time
+      --  and a reference count of zero will be chosen.
       for I in System_Block_Cache.Entries'Range loop
-         if Can_Block_Cache_Entry_Be_Invalidated
-              (System_Block_Cache, I, RISCV.Get_System_Time)
-         then
-            pragma
-              Debug
-                (Debug_Filesystems_Block_Cache,
-                 Log_Debug
-                   ("Invalidating block cache entry at index: " & I'Image));
-
-            Cache_Index := I;
-
-            goto Claim_Entry;
+         if System_Block_Cache.Entries (I).Reference_Count = 0 then
+            if System_Block_Cache.Entries (I).Last_Access < Lowest_Access_Time
+            then
+               Lowest_Access_Time :=
+                 System_Block_Cache.Entries (I).Last_Access;
+               Best_Eviction_Candidate_Index := I;
+            end if;
          end if;
       end loop;
+
+      if Best_Eviction_Candidate_Index /= 0 then
+         pragma
+           Debug
+             (Debug_Filesystems_Block_Cache,
+              Log_Debug
+                ("Invalidating block cache entry at index: "
+                 & Best_Eviction_Candidate_Index'Image));
+
+         Cache_Index := Best_Eviction_Candidate_Index;
+         goto Claim_Entry;
+      end if;
 
       Cache_Index := System_Block_Cache.Entries'First;
       Result := Not_Found;
@@ -387,6 +382,9 @@ package body Filesystems.Block_Cache is
       --  invalid state.
       System_Block_Cache.Entries (Cache_Index).Reference_Count :=
         System_Block_Cache.Entries (Cache_Index).Reference_Count - 1;
+
+      System_Block_Cache.Entries (Cache_Index).Last_Access :=
+        RISCV.Get_System_Time;
 
       if Invalidate_Cache_Entry then
          System_Block_Cache.Entries (Cache_Index).Data_Valid := False;

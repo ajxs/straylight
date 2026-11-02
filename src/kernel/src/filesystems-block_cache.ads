@@ -62,8 +62,6 @@ is
    System_Block_Cache : Block_Cache_T;
 
 private
-   Cache_Entry_Age_Threshold : constant Unsigned_64 := 1000000;
-
    function Is_Matching_Used_Cache_Entry
      (Cache        : Block_Cache_T;
       Cache_Index  : Positive;
@@ -77,11 +75,6 @@ private
       Data_Address_Virtual  : out Virtual_Address_T;
       Data_Address_Physical : out Physical_Address_T;
       Result                : out Function_Result);
-
-   function Can_Block_Cache_Entry_Be_Invalidated
-     (Cache        : Block_Cache_T;
-      Cache_Index  : Positive;
-      Current_Time : Unsigned_64) return Boolean;
 
    procedure Find_Existing_Block_In_Cache
      (Cache        : in out Block_Cache_T;
