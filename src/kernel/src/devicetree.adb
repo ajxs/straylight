@@ -108,7 +108,7 @@ package body Devicetree is
 
       Result := Success;
    exception
-      when others =>
+      when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_Reserved_Memory_Regions;
@@ -120,6 +120,12 @@ package body Devicetree is
       Node_Name               : in out Devicetree_String_T;
       Result                  : out Function_Result) is
    begin
+      --  Set an arbitrary maximum length for the string so that we can be
+      --  sure that the loop reading the node name string terminates.
+      --  Section 2.2.1 of the Devicetree specification specifies that a node
+      --  name string should be between 1-31 characters in length, however
+      --  in practice they can be longer. The 1-31 character limit also
+      --  doesn't include the unit address suffix.
       Maximum_Possible_String_Length : constant Integer :=
         Integer'Min
           (Integer (Structure_Block_Size - Curr_Offset),
@@ -138,18 +144,24 @@ package body Devicetree is
         Alignment => 1;
 
       for I in Name_String'Range loop
-         exit when Name_String (I) = ASCII.NUL;
+         if Name_String (I) = ASCII.NUL then
+            --  Increment the current read offset by the length of the node
+            --  name string, taking into account the null terminator.
+            Curr_Offset :=
+              Curr_Offset + Storage_Offset (Node_Name.Byte_Length) + 1;
+
+            Result := Success;
+            return;
+         end if;
+
          Node_Name.Value (I) := Name_String (I);
          Node_Name.Byte_Length := I;
       end loop;
 
-      --  Increment the current read offset by the length of the node name
-      --  string, taking into account the null terminator.
-      Curr_Offset := Curr_Offset + Storage_Offset (Node_Name.Byte_Length) + 1;
-
-      Result := Success;
+      Log_Error ("Unterminated name string encountered");
+      Result := Unhandled_Exception;
    exception
-      when others =>
+      when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Node_Name_String;
@@ -163,6 +175,11 @@ package body Devicetree is
    begin
       Property_Name.Byte_Length := 0;
 
+      --  Set an arbitrary maximum length for the string so that we can be
+      --  sure that the loop reading the property name string terminates.
+      --  Section 2.2.4 of the Devicetree specification specifies that a
+      --  property name should be between 1-31 characters in length, however
+      --  in practice they can be longer.
       Maximum_Possible_String_Length : constant Integer :=
         Integer'Min
           (Integer (String_Table_Size - String_Table_Offset),
@@ -182,19 +199,23 @@ package body Devicetree is
         Alignment  => 1;
 
       for I in Property_Name_String'Range loop
-         exit when Property_Name_String (I) = ASCII.NUL;
+         if Property_Name_String (I) = ASCII.NUL then
+            --  Note that this procedure does not update the current read
+            --  offset into the structure block. Since we're already reading a
+            --  property at this point, the caller will advance the read offset
+            --  by the entire property size.
+            Result := Success;
+            return;
+         end if;
+
          Property_Name.Value (I) := Property_Name_String (I);
          Property_Name.Byte_Length := I;
       end loop;
 
-      --  Note that this procedure does not update the current read offset into
-      --  the structure block. Since we're already reading a property at this
-      --  point, the caller will advance the read offset by the entire property
-      --  size.
-
-      Result := Success;
+      Log_Error ("Unterminated property name string encountered");
+      Result := Unhandled_Exception;
    exception
-      when others =>
+      when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Read_Property_Name_String;
@@ -240,7 +261,7 @@ package body Devicetree is
          & Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)'Image);
 
    exception
-      when others =>
+      when Constraint_Error =>
          Log_Constraint_Error;
    end Print_Devicetree_Header;
 
@@ -335,7 +356,7 @@ package body Devicetree is
 
       Result := Success;
    exception
-      when others =>
+      when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_Property;
@@ -366,7 +387,7 @@ package body Devicetree is
       Curr_Offset := Curr_Offset + 4;
       Result := Success;
    exception
-      when others =>
+      when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Get_Next_Token;
@@ -554,7 +575,7 @@ package body Devicetree is
 
       Result := Success;
    exception
-      when others =>
+      when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_Structure_Block;
@@ -587,7 +608,7 @@ package body Devicetree is
       --  unit address suffix.
       return Node_Name.Value (Target_Name'Length + 1) = ASCII.At_Sign;
    exception
-      when others =>
+      when Constraint_Error =>
          Log_Constraint_Error;
          return False;
    end Compare_Node_Name;
