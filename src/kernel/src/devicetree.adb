@@ -547,7 +547,8 @@ package body Devicetree is
             exit;
          else
             Log_Error ("Unknown token type: " & Token_Value'Image);
-            exit;
+            Result := Invalid_Argument;
+            return;
          end if;
       end loop;
 
@@ -561,21 +562,30 @@ package body Devicetree is
    function Compare_Node_Name
      (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean is
    begin
+      --  Return early if the lengths don't match, taking into account the
+      --  fact that a node name may include a unit address at the end, after
+      --  an '@' character.
       if Target_Name'Length > Node_Name.Byte_Length then
          return False;
       end if;
 
       for I in Target_Name'Range loop
-         if Node_Name.Value (I) /= Target_Name (I) then
+         if Node_Name.Value (I - Target_Name'First + 1) /= Target_Name (I) then
             return False;
-         elsif Node_Name.Value (I) = ASCII.At_Sign then
-            --  If we've reached the '@' character in the node name, without
-            --  finding any mismatches, consider it a match.
-            return True;
          end if;
       end loop;
 
-      return True;
+      --  Since we've compared every character up to Target_Name'Length, we can
+      --  check the entire string is equal by comparing the lengths.
+      if Node_Name.Byte_Length = Target_Name'Length then
+         return True;
+      end if;
+
+      --  If the whole name doesn't match at this point, we can assume that
+      --  the name is *at least* Target_Name'Length + 1 characters long.
+      --  In this case, check if the next character is an '@' signifying a
+      --  unit address suffix.
+      return Node_Name.Value (Target_Name'Length + 1) = ASCII.At_Sign;
    exception
       when others =>
          Log_Constraint_Error;
