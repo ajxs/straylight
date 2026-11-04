@@ -2,36 +2,83 @@ with Logging; use Logging;
 with Memory;  use Memory;
 
 package body Devicetree is
+   FDT_MAGIC_NUMBER : constant Unsigned_32 := 16#D00D_FEED#;
+
+   subtype FDT_Token_T is Unsigned_32;
+
+   type FDT_Property_T is record
+      Length      : Unsigned_32;
+      Name_Offset : Unsigned_32;
+   end record
+   with Convention => C;
+
+   type Reserved_Memory_Block_T is record
+      Addr : Unsigned_64;
+      Size : Unsigned_64;
+   end record
+   with Convention => C;
+
    --  The current address and size cells context is captured in a stack, so
    --  that we can properly handle nested nodes that override the
    --  #address-cells and #size-cells properties.
-   --  Procedures are contained in this package for pushing and popping the
-   --  context as the devicetree is traversed.
    type FDT_Cells_Context_T is record
       Address_Cells : Unsigned_32;
       Size_Cells    : Unsigned_32;
    end record;
 
-   type FDT_Cells_Context_Stack_T is
-     array (Natural range <>) of FDT_Cells_Context_T;
+   Maximum_Cells_Context_Depth : constant := 16;
+
+   type FDT_Cells_Context_Array_T is
+     array (1 .. Maximum_Cells_Context_Depth) of FDT_Cells_Context_T;
+
+   type FDT_Cells_Context_Stack_T is record
+      Contexts : FDT_Cells_Context_Array_T;
+      Count    : Natural := 0;
+   end record;
+
+   --  The state of the structure block parser, shared between the
+   --  procedures that handle each token type.
+   type FDT_Parser_State_T is record
+      Structure_Block_Address : Address;
+      Structure_Block_Size    : Storage_Count;
+      String_Table_Address    : Address;
+      String_Table_Size       : Storage_Count;
+      Curr_Offset             : Storage_Offset := 0;
+      Cells_Context_Stack     : FDT_Cells_Context_Stack_T;
+      --  This is the context the current node declares for its children.
+      --  The node's own 'reg' uses its parent's context, which is on top
+      --  of Cells_Context_Stack.
+      --  Devicetree specification v0.4 section 2.3.5 states:
+      --  'If missing, a client program should assume a default value of 2
+      --  for #address-cells, and a value of 1 for #size-cells.'
+      Current_Cells_Context   : FDT_Cells_Context_T :=
+        (Address_Cells => 2, Size_Cells => 1);
+      --  The name of the most recently started node.
+      Node_Name               : Devicetree_String_T;
+   end record;
+
+   type Devicetree_Property_T is record
+      Name          : Devicetree_String_T;
+      Length        : Unsigned_32 := 0;
+      Value_Address : Address := Null_Address;
+   end record;
 
    procedure Push_Cells_Context
-     (Context_Stack     : in out FDT_Cells_Context_Stack_T;
-      Context_Stack_Ptr : in out Natural;
-      New_Context       : FDT_Cells_Context_T;
-      Result            : out Function_Result) is
+     (Context_Stack : in out FDT_Cells_Context_Stack_T;
+      New_Context   : FDT_Cells_Context_T;
+      Result        : out Function_Result) is
    begin
-      if Context_Stack_Ptr > Context_Stack'Last then
+      if Context_Stack.Count >= Context_Stack.Contexts'Last then
          Log_Error
-           ("Cells context stack overflow: " & Context_Stack_Ptr'Image);
+           ("Cells context stack overflow: " & Context_Stack.Count'Image);
          Result := Constraint_Exception;
          return;
       end if;
 
       pragma Debug (Debug_Devicetree, Log_Debug ("Pushing cells context"));
 
-      Context_Stack (Context_Stack_Ptr) := New_Context;
-      Context_Stack_Ptr := Context_Stack_Ptr + 1;
+      Context_Stack.Count := Context_Stack.Count + 1;
+      Context_Stack.Contexts (Context_Stack.Count) := New_Context;
       Result := Success;
    exception
       when Constraint_Error =>
@@ -40,12 +87,11 @@ package body Devicetree is
    end Push_Cells_Context;
 
    procedure Pop_Cells_Context
-     (Context_Stack     : FDT_Cells_Context_Stack_T;
-      Context_Stack_Ptr : in out Natural;
-      Popped_Context    : out FDT_Cells_Context_T;
-      Result            : out Function_Result) is
+     (Context_Stack  : in out FDT_Cells_Context_Stack_T;
+      Popped_Context : out FDT_Cells_Context_T;
+      Result         : out Function_Result) is
    begin
-      if Context_Stack_Ptr <= Context_Stack'First then
+      if Context_Stack.Count = 0 then
          Log_Error ("Cells context stack underflow");
          Result := Constraint_Exception;
          return;
@@ -53,14 +99,33 @@ package body Devicetree is
 
       pragma Debug (Debug_Devicetree, Log_Debug ("Popping cells context"));
 
-      Context_Stack_Ptr := Context_Stack_Ptr - 1;
-      Popped_Context := Context_Stack (Context_Stack_Ptr);
+      Popped_Context := Context_Stack.Contexts (Context_Stack.Count);
+      Context_Stack.Count := Context_Stack.Count - 1;
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Pop_Cells_Context;
+
+   procedure Peek_Cells_Context
+     (Context_Stack : FDT_Cells_Context_Stack_T;
+      Top_Context   : out FDT_Cells_Context_T;
+      Result        : out Function_Result) is
+   begin
+      if Context_Stack.Count = 0 then
+         Log_Error ("Cells context stack is empty");
+         Result := Constraint_Exception;
+         return;
+      end if;
+
+      Top_Context := Context_Stack.Contexts (Context_Stack.Count);
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Peek_Cells_Context;
 
    ----------------------------------------------------------------------------
    --  Combines up to 2 big-endian cells into one value. 0 cells gives 0.
@@ -419,43 +484,55 @@ package body Devicetree is
       Result := Success;
    end Parse_Devicetree;
 
+   ----------------------------------------------------------------------------
+   --  Rounds an offset into the structure block up to the next 4-byte
+   --  boundary, which is where the next token begins.
+   ----------------------------------------------------------------------------
+   procedure Align_Offset_To_Word
+     (Offset : in out Storage_Offset; Result : out Function_Result) is
+   begin
+      Offset := (Offset + 3) / 4 * 4;
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Align_Offset_To_Word;
+
    procedure Parse_Property
-     (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Count;
-      String_Table_Address    : Address;
-      String_Table_Size       : Storage_Count;
-      Property_Name           : out Devicetree_String_T;
-      Property_Length         : out Unsigned_32;
-      Property_Address        : out Address;
-      Curr_Offset             : in out Storage_Offset;
-      Result                  : out Function_Result)
+     (State    : in out FDT_Parser_State_T;
+      Property : out Devicetree_Property_T;
+      Result   : out Function_Result)
    is
-      Property : FDT_Property_T
+      Raw_Property : constant FDT_Property_T
       with
         Import,
-        Address   => Structure_Block_Address + Curr_Offset,
+        Address   => State.Structure_Block_Address + State.Curr_Offset,
         Alignment => 1;
    begin
-      Property_Length := 0;
-      Property_Address := Null_Address;
+      Property.Length := 0;
+      Property.Value_Address := Null_Address;
 
       Read_Property_Name_String
-        (String_Table_Address,
-         String_Table_Size,
-         Storage_Offset (Convert_BEU32_To_LEU32 (Property.Name_Offset)),
-         Property_Name,
+        (State.String_Table_Address,
+         State.String_Table_Size,
+         Storage_Offset (Convert_BEU32_To_LEU32 (Raw_Property.Name_Offset)),
+         Property.Name,
          Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Property_Length := Convert_BEU32_To_LEU32 (Property.Length);
-      Property_Address := Structure_Block_Address + Curr_Offset + 8;
+      Property.Length := Convert_BEU32_To_LEU32 (Raw_Property.Length);
+      Property.Value_Address :=
+        State.Structure_Block_Address + State.Curr_Offset + 8;
 
       --  Advance the read offset by the size of the property structure
       --  (8 bytes) plus the length of the property value.
-      Curr_Offset := Curr_Offset + 8 + Storage_Offset (Property_Length);
-      if Curr_Offset >= Structure_Block_Size then
+      State.Curr_Offset :=
+        State.Curr_Offset + 8 + Storage_Offset (Property.Length);
+
+      if State.Curr_Offset >= State.Structure_Block_Size then
          Log_Error ("Property exceeds structure block size.");
          Result := Unhandled_Exception;
          return;
@@ -469,19 +546,17 @@ package body Devicetree is
    end Parse_Property;
 
    procedure Get_Next_Token
-     (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Count;
-      Curr_Offset             : in out Storage_Offset;
-      Token_Value             : out Unsigned_32;
-      Result                  : out Function_Result)
+     (State       : in out FDT_Parser_State_T;
+      Token_Value : out Unsigned_32;
+      Result      : out Function_Result)
    is
       Curr_Token : constant FDT_Token_T
       with
         Import,
-        Address   => Structure_Block_Address + Curr_Offset,
+        Address   => State.Structure_Block_Address + State.Curr_Offset,
         Alignment => 1;
    begin
-      if Curr_Offset >= Structure_Block_Size then
+      if State.Curr_Offset >= State.Structure_Block_Size then
          Log_Error ("End of structure block reached while reading token");
          Result := Unhandled_Exception;
          Token_Value := 0;
@@ -491,13 +566,233 @@ package body Devicetree is
       Token_Value := Convert_BEU32_To_LEU32 (Curr_Token);
 
       --  Advance the read offset by the size of the token (4 bytes).
-      Curr_Offset := Curr_Offset + 4;
+      State.Curr_Offset := State.Curr_Offset + 4;
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Get_Next_Token;
+
+   procedure Log_Node_Name (Node_Name : Devicetree_String_T) is
+   begin
+      Log_Debug
+        ("  Node Name: '"
+         & Node_Name.Value (1 .. Node_Name.Byte_Length)
+         & "'");
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+   end Log_Node_Name;
+
+   procedure Log_Cells_Context (Cells_Context : FDT_Cells_Context_T) is
+   begin
+      Log_Debug
+        ("Node cells context: ("
+         & "Address_Cells: "
+         & Cells_Context.Address_Cells'Image
+         & ", Size_Cells: "
+         & Cells_Context.Size_Cells'Image
+         & ")");
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+   end Log_Cells_Context;
+
+   procedure Log_Property (Property : Devicetree_Property_T) is
+   begin
+      Log_Debug ("Property:");
+      Log_Debug
+        ("  Name: '"
+         & Property.Name.Value (1 .. Property.Name.Byte_Length)
+         & "'");
+
+      if Property.Length = 0 then
+         Log_Debug ("  (No Value)");
+      elsif Is_String_Value (Property.Name) then
+         Read_Property_Value : declare
+            Property_Value : String (1 .. Integer (Property.Length))
+            with Import, Address => Property.Value_Address, Alignment => 1;
+         begin
+            Log_Debug ("  Value: '" & Property_Value & "'");
+         end Read_Property_Value;
+      end if;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+   end Log_Property;
+
+   ----------------------------------------------------------------------------
+   --  Reads the value of an #address-cells or #size-cells property.
+   ----------------------------------------------------------------------------
+   procedure Read_Cells_Property
+     (Property    : Devicetree_Property_T;
+      Cells_Value : out Unsigned_32;
+      Result      : out Function_Result)
+   is
+      Property_Value : constant Unsigned_32
+      with Import, Address => Property.Value_Address, Alignment => 1;
+   begin
+      Cells_Value := 0;
+
+      if Property.Length /= 4 then
+         Log_Error ("Invalid cells property length");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Cells_Value := Convert_BEU32_To_LEU32 (Property_Value);
+      Result := Success;
+   end Read_Cells_Property;
+
+   procedure Parse_Reg_Property
+     (State    : FDT_Parser_State_T;
+      Property : Devicetree_Property_T;
+      Result   : out Function_Result)
+   is
+      Parent_Cells_Context  : FDT_Cells_Context_T;
+      Total_Reg_Entry_Count : Natural := 0;
+      Reg_Base              : Unsigned_64 := 0;
+      Reg_Size              : Unsigned_64 := 0;
+   begin
+      --  A node's 'reg' uses its parent's cells context, which was pushed on
+      --  entry to this node.
+      Peek_Cells_Context
+        (State.Cells_Context_Stack, Parent_Cells_Context, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      --  If the parent node's address-cells or size-cells exceed 2, we cannot
+      --  parse the 'reg' property into 64-bit values.
+      --  This might occur in PCI device nodes.
+      if Parent_Cells_Context.Address_Cells > 2
+        or else Parent_Cells_Context.Size_Cells > 2
+      then
+         Log_Error
+           ("Skipping 'reg' with unsupported cell sizes in node '"
+            & State.Node_Name.Value (1 .. State.Node_Name.Byte_Length)
+            & "'");
+         Result := Success;
+         return;
+      end if;
+
+      Get_Reg_Entry_Count
+        (Property.Length, Parent_Cells_Context, Total_Reg_Entry_Count, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      for Entry_Index in 0 .. Total_Reg_Entry_Count - 1 loop
+         Read_Reg_Entry
+           (Property.Value_Address,
+            Property.Length,
+            Parent_Cells_Context,
+            Entry_Index,
+            Reg_Base,
+            Reg_Size,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         pragma
+           Debug
+             (Debug_Devicetree,
+              Log_Debug
+                ("  Reg"
+                 & Entry_Index'Image
+                 & ": Base="
+                 & Reg_Base'Image
+                 & ", Size="
+                 & Reg_Size'Image));
+      end loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Parse_Reg_Property;
+
+   procedure Handle_Begin_Node
+     (State : in out FDT_Parser_State_T; Result : out Function_Result) is
+   begin
+      pragma Debug (Debug_Devicetree, Log_Debug ("START STRUCTURE"));
+      State.Node_Name.Byte_Length := 0;
+
+      Push_Cells_Context
+        (State.Cells_Context_Stack, State.Current_Cells_Context, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Read_Node_Name_String
+        (State.Structure_Block_Address,
+         State.Structure_Block_Size,
+         State.Curr_Offset,
+         State.Node_Name,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Align_Offset_To_Word (State.Curr_Offset, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      pragma Debug (Debug_Devicetree, Log_Node_Name (State.Node_Name));
+   end Handle_Begin_Node;
+
+   procedure Handle_End_Node
+     (State : in out FDT_Parser_State_T; Result : out Function_Result) is
+   begin
+      pragma
+        Debug
+          (Debug_Devicetree, Log_Cells_Context (State.Current_Cells_Context));
+
+      Pop_Cells_Context
+        (State.Cells_Context_Stack, State.Current_Cells_Context, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      pragma Debug (Debug_Devicetree, Log_Debug ("END STRUCTURE"));
+   end Handle_End_Node;
+
+   procedure Handle_Property
+     (State : in out FDT_Parser_State_T; Result : out Function_Result)
+   is
+      Property : Devicetree_Property_T;
+   begin
+      Parse_Property (State, Property, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      pragma Debug (Debug_Devicetree, Log_Property (Property));
+
+      if Compare_Fixed_Length_String_With_String
+           (Property.Name, "#address-cells")
+      then
+         Read_Cells_Property
+           (Property, State.Current_Cells_Context.Address_Cells, Result);
+      elsif Compare_Fixed_Length_String_With_String
+              (Property.Name, "#size-cells")
+      then
+         Read_Cells_Property
+           (Property, State.Current_Cells_Context.Size_Cells, Result);
+      elsif Compare_Fixed_Length_String_With_String (Property.Name, "reg") then
+         Parse_Reg_Property (State, Property, Result);
+      end if;
+
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Align_Offset_To_Word (State.Curr_Offset, Result);
+   end Handle_Property;
 
    procedure Parse_Structure_Block
      (Structure_Block_Address : Address;
@@ -506,254 +801,50 @@ package body Devicetree is
       String_Table_Size       : Storage_Count;
       Result                  : out Function_Result)
    is
-      Curr_Offset : Storage_Offset := 0;
-
-      Node_Name : Devicetree_String_T;
-
-      Property_Name    : Devicetree_String_T;
-      Property_Length  : Unsigned_32;
-      Property_Address : Address;
-
       FDT_BEGIN_NODE : constant := 1;
       FDT_END_NODE   : constant := 2;
       FDT_PROP       : constant := 3;
       FDT_NOP        : constant := 4;
       FDT_END        : constant := 9;
 
-      Cells_Context_Stack     : FDT_Cells_Context_Stack_T (1 .. 16);
-      Cells_Context_Stack_Ptr : Natural := Cells_Context_Stack'First;
-
-      --  Devicetree specification v0.4 section 2.3.5 states:
-      --  'If missing, a client program should assume a default value of 2 for
-      --  #address-cells, and a value of 1 for #size-cells.'
-      --  This is the context the current node declares for its children.
-      --  The node's own 'reg' uses its parent's context, which is on top
-      --  of Cells_Context_Stack.
-      Current_Cells_Context : FDT_Cells_Context_T :=
-        (Address_Cells => 2, Size_Cells => 1);
+      State : FDT_Parser_State_T :=
+        (Structure_Block_Address => Structure_Block_Address,
+         Structure_Block_Size    => Structure_Block_Size,
+         String_Table_Address    => String_Table_Address,
+         String_Table_Size       => String_Table_Size,
+         others                  => <>);
 
       Token_Value : Unsigned_32 := 0;
    begin
       loop
-         Get_Next_Token
-           (Structure_Block_Address,
-            Structure_Block_Size,
-            Curr_Offset,
-            Token_Value,
-            Result);
+         Get_Next_Token (State, Token_Value, Result);
          if Is_Error (Result) then
             return;
          end if;
 
-         if Token_Value = FDT_BEGIN_NODE then
-            pragma Debug (Debug_Devicetree, Log_Debug ("START STRUCTURE"));
-            Node_Name.Byte_Length := 0;
+         case Token_Value is
+            when FDT_BEGIN_NODE =>
+               Handle_Begin_Node (State, Result);
 
-            Push_Cells_Context
-              (Cells_Context_Stack,
-               Cells_Context_Stack_Ptr,
-               Current_Cells_Context,
-               Result);
-            if Is_Error (Result) then
-               return;
-            end if;
+            when FDT_END_NODE   =>
+               Handle_End_Node (State, Result);
 
-            Read_Node_Name_String
-              (Structure_Block_Address,
-               Structure_Block_Size,
-               Curr_Offset,
-               Node_Name,
-               Result);
-            if Is_Error (Result) then
-               return;
-            end if;
+            when FDT_PROP       =>
+               Handle_Property (State, Result);
 
-            --  Align offset to the next word boundary.
-            while Curr_Offset mod 4 /= 0 loop
-               Curr_Offset := Curr_Offset + 1;
-            end loop;
+            when FDT_NOP        =>
+               pragma Debug (Debug_Devicetree, Log_Debug ("NOP"));
 
-            pragma
-              Debug
-                (Debug_Devicetree,
-                 Log_Debug
-                   ("  Node Name: '"
-                    & Node_Name.Value (1 .. Node_Name.Byte_Length)
-                    & "'"));
+            when FDT_END        =>
+               pragma Debug (Debug_Devicetree, Log_Debug ("END"));
+               exit;
 
-         elsif Token_Value = FDT_END_NODE then
-            pragma
-              Debug
-                (Debug_Devicetree,
-                 Log_Debug
-                   ("Node cells context: ("
-                    & "Address_Cells: "
-                    & Current_Cells_Context.Address_Cells'Image
-                    & ", Size_Cells: "
-                    & Current_Cells_Context.Size_Cells'Image
-                    & ")"));
+            when others         =>
+               Log_Error ("Unknown token type: " & Token_Value'Image);
+               Result := Invalid_Argument;
+         end case;
 
-            Pop_Cells_Context
-              (Cells_Context_Stack,
-               Cells_Context_Stack_Ptr,
-               Current_Cells_Context,
-               Result);
-            if Is_Error (Result) then
-               return;
-            end if;
-
-            pragma Debug (Debug_Devicetree, Log_Debug ("END STRUCTURE"));
-         elsif Token_Value = FDT_PROP then
-            Parse_Property
-              (Structure_Block_Address,
-               Structure_Block_Size,
-               String_Table_Address,
-               String_Table_Size,
-               Property_Name,
-               Property_Length,
-               Property_Address,
-               Curr_Offset,
-               Result);
-            if Is_Error (Result) then
-               return;
-            end if;
-
-            pragma Debug (Debug_Devicetree, Log_Debug ("Property:"));
-
-            pragma
-              Debug
-                (Debug_Devicetree,
-                 Log_Debug
-                   ("  Name: '"
-                    & Property_Name.Value (1 .. Property_Name.Byte_Length)
-                    & "'"));
-
-            if Property_Length = 0 then
-               pragma Debug (Debug_Devicetree, Log_Debug ("  (No Value)"));
-            elsif Is_String_Value (Property_Name) then
-               Read_Property_Value : declare
-                  Prop_Value : String (1 .. Integer (Property_Length))
-                  with Import, Address => Property_Address, Alignment => 1;
-               begin
-                  pragma
-                    Debug
-                      (Debug_Devicetree,
-                       Log_Debug ("  Value: '" & Prop_Value & "'"));
-               end Read_Property_Value;
-            end if;
-
-            if Compare_Fixed_Length_String_With_String
-                 (Property_Name, "#size-cells")
-              or else
-                Compare_Fixed_Length_String_With_String
-                  (Property_Name, "#address-cells")
-            then
-               Read_Cells_Property_Value : declare
-                  Prop_Value : constant Unsigned_32
-                  with Import, Address => Property_Address, Alignment => 1;
-               begin
-                  if Property_Length /= 4 then
-                     Log_Error ("Invalid cells property length");
-                     Result := Invalid_Argument;
-                     return;
-                  end if;
-
-                  Cells_Value : constant Unsigned_32 :=
-                    Convert_BEU32_To_LEU32 (Prop_Value);
-
-                  if Compare_Fixed_Length_String_With_String
-                       (Property_Name, "#size-cells")
-                  then
-                     Current_Cells_Context.Size_Cells := Cells_Value;
-                  elsif Compare_Fixed_Length_String_With_String
-                          (Property_Name, "#address-cells")
-                  then
-                     Current_Cells_Context.Address_Cells := Cells_Value;
-                  end if;
-               end Read_Cells_Property_Value;
-
-            elsif Compare_Fixed_Length_String_With_String
-                    (Property_Name, "reg")
-            then
-               if Cells_Context_Stack_Ptr <= Cells_Context_Stack'First then
-                  Log_Error ("No parent cells context for 'reg' property");
-                  Result := Invalid_Argument;
-                  return;
-               end if;
-
-               Read_Reg_Property : declare
-                  --  A node's 'reg' uses its parent's cells context, which
-                  --  was pushed on entry to this node.
-                  Parent_Cells_Context : constant FDT_Cells_Context_T :=
-                    Cells_Context_Stack (Cells_Context_Stack_Ptr - 1);
-
-                  Reg_Base : Unsigned_64 := 0;
-                  Reg_Size : Unsigned_64 := 0;
-
-                  Total_Reg_Entry_Count : Natural := 0;
-
-                  --  If the parent node's address-cells or size-cells exceed
-                  --  2, we cannot parse the 'reg' property into 64-bit values.
-                  --  This might occur in PCI device nodes.
-                  Cells_Context_Is_Parseable : constant Boolean :=
-                    Parent_Cells_Context.Address_Cells <= 2
-                    and then Parent_Cells_Context.Size_Cells <= 2;
-               begin
-                  if Cells_Context_Is_Parseable then
-                     Get_Reg_Entry_Count
-                       (Property_Length,
-                        Parent_Cells_Context,
-                        Total_Reg_Entry_Count,
-                        Result);
-                     if Is_Error (Result) then
-                        return;
-                     end if;
-
-                     for Entry_Index in 0 .. Total_Reg_Entry_Count - 1 loop
-                        Read_Reg_Entry
-                          (Property_Address,
-                           Property_Length,
-                           Parent_Cells_Context,
-                           Entry_Index,
-                           Reg_Base,
-                           Reg_Size,
-                           Result);
-                        if Is_Error (Result) then
-                           return;
-                        end if;
-
-                        pragma
-                          Debug
-                            (Debug_Devicetree,
-                             Log_Debug
-                               ("  Reg"
-                                & Entry_Index'Image
-                                & ": Base="
-                                & Reg_Base'Image
-                                & ", Size="
-                                & Reg_Size'Image));
-                     end loop;
-                  else
-                     Log_Error
-                       ("Skipping 'reg' with unsupported cell sizes in node '"
-                        & Node_Name.Value (1 .. Node_Name.Byte_Length)
-                        & "'");
-                  end if;
-               end Read_Reg_Property;
-            end if;
-
-            --  Align offset to the next word boundary.
-            while Curr_Offset mod 4 /= 0 loop
-               Curr_Offset := Curr_Offset + 1;
-            end loop;
-         elsif Token_Value = FDT_NOP then
-            pragma Debug (Debug_Devicetree, Log_Debug ("NOP"));
-         elsif Token_Value = FDT_END then
-            pragma Debug (Debug_Devicetree, Log_Debug ("END"));
-            exit;
-         else
-            Log_Error ("Unknown token type: " & Token_Value'Image);
-            Result := Invalid_Argument;
+         if Is_Error (Result) then
             return;
          end if;
       end loop;
