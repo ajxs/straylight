@@ -62,6 +62,113 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Pop_Cells_Context;
 
+   ----------------------------------------------------------------------------
+   --  Combines up to 2 big-endian cells into one value. 0 cells gives 0.
+   ----------------------------------------------------------------------------
+   function Read_Cells_Value
+     (Value_Address : Address; Cell_Count : Unsigned_32) return Unsigned_64
+   is
+      Value : Unsigned_64 := 0;
+   begin
+      --  Each cell is 4 bytes, this loop reads them in big-endian order,
+      --  shifting the accumulated value 32 bits left for each cell.
+      for I in 1 .. Cell_Count loop
+         Read_Cell : declare
+            Cell : constant Unsigned_32
+            with
+              Import,
+              Address   => Value_Address + Storage_Offset ((I - 1) * 4),
+              Alignment => 1;
+         begin
+            Value :=
+              Shift_Left (Value, 32)
+              or Unsigned_64 (Convert_BEU32_To_LEU32 (Cell));
+         end Read_Cell;
+      end loop;
+
+      return Value;
+   end Read_Cells_Value;
+
+   procedure Get_Reg_Entry_Count
+     (Property_Length : Unsigned_32;
+      Cells_Context   : FDT_Cells_Context_T;
+      Entry_Count     : out Natural;
+      Result          : out Function_Result) is
+   begin
+      Entry_Size : constant Unsigned_32 :=
+        (Cells_Context.Address_Cells + Cells_Context.Size_Cells) * 4;
+
+      if Entry_Size = 0 then
+         Entry_Count := 0;
+         Result := Success;
+         return;
+      end if;
+
+      Entry_Count := Natural (Property_Length / Entry_Size);
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Entry_Count := 0;
+         Result := Constraint_Exception;
+   end Get_Reg_Entry_Count;
+
+   procedure Read_Reg_Entry
+     (Property_Address : Address;
+      Property_Length  : Unsigned_32;
+      Cells_Context    : FDT_Cells_Context_T;
+      Entry_Index      : Natural;
+      Reg_Base         : out Unsigned_64;
+      Reg_Size         : out Unsigned_64;
+      Result           : out Function_Result)
+   is
+      Total_Reg_Entry_Count : Natural;
+   begin
+      Reg_Base := 0;
+      Reg_Size := 0;
+
+      --  Values wider than 2 cells don't fit in the 64-bit outputs.
+      if Cells_Context.Address_Cells > 2 or else Cells_Context.Size_Cells > 2
+      then
+         Log_Error ("Unsupported reg cell counts");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Get_Reg_Entry_Count
+        (Property_Length, Cells_Context, Total_Reg_Entry_Count, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      if Entry_Index >= Total_Reg_Entry_Count then
+         Log_Error ("reg entry index out of range: " & Entry_Index'Image);
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Address_Size : constant Storage_Offset :=
+        Storage_Offset (Cells_Context.Address_Cells * 4);
+
+      Entry_Size : constant Storage_Offset :=
+        Address_Size + Storage_Offset (Cells_Context.Size_Cells * 4);
+
+      Entry_Address : constant Address :=
+        Property_Address + Storage_Offset (Entry_Index) * Entry_Size;
+
+      Reg_Base :=
+        Read_Cells_Value (Entry_Address, Cells_Context.Address_Cells);
+      Reg_Size :=
+        Read_Cells_Value
+          (Entry_Address + Address_Size, Cells_Context.Size_Cells);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Read_Reg_Entry;
+
    procedure Parse_Reserved_Memory_Regions
      (Reserved_Mem_Map_Address : Address;
       Total_Size               : Storage_Count;
@@ -419,6 +526,9 @@ package body Devicetree is
       --  Devicetree specification v0.4 section 2.3.5 states:
       --  'If missing, a client program should assume a default value of 2 for
       --  #address-cells, and a value of 1 for #size-cells.'
+      --  This is the context the current node declares for its children.
+      --  The node's own 'reg' uses its parent's context, which is on top
+      --  of Cells_Context_Stack.
       Current_Cells_Context : FDT_Cells_Context_T :=
         (Address_Cells => 2, Size_Cells => 1);
 
@@ -542,6 +652,12 @@ package body Devicetree is
                   Prop_Value : constant Unsigned_32
                   with Import, Address => Property_Address, Alignment => 1;
                begin
+                  if Property_Length /= 4 then
+                     Log_Error ("Invalid cells property length");
+                     Result := Invalid_Argument;
+                     return;
+                  end if;
+
                   Cells_Value : constant Unsigned_32 :=
                     Convert_BEU32_To_LEU32 (Prop_Value);
 
@@ -555,6 +671,75 @@ package body Devicetree is
                      Current_Cells_Context.Address_Cells := Cells_Value;
                   end if;
                end Read_Cells_Property_Value;
+
+            elsif Compare_Fixed_Length_String_With_String
+                    (Property_Name, "reg")
+            then
+               if Cells_Context_Stack_Ptr <= Cells_Context_Stack'First then
+                  Log_Error ("No parent cells context for 'reg' property");
+                  Result := Invalid_Argument;
+                  return;
+               end if;
+
+               Read_Reg_Property : declare
+                  --  A node's 'reg' uses its parent's cells context, which
+                  --  was pushed on entry to this node.
+                  Parent_Cells_Context : constant FDT_Cells_Context_T :=
+                    Cells_Context_Stack (Cells_Context_Stack_Ptr - 1);
+
+                  Reg_Base : Unsigned_64 := 0;
+                  Reg_Size : Unsigned_64 := 0;
+
+                  Total_Reg_Entry_Count : Natural := 0;
+
+                  --  If the parent node's address-cells or size-cells exceed
+                  --  2, we cannot parse the 'reg' property into 64-bit values.
+                  --  This might occur in PCI device nodes.
+                  Cells_Context_Is_Parseable : constant Boolean :=
+                    Parent_Cells_Context.Address_Cells <= 2
+                    and then Parent_Cells_Context.Size_Cells <= 2;
+               begin
+                  if Cells_Context_Is_Parseable then
+                     Get_Reg_Entry_Count
+                       (Property_Length,
+                        Parent_Cells_Context,
+                        Total_Reg_Entry_Count,
+                        Result);
+                     if Is_Error (Result) then
+                        return;
+                     end if;
+
+                     for Entry_Index in 0 .. Total_Reg_Entry_Count - 1 loop
+                        Read_Reg_Entry
+                          (Property_Address,
+                           Property_Length,
+                           Parent_Cells_Context,
+                           Entry_Index,
+                           Reg_Base,
+                           Reg_Size,
+                           Result);
+                        if Is_Error (Result) then
+                           return;
+                        end if;
+
+                        pragma
+                          Debug
+                            (Debug_Devicetree,
+                             Log_Debug
+                               ("  Reg"
+                                & Entry_Index'Image
+                                & ": Base="
+                                & Reg_Base'Image
+                                & ", Size="
+                                & Reg_Size'Image));
+                     end loop;
+                  else
+                     Log_Error
+                       ("Skipping 'reg' with unsupported cell sizes in node '"
+                        & Node_Name.Value (1 .. Node_Name.Byte_Length)
+                        & "'");
+                  end if;
+               end Read_Reg_Property;
             end if;
 
             --  Align offset to the next word boundary.
