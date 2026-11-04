@@ -63,8 +63,9 @@ package body Devicetree is
       --  for #address-cells, and a value of 1 for #size-cells.'
       Current_Cells_Context   : FDT_Cells_Context_T :=
         (Address_Cells => 2, Size_Cells => 1);
-      --  The name of the most recently started node.
-      Node_Name               : Devicetree_String_T;
+
+      --  The name of the node currently being parsed.
+      Current_Node_Name : Devicetree_String_T;
 
       --  Current_Node_Reg_Property's Value_Address is null if the node has
       --  no 'reg'.
@@ -738,7 +739,8 @@ package body Devicetree is
       then
          Log_Error
            ("Skipping 'reg' with unsupported cell sizes in node '"
-            & State.Node_Name.Value (1 .. State.Node_Name.Byte_Length)
+            & State.Current_Node_Name.Value
+                (1 .. State.Current_Node_Name.Byte_Length)
             & "'");
          Result := Success;
          return;
@@ -827,7 +829,7 @@ package body Devicetree is
          return;
       end if;
 
-      State.Node_Name.Byte_Length := 0;
+      State.Current_Node_Name.Byte_Length := 0;
 
       Push_Cells_Context
         (State.Cells_Context_Stack, State.Current_Cells_Context, Result);
@@ -839,7 +841,7 @@ package body Devicetree is
         (State.Structure_Block_Address,
          State.Structure_Block_Size,
          State.Curr_Offset,
-         State.Node_Name,
+         State.Current_Node_Name,
          Result);
       if Is_Error (Result) then
          return;
@@ -850,7 +852,7 @@ package body Devicetree is
          return;
       end if;
 
-      pragma Debug (Debug_Devicetree, Log_Node_Name (State.Node_Name));
+      pragma Debug (Debug_Devicetree, Log_Node_Name (State.Current_Node_Name));
    end Handle_Begin_Node;
 
    procedure Handle_End_Node
