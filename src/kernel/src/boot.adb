@@ -23,6 +23,7 @@ with Logging;              use Logging;
 with Memory.Kernel;        use Memory.Kernel;
 with Memory.Physical;      use Memory.Physical;
 with Memory.Virtual;       use Memory.Virtual;
+with RISCV.Paging;
 with RISCV.SBI;
 with Processes.Scheduler;
 with Traps;
@@ -661,25 +662,64 @@ package body Boot is
       Kernel_End : constant Natural
       with Import, External_Name => "__kernel_end";
 
+      Page_Mask : constant Unsigned_64 := RISCV.Paging.Small_Page_Size - 1;
+
+      --  Until reserved memory regions are excluded, only memory above the
+      --  kernel image is used. This assumes that the firmware sits below it.
+      Kernel_End_Phys_Addr_As_U64 : constant Unsigned_64 :=
+        Address_To_Unsigned_64
+          (Address (Get_Lower_Physical_Address (Kernel_End'Address)));
+
       Result : Function_Result := Unset;
    begin
       pragma Debug (Debug_Boot, Log_Debug ("Initialising PMM..."));
 
-      Free_Physical_Memory_Length : constant Storage_Offset :=
-        To_Address (16#8800_0000#) - (Kernel_End'Address - Higher_Half_Offset);
-
-      if Free_Physical_Memory_Length not in Storage_Count'Range then
-         Panic ("Invalid free physical memory length");
+      if Devicetree.Memory_Region_Count = 0 then
+         Panic ("No memory regions available");
       end if;
 
-      Create_Free_Physical_Memory_Region
-        (Get_Lower_Physical_Address (Kernel_End'Address),
-         Free_Physical_Memory_Length,
-         Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
+      --  The Devicetree blob isn't used after this point, so it's alright for
+      --  the memory it sits in to be allocated as free memory.
+      for Region of
+        Devicetree.Memory_Regions (1 .. Devicetree.Memory_Region_Count)
+      loop
+         Map_Physical_Memory_Region : declare
+            --  Align the region addresses to a page boundary, and clamp
+            --  the region to the physical memory map's limits.
+            --  Clamping both ends to the map's limit first means rounding
+            --  can't wrap around.
+            Region_Start : constant Unsigned_64 :=
+              (Unsigned_64'Min
+                 (Unsigned_64'Max (Region.Base, Kernel_End_Phys_Addr_As_U64),
+                  Physical_Memory_Map_Limit)
+               + Page_Mask)
+              and not Page_Mask;
+
+            Region_End : constant Unsigned_64 :=
+              Unsigned_64'Min
+                (Region.Base + Region.Size, Physical_Memory_Map_Limit)
+              and not Page_Mask;
+         begin
+            if Region_End > Region_Start then
+               pragma
+                 Debug
+                   (Debug_Boot,
+                    Log_Debug
+                      ("Free physical memory:"
+                       & Region_Start'Image
+                       & " .."
+                       & Region_End'Image));
+
+               Create_Free_Physical_Memory_Region
+                 (Physical_Address_T (Unsigned_64_To_Address (Region_Start)),
+                  Storage_Count (Region_End - Region_Start),
+                  Result);
+               if Is_Error (Result) then
+                  Panic ("Error creating free physical memory region");
+               end if;
+            end if;
+         end Map_Physical_Memory_Region;
+      end loop;
 
       pragma Debug (Debug_Boot, Log_Debug ("Initialised PMM."));
    exception

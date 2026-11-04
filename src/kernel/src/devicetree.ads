@@ -8,6 +8,22 @@ with Utilities;        use Utilities;
 package Devicetree
   with Preelaborate
 is
+   --  A range of physical memory described by a 'memory' node's 'reg'.
+   type Memory_Region_T is record
+      Base : Unsigned_64 := 0;
+      Size : Unsigned_64 := 0;
+   end record;
+
+   Maximum_Memory_Regions : constant := 16;
+
+   type Memory_Region_Array_T is
+     array (1 .. Maximum_Memory_Regions) of Memory_Region_T;
+
+   --  The memory regions found by Parse_Devicetree. They are copied out of
+   --  the blob so that it isn't needed once physical memory is in use.
+   Memory_Regions      : Memory_Region_Array_T;
+   Memory_Region_Count : Natural := 0;
+
    procedure Parse_Devicetree
      (DTB_Address : Address; Result : out Function_Result);
 

@@ -36,8 +36,18 @@ package body Devicetree is
       Count    : Natural := 0;
    end record;
 
+   type Devicetree_Property_T is record
+      Name          : Devicetree_String_T;
+      Length        : Unsigned_32 := 0;
+      Value_Address : Address := Null_Address;
+   end record;
+
    --  The state of the structure block parser, shared between the
    --  procedures that handle each token type.
+   --  Some properties of the current node can only be acted on once all
+   --  of its properties have been read, since the standard doesn't dictate
+   --  their order. These properties are stored in the parser state until the
+   --  node is fully parsed.
    type FDT_Parser_State_T is record
       Structure_Block_Address : Address;
       Structure_Block_Size    : Storage_Count;
@@ -55,12 +65,13 @@ package body Devicetree is
         (Address_Cells => 2, Size_Cells => 1);
       --  The name of the most recently started node.
       Node_Name               : Devicetree_String_T;
-   end record;
 
-   type Devicetree_Property_T is record
-      Name          : Devicetree_String_T;
-      Length        : Unsigned_32 := 0;
-      Value_Address : Address := Null_Address;
+      --  Current_Node_Reg_Property's Value_Address is null if the node has
+      --  no 'reg'.
+      Current_Node_Reg_Property : Devicetree_Property_T;
+
+      --  In future, this could be replaced by a 'Current_Node_Type' enum.
+      Current_Node_Is_Memory : Boolean := False;
    end record;
 
    procedure Push_Cells_Context
@@ -471,6 +482,8 @@ package body Devicetree is
          return;
       end if;
 
+      Memory_Region_Count := 0;
+
       Parse_Structure_Block
         (Structure_Block_Address,
          Storage_Count (Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)),
@@ -645,6 +658,60 @@ package body Devicetree is
       Result := Success;
    end Read_Cells_Property;
 
+   function Compare_Property_Value_With_String
+     (Property : Devicetree_Property_T; Value : String) return Boolean is
+   begin
+      --  The stored value includes the null terminator.
+      if Property.Length /= Unsigned_32 (Value'Length) + 1 then
+         return False;
+      end if;
+
+      Compare_Property_Value : declare
+         Property_Value : String (1 .. Value'Length + 1)
+         with Import, Address => Property.Value_Address, Alignment => 1;
+      begin
+         return
+           Property_Value (1 .. Value'Length) = Value
+           and then Property_Value (Property_Value'Last) = ASCII.NUL;
+      end Compare_Property_Value;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         return False;
+   end Compare_Property_Value_With_String;
+
+   procedure Add_Memory_Region
+     (Base : Unsigned_64; Size : Unsigned_64; Result : out Function_Result) is
+   begin
+      if Size = 0 then
+         Result := Success;
+         return;
+      end if;
+
+      --  Ensure that the memory region size doesn't overflow the address
+      --  space, and wrap around.
+      if Size > Unsigned_64'Last - Base then
+         Log_Error ("Memory region exceeds the address space");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if Memory_Region_Count >= Memory_Regions'Last then
+         Log_Error ("Too many memory regions in devicetree");
+         Result := Region_Array_Exhausted;
+         return;
+      end if;
+
+      Memory_Region_Count := Memory_Region_Count + 1;
+      Memory_Regions (Memory_Region_Count) := (Base, Size);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Add_Memory_Region;
+
    procedure Parse_Reg_Property
      (State    : FDT_Parser_State_T;
       Property : Devicetree_Property_T;
@@ -706,6 +773,13 @@ package body Devicetree is
                  & Reg_Base'Image
                  & ", Size="
                  & Reg_Size'Image));
+
+         if State.Current_Node_Is_Memory then
+            Add_Memory_Region (Reg_Base, Reg_Size, Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+         end if;
       end loop;
 
       Result := Success;
@@ -715,10 +789,44 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Parse_Reg_Property;
 
+   ----------------------------------------------------------------------------
+   --  'Finalise' the node after all its properties have been read, since the
+   --  standard does not dictate the order in which a node's properties appear.
+   --  Section 5.4.2 of the Devicetree specification requires a node's
+   --  properties to precede its child nodes, so this is called at the start
+   --  of the first child node, or at the end of the node. As such, this
+   --  procedure needs to be idempotent.
+   ----------------------------------------------------------------------------
+   procedure Finalise_Node_Properties
+     (State : in out FDT_Parser_State_T; Result : out Function_Result) is
+   begin
+      if State.Current_Node_Reg_Property.Value_Address /= Null_Address then
+         Parse_Reg_Property (State, State.Current_Node_Reg_Property, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+      end if;
+
+      --  Clear the current node's state.
+      State.Current_Node_Reg_Property.Value_Address := Null_Address;
+      State.Current_Node_Is_Memory := False;
+
+      Result := Success;
+   end Finalise_Node_Properties;
+
    procedure Handle_Begin_Node
      (State : in out FDT_Parser_State_T; Result : out Function_Result) is
    begin
       pragma Debug (Debug_Devicetree, Log_Debug ("START STRUCTURE"));
+
+      --  Finalise the current node's properties before starting a new node.
+      --  This runs before the push, so the parent node's 'reg' is still
+      --  decoded with its own parent's cells context.
+      Finalise_Node_Properties (State, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
       State.Node_Name.Byte_Length := 0;
 
       Push_Cells_Context
@@ -752,6 +860,13 @@ package body Devicetree is
         Debug
           (Debug_Devicetree, Log_Cells_Context (State.Current_Cells_Context));
 
+      --  If the node hasn't already been finalised before parsing its first
+      --  child node, finalise it here.
+      Finalise_Node_Properties (State, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
       Pop_Cells_Context
         (State.Cells_Context_Stack, State.Current_Cells_Context, Result);
       if Is_Error (Result) then
@@ -784,7 +899,12 @@ package body Devicetree is
          Read_Cells_Property
            (Property, State.Current_Cells_Context.Size_Cells, Result);
       elsif Compare_Fixed_Length_String_With_String (Property.Name, "reg") then
-         Parse_Reg_Property (State, Property, Result);
+         State.Current_Node_Reg_Property := Property;
+      elsif Compare_Fixed_Length_String_With_String
+              (Property.Name, "device_type")
+      then
+         State.Current_Node_Is_Memory :=
+           Compare_Property_Value_With_String (Property, "memory");
       end if;
 
       if Is_Error (Result) then
