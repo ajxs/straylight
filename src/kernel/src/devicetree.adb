@@ -990,6 +990,92 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Parse_Structure_Block;
 
+   ----------------------------------------------------------------------------
+   --  Takes a memory region and a reserved region, and creates a new set of
+   --  regions representing the parts of the memory region not covered by the
+   --  reserved region.
+   --  This works because Add_Memory_Region ignores empty regions, so any part
+   --  of the memory region that is completely covered by the reserved region
+   --  won't be added to the new set of regions.
+   ----------------------------------------------------------------------------
+   procedure Create_New_Regions_With_Reserved_Regions_Removed
+     (Regions         : in out Memory_Region_Array_T;
+      Count           : in out Natural;
+      Memory_Region   : Memory_Region_T;
+      Reserved_Region : Memory_Region_T;
+      Result          : out Function_Result)
+   is
+      --  Add_Memory_Region rejects regions that wrap around the address
+      --  space, so neither end can overflow.
+      Memory_End : constant Unsigned_64 :=
+        Memory_Region.Base + Memory_Region.Size;
+
+      Reserved_End : constant Unsigned_64 :=
+        Reserved_Region.Base + Reserved_Region.Size;
+
+      --  The reserved region's ends, clamped to the memory region.
+      Lower_End : constant Unsigned_64 :=
+        Unsigned_64'Min
+          (Unsigned_64'Max (Reserved_Region.Base, Memory_Region.Base),
+           Memory_End);
+
+      Upper_Base : constant Unsigned_64 :=
+        Unsigned_64'Min
+          (Unsigned_64'Max (Reserved_End, Memory_Region.Base), Memory_End);
+   begin
+      Add_Memory_Region
+        (Regions,
+         Count,
+         Memory_Region.Base,
+         Lower_End - Memory_Region.Base,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Add_Memory_Region
+        (Regions, Count, Upper_Base, Memory_End - Upper_Base, Result);
+   end Create_New_Regions_With_Reserved_Regions_Removed;
+
+   procedure Remove_Reserved_Memory_Regions_From_Memory_Regions
+     (State : FDT_Parser_State_T; Result : out Function_Result)
+   is
+      --  This array holds the memory regions that remain after removing the
+      --  reserved regions.
+      Remaining_Regions      : Memory_Region_Array_T;
+      Remaining_Region_Count : Natural;
+   begin
+      --  Each pass removes one reserved region from every memory region.
+      --  A split adds a region, so the remainder is built in a separate
+      --  array rather than edited in place.
+      for Reserved_Region of
+        State.Reserved_Memory_Regions (1 .. State.Reserved_Memory_Region_Count)
+      loop
+         Remaining_Region_Count := 0;
+
+         for Memory_Region of Memory_Regions (1 .. Memory_Region_Count) loop
+            Create_New_Regions_With_Reserved_Regions_Removed
+              (Remaining_Regions,
+               Remaining_Region_Count,
+               Memory_Region,
+               Reserved_Region,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+         end loop;
+
+         Memory_Regions := Remaining_Regions;
+         Memory_Region_Count := Remaining_Region_Count;
+      end loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Remove_Reserved_Memory_Regions_From_Memory_Regions;
+
    procedure Parse_Devicetree
      (DTB_Address : Address; Result : out Function_Result)
    is
@@ -1033,6 +1119,11 @@ package body Devicetree is
       end if;
 
       Parse_Structure_Block (State, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Remove_Reserved_Memory_Regions_From_Memory_Regions (State, Result);
       if Is_Error (Result) then
          return;
       end if;
