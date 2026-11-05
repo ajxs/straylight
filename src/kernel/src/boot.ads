@@ -6,6 +6,7 @@
 with Interfaces; use Interfaces;
 with System;     use System;
 
+with Devicetree;
 with Hart_State; use Hart_State;
 with Memory;     use Memory;
 with Processes;  use Processes;
@@ -34,7 +35,9 @@ private
      Convention    => Assembler,
      External_Name => "boot_initialise_kernel_services";
 
-   procedure Initialise_Physical_Memory_Manager;
+   procedure Initialise_Physical_Memory_Manager
+     (Memory_Regions      : Devicetree.Memory_Region_Array_T;
+      Memory_Region_Count : Natural);
 
    procedure Free_Boot_Memory;
 

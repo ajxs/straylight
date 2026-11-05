@@ -82,6 +82,9 @@ package body Devicetree is
       --  current depth of the cells context stack.
       Reserved_Memory_Node_Depth : Natural := 0;
 
+      Memory_Regions      : Memory_Region_Array_T;
+      Memory_Region_Count : Natural := 0;
+
       Reserved_Memory_Regions      : Memory_Region_Array_T;
       Reserved_Memory_Region_Count : Natural := 0;
    end record;
@@ -776,8 +779,8 @@ package body Devicetree is
 
          if State.Current_Node_Is_Memory then
             Add_Memory_Region
-              (Memory_Regions,
-               Memory_Region_Count,
+              (State.Memory_Regions,
+               State.Memory_Region_Count,
                Reg_Base,
                Reg_Size,
                Result);
@@ -1040,7 +1043,10 @@ package body Devicetree is
    end Create_New_Regions_With_Reserved_Regions_Removed;
 
    procedure Remove_Region_From_Memory_Regions
-     (Region : Memory_Region_T; Result : out Function_Result)
+     (Regions : in out Memory_Region_Array_T;
+      Count   : in out Natural;
+      Region  : Memory_Region_T;
+      Result  : out Function_Result)
    is
       --  This array holds the memory regions that remain after removing the
       --  region.
@@ -1055,7 +1061,7 @@ package body Devicetree is
 
       --  A split adds a region, so the remainder is built in a separate
       --  array rather than edited in place.
-      for Memory_Region of Memory_Regions (1 .. Memory_Region_Count) loop
+      for Memory_Region of Regions (1 .. Count) loop
          Create_New_Regions_With_Reserved_Regions_Removed
            (Remaining_Regions,
             Remaining_Region_Count,
@@ -1067,8 +1073,8 @@ package body Devicetree is
          end if;
       end loop;
 
-      Memory_Regions := Remaining_Regions;
-      Memory_Region_Count := Remaining_Region_Count;
+      Regions := Remaining_Regions;
+      Count := Remaining_Region_Count;
 
       Result := Success;
    exception
@@ -1078,7 +1084,7 @@ package body Devicetree is
    end Remove_Region_From_Memory_Regions;
 
    procedure Remove_Reserved_Memory_Regions_From_Memory_Regions
-     (State : FDT_Parser_State_T; Result : out Function_Result)
+     (State : in out FDT_Parser_State_T; Result : out Function_Result)
    is
       --  The kernel image's physical address range. It starts with the boot
       --  section, which Boot.Free_Boot_Memory frees once it's no longer
@@ -1100,7 +1106,11 @@ package body Devicetree is
       for Reserved_Region of
         State.Reserved_Memory_Regions (1 .. State.Reserved_Memory_Region_Count)
       loop
-         Remove_Region_From_Memory_Regions (Reserved_Region, Result);
+         Remove_Region_From_Memory_Regions
+           (State.Memory_Regions,
+            State.Memory_Region_Count,
+            Reserved_Region,
+            Result);
          if Is_Error (Result) then
             return;
          end if;
@@ -1120,7 +1130,10 @@ package body Devicetree is
 
       --  Remove the kernel image from the available memory regions.
       Remove_Region_From_Memory_Regions
-        ((Base => Kernel_Start_Phys_Addr_As_U64, Size => Size), Result);
+        (State.Memory_Regions,
+         State.Memory_Region_Count,
+         (Base => Kernel_Start_Phys_Addr_As_U64, Size => Size),
+         Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -1133,13 +1146,18 @@ package body Devicetree is
    end Remove_Reserved_Memory_Regions_From_Memory_Regions;
 
    procedure Parse_Devicetree
-     (DTB_Address : Address; Result : out Function_Result)
+     (DTB_Address         : Address;
+      Memory_Regions      : out Memory_Region_Array_T;
+      Memory_Region_Count : out Natural;
+      Result              : out Function_Result)
    is
       Header : constant FDT_Header_T
       with Import, Address => DTB_Address, Alignment => 1;
 
       State : FDT_Parser_State_T;
    begin
+      Memory_Region_Count := 0;
+
       pragma Debug (Debug_Devicetree, Print_Devicetree_Header (Header));
 
       if Convert_BEU32_To_LEU32 (Header.Magic) /= FDT_MAGIC_NUMBER then
@@ -1162,8 +1180,6 @@ package body Devicetree is
       State.Structure_Block_Size :=
         Storage_Count (Convert_BEU32_To_LEU32 (Header.Size_DT_Struct));
 
-      Memory_Region_Count := 0;
-
       Parse_Reserved_Memory_Regions
         (State,
          DTB_Address,
@@ -1183,6 +1199,9 @@ package body Devicetree is
       if Is_Error (Result) then
          return;
       end if;
+
+      Memory_Regions := State.Memory_Regions;
+      Memory_Region_Count := State.Memory_Region_Count;
 
       Result := Success;
    end Parse_Devicetree;

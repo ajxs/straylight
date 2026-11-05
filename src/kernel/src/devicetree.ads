@@ -18,14 +18,14 @@ is
    type Memory_Region_Array_T is
      array (1 .. Maximum_Memory_Regions) of Memory_Region_T;
 
-   --  The memory regions found by Parse_Devicetree, with the reserved
-   --  regions and the kernel image removed. They are copied out of the blob
-   --  so that it isn't needed once physical memory is in use.
-   Memory_Regions      : Memory_Region_Array_T;
-   Memory_Region_Count : Natural := 0;
-
+   --  Memory_Regions returns an array of usable physical memory regions
+   --  described by the devicetree, with reserved regions and the kernel image
+   --  removed.
    procedure Parse_Devicetree
-     (DTB_Address : Address; Result : out Function_Result);
+     (DTB_Address         : Address;
+      Memory_Regions      : out Memory_Region_Array_T;
+      Memory_Region_Count : out Natural;
+      Result              : out Function_Result);
 
    --  The header is a public definition, since it's used in the early
    --  boot stage when mapping the devicetree into virtual memory.

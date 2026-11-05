@@ -12,7 +12,6 @@ with Devices.Virtio.Block; use Devices.Virtio.Block;
 with Devices.Virtio.Graphics;
 with Devices.UART;
 with Devices.PLIC;
-with Devicetree;
 with Filesystems;          use Filesystems;
 with Filesystems.Root;     use Filesystems.Root;
 with Function_Results;     use Function_Results;
@@ -592,6 +591,9 @@ package body Boot is
       Result : Function_Result := Unset;
 
       Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
+
+      Memory_Regions      : Devicetree.Memory_Region_Array_T;
+      Memory_Region_Count : Natural := 0;
    begin
       --  This needs to be the first function called on each hart to set up
       --  the hart's state structure. This needs be called before any logging
@@ -607,7 +609,11 @@ package body Boot is
       Devicetree_Higher_Half_Address : constant Address :=
         Address (DTB_Address) + Higher_Half_Offset;
 
-      Devicetree.Parse_Devicetree (Devicetree_Higher_Half_Address, Result);
+      Devicetree.Parse_Devicetree
+        (Devicetree_Higher_Half_Address,
+         Memory_Regions,
+         Memory_Region_Count,
+         Result);
       if Is_Error (Result) then
          --  Error already printed.
          Panic;
@@ -617,7 +623,7 @@ package body Boot is
         Debug
           (Debug_Boot, Log_Debug ("Initialising core kernel subsystems..."));
 
-      Initialise_Physical_Memory_Manager;
+      Initialise_Physical_Memory_Manager (Memory_Regions, Memory_Region_Count);
 
       Initialise_Kernel_Address_Space;
 
@@ -656,7 +662,10 @@ package body Boot is
          Panic_Constraint_Error;
    end Kernel_Main;
 
-   procedure Initialise_Physical_Memory_Manager is
+   procedure Initialise_Physical_Memory_Manager
+     (Memory_Regions      : Devicetree.Memory_Region_Array_T;
+      Memory_Region_Count : Natural)
+   is
       Page_Mask : constant Unsigned_64 := RISCV.Paging.Small_Page_Size - 1;
 
       Result : Function_Result := Unset;
@@ -665,15 +674,13 @@ package body Boot is
 
       --  Parse_Devicetree has already removed the reserved regions and the
       --  kernel image from these regions.
-      if Devicetree.Memory_Region_Count = 0 then
+      if Memory_Region_Count = 0 then
          Panic ("No memory regions available");
       end if;
 
       --  The Devicetree blob isn't used after this point, so it's alright for
       --  the memory it sits in to be allocated as free memory.
-      for Region of
-        Devicetree.Memory_Regions (1 .. Devicetree.Memory_Region_Count)
-      loop
+      for Region of Memory_Regions (1 .. Memory_Region_Count) loop
          Map_Physical_Memory_Region : declare
             --  Align the region addresses to a page boundary, and clamp
             --  the region to the physical memory map's limits.
