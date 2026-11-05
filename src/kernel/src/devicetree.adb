@@ -1,6 +1,7 @@
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Logging; use Logging;
+with Memory;  use Memory;
 
 package body Devicetree is
    FDT_MAGIC_NUMBER : constant Unsigned_32 := 16#D00D_FEED#;
@@ -1006,7 +1007,8 @@ package body Devicetree is
       Result          : out Function_Result)
    is
       --  Add_Memory_Region rejects regions that wrap around the address
-      --  space, so neither end can overflow.
+      --  space, and Remove_Region_From_Memory_Regions checks the region it
+      --  removes, so neither end can overflow.
       Memory_End : constant Unsigned_64 :=
         Memory_Region.Base + Memory_Region.Size;
 
@@ -1037,37 +1039,91 @@ package body Devicetree is
         (Regions, Count, Upper_Base, Memory_End - Upper_Base, Result);
    end Create_New_Regions_With_Reserved_Regions_Removed;
 
+   procedure Remove_Region_From_Memory_Regions
+     (Region : Memory_Region_T; Result : out Function_Result)
+   is
+      --  This array holds the memory regions that remain after removing the
+      --  region.
+      Remaining_Regions      : Memory_Region_Array_T;
+      Remaining_Region_Count : Natural := 0;
+   begin
+      if Region.Size > Unsigned_64'Last - Region.Base then
+         Log_Error ("Removed memory region exceeds the address space");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      --  A split adds a region, so the remainder is built in a separate
+      --  array rather than edited in place.
+      for Memory_Region of Memory_Regions (1 .. Memory_Region_Count) loop
+         Create_New_Regions_With_Reserved_Regions_Removed
+           (Remaining_Regions,
+            Remaining_Region_Count,
+            Memory_Region,
+            Region,
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+      end loop;
+
+      Memory_Regions := Remaining_Regions;
+      Memory_Region_Count := Remaining_Region_Count;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Remove_Region_From_Memory_Regions;
+
    procedure Remove_Reserved_Memory_Regions_From_Memory_Regions
      (State : FDT_Parser_State_T; Result : out Function_Result)
    is
-      --  This array holds the memory regions that remain after removing the
-      --  reserved regions.
-      Remaining_Regions      : Memory_Region_Array_T;
-      Remaining_Region_Count : Natural;
+      --  The kernel image's physical address range. It starts with the boot
+      --  section, which Boot.Free_Boot_Memory frees once it's no longer
+      --  needed.
+      Kernel_Start : constant Natural
+      with Import, External_Name => "__boot_start_physical";
+
+      Kernel_End : constant Natural
+      with Import, External_Name => "__kernel_end_physical";
+
+      Kernel_Start_Phys_Addr_As_U64 : constant Unsigned_64 :=
+        Address_To_Unsigned_64 (Kernel_Start'Address);
+
+      Kernel_End_Phys_Addr_As_U64 : constant Unsigned_64 :=
+        Address_To_Unsigned_64 (Kernel_End'Address);
    begin
-      --  Each pass removes one reserved region from every memory region.
-      --  A split adds a region, so the remainder is built in a separate
-      --  array rather than edited in place.
+      --  Each pass removes one reserved region from every memory region, so
+      --  later passes see the pieces that earlier ones left.
       for Reserved_Region of
         State.Reserved_Memory_Regions (1 .. State.Reserved_Memory_Region_Count)
       loop
-         Remaining_Region_Count := 0;
-
-         for Memory_Region of Memory_Regions (1 .. Memory_Region_Count) loop
-            Create_New_Regions_With_Reserved_Regions_Removed
-              (Remaining_Regions,
-               Remaining_Region_Count,
-               Memory_Region,
-               Reserved_Region,
-               Result);
-            if Is_Error (Result) then
-               return;
-            end if;
-         end loop;
-
-         Memory_Regions := Remaining_Regions;
-         Memory_Region_Count := Remaining_Region_Count;
+         Remove_Region_From_Memory_Regions (Reserved_Region, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
       end loop;
+
+      Size : constant Unsigned_64 :=
+        Kernel_End_Phys_Addr_As_U64 - Kernel_Start_Phys_Addr_As_U64;
+
+      pragma
+        Debug
+          (Debug_Devicetree,
+           Log_Debug
+             ("Removing kernel image from memory regions: Base = "
+              & Kernel_Start_Phys_Addr_As_U64'Image
+              & ", Size = "
+              & Size'Image));
+
+      --  Remove the kernel image from the available memory regions.
+      Remove_Region_From_Memory_Regions
+        ((Base => Kernel_Start_Phys_Addr_As_U64, Size => Size), Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Result := Success;
    exception

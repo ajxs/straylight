@@ -19,7 +19,7 @@ is
    Debug_Devices_Ramdisk         : constant Boolean := False;
    Debug_Devices_Virtio          : constant Boolean := False;
    Debug_Devices_Virtio_Graphics : constant Boolean := False;
-   Debug_Devicetree              : constant Boolean := True;
+   Debug_Devicetree              : constant Boolean := False;
    Debug_Filesystems             : constant Boolean := False;
    Debug_Filesystems_Block_Cache : constant Boolean := False;
    Debug_Filesystems_Node_Cache  : constant Boolean := False;

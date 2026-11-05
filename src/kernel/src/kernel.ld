@@ -108,14 +108,10 @@ SECTIONS
 	. = ALIGN(4K);
 	__kernel_end = .;
 
-	/** 
-	 * These are the physical memory addresses of the boot section, with the
-	 * higher-half offset added. This is so that they are loadable from the 
-	 * higher-half kernel code to 'free' the physical boot memory.
+	/**
+	 * Physical addresses of the kernel image.
 	 */
-	__boot_start_offset = __boot_start + KERNEL_VIRTUAL_MEMORY_ADDRESS;
-	__boot_end_offset = __boot_end + KERNEL_VIRTUAL_MEMORY_ADDRESS;
-
-	__physical_memory_start = 0x80000000;
-	__physical_memory_end = 0x80000000 + 128M;
+	__boot_start_physical = __boot_start;
+	__boot_end_physical = __boot_end;
+	__kernel_end_physical = __kernel_end - KERNEL_VIRTUAL_MEMORY_ADDRESS;
 }

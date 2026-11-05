@@ -97,28 +97,26 @@ package body Boot is
    end Initialise_Hart_Boot_Secondary_Stack;
 
    procedure Free_Boot_Memory is
-      --  These are the physical memory addresses of the boot section, with the
-      --  higher-half offset added. This is so that they are loadable from the
-      --  higher-half kernel code to 'free' the physical boot memory.
-      Boot_Start_Offset : constant Natural
-      with Import, External_Name => "__boot_start_offset";
+      --  The physical address range of the boot section.
+      Boot_Start : constant Natural
+      with Import, External_Name => "__boot_start_physical";
 
-      Boot_End_Offset : constant Natural
-      with Import, External_Name => "__boot_end_offset";
+      Boot_End : constant Natural
+      with Import, External_Name => "__boot_end_physical";
 
       Result : Function_Result := Unset;
    begin
       pragma Debug (Debug_Boot, Log_Debug ("Freeing boot memory..."));
 
       Free_Physical_Memory_Length : constant Storage_Offset :=
-        Boot_End_Offset'Address - Boot_Start_Offset'Address;
+        Boot_End'Address - Boot_Start'Address;
 
       if Free_Physical_Memory_Length not in Storage_Count'Range then
          Panic ("Invalid free physical memory length");
       end if;
 
       Create_Free_Physical_Memory_Region
-        (Get_Lower_Physical_Address (Boot_Start_Offset'Address),
+        (Physical_Address_T (Boot_Start'Address),
          Free_Physical_Memory_Length,
          Result);
       if Is_Error (Result) then
@@ -659,21 +657,14 @@ package body Boot is
    end Kernel_Main;
 
    procedure Initialise_Physical_Memory_Manager is
-      Kernel_End : constant Natural
-      with Import, External_Name => "__kernel_end";
-
       Page_Mask : constant Unsigned_64 := RISCV.Paging.Small_Page_Size - 1;
-
-      --  Until reserved memory regions are excluded, only memory above the
-      --  kernel image is used. This assumes that the firmware sits below it.
-      Kernel_End_Phys_Addr_As_U64 : constant Unsigned_64 :=
-        Address_To_Unsigned_64
-          (Address (Get_Lower_Physical_Address (Kernel_End'Address)));
 
       Result : Function_Result := Unset;
    begin
       pragma Debug (Debug_Boot, Log_Debug ("Initialising PMM..."));
 
+      --  Parse_Devicetree has already removed the reserved regions and the
+      --  kernel image from these regions.
       if Devicetree.Memory_Region_Count = 0 then
          Panic ("No memory regions available");
       end if;
@@ -689,9 +680,7 @@ package body Boot is
             --  Clamping both ends to the map's limit first means rounding
             --  can't wrap around.
             Region_Start : constant Unsigned_64 :=
-              (Unsigned_64'Min
-                 (Unsigned_64'Max (Region.Base, Kernel_End_Phys_Addr_As_U64),
-                  Physical_Memory_Map_Limit)
+              (Unsigned_64'Min (Region.Base, Physical_Memory_Map_Limit)
                + Page_Mask)
               and not Page_Mask;
 

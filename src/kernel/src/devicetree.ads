@@ -18,8 +18,9 @@ is
    type Memory_Region_Array_T is
      array (1 .. Maximum_Memory_Regions) of Memory_Region_T;
 
-   --  The memory regions found by Parse_Devicetree. They are copied out of
-   --  the blob so that it isn't needed once physical memory is in use.
+   --  The memory regions found by Parse_Devicetree, with the reserved
+   --  regions and the kernel image removed. They are copied out of the blob
+   --  so that it isn't needed once physical memory is in use.
    Memory_Regions      : Memory_Region_Array_T;
    Memory_Region_Count : Natural := 0;
 
