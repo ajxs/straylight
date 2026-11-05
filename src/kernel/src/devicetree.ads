@@ -1,6 +1,5 @@
-with Interfaces;              use Interfaces;
-with System;                  use System;
-with System.Storage_Elements; use System.Storage_Elements;
+with Interfaces; use Interfaces;
+with System;     use System;
 
 with Function_Results; use Function_Results;
 with Utilities;        use Utilities;
@@ -48,13 +47,6 @@ private
 
    subtype Devicetree_String_T is
      Fixed_Length_String_T (Maximum_FDT_String_Length);
-
-   procedure Parse_Structure_Block
-     (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Count;
-      String_Table_Address    : Address;
-      String_Table_Size       : Storage_Count;
-      Result                  : out Function_Result);
 
    function Compare_Node_Name
      (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean;

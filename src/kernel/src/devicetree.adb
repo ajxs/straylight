@@ -1,5 +1,6 @@
+with System.Storage_Elements; use System.Storage_Elements;
+
 with Logging; use Logging;
-with Memory;  use Memory;
 
 package body Devicetree is
    FDT_MAGIC_NUMBER : constant Unsigned_32 := 16#D00D_FEED#;
@@ -73,6 +74,9 @@ package body Devicetree is
 
       --  In future, this could be replaced by a 'Current_Node_Type' enum.
       Current_Node_Is_Memory : Boolean := False;
+
+      Reserved_Memory_Regions      : Memory_Region_Array_T;
+      Reserved_Memory_Region_Count : Natural := 0;
    end record;
 
    procedure Push_Cells_Context
@@ -246,18 +250,75 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Read_Reg_Entry;
 
+   procedure Add_Memory_Region
+     (Regions : in out Memory_Region_Array_T;
+      Count   : in out Natural;
+      Base    : Unsigned_64;
+      Size    : Unsigned_64;
+      Result  : out Function_Result) is
+   begin
+      if Size = 0 then
+         Result := Success;
+         return;
+      end if;
+
+      --  Ensure that the memory region size doesn't overflow the address
+      --  space, and wrap around.
+      if Size > Unsigned_64'Last - Base then
+         Log_Error ("Memory region exceeds the address space");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if Count >= Regions'Last then
+         Log_Error ("Too many memory regions in devicetree");
+         Result := Region_Array_Exhausted;
+         return;
+      end if;
+
+      Count := Count + 1;
+      Regions (Count) := (Base, Size);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Add_Memory_Region;
+
    procedure Parse_Reserved_Memory_Regions
-     (Reserved_Mem_Map_Address : Address;
-      Total_Size               : Storage_Count;
-      Result                   : out Function_Result)
+     (State                      : in out FDT_Parser_State_T;
+      DTB_Address                : Address;
+      Reserved_Memory_Map_Offset : Storage_Offset;
+      Total_Header_Size          : Storage_Count;
+      Result                     : out Function_Result)
    is
       Curr_Offset : Storage_Offset := 0;
    begin
+      if Reserved_Memory_Map_Offset >= Total_Header_Size then
+         Log_Error
+           ("Reserved memory map offset exceeds total devicetree size");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Reserved_Mem_Map_Address : constant Address :=
+        DTB_Address + Reserved_Memory_Map_Offset;
+
+      Reserved_Memory_Map_Size : constant Storage_Count :=
+        Total_Header_Size - Reserved_Memory_Map_Offset;
+
       pragma
         Debug
           (Debug_Devicetree, Log_Debug ("Parsing Reserved Memory Regions..."));
 
       loop
+         if Curr_Offset + 16 > Reserved_Memory_Map_Size then
+            Log_Error ("Reserved memory map exceeds total devicetree size.");
+            Result := Unhandled_Exception;
+            return;
+         end if;
+
          Read_Block : declare
             Block : Reserved_Memory_Block_T
             with
@@ -270,24 +331,20 @@ package body Devicetree is
             --  address and size set to zero.
             exit when Block.Size = 0 and then Block.Addr = 0;
 
-            pragma
-              Debug
-                (Debug_Devicetree,
-                 Log_Debug
-                   ("Addr="
-                    & Convert_BEU64_To_LEU64 (Block.Addr)'Image
-                    & ", Size= "
-                    & Convert_BEU64_To_LEU64 (Block.Size)'Image));
+            Add_Memory_Region
+              (State.Reserved_Memory_Regions,
+               State.Reserved_Memory_Region_Count,
+               Convert_BEU64_To_LEU64 (Block.Addr),
+               Convert_BEU64_To_LEU64 (Block.Size),
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
 
          end Read_Block;
 
          --  Advance by the size of the reserved memory block structure.
          Curr_Offset := Curr_Offset + 16;
-         if Curr_Offset >= Total_Size then
-            Log_Error ("Reserved memory map exceeds total devicetree size.");
-            Result := Unhandled_Exception;
-            return;
-         end if;
       end loop;
 
       Result := Success;
@@ -448,55 +505,6 @@ package body Devicetree is
       when Constraint_Error =>
          Log_Constraint_Error;
    end Print_Devicetree_Header;
-
-   procedure Parse_Devicetree
-     (DTB_Address : Address; Result : out Function_Result)
-   is
-      Header : constant FDT_Header_T
-      with Import, Address => DTB_Address, Alignment => 1;
-   begin
-      pragma Debug (Debug_Devicetree, Print_Devicetree_Header (Header));
-
-      if Convert_BEU32_To_LEU32 (Header.Magic) /= FDT_MAGIC_NUMBER then
-         Log_Error ("Invalid devicetree magic value.");
-         Result := Unhandled_Exception;
-         return;
-      end if;
-
-      String_Table_Address : constant Virtual_Address_T :=
-        DTB_Address
-        + Storage_Offset (Convert_BEU32_To_LEU32 (Header.Off_DT_Strings));
-
-      Reserved_Mem_Map_Address : constant Virtual_Address_T :=
-        DTB_Address
-        + Storage_Offset (Convert_BEU32_To_LEU32 (Header.Off_Mem_Rsvmap));
-
-      Structure_Block_Address : constant Virtual_Address_T :=
-        DTB_Address
-        + Storage_Offset (Convert_BEU32_To_LEU32 (Header.Off_DT_Struct));
-
-      Parse_Reserved_Memory_Regions
-        (Reserved_Mem_Map_Address,
-         Storage_Count (Convert_BEU32_To_LEU32 (Header.Totalsize)),
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Memory_Region_Count := 0;
-
-      Parse_Structure_Block
-        (Structure_Block_Address,
-         Storage_Count (Convert_BEU32_To_LEU32 (Header.Size_DT_Struct)),
-         String_Table_Address,
-         Storage_Count (Convert_BEU32_To_LEU32 (Header.Size_DT_Strings)),
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Result := Success;
-   end Parse_Devicetree;
 
    ----------------------------------------------------------------------------
    --  Rounds an offset into the structure block up to the next 4-byte
@@ -681,38 +689,6 @@ package body Devicetree is
          return False;
    end Compare_Property_Value_With_String;
 
-   procedure Add_Memory_Region
-     (Base : Unsigned_64; Size : Unsigned_64; Result : out Function_Result) is
-   begin
-      if Size = 0 then
-         Result := Success;
-         return;
-      end if;
-
-      --  Ensure that the memory region size doesn't overflow the address
-      --  space, and wrap around.
-      if Size > Unsigned_64'Last - Base then
-         Log_Error ("Memory region exceeds the address space");
-         Result := Invalid_Argument;
-         return;
-      end if;
-
-      if Memory_Region_Count >= Memory_Regions'Last then
-         Log_Error ("Too many memory regions in devicetree");
-         Result := Region_Array_Exhausted;
-         return;
-      end if;
-
-      Memory_Region_Count := Memory_Region_Count + 1;
-      Memory_Regions (Memory_Region_Count) := (Base, Size);
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
-   end Add_Memory_Region;
-
    procedure Parse_Reg_Property
      (State    : FDT_Parser_State_T;
       Property : Devicetree_Property_T;
@@ -777,7 +753,12 @@ package body Devicetree is
                  & Reg_Size'Image));
 
          if State.Current_Node_Is_Memory then
-            Add_Memory_Region (Reg_Base, Reg_Size, Result);
+            Add_Memory_Region
+              (Memory_Regions,
+               Memory_Region_Count,
+               Reg_Base,
+               Reg_Size,
+               Result);
             if Is_Error (Result) then
                return;
             end if;
@@ -917,24 +898,13 @@ package body Devicetree is
    end Handle_Property;
 
    procedure Parse_Structure_Block
-     (Structure_Block_Address : Address;
-      Structure_Block_Size    : Storage_Count;
-      String_Table_Address    : Address;
-      String_Table_Size       : Storage_Count;
-      Result                  : out Function_Result)
+     (State : in out FDT_Parser_State_T; Result : out Function_Result)
    is
       FDT_BEGIN_NODE : constant := 1;
       FDT_END_NODE   : constant := 2;
       FDT_PROP       : constant := 3;
       FDT_NOP        : constant := 4;
       FDT_END        : constant := 9;
-
-      State : FDT_Parser_State_T :=
-        (Structure_Block_Address => Structure_Block_Address,
-         Structure_Block_Size    => Structure_Block_Size,
-         String_Table_Address    => String_Table_Address,
-         String_Table_Size       => String_Table_Size,
-         others                  => <>);
 
       Token_Value : Unsigned_32 := 0;
    begin
@@ -977,6 +947,56 @@ package body Devicetree is
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Parse_Structure_Block;
+
+   procedure Parse_Devicetree
+     (DTB_Address : Address; Result : out Function_Result)
+   is
+      Header : constant FDT_Header_T
+      with Import, Address => DTB_Address, Alignment => 1;
+
+      State : FDT_Parser_State_T;
+   begin
+      pragma Debug (Debug_Devicetree, Print_Devicetree_Header (Header));
+
+      if Convert_BEU32_To_LEU32 (Header.Magic) /= FDT_MAGIC_NUMBER then
+         Log_Error ("Invalid devicetree magic value.");
+         Result := Unhandled_Exception;
+         return;
+      end if;
+
+      State.String_Table_Address :=
+        DTB_Address
+        + Storage_Offset (Convert_BEU32_To_LEU32 (Header.Off_DT_Strings));
+
+      State.String_Table_Size :=
+        Storage_Count (Convert_BEU32_To_LEU32 (Header.Size_DT_Strings));
+
+      State.Structure_Block_Address :=
+        DTB_Address
+        + Storage_Offset (Convert_BEU32_To_LEU32 (Header.Off_DT_Struct));
+
+      State.Structure_Block_Size :=
+        Storage_Count (Convert_BEU32_To_LEU32 (Header.Size_DT_Struct));
+
+      Memory_Region_Count := 0;
+
+      Parse_Reserved_Memory_Regions
+        (State,
+         DTB_Address,
+         Storage_Offset (Convert_BEU32_To_LEU32 (Header.Off_Mem_Rsvmap)),
+         Storage_Count (Convert_BEU32_To_LEU32 (Header.Totalsize)),
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Parse_Structure_Block (State, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Result := Success;
+   end Parse_Devicetree;
 
    function Compare_Node_Name
      (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean is
