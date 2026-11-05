@@ -75,6 +75,12 @@ package body Devicetree is
       --  In future, this could be replaced by a 'Current_Node_Type' enum.
       Current_Node_Is_Memory : Boolean := False;
 
+      --  This variable is used to determine whether the parser is currently
+      --  inside a 'reserved-memory' child node.
+      --  When entering a reserved memory parent node, this is set to the
+      --  current depth of the cells context stack.
+      Reserved_Memory_Node_Depth : Natural := 0;
+
       Reserved_Memory_Regions      : Memory_Region_Array_T;
       Reserved_Memory_Region_Count : Natural := 0;
    end record;
@@ -689,10 +695,22 @@ package body Devicetree is
          return False;
    end Compare_Property_Value_With_String;
 
+   function Is_Reserved_Memory_Child_Node
+     (State : FDT_Parser_State_T) return Boolean is
+   begin
+      return
+        State.Reserved_Memory_Node_Depth /= 0
+        and then
+          State.Cells_Context_Stack.Count
+          = State.Reserved_Memory_Node_Depth + 1;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         return False;
+   end Is_Reserved_Memory_Child_Node;
+
    procedure Parse_Reg_Property
-     (State    : FDT_Parser_State_T;
-      Property : Devicetree_Property_T;
-      Result   : out Function_Result)
+     (State : in out FDT_Parser_State_T; Result : out Function_Result)
    is
       Parent_Cells_Context  : FDT_Cells_Context_T;
       Total_Reg_Entry_Count : Natural := 0;
@@ -723,15 +741,18 @@ package body Devicetree is
       end if;
 
       Get_Reg_Entry_Count
-        (Property.Length, Parent_Cells_Context, Total_Reg_Entry_Count, Result);
+        (State.Current_Node_Reg_Property.Length,
+         Parent_Cells_Context,
+         Total_Reg_Entry_Count,
+         Result);
       if Is_Error (Result) then
          return;
       end if;
 
       for Entry_Index in 0 .. Total_Reg_Entry_Count - 1 loop
          Read_Reg_Entry
-           (Property.Value_Address,
-            Property.Length,
+           (State.Current_Node_Reg_Property.Value_Address,
+            State.Current_Node_Reg_Property.Length,
             Parent_Cells_Context,
             Entry_Index,
             Reg_Base,
@@ -762,7 +783,19 @@ package body Devicetree is
             if Is_Error (Result) then
                return;
             end if;
+
+         elsif Is_Reserved_Memory_Child_Node (State) then
+            Add_Memory_Region
+              (State.Reserved_Memory_Regions,
+               State.Reserved_Memory_Region_Count,
+               Reg_Base,
+               Reg_Size,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
          end if;
+
       end loop;
 
       Result := Success;
@@ -784,7 +817,7 @@ package body Devicetree is
      (State : in out FDT_Parser_State_T; Result : out Function_Result) is
    begin
       if State.Current_Node_Reg_Property.Value_Address /= Null_Address then
-         Parse_Reg_Property (State, State.Current_Node_Reg_Property, Result);
+         Parse_Reg_Property (State, Result);
          if Is_Error (Result) then
             return;
          end if;
@@ -828,6 +861,10 @@ package body Devicetree is
          return;
       end if;
 
+      if Compare_Node_Name (State.Current_Node_Name, "reserved-memory") then
+         State.Reserved_Memory_Node_Depth := State.Cells_Context_Stack.Count;
+      end if;
+
       Align_Offset_To_Word (State.Curr_Offset, Result);
       if Is_Error (Result) then
          return;
@@ -848,6 +885,11 @@ package body Devicetree is
       Finalise_Node_Properties (State, Result);
       if Is_Error (Result) then
          return;
+      end if;
+
+      if State.Cells_Context_Stack.Count = State.Reserved_Memory_Node_Depth
+      then
+         State.Reserved_Memory_Node_Depth := 0;
       end if;
 
       Pop_Cells_Context
