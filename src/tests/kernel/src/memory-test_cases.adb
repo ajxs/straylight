@@ -158,4 +158,38 @@ package body Memory.Test_Cases is
          "A wrapping region is not detected against a low region");
    end Run_Test;
 
+   overriding
+   procedure Run_Test (T : in out Test_Align_Physical_Address) is
+      pragma Unreferenced (T);
+
+      function P (Value : Integer_Address) return Physical_Address_T
+      is (Physical_Address_T (To_Address (Value)));
+
+      Page_Size : constant := 16#1000#;
+   begin
+      Assert
+        (Align_Down (P (16#8006_0000#), Page_Size) = P (16#8006_0000#),
+         "Align_Down leaves an aligned address unchanged");
+      Assert
+        (Align_Down (P (16#8006_0FFF#), Page_Size) = P (16#8006_0000#),
+         "Align_Down rounds down to the page start");
+
+      Assert
+        (Align_Up (P (16#8006_0000#), Page_Size) = P (16#8006_0000#),
+         "Align_Up leaves an aligned address unchanged");
+      Assert
+        (Align_Up (P (16#8006_0001#), Page_Size) = P (16#8006_1000#),
+         "Align_Up rounds up to the next page");
+
+      Assert
+        (Align_Up (P (0), Page_Size) = P (0),
+         "Align_Up leaves zero unchanged");
+
+      --  Documents the limit named in the spec, rather than desired
+      --  behaviour: rounding up within a page of the top wraps to zero.
+      Assert
+        (Align_Up (P (Integer_Address'Last), Page_Size) = P (0),
+         "Align_Up wraps at the top of the address space");
+   end Run_Test;
+
 end Memory.Test_Cases;

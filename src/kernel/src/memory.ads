@@ -46,6 +46,14 @@ is
       Physical_Address : Physical_Address_T := Null_Physical_Address;
    end record;
 
+   type Physical_Memory_Region_T is record
+      Base : Physical_Address_T := Null_Physical_Address;
+      Size : Storage_Count := 0;
+   end record;
+
+   type Physical_Memory_Region_Array_T is
+     array (Natural range <>) of Physical_Memory_Region_T;
+
    --  This is kept as a constant because it's used in address arithmetic.
    Higher_Half_Offset : constant := 16#FFFF_FFFF_0000_0000#;
 
@@ -103,6 +111,42 @@ is
    function Is_Address_Aligned
      (Addr : System.Address; Boundary : Integer_Address) return Boolean
    is ((To_Integer (Addr) and (Boundary - 1)) = 0)
+   with Inline, Pure_Function;
+
+   ----------------------------------------------------------------------------
+   --  Rounds a physical address down or up to a boundary, which must be a
+   --  power of two. Align_Up wraps around if the address is within
+   --  Boundary - 1 of the top of the address space.
+   ----------------------------------------------------------------------------
+   function Align_Down
+     (Addr : Physical_Address_T; Boundary : Integer_Address)
+      return Physical_Address_T
+   is (Physical_Address_T
+         (To_Address (To_Integer (Address (Addr)) and not (Boundary - 1))))
+   with Inline, Pure_Function;
+
+   function Align_Up
+     (Addr : Physical_Address_T; Boundary : Integer_Address)
+      return Physical_Address_T
+   is (Align_Down
+         (Physical_Address_T
+            (To_Address (To_Integer (Address (Addr)) + (Boundary - 1))),
+          Boundary))
+   with Inline, Pure_Function;
+
+   ----------------------------------------------------------------------------
+   --  Align_Down and Align_Up to a 4KiB page boundary.
+   --  Note that this declares a literal constant for the 4KiB page size.
+   --  This is to avoid a circular dependency with the RISCV.Paging package.
+   ----------------------------------------------------------------------------
+   function Align_Down_To_Page_Boundary
+     (Addr : Physical_Address_T) return Physical_Address_T
+   is (Align_Down (Addr, 16#1000#))
+   with Inline, Pure_Function;
+
+   function Align_Up_To_Page_Boundary
+     (Addr : Physical_Address_T) return Physical_Address_T
+   is (Align_Up (Addr, 16#1000#))
    with Inline, Pure_Function;
 
    function Convert_Higher_Half_Address_To_Lower

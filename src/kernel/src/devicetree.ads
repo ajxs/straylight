@@ -2,28 +2,19 @@ with Interfaces; use Interfaces;
 with System;     use System;
 
 with Function_Results; use Function_Results;
+with Memory;           use Memory;
 with Utilities;        use Utilities;
 
 package Devicetree
   with Preelaborate
 is
-   --  A range of physical memory described by a 'memory' node's 'reg'.
-   type Memory_Region_T is record
-      Base : Unsigned_64 := 0;
-      Size : Unsigned_64 := 0;
-   end record;
-
-   Maximum_Memory_Regions : constant := 16;
-
-   type Memory_Region_Array_T is
-     array (1 .. Maximum_Memory_Regions) of Memory_Region_T;
-
    --  Memory_Regions returns an array of usable physical memory regions
    --  described by the devicetree, with reserved regions and the kernel image
-   --  removed.
+   --  removed. If they don't fit in Memory_Regions, Result is
+   --  Region_Array_Exhausted.
    procedure Parse_Devicetree
      (DTB_Address         : Address;
-      Memory_Regions      : out Memory_Region_Array_T;
+      Memory_Regions      : out Physical_Memory_Region_Array_T;
       Memory_Region_Count : out Natural;
       Result              : out Function_Result);
 

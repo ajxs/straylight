@@ -14,6 +14,8 @@ begin
      (Test_Case_Access'(new Test_Is_Valid_Userspace_Address_Range));
    Test_Suite_Ptr.all.Add_Test
      (Test_Case_Access'(new Test_Do_Memory_Regions_Overlap));
+   Test_Suite_Ptr.all.Add_Test
+     (Test_Case_Access'(new Test_Align_Physical_Address));
 
    return Test_Suite_Ptr;
 end Memory_Test_Suite;

@@ -12,6 +12,7 @@ with Devices.Virtio.Block; use Devices.Virtio.Block;
 with Devices.Virtio.Graphics;
 with Devices.UART;
 with Devices.PLIC;
+with Devicetree;
 with Filesystems;          use Filesystems;
 with Filesystems.Root;     use Filesystems.Root;
 with Function_Results;     use Function_Results;
@@ -22,7 +23,6 @@ with Logging;              use Logging;
 with Memory.Kernel;        use Memory.Kernel;
 with Memory.Physical;      use Memory.Physical;
 with Memory.Virtual;       use Memory.Virtual;
-with RISCV.Paging;
 with RISCV.SBI;
 with Processes.Scheduler;
 with Traps;
@@ -592,7 +592,12 @@ package body Boot is
 
       Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
 
-      Memory_Regions      : Devicetree.Memory_Region_Array_T;
+      --  Parse_Devicetree fails with Region_Array_Exhausted if the
+      --  Devicetree describes more usable memory regions than fit here.
+      Maximum_Memory_Regions : constant := 16;
+
+      Memory_Regions      :
+        Physical_Memory_Region_Array_T (1 .. Maximum_Memory_Regions);
       Memory_Region_Count : Natural := 0;
    begin
       --  This needs to be the first function called on each hart to set up
@@ -623,7 +628,8 @@ package body Boot is
         Debug
           (Debug_Boot, Log_Debug ("Initialising core kernel subsystems..."));
 
-      Initialise_Physical_Memory_Manager (Memory_Regions, Memory_Region_Count);
+      Initialise_Physical_Memory_Manager
+        (Memory_Regions (1 .. Memory_Region_Count));
 
       Initialise_Kernel_Address_Space;
 
@@ -663,10 +669,12 @@ package body Boot is
    end Kernel_Main;
 
    procedure Initialise_Physical_Memory_Manager
-     (Memory_Regions      : Devicetree.Memory_Region_Array_T;
-      Memory_Region_Count : Natural)
+     (Memory_Regions : Physical_Memory_Region_Array_T)
    is
-      Page_Mask : constant Unsigned_64 := RISCV.Paging.Small_Page_Size - 1;
+      --  Memory above the physical memory map's limit can't be reached
+      --  through the map, so it isn't used.
+      Map_Limit : constant Physical_Address_T :=
+        Physical_Address_T (To_Address (Physical_Memory_Map_Limit));
 
       Result : Function_Result := Unset;
    begin
@@ -674,41 +682,41 @@ package body Boot is
 
       --  Parse_Devicetree has already removed the reserved regions and the
       --  kernel image from these regions.
-      if Memory_Region_Count = 0 then
+      if Memory_Regions'Length = 0 then
          Panic ("No memory regions available");
       end if;
 
       --  The Devicetree blob isn't used after this point, so it's alright for
       --  the memory it sits in to be allocated as free memory.
-      for Region of Memory_Regions (1 .. Memory_Region_Count) loop
+      for Region of Memory_Regions loop
          Map_Physical_Memory_Region : declare
-            --  Align the region addresses to a page boundary, and clamp
-            --  the region to the physical memory map's limits.
-            --  Clamping both ends to the map's limit first means rounding
-            --  can't wrap around.
-            Region_Start : constant Unsigned_64 :=
-              (Unsigned_64'Min (Region.Base, Physical_Memory_Map_Limit)
-               + Page_Mask)
-              and not Page_Mask;
+            Region_End : constant Physical_Address_T :=
+              Physical_Address_T (Address (Region.Base) + Region.Size);
 
-            Region_End : constant Unsigned_64 :=
-              Unsigned_64'Min
-                (Region.Base + Region.Size, Physical_Memory_Map_Limit)
-              and not Page_Mask;
+            --  Align the region to page boundaries, and clamp it to the
+            --  physical memory map's limit. Clamping before rounding means
+            --  rounding can't wrap around.
+            Aligned_Start : constant Physical_Address_T :=
+              Align_Up_To_Page_Boundary
+                ((if Region.Base < Map_Limit then Region.Base else Map_Limit));
+
+            Aligned_End : constant Physical_Address_T :=
+              Align_Down_To_Page_Boundary
+                ((if Region_End < Map_Limit then Region_End else Map_Limit));
          begin
-            if Region_End > Region_Start then
+            if Aligned_End > Aligned_Start then
                pragma
                  Debug
                    (Debug_Boot,
                     Log_Debug
                       ("Free physical memory:"
-                       & Region_Start'Image
+                       & Aligned_Start'Image
                        & " .."
-                       & Region_End'Image));
+                       & Aligned_End'Image));
 
                Create_Free_Physical_Memory_Region
-                 (Physical_Address_T (Unsigned_64_To_Address (Region_Start)),
-                  Storage_Count (Region_End - Region_Start),
+                 (Aligned_Start,
+                  Address (Aligned_End) - Address (Aligned_Start),
                   Result);
                if Is_Error (Result) then
                   Panic ("Error creating free physical memory region");

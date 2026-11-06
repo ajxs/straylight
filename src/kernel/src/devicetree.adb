@@ -1,10 +1,22 @@
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Logging; use Logging;
-with Memory;  use Memory;
 
 package body Devicetree is
    FDT_MAGIC_NUMBER : constant Unsigned_32 := 16#D00D_FEED#;
+
+   --  A range of physical memory, as raw Devicetree values. The parser works
+   --  in Unsigned_64, and only converts to Physical_Memory_Region_T when it
+   --  returns the regions.
+   type Memory_Region_T is record
+      Base : Unsigned_64 := 0;
+      Size : Unsigned_64 := 0;
+   end record;
+
+   Maximum_Memory_Regions : constant := 16;
+
+   type Memory_Region_Array_T is
+     array (1 .. Maximum_Memory_Regions) of Memory_Region_T;
 
    subtype FDT_Token_T is Unsigned_32;
 
@@ -1145,9 +1157,49 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Remove_Reserved_Memory_Regions_From_Memory_Regions;
 
+   procedure Copy_Parsed_Memory_Regions_To_Result
+     (State               : FDT_Parser_State_T;
+      Memory_Regions      : out Physical_Memory_Region_Array_T;
+      Memory_Region_Count : out Natural;
+      Result              : out Function_Result) is
+   begin
+      Memory_Region_Count := 0;
+
+      if State.Memory_Region_Count > Memory_Regions'Length then
+         Log_Error ("Too many memory regions for the output array");
+         Result := Region_Array_Exhausted;
+         return;
+      end if;
+
+      for I in 1 .. State.Memory_Region_Count loop
+         --  Storage_Count can't hold sizes of 2**63 or more.
+         if State.Memory_Regions (I).Size > Unsigned_64 (Storage_Count'Last)
+         then
+            Log_Error ("Memory region is too large");
+            Result := Invalid_Argument;
+            return;
+         end if;
+
+         Memory_Regions (Memory_Regions'First + I - 1) :=
+           (Base =>
+              Physical_Address_T
+                (Unsigned_64_To_Address (State.Memory_Regions (I).Base)),
+            Size => Storage_Count (State.Memory_Regions (I).Size));
+      end loop;
+
+      Memory_Region_Count := State.Memory_Region_Count;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Memory_Region_Count := 0;
+         Result := Constraint_Exception;
+   end Copy_Parsed_Memory_Regions_To_Result;
+
    procedure Parse_Devicetree
      (DTB_Address         : Address;
-      Memory_Regions      : out Memory_Region_Array_T;
+      Memory_Regions      : out Physical_Memory_Region_Array_T;
       Memory_Region_Count : out Natural;
       Result              : out Function_Result)
    is
@@ -1200,8 +1252,11 @@ package body Devicetree is
          return;
       end if;
 
-      Memory_Regions := State.Memory_Regions;
-      Memory_Region_Count := State.Memory_Region_Count;
+      Copy_Parsed_Memory_Regions_To_Result
+        (State, Memory_Regions, Memory_Region_Count, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
 
       Result := Success;
    end Parse_Devicetree;

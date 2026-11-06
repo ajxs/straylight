@@ -12,6 +12,8 @@ package Memory.Test_Cases is
 
    type Test_Do_Memory_Regions_Overlap is new Test_Case with null record;
 
+   type Test_Align_Physical_Address is new Test_Case with null record;
+
    overriding
    function Name
      (T : Test_Is_Valid_Userspace_Address_Range) return AUnit.Message_String
@@ -23,9 +25,17 @@ package Memory.Test_Cases is
    is (AUnit.Format ("Memory.Do_Memory_Regions_Overlap"));
 
    overriding
+   function Name
+     (T : Test_Align_Physical_Address) return AUnit.Message_String
+   is (AUnit.Format ("Memory.Align_Up/Align_Down"));
+
+   overriding
    procedure Run_Test (T : in out Test_Is_Valid_Userspace_Address_Range);
 
    overriding
    procedure Run_Test (T : in out Test_Do_Memory_Regions_Overlap);
+
+   overriding
+   procedure Run_Test (T : in out Test_Align_Physical_Address);
 
 end Memory.Test_Cases;
