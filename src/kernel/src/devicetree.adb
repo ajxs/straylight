@@ -1,9 +1,20 @@
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Logging; use Logging;
+with Logging;   use Logging;
+with Utilities; use Utilities;
 
 package body Devicetree is
    FDT_MAGIC_NUMBER : constant Unsigned_32 := 16#D00D_FEED#;
+
+   Maximum_FDT_String_Length : constant := 256;
+
+   subtype Devicetree_String_T is
+     Fixed_Length_String_T (Maximum_FDT_String_Length);
+
+   --  Forward declaration for this private function to avoid moving the
+   --  function body.
+   function Compare_Node_Name
+     (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean;
 
    --  A range of physical memory, as raw Devicetree values. The parser works
    --  in Unsigned_64, and only converts to Physical_Memory_Region_T when it
