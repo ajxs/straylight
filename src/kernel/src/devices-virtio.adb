@@ -45,31 +45,6 @@ package body Devices.Virtio is
             Descriptor_Index : constant Unsigned_32 :=
               Q_Used.Ring (Queue_Index).Id;
 
-            --  Verify that the status byte has been cleared by the device,
-            --  indicating that the request was successful.
-            --  This block has not been moved to its own function because the
-            --  import can raise a Constraint_Error.
-            Check_Request_Status : declare
-               Request_Status_Array : Virtio_Status_Byte_Array_T
-               with
-                 Import,
-                 Address   =>
-                   Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
-                 Alignment => 1;
-            begin
-               Status_Byte : constant Unsigned_8 :=
-                 Request_Status_Array
-                   (Virtio_Queue_Index_T (Descriptor_Index));
-
-               --  The status byte is cleared by the device. If a value other
-               --  than zero is encountered here, an error has occurred.
-               if Status_Byte /= 0 then
-                  Log_Error ("Invalid status byte: " & Status_Byte'Image);
-                  Result := Unhandled_Exception;
-                  return;
-               end if;
-            end Check_Request_Status;
-
             pragma
               Debug
                 (Debug_Devices_Virtio,
@@ -251,9 +226,6 @@ package body Devices.Virtio is
                   .Virtual_Address'Image));
 
       --  Initialise the request status array to 0.
-      --  The interrupt handler checks the status byte of every completed
-      --  request, but only block requests set it, other Virtio device types
-      --  rely on it being explicitly zeroed here.
       --  The entries are all contiguous, so we can use a single memset call.
       Set
         (Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
