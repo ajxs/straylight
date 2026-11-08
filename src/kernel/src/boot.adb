@@ -146,6 +146,13 @@ package body Boot is
       Graphics_Device renames System_Devices (6);
       Console_Device renames System_Devices (7);
 
+      --  Default unallocated addresses for Virtio device resources.
+      --  When using this constant value for the unallocated address pairs in
+      --  the Virtio device structures, it causes the GNAT compiler to make
+      --  the change directly in the system device array. Without using the
+      --  constant value, GNAT will construct the structures temporarily on
+      --  the stack, which will overflow the stack. This issue needs to be
+      --  resolved in the future.
       Default_Unallocated_Addresses :
         constant Virtual_Physical_Address_Pair_T := (others => <>);
 
