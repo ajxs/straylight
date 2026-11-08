@@ -167,6 +167,8 @@ is
 
    end record;
 
-   System_Devices : array (1 .. 16) of aliased Device_T;
+   type Device_Array_T is array (Positive range <>) of aliased Device_T;
+
+   System_Devices : Device_Array_T (1 .. 16);
 
 end Devices;

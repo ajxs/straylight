@@ -833,6 +833,39 @@ package body Devicetree is
    end Parse_Reg_Property;
 
    ----------------------------------------------------------------------------
+   --  Checks whether any of the null-terminated strings in a 'stringlist'
+   --  property, such as 'compatible', contains the given string.
+   --  Bytes after the last null terminator are ignored.
+   ----------------------------------------------------------------------------
+   function Does_Stringlist_Property_Contain_String
+     (Property : Devicetree_Property_T; Value : String) return Boolean
+   with Unreferenced
+   is
+      Start_Position : Positive := 1;
+   begin
+      Read_Stringlist : declare
+         Stringlist : constant String (1 .. Integer (Property.Length))
+         with Import, Address => Property.Value_Address, Alignment => 1;
+      begin
+         for I in Stringlist'Range loop
+            if Stringlist (I) = ASCII.NUL then
+               if Stringlist (Start_Position .. I - 1) = Value then
+                  return True;
+               end if;
+
+               Start_Position := I + 1;
+            end if;
+         end loop;
+      end Read_Stringlist;
+
+      return False;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         return False;
+   end Does_Stringlist_Property_Contain_String;
+
+   ----------------------------------------------------------------------------
    --  'Finalise' the node after all its properties have been read, since the
    --  standard does not dictate the order in which a node's properties appear.
    --  Section 5.4.2 of the Devicetree specification requires a node's
