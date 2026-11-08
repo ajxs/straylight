@@ -38,8 +38,6 @@ is
 
    Maximum_Virtio_Queue_Length : constant := 256;
 
-   subtype Virtio_Descriptor_Array_Index_T is Unsigned_16;
-
    --  The index of a descriptor within a single virtqueue.
    subtype Virtio_Queue_Index_T is
      Unsigned_16 range 0 .. Maximum_Virtio_Queue_Length - 1;

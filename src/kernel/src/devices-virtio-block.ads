@@ -95,8 +95,9 @@ private
        Reserved     at 4 range 0 .. 31;
        Sector       at 8 range 0 .. 63;
      end record;
+
    type Block_Request_Array_T is
-     array (Virtio_Descriptor_Array_Index_T) of Block_Request_T
+     array (Virtio_Queue_Index_T) of Block_Request_T
    with Convention => C;
 
    --  Virtio block device configuration space layout (Virtio Spec 1.3 §5.2.4).

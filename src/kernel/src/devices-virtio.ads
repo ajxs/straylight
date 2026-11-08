@@ -37,7 +37,7 @@ private
    VIRTQ_DESC_F_WRITE : constant := 2; --  Device writes, as opposed to read.
 
    type Virtio_Status_Byte_Array_T is
-     array (Virtio_Descriptor_Array_Index_T) of Unsigned_8
+     array (Virtio_Queue_Index_T) of Unsigned_8
    with Convention => C;
 
    subtype Descriptor_Index_T is Unsigned_16;
@@ -50,11 +50,11 @@ private
    end record;
 
    type Virtqueue_Descriptor_Array is
-     array (Virtio_Descriptor_Array_Index_T) of Virtqueue_Descriptor_T
+     array (Virtio_Queue_Index_T) of Virtqueue_Descriptor_T
    with Convention => C;
 
    type Virtqueue_Available_Descriptor_Array is
-     array (Virtio_Descriptor_Array_Index_T) of Descriptor_Index_T
+     array (Virtio_Queue_Index_T) of Descriptor_Index_T
    with Convention => C;
 
    type Virtqueue_Available_T is record
@@ -72,7 +72,7 @@ private
    end record;
 
    type Virtqueue_Used_Descriptor_Array is
-     array (Virtio_Descriptor_Array_Index_T) of Virtqueue_Used_Element
+     array (Virtio_Queue_Index_T) of Virtqueue_Used_Element
    with Convention => C;
 
    type Virtqueue_Used_T is record

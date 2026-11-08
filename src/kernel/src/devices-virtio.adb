@@ -59,7 +59,7 @@ package body Devices.Virtio is
             begin
                Status_Byte : constant Unsigned_8 :=
                  Request_Status_Array
-                   (Virtio_Descriptor_Array_Index_T (Descriptor_Index));
+                   (Virtio_Queue_Index_T (Descriptor_Index));
 
                --  The status byte is cleared by the device. If a value other
                --  than zero is encountered here, an error has occurred.
@@ -250,21 +250,15 @@ package body Devices.Virtio is
                   .Request_Status_Array
                   .Virtual_Address'Image));
 
-      Initialise_Request_Status_Array : declare
-         Request_Status_Array : Virtio_Status_Byte_Array_T
-         with
-           Import,
-           Address   =>
-             Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
-           Alignment => 1;
-      begin
-         for I in
-           0
-           .. Virtio_Descriptor_Array_Index_T (Maximum_Virtio_Queue_Length - 1)
-         loop
-            Request_Status_Array (I) := 0;
-         end loop;
-      end Initialise_Request_Status_Array;
+      --  Initialise the request status array to 0.
+      --  The interrupt handler checks the status byte of every completed
+      --  request, but only block requests set it, other Virtio device types
+      --  rely on it being explicitly zeroed here.
+      --  The entries are all contiguous, so we can use a single memset call.
+      Set
+        (Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
+         0,
+         Maximum_Virtio_Queue_Length);
 
       pragma
         Debug
