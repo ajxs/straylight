@@ -78,7 +78,7 @@ package body Devices.Virtio is
 
             Channel : constant Unsigned_64 :=
               Device.Bus_Info.Virtio.Request_Info
-                (Virtio_Descriptor_Array_Index_T (Descriptor_Index))
+                (Virtio_Queue_Index_T (Descriptor_Index))
                 .Channel;
 
             pragma
@@ -141,7 +141,7 @@ package body Devices.Virtio is
          return;
       end if;
 
-      for I in Virtio_Descriptor_Array_Index_T loop
+      for I in Virtio_Queue_Index_T loop
          if Device.Bus_Info.Virtio.Descriptor_Status (I) then
             Index := I;
             Device.Bus_Info.Virtio.Descriptor_Status (I) := False;
@@ -322,7 +322,7 @@ package body Devices.Virtio is
          return;
       end if;
 
-      if Index > Maximum_Virtio_Queue_Length
+      if Index >= Maximum_Virtio_Queue_Length
         or else Device.Bus_Info.Virtio.Descriptor_Status (Index)
       then
          Log_Error ("Invalid descriptor index to free: " & Index'Image);
@@ -535,7 +535,7 @@ package body Devices.Virtio is
       Status.Driver_OK := True;
       Device_Registers.Status := Status;
 
-      for I in Virtio_Descriptor_Array_Index_T loop
+      for I in Virtio_Queue_Index_T loop
          Device.Bus_Info.Virtio.Descriptor_Status (I) := True;
       end loop;
 

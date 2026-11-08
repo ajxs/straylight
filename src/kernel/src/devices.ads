@@ -40,15 +40,19 @@ is
 
    subtype Virtio_Descriptor_Array_Index_T is Unsigned_16;
 
+   --  The index of a descriptor within a single virtqueue.
+   subtype Virtio_Queue_Index_T is
+     Unsigned_16 range 0 .. Maximum_Virtio_Queue_Length - 1;
+
    type Virtio_Descriptor_Status_Array_T is
-     array (Virtio_Descriptor_Array_Index_T) of Boolean;
+     array (Virtio_Queue_Index_T) of Boolean;
 
    type Virtio_Device_Request_Info_T is record
       Channel : Blocking_Channel_T := 0;
    end record;
 
    type Request_Info_Array_T is
-     array (Virtio_Descriptor_Array_Index_T) of Virtio_Device_Request_Info_T;
+     array (Virtio_Queue_Index_T) of Virtio_Device_Request_Info_T;
 
    --  Feature bits for Virtio devices are split into multiple 'pages' of
    --  32-bit feature bitmaps. The first page (Page 0) is accessed by writing
@@ -73,7 +77,9 @@ is
       --  the kernel needs to maintain both virtual and physical addresses for
       --  Virtio devices resources.
       Request_Status_Array   : Virtual_Physical_Address_Pair_T;
-      Request_Serviced_Index : Virtio_Descriptor_Array_Index_T := 0;
+      --  This counter wraps at 2**16, like the used ring's index field.
+      --  It is not a descriptor index, so it must not be range-constrained.
+      Request_Serviced_Index : Unsigned_16 := 0;
       Q_Used                 : Virtual_Physical_Address_Pair_T;
       Q_Available            : Virtual_Physical_Address_Pair_T;
       Q_Descriptor           : Virtual_Physical_Address_Pair_T;
