@@ -6,7 +6,6 @@
 package RISCV.SBI
   with Preelaborate
 is
-
    type SBI_Result_T is record
       Error : Integer_64;
       Value : Integer_64;
@@ -56,5 +55,17 @@ is
      Import,
      Convention    => Assembler,
      External_Name => "sbi_get_hart_status";
+
+   --  SBI System Reset extension codes.
+   --  Refer to: https://github.com/
+   --    riscv-non-isa/riscv-sbi-doc/blob/master/src/ext-sys-reset.adoc
+   SBI_SRST_TYPE_SHUTDOWN         : constant := 0;
+   SBI_SRST_TYPE_COLD_REBOOT      : constant := 1;
+   SBI_SRST_REASON_NONE           : constant := 0;
+   SBI_SRST_REASON_SYSTEM_FAILURE : constant := 1;
+
+   function System_Reset
+     (Reset_Type : Unsigned_32; Reset_Reason : Unsigned_32) return SBI_Result_T
+   with Import, Convention => Assembler, External_Name => "sbi_system_reset";
 
 end RISCV.SBI;

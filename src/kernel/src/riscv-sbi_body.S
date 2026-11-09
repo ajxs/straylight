@@ -40,3 +40,12 @@ sbi_get_hart_status:
 	ecall
 
 	ret
+
+.global sbi_system_reset
+.type sbi_system_reset, @function
+sbi_system_reset:
+	li a7, 0x53525354
+	li a6, 0x0
+	ecall
+
+	ret
