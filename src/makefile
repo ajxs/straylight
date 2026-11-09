@@ -8,8 +8,8 @@
 MAKEFLAGS += --warn-undefined-variables
 MAKEFLAGS += --no-builtin-rules
 
-.PHONY: all bios clean connect-to-debug-socket debug emu emu-log emu-socket \
-	kernel libc libs libstraylight test_disk userspace
+.PHONY: all bios clean connect-to-debug-socket debug emu emu-headless emu-log \
+	emu-socket kernel libc libs libstraylight test_disk userspace
 
 KERNEL_DIR      := kernel
 KERNEL_BINARY   := ${KERNEL_DIR}/bin/straylight.elf
@@ -98,6 +98,15 @@ emu-log: kernel ${BIOS}
 	qemu-system-riscv64     \
 		${QEMU_FLAGS}         \
 		${QEMU_DISPLAY_FLAGS} \
+		-serial ${QEMU_SERIAL_OUTPUT_DEBUG}
+
+# No display window, serial to file. -no-reboot makes a reset exit QEMU
+# instead of rebooting, so an unattended run can't get stuck.
+emu-headless: kernel ${BIOS}
+	qemu-system-riscv64     \
+		${QEMU_FLAGS}         \
+		-display none         \
+		-no-reboot            \
 		-serial ${QEMU_SERIAL_OUTPUT_DEBUG}
 
 emu-socket: kernel ${BIOS}

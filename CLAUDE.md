@@ -16,6 +16,7 @@ All build commands are run from the `src/` directory unless noted.
 | `make kernel` | Kernel only |
 | `make emu` | Build and run in QEMU (serial → stdio) |
 | `make emu-log` | Build and run, serial output to `serial.log` |
+| `make emu-headless` | As `emu-log`, but no display window, and a reset exits QEMU. Use for unattended runs: `timeout 60 make emu-headless` |
 | `make debug` | Build and run with GDB stub on port 1234, serial to `serial.log` |
 | `make bios` | Build OpenSBI (requires `riscv64-linux-gnu-` toolchain) |
 | `make clean` | Clean all build artifacts |
