@@ -9,6 +9,7 @@ with Memory.Kernel;   use Memory.Kernel;
 with Memory.Physical; use Memory.Physical;
 with Processes.Scheduler;
 with RISCV.Interrupts;
+with RISCV.SBI;
 
 package body Processes is
    procedure Allocate_And_Map_New_Process_Memory
@@ -489,9 +490,24 @@ package body Processes is
       if Curr_Process = null then
          pragma Debug (Debug_Idle, Log_Debug ("No processes to clean up."));
 
-         --  This has been placed here temporarily for development purposes.
-         --  If there are no running processes, the kernel will panic.
-         Panic ("No running processes.");
+         Shutdown_System : declare
+            SBI_Result : RISCV.SBI.SBI_Result_T;
+         begin
+            --  This has been placed here temporarily for development purposes.
+            --  If there are no running processes, shutdown the system.
+            Log_Debug ("No running processes. Shutting down...");
+
+            SBI_Result :=
+              RISCV.SBI.System_Reset
+                (RISCV.SBI.SBI_SRST_TYPE_SHUTDOWN,
+                 RISCV.SBI.SBI_SRST_REASON_NONE);
+            if SBI_Result.Error /= 0 then
+               Panic ("Error shutting down system: " & SBI_Result.Error'Image);
+            end if;
+         exception
+            when Constraint_Error =>
+               Panic_Constraint_Error;
+         end Shutdown_System;
       end if;
 
       while Curr_Process /= null loop
