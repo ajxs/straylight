@@ -70,23 +70,23 @@ private
 
    procedure Non_Boot_Hart_Start (Hart_Id : Hart_Index_T);
 
-   --  This is a one-page 'secondary stack' mapped into kernel space.
+   --  This is a one-page per-hart stack mapped into kernel space.
    --  This is used so that there's a mapped stack to switch to when enabling
    --  paging and jumping into the kernel's higher-half address space.
    --  It's required because a large number of early internal processes, such
    --  as allocating new process resources, require the kernel allocators to
    --  be functional, which in turn requires paging to be enabled.
    --  Ideally in the long term there will be a better solution for this.
-   Boot_Secondary_Stack_Phys_Address_Base : Physical_Address_T;
+   Early_Kernel_Stack_Phys_Address_Base : Physical_Address_T;
 
    --  This is the 'System Init Process', the first userspace program which is
    --  launched by the kernel once initialisation is complete.
    Init_Process : Process_Control_Block_Access := null;
 
-   Boot_Secondary_Stack_Virtual_Address_Base : constant Address :=
+   Early_Kernel_Stack_Virtual_Address_Base : constant Address :=
      System'To_Address (16#FFFF_FFE8_0000_0000#);
 
-   Boot_Secondary_Stack_Size : constant := 16#1000#;
+   Early_Kernel_Stack_Size : constant := 16#1000#;
 
    --  Loads the provided SATP, stack pointer, and jumps to the specified
    --  return address. This is used to switch into the kernel's address space

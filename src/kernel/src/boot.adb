@@ -29,16 +29,16 @@ with Traps;
 with Utilities;            use Utilities;
 
 package body Boot is
-   function Get_Boot_Secondary_Stack_Virtual_Address
+   function Get_Early_Kernel_Stack_Virtual_Address
      (Hart_Id : Hart_Index_T) return Virtual_Address_T
-   is (Boot_Secondary_Stack_Virtual_Address_Base
-       + Storage_Offset (Hart_Id) * Boot_Secondary_Stack_Size)
+   is (Early_Kernel_Stack_Virtual_Address_Base
+       + Storage_Offset (Hart_Id) * Early_Kernel_Stack_Size)
    with Inline, Pure_Function;
 
-   function Get_Boot_Secondary_Stack_Physical_Address
+   function Get_Early_Kernel_Stack_Physical_Address
      (Hart_Id : Hart_Index_T) return Physical_Address_T
-   is (Boot_Secondary_Stack_Phys_Address_Base
-       + Storage_Offset (Hart_Id) * Boot_Secondary_Stack_Size)
+   is (Early_Kernel_Stack_Phys_Address_Base
+       + Storage_Offset (Hart_Id) * Early_Kernel_Stack_Size)
    with Inline, Pure_Function;
 
    function Get_Hart_Emergency_Stack_Top_Address
@@ -69,21 +69,21 @@ package body Boot is
          Panic_Constraint_Error;
    end Get_Hart_Emergency_Stack_Top_Address;
 
-   procedure Initialise_Hart_Boot_Secondary_Stack
-     (Hart_Id : Hart_Index_T; Boot_Secondary_Stack_Top : out Virtual_Address_T)
+   procedure Initialise_Hart_Early_Kernel_Stack
+     (Hart_Id : Hart_Index_T; Early_Kernel_Stack_Top : out Virtual_Address_T)
    is
       Result : Function_Result := Unset;
    begin
-      Boot_Secondary_Stack_Phys_Address : constant Physical_Address_T :=
-        Get_Boot_Secondary_Stack_Physical_Address (Hart_Id);
+      Early_Kernel_Stack_Phys_Address : constant Physical_Address_T :=
+        Get_Early_Kernel_Stack_Physical_Address (Hart_Id);
 
-      Boot_Secondary_Stack_Virtual_Address : constant Virtual_Address_T :=
-        Get_Boot_Secondary_Stack_Virtual_Address (Hart_Id);
+      Early_Kernel_Stack_Virtual_Address : constant Virtual_Address_T :=
+        Get_Early_Kernel_Stack_Virtual_Address (Hart_Id);
 
       Map_Kernel_Memory
-        (Boot_Secondary_Stack_Virtual_Address,
-         Boot_Secondary_Stack_Phys_Address,
-         Boot_Secondary_Stack_Size,
+        (Early_Kernel_Stack_Virtual_Address,
+         Early_Kernel_Stack_Phys_Address,
+         Early_Kernel_Stack_Size,
          (True, True, False, False),
          Result);
       if Is_Error (Result) then
@@ -91,9 +91,9 @@ package body Boot is
          Panic;
       end if;
 
-      Boot_Secondary_Stack_Top :=
-        Boot_Secondary_Stack_Virtual_Address + Boot_Secondary_Stack_Size;
-   end Initialise_Hart_Boot_Secondary_Stack;
+      Early_Kernel_Stack_Top :=
+        Early_Kernel_Stack_Virtual_Address + Early_Kernel_Stack_Size;
+   end Initialise_Hart_Early_Kernel_Stack;
 
    procedure Free_Boot_Memory is
       --  The physical address range of the boot section.
@@ -151,8 +151,8 @@ package body Boot is
       --  the Virtio device structures, it causes the GNAT compiler to make
       --  the change directly in the system device array. Without using the
       --  constant value, GNAT will construct the structures temporarily on
-      --  the stack, which will overflow the stack. This issue needs to be
-      --  resolved in the future.
+      --  the stack, which will overflow the 4 KiB early kernel stack. This
+      --  issue needs to be resolved in the future.
       Default_Unallocated_Addresses :
         constant Virtual_Physical_Address_Pair_T := (others => <>);
 
@@ -597,7 +597,7 @@ package body Boot is
    is
       Result : Function_Result := Unset;
 
-      Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
+      Early_Kernel_Stack_Top : Virtual_Address_T := Null_Address;
 
       --  Parse_Devicetree fails with Region_Array_Exhausted if the
       --  Devicetree describes more usable memory regions than fit here.
@@ -640,21 +640,21 @@ package body Boot is
 
       Initialise_Kernel_Address_Space;
 
-      --  Allocate the boot secondary stack for all harts.
+      --  Allocate the early kernel stack for all harts.
       --  However only the current hart will be mapped here.
       Allocate_Physical_Memory
-        (Boot_Secondary_Stack_Size * Maximum_Harts,
-         Boot_Secondary_Stack_Phys_Address_Base,
+        (Early_Kernel_Stack_Size * Maximum_Harts,
+         Early_Kernel_Stack_Phys_Address_Base,
          Result);
       if Is_Error (Result) then
          --  Error already printed.
          Panic;
       end if;
 
-      Initialise_Hart_Boot_Secondary_Stack (Hart_Id, Boot_Secondary_Stack_Top);
+      Initialise_Hart_Early_Kernel_Stack (Hart_Id, Early_Kernel_Stack_Top);
 
       pragma
-        Debug (Debug_Boot, Log_Debug ("Initialised boot secondary stack."));
+        Debug (Debug_Boot, Log_Debug ("Initialised early kernel stack."));
 
       --  Once the kernel address space is set up, we can mark this hart as
       --  running. Once all harts are running, the boot memory is no longer
@@ -667,8 +667,8 @@ package body Boot is
       Switch_To_Kernel_Address_Space
         (Hart_Id,
          Get_Kernel_Address_Space_SATP,
-         Boot_Secondary_Stack_Top,
-         Boot_Secondary_Stack_Size,
+         Early_Kernel_Stack_Top,
+         Early_Kernel_Stack_Size,
          Initialise_Kernel_Services'Address);
    exception
       when Constraint_Error =>
@@ -1030,7 +1030,7 @@ package body Boot is
    end Start_Non_Boot_Harts;
 
    procedure Non_Boot_Hart_Entry (Hart_Id : Hart_Index_T) is
-      Boot_Secondary_Stack_Top : Virtual_Address_T := Null_Address;
+      Early_Kernel_Stack_Top : Virtual_Address_T := Null_Address;
 
       procedure Log_Hart is
       begin
@@ -1048,14 +1048,14 @@ package body Boot is
 
       pragma Debug (Debug_Boot, Log_Hart);
 
-      Initialise_Hart_Boot_Secondary_Stack (Hart_Id, Boot_Secondary_Stack_Top);
+      Initialise_Hart_Early_Kernel_Stack (Hart_Id, Early_Kernel_Stack_Top);
 
       --  Enter the kernel address space.
       Switch_To_Kernel_Address_Space
         (Hart_Id,
          Get_Kernel_Address_Space_SATP,
-         Boot_Secondary_Stack_Top,
-         Boot_Secondary_Stack_Size,
+         Early_Kernel_Stack_Top,
+         Early_Kernel_Stack_Size,
          Non_Boot_Hart_Start'Address);
    end Non_Boot_Hart_Entry;
 

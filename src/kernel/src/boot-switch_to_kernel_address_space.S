@@ -28,7 +28,7 @@ boot_switch_to_kernel_address_space:
 
 # Subtract the stack size from the stack top to get the stack limit, and 
 # install it alongside sp, so that a supervisor-mode trap can detect an 
-# overflow of the boot secondary stack.
+# overflow of the early kernel stack.
 	sub  t0, a2, a3
 	sd   t0, HART_STATE_STACK_LIMIT_OFFSET(tp)
 
