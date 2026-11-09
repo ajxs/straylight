@@ -8,8 +8,8 @@ package RISCV.SBI
 is
 
    type SBI_Result_T is record
-      Error : Integer_32;
-      Value : Integer_32;
+      Error : Integer_64;
+      Value : Integer_64;
    end record
    with Convention => C;
 
