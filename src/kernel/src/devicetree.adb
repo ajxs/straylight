@@ -1,3 +1,4 @@
+with GNAT.Source_Info;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Logging;   use Logging;
@@ -629,18 +630,24 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Get_Next_Token;
 
-   procedure Log_Node_Name (Node_Name : Devicetree_String_T) is
+   procedure Log_Node_Name
+     (Node_Name : Devicetree_String_T;
+      File      : String := GNAT.Source_Info.File;
+      Line      : Positive := GNAT.Source_Info.Line) is
    begin
       Log_Debug
-        ("  Node Name: '"
-         & Node_Name.Value (1 .. Node_Name.Byte_Length)
-         & "'");
+        ("  Node Name: '" & Node_Name.Value (1 .. Node_Name.Byte_Length) & "'",
+         File,
+         Line);
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
    end Log_Node_Name;
 
-   procedure Log_Cells_Context (Cells_Context : FDT_Cells_Context_T) is
+   procedure Log_Cells_Context
+     (Cells_Context : FDT_Cells_Context_T;
+      File          : String := GNAT.Source_Info.File;
+      Line          : Positive := GNAT.Source_Info.Line) is
    begin
       Log_Debug
         ("Node cells context: ("
@@ -648,28 +655,35 @@ package body Devicetree is
          & Cells_Context.Address_Cells'Image
          & ", Size_Cells: "
          & Cells_Context.Size_Cells'Image
-         & ")");
+         & ")",
+         File,
+         Line);
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
    end Log_Cells_Context;
 
-   procedure Log_Property (Property : Devicetree_Property_T) is
+   procedure Log_Property
+     (Property : Devicetree_Property_T;
+      File     : String := GNAT.Source_Info.File;
+      Line     : Positive := GNAT.Source_Info.Line) is
    begin
-      Log_Debug ("Property:");
+      Log_Debug ("Property:", File, Line);
       Log_Debug
         ("  Name: '"
          & Property.Name.Value (1 .. Property.Name.Byte_Length)
-         & "'");
+         & "'",
+         File,
+         Line);
 
       if Property.Length = 0 then
-         Log_Debug ("  (No Value)");
+         Log_Debug ("  (No Value)", File, Line);
       elsif Is_String_Value (Property.Name) then
          Read_Property_Value : declare
             Property_Value : String (1 .. Integer (Property.Length))
             with Import, Address => Property.Value_Address, Alignment => 1;
          begin
-            Log_Debug ("  Value: '" & Property_Value & "'");
+            Log_Debug ("  Value: '" & Property_Value & "'", File, Line);
          end Read_Property_Value;
       end if;
    exception

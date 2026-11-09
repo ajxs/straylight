@@ -16,9 +16,12 @@ package body Hart_State is
       return ((Get_Current_Hart_Id * 2) + 1);
    end Get_Current_Hart_Supervisor_Interrupt_Context;
 
-   procedure Panic (Message : String := "Kernel Panic") is
+   procedure Panic
+     (Message : String := "Kernel Panic";
+      File    : String := GNAT.Source_Info.File;
+      Line    : Positive := GNAT.Source_Info.Line) is
    begin
-      Log_Error ("Panic: " & Message);
+      Log_Error ("Panic: " & Message, File, Line);
 
       RISCV.Interrupts.Disable_Supervisor_Interrupts;
 
@@ -37,10 +40,7 @@ package body Hart_State is
      (File : String := GNAT.Source_Info.File;
       Line : Positive := GNAT.Source_Info.Line) is
    begin
-      Panic ("Constraint_Error at " & File & ":" & Line'Image);
-   exception
-      when Constraint_Error =>
-         Panic ("Constraint_Error in Panic_Constraint_Error");
+      Panic ("Constraint_Error", File, Line);
    end Panic_Constraint_Error;
 
    procedure Pop_Interrupts_Off is

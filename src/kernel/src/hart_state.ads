@@ -67,7 +67,10 @@ is
    --  Each Hart has its own idle process.
    Hart_Idle_Processes : array (Hart_Index_T) of Process_Control_Block_Access;
 
-   procedure Panic (Message : String := "Kernel Panic")
+   procedure Panic
+     (Message : String := "Kernel Panic";
+      File    : String := GNAT.Source_Info.File;
+      Line    : Positive := GNAT.Source_Info.Line)
    with No_Return;
 
    procedure Panic_Constraint_Error

@@ -47,11 +47,20 @@ is
    for Log_Level_T use
      (Log_Level_Error => 0, Log_Level_Info => 1, Log_Level_Debug => 2);
 
-   procedure Log_Debug (Message : String);
+   procedure Log_Debug
+     (Message : String;
+      File    : String := GNAT.Source_Info.File;
+      Line    : Positive := GNAT.Source_Info.Line);
 
-   procedure Log_Debug_Wide (Message : Wide_String);
+   procedure Log_Debug_Wide
+     (Message : Wide_String;
+      File    : String := GNAT.Source_Info.File;
+      Line    : Positive := GNAT.Source_Info.Line);
 
-   procedure Log_Error (Message : String);
+   procedure Log_Error
+     (Message : String;
+      File    : String := GNAT.Source_Info.File;
+      Line    : Positive := GNAT.Source_Info.Line);
 
    ----------------------------------------------------------------------------
    --  Logs the source location at which a Constraint_Error was handled.

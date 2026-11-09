@@ -73,7 +73,18 @@ package body Logging.Debug_Console is
          null;
    end Print_String_To_SBI_Console;
 
-   procedure Log_To_Debug_Console (Message : String; Level : Log_Level_T) is
+   ----------------------------------------------------------------------------
+   --  According to Ada 2022 RM 4.10 (Image Attributes):
+   --  "For an integer type, the image written out is... with a single leading
+   --  character that is either a minus sign or a space."
+   --  This indicates that it's safe to strip the leading character when
+   --  displaying the image of an integer type that will always be positive,
+   --  such as the system time, and hart ID.
+   --  Refer to: http://ada-auth.org/standards/22rm/html/RM-4-10.html
+   ----------------------------------------------------------------------------
+   procedure Log_To_Debug_Console
+     (Message : String; Level : Log_Level_T; File : String; Line : Positive)
+   is
       System_Time  : constant Unsigned_64 := RISCV.Get_System_Time;
       Current_Hart : constant Hart_State_Access := Get_Current_Hart_State;
    begin
@@ -81,18 +92,30 @@ package body Logging.Debug_Console is
       Print_String_To_SBI_Console
         ("hart="
          & Current_Hart.all.Hart_Id'Image
+             (2 .. Current_Hart.all.Hart_Id'Image'Length)
          & " process="
          & (if Current_Hart.all.Current_Process = null
             then "null"
-            else Current_Hart.all.Current_Process.all.Process_Id'Image)
+            else
+              Current_Hart.all.Current_Process.all.Process_Id'Image
+                (2
+                 ..
+                   Current_Hart.all.Current_Process.all
+                     .Process_Id'Image'Length))
          & " time="
-         & System_Time'Image
+         & System_Time'Image (2 .. System_Time'Image'Length)
          & " level="
          & (if Level = Log_Level_Error
             then "Error"
             elsif Level = Log_Level_Info
             then "Info"
             else "Debug")
+         & " location="
+         & ASCII.Quotation
+         & File
+         & ":"
+         & Line'Image (2 .. Line'Image'Length)
+         & ASCII.Quotation
          & " message="
          & ASCII.Quotation
          & Message

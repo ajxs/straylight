@@ -10,12 +10,16 @@ package body Memory.Heap_Allocator is
 
    procedure Log_Invalid_Block
      (Block_Addr     : Virtual_Address_T;
-      Procedure_Name : String := GNAT.Source_Info.Enclosing_Entity) is
+      Procedure_Name : String := GNAT.Source_Info.Enclosing_Entity;
+      File           : String := GNAT.Source_Info.File;
+      Line           : Positive := GNAT.Source_Info.Line) is
    begin
       Log_Error
         (Procedure_Name
          & ": Invalid block encountered at address "
-         & Block_Addr'Image);
+         & Block_Addr'Image,
+         File,
+         Line);
    exception
       when Constraint_Error =>
          null;
@@ -23,12 +27,16 @@ package body Memory.Heap_Allocator is
 
    procedure Log_Invalid_Region
      (Region_Ptr     : Heap_Memory_Region_Access;
-      Procedure_Name : String := GNAT.Source_Info.Enclosing_Entity) is
+      Procedure_Name : String := GNAT.Source_Info.Enclosing_Entity;
+      File           : String := GNAT.Source_Info.File;
+      Line           : Positive := GNAT.Source_Info.Line) is
    begin
       Log_Error
         (Procedure_Name
          & ": Invalid heap region encountered at address "
-         & Region_Ptr.all'Address'Image);
+         & Region_Ptr.all'Address'Image,
+         File,
+         Line);
    exception
       when Constraint_Error =>
          null;
