@@ -3,6 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with GNAT.Debug_Utilities;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
@@ -17,7 +18,6 @@ with RISCV;            use RISCV;
 with RISCV.SBI;        use RISCV.SBI;
 with System_Calls;
 with Hart_State;       use Hart_State;
-with Utilities;        use Utilities;
 
 package body Traps is
    procedure Handle_Supervisor_Mode_Exception
@@ -57,34 +57,25 @@ package body Traps is
          if Is_Stack_Overflow then
             Panic
               ("Traps.Handle_Supervisor_Mode_Exception: Stack Overflow:"
-               & ASCII.LF
-               & "  Stval:      "
-               & Stval'Image
-               & ASCII.LF
-               & "  Stack Base: "
-               & Trapping_Process.Kernel_Stack_Virt_Addr'Image);
+               & " stval="
+               & GNAT.Debug_Utilities.Image_C (Unsigned_64_To_Address (Stval))
+               & " stack_base="
+               & GNAT.Debug_Utilities.Image_C
+                   (Trapping_Process.Kernel_Stack_Virt_Addr));
          end if;
 
          Panic
-           ("Unhandled supervisor mode exception"
-            & ASCII.LF
-            & "  Hart#      "
-            & Hart_Id'Image
-            & ASCII.LF
-            & "  PID#       "
+           ("Unhandled supervisor mode exception: pid="
             & Trapping_Process.Process_Id'Image
-            & ASCII.LF
-            & "  Idle Proc: "
+                (2 .. Trapping_Process.Process_Id'Image'Length)
+            & " idle="
             & Is_Idle_Process'Image
-            & ASCII.LF
-            & "  Cause:     "
-            & Cause'Image
-            & ASCII.LF
-            & "  Sepc:      "
-            & Sepc'Image
-            & ASCII.LF
-            & "  Stval:     "
-            & Stval'Image);
+            & " cause="
+            & Cause'Image (2 .. Cause'Image'Length)
+            & " sepc="
+            & GNAT.Debug_Utilities.Image_C (Sepc)
+            & " stval="
+            & GNAT.Debug_Utilities.Image_C (Unsigned_64_To_Address (Stval)));
 
       end Read_Process_Info;
 
@@ -111,13 +102,11 @@ package body Traps is
         Debug
           (Debug_Traps,
            Log_Debug
-             ("External Interrupt: "
-              & ASCII.LF
-              & "  Context:      "
+             ("External Interrupt: context="
               & Supervisor_Interrupt_Context'Image
-              & ASCII.LF
-              & "  Interrupt ID: "
-              & Interrupt_ID'Image));
+                  (2 .. Supervisor_Interrupt_Context'Image'Length)
+              & " irq="
+              & Interrupt_ID'Image (2 .. Interrupt_ID'Image'Length)));
 
       if Interrupt_ID = 0 then
          Log_Error ("Unable to claim interrupt: Interrupt ID is zero");
@@ -132,8 +121,9 @@ package body Traps is
               Debug
                 (Debug_Traps,
                  Log_Debug
-                   ("Handling Interrupt for Device at Virtual Address: "
-                    & System_Device.Virtual_Address'Image));
+                   ("Handling Interrupt for Device: addr_virt="
+                    & GNAT.Debug_Utilities.Image_C
+                        (System_Device.Virtual_Address)));
 
             if System_Device.Device_Bus = Device_Bus_Virtio_MMIO then
                Devices.Virtio.Acknowledge_Interrupt (System_Device, Result);
@@ -145,7 +135,9 @@ package body Traps is
             end if;
 
             if Is_Error (Result) then
-               Panic ("Error acknowledging device interrupt: " & Result'Image);
+               Panic
+                 ("Error acknowledging device interrupt: result="
+                  & Result'Image);
             end if;
          end if;
       end loop;
@@ -162,7 +154,9 @@ package body Traps is
    is
       procedure Log_Cause is
       begin
-         Log_Debug ("Supervisor Mode: Other Interrupt: " & Cause'Image);
+         Log_Debug
+           ("Supervisor Mode: Other Interrupt: cause="
+            & Cause'Image (2 .. Cause'Image'Length));
       exception
          when Constraint_Error =>
             null;
@@ -190,21 +184,18 @@ package body Traps is
       Stval                 : Unsigned_64;
       Entering              : Boolean)
    is
-      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
-
       Cause : constant Unsigned_64 := Get_Cause (Scause);
 
       Trap_Is_Interrupt : constant Boolean := Is_Interrupt (Scause);
 
-      Process_Id_String : String (1 .. 24) := "None                    ";
+      Process_Id : Process_Id_T := 0;
    begin
       if Trapping_Process_Addr /= Null_Address then
          Get_Process_Id : declare
             Trapping_Process : Process_Control_Block_T
             with Import, Alignment => 1, Address => Trapping_Process_Addr;
          begin
-            Set_Fixed_Length_String
-              (Trapping_Process.Process_Id'Image, Process_Id_String);
+            Process_Id := Trapping_Process.Process_Id;
          end Get_Process_Id;
       end if;
 
@@ -213,38 +204,29 @@ package body Traps is
            ((if Supervisor_Mode
              then "Traps.Handle_Supervisor_Mode_Trap:"
              else "Traps.Handle_User_Mode_Trap:")
-            & ASCII.LF
-            & "  Hart#      "
-            & Hart_Id'Image
-            & ASCII.LF
-            & "  PID#       "
-            & Process_Id_String
-            & ASCII.LF
-            & "  Interrupt: "
+            & " pid="
+            & (if Trapping_Process_Addr = Null_Address
+               then "none"
+               else Process_Id'Image (2 .. Process_Id'Image'Length))
+            & " interrupt="
             & Trap_Is_Interrupt'Image
-            & ASCII.LF
-            & "  Cause:     "
-            & Cause'Image
-            & ASCII.LF
-            & "  Sepc:      "
-            & Sepc'Image
-            & ASCII.LF
-            & "  Stval:     "
-            & Stval'Image);
+            & " cause="
+            & Cause'Image (2 .. Cause'Image'Length)
+            & " sepc="
+            & GNAT.Debug_Utilities.Image_C (Sepc)
+            & " stval="
+            & GNAT.Debug_Utilities.Image_C (Unsigned_64_To_Address (Stval)));
       else
          Log_Debug
            ((if Supervisor_Mode
              then "Traps.Handle_Supervisor_Mode_Trap: Returning from trap:"
              else "Traps.Handle_User_Mode_Trap: Returning from trap:")
-            & ASCII.LF
-            & "  Hart#  "
-            & Hart_Id'Image
-            & ASCII.LF
-            & "  PID#   "
-            & Process_Id_String
-            & ASCII.LF
-            & "  Cause: "
-            & Cause'Image);
+            & " pid="
+            & (if Trapping_Process_Addr = Null_Address
+               then "none"
+               else Process_Id'Image (2 .. Process_Id'Image'Length))
+            & " cause="
+            & Cause'Image (2 .. Cause'Image'Length));
       end if;
    exception
       when Constraint_Error =>
@@ -280,16 +262,12 @@ package body Traps is
    end Handle_Supervisor_Mode_Trap;
 
    procedure Log_Timer_Interrupt_Scheduling (Entering : Boolean) is
-      Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
    begin
       if Entering then
-         Log_Debug ("Hart#" & Hart_Id'Image & ": Scheduling from timer IRQ");
+         Log_Debug ("Scheduling from timer IRQ");
       else
-         Log_Debug ("Hart#" & Hart_Id'Image & ": Returning from timer IRQ");
+         Log_Debug ("Returning from timer IRQ");
       end if;
-   exception
-      when Constraint_Error =>
-         null;
    end Log_Timer_Interrupt_Scheduling;
 
    procedure Handle_Timer_Interrupt is
@@ -322,7 +300,7 @@ package body Traps is
          when Scause_U_Mode_Ecall =>
             System_Calls.Handle_User_Mode_Syscall (Trapping_Process, Result);
             if Is_Error (Result) then
-               Panic ("Error handling syscall: " & Result'Image);
+               Panic ("Error handling syscall: result=" & Result'Image);
             end if;
 
             --  Since Sepc points to the address at the time of the trap,
@@ -334,22 +312,16 @@ package body Traps is
 
          when others              =>
             Panic
-              ("Unhandled user mode exception: "
-               & ASCII.LF
-               & "  Hart#  "
-               & Get_Current_Hart_Id'Image
-               & ASCII.LF
-               & "  PID#   "
+              ("Unhandled user mode exception: pid="
                & Trapping_Process.Process_Id'Image
-               & ASCII.LF
-               & "  Cause: "
-               & Cause'Image
-               & ASCII.LF
-               & "  Sepc:  "
-               & Sepc'Image
-               & ASCII.LF
-               & "  Stval: "
-               & Stval'Image);
+                   (2 .. Trapping_Process.Process_Id'Image'Length)
+               & " cause="
+               & Cause'Image (2 .. Cause'Image'Length)
+               & " sepc="
+               & GNAT.Debug_Utilities.Image_C (Sepc)
+               & " stval="
+               & GNAT.Debug_Utilities.Image_C
+                   (Unsigned_64_To_Address (Stval)));
       end case;
    exception
       when Constraint_Error =>
@@ -359,7 +331,9 @@ package body Traps is
    procedure Handle_User_Mode_Interrupt (Cause : Unsigned_64) is
       procedure Log_Cause is
       begin
-         Log_Debug ("User Mode: Other Interrupt: " & Cause'Image);
+         Log_Debug
+           ("User Mode: Other Interrupt: cause="
+            & Cause'Image (2 .. Cause'Image'Length));
       exception
          when Constraint_Error =>
             null;
@@ -420,7 +394,7 @@ package body Traps is
       SBI_Ret : constant SBI_Result_T :=
         RISCV.SBI.Set_Timer (RISCV.Get_System_Time + System_Tick_Interval);
       if SBI_Ret.Error /= 0 then
-         Panic ("Error setting next event time: " & SBI_Ret.Error'Image);
+         Panic ("Error setting next event time: error=" & SBI_Ret.Error'Image);
       end if;
 
    exception
@@ -432,11 +406,14 @@ package body Traps is
       Hart_Id : constant Hart_Index_T := Get_Current_Hart_Id;
    begin
       if Hart_States (Hart_Id).Interrupts_Off_Counter /= 0 then
-         Panic
-           ("Hart# "
-            & Hart_Id'Image
-            & " still has active locks prior to trap: "
-            & Hart_States (Hart_Id).Interrupts_Off_Counter'Image);
+         Report_Locks : declare
+            Counter_Image : constant String :=
+              Hart_States (Hart_Id).Interrupts_Off_Counter'Image;
+         begin
+            Panic
+              ("Hart still has active locks prior to trap: interrupts_off="
+               & Counter_Image (2 .. Counter_Image'Last));
+         end Report_Locks;
       end if;
    exception
       when Constraint_Error =>
