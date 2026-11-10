@@ -31,7 +31,9 @@ BIOS            := ${OPENSBI_BIN}
 
 HART_COUNT := 3
 
-# @TODO: Why did I specify the VirtIO MMIO buses here? I can't recall now.
+# Pin each VirtIO device to a fixed MMIO slot.
+# Currently Boot.Initialise_Devices hardcodes device addresses and IRQs.
+# (bus.N is at 0x10001000 + N * 0x1000, IRQ N + 1).
 QEMU_FLAGS :=        \
 	-bios ${BIOS}      \
 	-cpu rv64          \
