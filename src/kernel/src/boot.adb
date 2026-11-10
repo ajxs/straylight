@@ -3,6 +3,7 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
+with GNAT.Debug_Utilities;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Devices;              use Devices;
@@ -337,18 +338,24 @@ package body Boot is
               Debug
                 (Debug_Boot,
                  Log_Debug
-                   ("Mapping Device "
-                    & I'Image
-                    & ": "
-                    & ASCII.LF
-                    & "  Class:     "
+                   ("Mapping Device: id="
+                    & I'Image (2 .. I'Image'Length)
+                    --  Because the kernel uses pragma Discard_Names,
+                    --  Device_Class is printed as an integer. For this reason
+                    --  the first space can be safely trimmed.
+                    & " class="
                     & System_Devices (I).Device_Class'Image
-                    & ASCII.LF
-                    & "  Virt Addr: "
-                    & System_Devices (I).Virtual_Address'Image
-                    & ASCII.LF
-                    & "  Phys Addr: "
-                    & System_Devices (I).Physical_Address'Image));
+                        (2 .. System_Devices (I).Device_Class'Image'Length)
+                    & " addr_virt="
+                    & GNAT.Debug_Utilities.Image_C
+                        (System_Devices (I).Virtual_Address)
+                    & " addr_phys="
+                    & GNAT.Debug_Utilities.Image_C
+                        (Address (System_Devices (I).Physical_Address))
+                    & " irq="
+                    & System_Devices (I).Interrupt_Line'Image
+                        (2
+                         .. System_Devices (I).Interrupt_Line'Image'Length)));
 
             if System_Devices (I).Memory_Size /= 0 then
                --  Map each device into the kernel's address space.
@@ -388,13 +395,6 @@ package body Boot is
 
             --  If the device has an interrupt line, then enable it.
             if System_Devices (I).Interrupt_Line /= 0 then
-               pragma
-                 Debug
-                   (Debug_Boot,
-                    Log_Debug
-                      ("Setting interrupt line: "
-                       & System_Devices (I).Interrupt_Line'Image));
-
                Devices.PLIC.Set_IRQ_Enable_State
                  (APIC_Device,
                   Supervisor_Interrupt_Context,
@@ -653,8 +653,7 @@ package body Boot is
 
       Initialise_Hart_Early_Kernel_Stack (Hart_Id, Early_Kernel_Stack_Top);
 
-      pragma
-        Debug (Debug_Boot, Log_Debug ("Initialised early kernel stack."));
+      pragma Debug (Debug_Boot, Log_Debug ("Initialised early kernel stack."));
 
       --  Once the kernel address space is set up, we can mark this hart as
       --  running. Once all harts are running, the boot memory is no longer
@@ -716,10 +715,11 @@ package body Boot is
                  Debug
                    (Debug_Boot,
                     Log_Debug
-                      ("Free physical memory:"
-                       & Aligned_Start'Image
-                       & " .."
-                       & Aligned_End'Image));
+                      ("Free physical memory: start="
+                       & GNAT.Debug_Utilities.Image_C (Address (Aligned_Start))
+                       & " end="
+                       & GNAT.Debug_Utilities.Image_C
+                           (Address (Aligned_End))));
 
                Create_Free_Physical_Memory_Region
                  (Aligned_Start,
@@ -797,12 +797,12 @@ package body Boot is
           (Debug_Boot,
            Log_Debug
              ("Allocated framebuffer: "
-              & ASCII.LF
-              & "  Virt Addr: "
-              & Framebuffer_Allocation.Virtual_Address'Image
-              & ASCII.LF
-              & "  Phys Addr: "
-              & Framebuffer_Allocation.Physical_Address'Image));
+              & "addr_virt="
+              & GNAT.Debug_Utilities.Image_C
+                  (Framebuffer_Allocation.Virtual_Address)
+              & " addr_phys="
+              & GNAT.Debug_Utilities.Image_C
+                  (Address (Framebuffer_Allocation.Physical_Address))));
 
       Graphics_Device.Bus_Info.Virtio.Resource_Id := Resource_Id;
       Graphics_Device.Framebuffer_Addresses := Framebuffer_Allocation;
