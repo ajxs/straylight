@@ -7,6 +7,7 @@ with Ada.Unchecked_Conversion;
 
 with Function_Results; use Function_Results;
 with MMIO;             use MMIO;
+with Processes;        use Processes;
 
 -------------------------------------------------------------------------------
 --  Contains functionality for interfacing with the serial hardware.
@@ -32,13 +33,21 @@ is
    type UART_Interrupt_Type is
      (Modem_Line_Status, Rx_Data_Available, Rx_Line_Status, Tx_Empty);
 
+   type UART_Device_State_T is record
+      Ring_Buffer_Address      : Virtual_Address_T := Null_Address;
+      Ring_Buffer_Size         : Storage_Count := 0;
+      Ring_Buffer_Offset_Read  : Storage_Offset := 0;
+      Ring_Buffer_Offset_Write : Storage_Offset := 0;
+   end record;
+
    ----------------------------------------------------------------------------
    --  Initialises a particular serial port.
    --  This procedure will configure the baud rate, word length, parity
    --  and stop bits for a particular serial port.
    ----------------------------------------------------------------------------
    procedure Initialise
-     (Device : in out Device_T;
+     (Device : Device_Common_State_T;
+      State  : in out UART_Device_State_T;
       Result : out Function_Result;
       Rate   : Baud_Rate := MAXIMUM_BAUD_RATE);
 
@@ -46,41 +55,49 @@ is
    --  Enables or disables the generation of interrupts of a particular type.
    ----------------------------------------------------------------------------
    procedure Set_Interrupt_Generation
-     (Device         : Device_T;
+     (Device         : Device_Common_State_T;
       Interrupt_Type : UART_Interrupt_Type;
       Status         : Boolean);
 
    procedure Acknowledge_Interrupt
-     (Device : in out Device_T; Result : out Function_Result);
+     (Device : in out Device_Common_State_T;
+      State  : in out UART_Device_State_T;
+      Result : out Function_Result);
 
    ----------------------------------------------------------------------------
    --  Prints a string to the specified device.
    ----------------------------------------------------------------------------
-   procedure Put_String (Device : Device_T; Data : String);
+   procedure Put_String (Device : Device_Common_State_T; Data : String);
 
    ----------------------------------------------------------------------------
    --  Prints a wide string to the specified device.
    ----------------------------------------------------------------------------
-   procedure Put_String_Wide (Device : Device_T; Data : Wide_String);
+   procedure Put_String_Wide
+     (Device : Device_Common_State_T; Data : Wide_String);
 
    ----------------------------------------------------------------------------
    --  Prints a character to a UART port.
    ----------------------------------------------------------------------------
-   procedure Put_Char (Device : Device_T; Data : Character);
+   procedure Put_Char (Device : Device_Common_State_T; Data : Character);
 
-   procedure Put_Bytes (Device : Device_T; Data : Storage_Array);
+   procedure Put_Bytes
+     (Device : Device_Common_State_T;
+      State  : UART_Device_State_T;
+      Data   : Storage_Array);
 
-   procedure Put_Byte (Device : Device_T; Data : Unsigned_8);
+   procedure Put_Byte (Device : Device_Common_State_T; Data : Unsigned_8);
 
    procedure Read_Bytes
-     (Device     : in out Device_T;
+     (Device     : in out Device_Common_State_T;
+      State      : in out UART_Device_State_T;
       Process    : in out Process_Control_Block_T;
       Buffer     : out Storage_Array;
       Bytes_Read : out Storage_Count;
       Result     : out Function_Result);
 
    procedure Read_Byte
-     (Device  : in out Device_T;
+     (Device  : in out Device_Common_State_T;
+      State   : in out UART_Device_State_T;
       Process : in out Process_Control_Block_T;
       Byte    : out Unsigned_8;
       Result  : out Function_Result);
@@ -169,13 +186,13 @@ private
    --  This is used during the various transmission functions to ensure that
    --  an overflow exception is not generated.
    ----------------------------------------------------------------------------
-   function Is_Tx_Empty (Device : Device_T) return Boolean
+   function Is_Tx_Empty (Device : Device_Common_State_T) return Boolean
    is ((Read_Unsigned_8 (Device.Virtual_Address + UART_Reg_Line_Status)
         and 16#20#)
        /= 0)
    with Volatile_Function;
 
-   function Is_Rx_Empty (Device : Device_T) return Boolean
+   function Is_Rx_Empty (Device : Device_Common_State_T) return Boolean
    is ((Read_Unsigned_8 (Device.Virtual_Address + UART_Reg_Line_Status)
         and 16#01#)
        = 0)
@@ -187,24 +204,28 @@ private
    --  For more information regarding the use of this procedure refer to the
    --  16550 UART documentation.
    ----------------------------------------------------------------------------
-   procedure Set_Divisor_Latch_State (Device : Device_T; State : Boolean);
+   procedure Set_Divisor_Latch_State
+     (Device : Device_Common_State_T; State : Boolean);
 
    ----------------------------------------------------------------------------
    --  Sets the baud rate for a particular UART port.
    ----------------------------------------------------------------------------
-   procedure Set_Baud_Rate (Device : Device_T; Rate : Baud_Rate);
+   procedure Set_Baud_Rate (Device : Device_Common_State_T; Rate : Baud_Rate);
 
    function Wait_For_Byte
-     (Device : Device_T; Timeout : Positive := 1_000) return Unsigned_8;
+     (Device : Device_Common_State_T; Timeout : Positive := 1_000)
+      return Unsigned_8;
 
-   function Read_Byte_From_Device (Device : Device_T) return Unsigned_8
+   function Read_Byte_From_Device
+     (Device : Device_Common_State_T) return Unsigned_8
    is (Read_Unsigned_8 (Device.Virtual_Address));
 
-   function Read_Character (Device : Device_T) return Character
+   function Read_Character (Device : Device_Common_State_T) return Character
    is (Character'Val (Read_Byte_From_Device (Device)));
 
    procedure Read_All_Incoming_Data
-     (Device     : in out Device_T;
+     (Device     : in out Device_Common_State_T;
+      State      : in out UART_Device_State_T;
       Bytes_Read : out Integer;
       Result     : out Function_Result);
 

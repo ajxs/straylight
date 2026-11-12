@@ -4,15 +4,68 @@
 -------------------------------------------------------------------------------
 
 with Function_Results; use Function_Results;
+with Processes;        use Processes;
 
 package Devices.Virtio
   with Preelaborate
 is
+   Maximum_Virtio_Queue_Length : constant := 256;
+
+   --  The index of a descriptor within a single virtqueue.
+   subtype Virtio_Queue_Index_T is
+     Unsigned_16 range 0 .. Maximum_Virtio_Queue_Length - 1;
+
+   type Virtio_Descriptor_Status_Array_T is
+     array (Virtio_Queue_Index_T) of Boolean;
+
+   type Virtio_Device_Request_Info_T is record
+      Channel : Blocking_Channel_T := 0;
+   end record;
+
+   type Request_Info_Array_T is
+     array (Virtio_Queue_Index_T) of Virtio_Device_Request_Info_T;
+
+   --  Feature bits for Virtio devices are split into multiple 'pages' of
+   --  32-bit feature bitmaps. The first page (Page 0) is accessed by writing
+   --  0 to the DeviceFeaturesSel register, the second page (Page 1) is
+   --  accessed by writing 1, and so on.
+   --  Currently only two pages are defined in the Virtio specification.
+   --  Refer to section 4.2.2 of the Virtio specification for more details.
+   type Virtio_Device_Features_Pages_T is array (0 .. 1) of Unsigned_32;
+
+   --  The state shared by every Virtio MMIO device, regardless of its type.
+   --  Each Virtio driver's state record contains one of these.
+   type Virtio_Device_State_T is record
+      --  Defines which features the driver supports.
+      --  During feature negotiation, this field will be combined with the
+      --  device's supported features to determine the final set of active
+      --  features.
+      Driver_Features : Virtio_Device_Features_Pages_T := [others => 0];
+      Request_Info    : Request_Info_Array_T := [others => (Channel => 0)];
+
+      --  The kernel is mapped into the higher-half, and needs to operate on
+      --  virtual addresses. However, devices operate on physical addresses, so
+      --  the kernel needs to maintain both virtual and physical addresses for
+      --  Virtio devices resources.
+      Request_Status_Array   : Virtual_Physical_Address_Pair_T;
+      --  This counter wraps at 2**16, like the used ring's index field.
+      --  It is not a descriptor index, so it must not be range-constrained.
+      Request_Serviced_Index : Unsigned_16 := 0;
+      Q_Used                 : Virtual_Physical_Address_Pair_T;
+      Q_Available            : Virtual_Physical_Address_Pair_T;
+      Q_Descriptor           : Virtual_Physical_Address_Pair_T;
+      Descriptor_Status      : Virtio_Descriptor_Status_Array_T;
+   end record;
+
    procedure Initialise_MMIO_Device
-     (Device : in out Device_T; Result : out Function_Result);
+     (Device : in out Device_Common_State_T;
+      State  : in out Virtio_Device_State_T;
+      Result : out Function_Result);
 
    procedure Acknowledge_Interrupt
-     (Device : in out Device_T; Result : out Function_Result);
+     (Device : in out Device_Common_State_T;
+      State  : in out Virtio_Device_State_T;
+      Result : out Function_Result);
 
    --  Reserved feature bits.
    VIRTIO_F_ANY_LAYOUT    : constant := 2 ** 27;
@@ -178,12 +231,12 @@ private
    with Inline;
 
    procedure Allocate_Descriptor
-     (Device : in out Device_T;
+     (State  : in out Virtio_Device_State_T;
       Index  : out Descriptor_Index_T;
       Result : out Function_Result);
 
    procedure Free_Descriptor
-     (Device : in out Device_T;
+     (State  : in out Virtio_Device_State_T;
       Index  : Descriptor_Index_T;
       Result : out Function_Result);
 
@@ -191,19 +244,19 @@ private
      array (Descriptor_Index_T range 0 .. 15) of Unsigned_16;
 
    procedure Allocate_Descriptors
-     (Device             : in out Device_T;
+     (State              : in out Virtio_Device_State_T;
       Num_Descriptors    : Positive;
       Descriptor_Indexes : out Allocated_Descriptor_Array_T;
       Result             : out Function_Result);
 
    procedure Free_Descriptor_Chain
-     (Device : in out Device_T;
+     (State  : in out Virtio_Device_State_T;
       Index  : Descriptor_Index_T;
       Result : out Function_Result);
 
    function Increment_Index (Index : Unsigned_16) return Unsigned_16;
 
    procedure Allocate_Virtio_Device_Resources
-     (Device : in out Device_T; Result : out Function_Result);
+     (State : in out Virtio_Device_State_T; Result : out Function_Result);
 
 end Devices.Virtio;

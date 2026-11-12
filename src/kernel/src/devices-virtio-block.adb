@@ -10,7 +10,7 @@ with RISCV.Atomics;       use RISCV.Atomics;
 
 package body Devices.Virtio.Block is
    procedure Get_Block_Request_Physical_Address
-     (Device : Device_T;
+     (State  : Virtio_Block_Device_State_T;
       Index  : Unsigned_16;
       Addr   : out Physical_Address_T;
       Result : out Function_Result) is
@@ -18,7 +18,7 @@ package body Devices.Virtio.Block is
       Block_Request_Size : constant Unsigned_64 := Block_Request_T'Size / 8;
 
       Addr :=
-        Device.Bus_Info.Virtio.Block_Request_Array_Addresses.Physical_Address
+        State.Block_Request_Array_Addresses.Physical_Address
         + Physical_Address_T
             (Unsigned_64_To_Address
                (Unsigned_64 (Index) * Block_Request_Size));
@@ -33,7 +33,8 @@ package body Devices.Virtio.Block is
 
    procedure Read_Sector
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Result                : out Function_Result) is
@@ -41,6 +42,7 @@ package body Devices.Virtio.Block is
       Read_Write
         (Reading_Process,
          Device,
+         State,
          Data_Physical_Address,
          Sector,
          False,
@@ -49,18 +51,26 @@ package body Devices.Virtio.Block is
 
    procedure Write_Sector
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Result                : out Function_Result) is
    begin
       Read_Write
-        (Reading_Process, Device, Data_Physical_Address, Sector, True, Result);
+        (Reading_Process,
+         Device,
+         State,
+         Data_Physical_Address,
+         Sector,
+         True,
+         Result);
    end Write_Sector;
 
    procedure Read_Sectors
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Start_Sector          : Sector_Index_T;
       Sector_Count          : Natural;
@@ -69,6 +79,7 @@ package body Devices.Virtio.Block is
       Read_Write
         (Reading_Process,
          Device,
+         State,
          Data_Physical_Address,
          Start_Sector,
          False,
@@ -78,7 +89,8 @@ package body Devices.Virtio.Block is
 
    procedure Write_Sectors
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Start_Sector          : Sector_Index_T;
       Sector_Count          : Natural;
@@ -87,6 +99,7 @@ package body Devices.Virtio.Block is
       Read_Write
         (Reading_Process,
          Device,
+         State,
          Data_Physical_Address,
          Start_Sector,
          True,
@@ -95,27 +108,25 @@ package body Devices.Virtio.Block is
    end Write_Sectors;
 
    function Is_Valid_Sector_Range
-     (Device       : Device_T;
+     (State        : Virtio_Block_Device_State_T;
       Start_Sector : Sector_Index_T;
-      Data_Length  : Unsigned_32) return Boolean is
+      Data_Length  : Unsigned_32) return Boolean
+   is
+      --  The divisor is a non-zero constant, so this check can never fail.
+      --  Without this, GNAT warns that the division may call the last chance
+      --  handler, but also that a local handler for it can never be entered.
+      pragma Suppress (Division_Check);
    begin
       --  It's important to ensure the arithmetic here takes into account the
       --  possibility of an integer overflow, and the possibility of
       --  unintentionally narrowing the integer ranges in the arithmetic.
       --  e.g. Conversion to a signed type like 'Natural' for arithmetic will
       --  greatly reduce the range of valid sectors.
-      Sector_Count : constant Sector_Index_T :=
-        Sector_Index_T (Data_Length) / Virtio_Block_Sector_Size;
-
       return
-        Start_Sector <= Device.Bus_Info.Virtio.Total_Sectors
+        Start_Sector <= State.Total_Sectors
         and then
-          Sector_Count <= Device.Bus_Info.Virtio.Total_Sectors - Start_Sector;
-
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         return False;
+          Sector_Index_T (Data_Length) / Virtio_Block_Sector_Size
+          <= State.Total_Sectors - Start_Sector;
    end Is_Valid_Sector_Range;
 
    ----------------------------------------------------------------------------
@@ -128,7 +139,8 @@ package body Devices.Virtio.Block is
    ----------------------------------------------------------------------------
    procedure Read_Write_Unlocked
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Write                 : Boolean;
@@ -150,7 +162,7 @@ package body Devices.Virtio.Block is
          return;
       end if;
 
-      if not Is_Valid_Sector_Range (Device, Sector, Data_Length) then
+      if not Is_Valid_Sector_Range (State, Sector, Data_Length) then
          Result := Sector_Out_Of_Bounds;
          return;
       end if;
@@ -169,7 +181,7 @@ package body Devices.Virtio.Block is
          return;
       end if;
 
-      Allocate_Descriptors (Device, 3, Descriptor_Indexes, Result);
+      Allocate_Descriptors (State.Virtio, 3, Descriptor_Indexes, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -177,15 +189,14 @@ package body Devices.Virtio.Block is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Data_Physical_Address));
 
-      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Initialise_Status : declare
          Request_Status_Array : Virtio_Status_Byte_Array_T
          with
            Import,
-           Address   =>
-             Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
+           Address   => State.Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
       begin
          Request_Status_Array (Descriptor_Indexes (0)) := 255;
@@ -195,24 +206,19 @@ package body Devices.Virtio.Block is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
+           Address   => State.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
+           Address   => State.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
          Block_Device_Request_Array : Block_Request_Array_T
          with
            Import,
-           Address   =>
-             Device
-               .Bus_Info
-               .Virtio
-               .Block_Request_Array_Addresses
-               .Virtual_Address,
+           Address   => State.Block_Request_Array_Addresses.Virtual_Address,
            Alignment => 1;
 
          Block_Request_Phys_Addr : Physical_Address_T := Null_Physical_Address;
@@ -231,9 +237,10 @@ package body Devices.Virtio.Block is
          end if;
 
          Get_Block_Request_Physical_Address
-           (Device, Descriptor_Indexes (0), Block_Request_Phys_Addr, Result);
+           (State, Descriptor_Indexes (0), Block_Request_Phys_Addr, Result);
          if Is_Error (Result) then
-            Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
+            Free_Descriptor_Chain
+              (State.Virtio, Descriptor_Indexes (0), Result);
             return;
          end if;
 
@@ -257,7 +264,7 @@ package body Devices.Virtio.Block is
          Descriptors (Descriptor_Indexes (2)) :=
            (Address =>
               --  Get the address of the status byte for this request.
-              Device.Bus_Info.Virtio.Request_Status_Array.Physical_Address
+              State.Virtio.Request_Status_Array.Physical_Address
               + Physical_Address_T
                   (Unsigned_64_To_Address
                      (Unsigned_64 (Descriptor_Indexes (0)))),
@@ -285,7 +292,7 @@ package body Devices.Virtio.Block is
 
       --  Reached once the request is complete and control is returned to
       --  the calling process.
-      Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
+      Free_Descriptor_Chain (State.Virtio, Descriptor_Indexes (0), Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -294,8 +301,7 @@ package body Devices.Virtio.Block is
          Request_Status_Array : Virtio_Status_Byte_Array_T
          with
            Import,
-           Address   =>
-             Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
+           Address   => State.Virtio.Request_Status_Array.Virtual_Address,
            Alignment => 1;
 
          VIRTIO_BLK_S_OK : constant := 0;
@@ -319,7 +325,8 @@ package body Devices.Virtio.Block is
 
    procedure Read_Write
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Write                 : Boolean;
@@ -331,6 +338,7 @@ package body Devices.Virtio.Block is
       Read_Write_Unlocked
         (Reading_Process,
          Device,
+         State,
          Data_Physical_Address,
          Sector,
          Write,
@@ -340,8 +348,10 @@ package body Devices.Virtio.Block is
       Release_Spinlock (Device.Spinlock);
    end Read_Write;
 
-   procedure Initialise_Block_Device
-     (Device : in out Device_T; Result : out Function_Result)
+   procedure Initialise_Block_Device_Unlocked
+     (Device : Device_Common_State_T;
+      State  : in out Virtio_Block_Device_State_T;
+      Result : out Function_Result)
    is
       Device_Configuration_Space : Virtio_Block_Device_Configuration_Space_T
       with Import, Address => Device.Virtual_Address + 16#100#, Alignment => 1;
@@ -353,7 +363,7 @@ package body Devices.Virtio.Block is
 
       Allocate_Kernel_Physical_Memory
         ((Block_Request_T'Size / 8) * Maximum_Virtio_Queue_Length,
-         Device.Bus_Info.Virtio.Block_Request_Array_Addresses,
+         State.Block_Request_Array_Addresses,
          Result);
       if Is_Error (Result) then
          Log_Error ("Error allocating block request memory: " & Result'Image);
@@ -365,14 +375,23 @@ package body Devices.Virtio.Block is
           (Debug_Devices_Virtio,
            Log_Debug ("Allocated Block Device Request Array."));
 
-      Device.Bus_Info.Virtio.Total_Sectors :=
-        Device_Configuration_Space.Capacity;
+      State.Total_Sectors := Device_Configuration_Space.Capacity;
 
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
+   end Initialise_Block_Device_Unlocked;
+
+   procedure Initialise_Block_Device
+     (Device : in out Device_Common_State_T;
+      State  : in out Virtio_Block_Device_State_T;
+      Result : out Function_Result) is
+   begin
+      Acquire_Spinlock (Device.Spinlock);
+      Initialise_Block_Device_Unlocked (Device, State, Result);
+      Release_Spinlock (Device.Spinlock);
    end Initialise_Block_Device;
 
 end Devices.Virtio.Block;

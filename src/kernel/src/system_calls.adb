@@ -6,7 +6,7 @@
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Devices;
+with Devices.Attached_System_Devices;
 with Devices.Virtio.Graphics;
 with Logging;            use Logging;
 with Memory;             use Memory;
@@ -143,7 +143,8 @@ package body System_Calls is
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
 
-      Graphics_Device renames Devices.System_Devices (6);
+      Graphics_Device renames
+        Devices.Attached_System_Devices.System_Devices (6);
    begin
       pragma
         Debug
@@ -169,11 +170,11 @@ package body System_Calls is
       --  Validated first so the offset arithmetic below cannot overflow, and
       --  computed in Unsigned_64 to avoid wraparound on the additions.
       if Unsigned_64 (User_Pixel_Data_X) + Unsigned_64 (User_Pixel_Data_Width)
-        > Unsigned_64 (Graphics_Device.Framebuffer_Width)
+        > Unsigned_64 (Graphics_Device.Virtio_GPU.Framebuffer_Width)
         or else
           Unsigned_64 (User_Pixel_Data_Y)
           + Unsigned_64 (User_Pixel_Data_Height)
-          > Unsigned_64 (Graphics_Device.Framebuffer_Height)
+          > Unsigned_64 (Graphics_Device.Virtio_GPU.Framebuffer_Height)
       then
          Log_Error ("Framebuffer rectangle out of bounds");
 
@@ -198,7 +199,8 @@ package body System_Calls is
       Validate_User_Buffer : declare
          Bytes_Per_Pixel : constant := 4;
          Stride          : constant Storage_Count :=
-           Storage_Count (Graphics_Device.Framebuffer_Width) * Bytes_Per_Pixel;
+           Storage_Count (Graphics_Device.Virtio_GPU.Framebuffer_Width)
+           * Bytes_Per_Pixel;
          End_Offset      : constant Storage_Count :=
            (Storage_Count (User_Pixel_Data_Y)
             + Storage_Count (User_Pixel_Data_Height)
@@ -221,7 +223,7 @@ package body System_Calls is
       Copy_Pixel_Data : declare
          Bytes_Per_Pixel : constant := 4;
          Stride          : constant Storage_Offset :=
-           Storage_Offset (Graphics_Device.Framebuffer_Width)
+           Storage_Offset (Graphics_Device.Virtio_GPU.Framebuffer_Width)
            * Bytes_Per_Pixel;
          Row_Bytes       : constant Integer :=
            Integer (User_Pixel_Data_Width) * Bytes_Per_Pixel;
@@ -235,7 +237,10 @@ package body System_Calls is
                Copy
                  (Source => User_Framebuffer_Address + Row_Offset,
                   Dest   =>
-                    Graphics_Device.Framebuffer_Addresses.Virtual_Address
+                    Graphics_Device
+                      .Virtio_GPU
+                      .Framebuffer_Addresses
+                      .Virtual_Address
                     + Row_Offset,
                   Count  => Row_Bytes);
             end;
@@ -244,8 +249,9 @@ package body System_Calls is
 
       Devices.Virtio.Graphics.Transfer_To_Host_2d
         (Process,
-         Graphics_Device,
-         Graphics_Device.Bus_Info.Virtio.Resource_Id,
+         Graphics_Device.Common,
+         Graphics_Device.Virtio_GPU,
+         Graphics_Device.Virtio_GPU.Resource_Id,
          User_Pixel_Data_X,
          User_Pixel_Data_Y,
          User_Pixel_Data_Width,
@@ -257,8 +263,9 @@ package body System_Calls is
 
       Devices.Virtio.Graphics.Resource_Flush
         (Process,
-         Graphics_Device,
-         Graphics_Device.Bus_Info.Virtio.Resource_Id,
+         Graphics_Device.Common,
+         Graphics_Device.Virtio_GPU,
+         Graphics_Device.Virtio_GPU.Resource_Id,
          User_Pixel_Data_X,
          User_Pixel_Data_Y,
          User_Pixel_Data_Width,

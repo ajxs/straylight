@@ -11,7 +11,8 @@ package body Devices.Virtio.Graphics is
 
    procedure Attach_Framebuffer_To_Resource_Unlocked
      (Reading_Process              : in out Process_Control_Block_T;
-      Device                       : in out Device_T;
+      Device                       : in out Device_Common_State_T;
+      State                        : in out Virtio_GPU_Device_State_T;
       Resource_Id                  : Unsigned_32;
       Framebuffer_Physical_Address : Physical_Address_T;
       Result                       : out Function_Result)
@@ -34,7 +35,7 @@ package body Devices.Virtio.Graphics is
           (Logging_Enabled,
            Log_Debug ("Attaching framebuffer to Virtio Graphics Resource"));
 
-      Allocate_Descriptors (Device, 3, Descriptor_Indexes, Result);
+      Allocate_Descriptors (State.Virtio, 3, Descriptor_Indexes, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -70,8 +71,7 @@ package body Devices.Virtio.Graphics is
          Request_Mem_Entry :=
            (Addr    =>
               Address_To_Unsigned_64 (Address (Framebuffer_Physical_Address)),
-            Length  =>
-              Device.Framebuffer_Width * Device.Framebuffer_Height * 4,
+            Length  => State.Framebuffer_Width * State.Framebuffer_Height * 4,
             Padding => 0);
       end Setup_Request;
 
@@ -79,13 +79,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
+           Address   => State.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
+           Address   => State.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -129,7 +129,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -156,7 +156,7 @@ package body Devices.Virtio.Graphics is
 
       --  Reached once the request is complete and control is returned to
       --  the calling process.
-      Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
+      Free_Descriptor_Chain (State.Virtio, Descriptor_Indexes (0), Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -173,7 +173,8 @@ package body Devices.Virtio.Graphics is
 
    procedure Attach_Framebuffer_To_Resource
      (Reading_Process              : in out Process_Control_Block_T;
-      Device                       : in out Device_T;
+      Device                       : in out Device_Common_State_T;
+      State                        : in out Virtio_GPU_Device_State_T;
       Resource_Id                  : Unsigned_32;
       Framebuffer_Physical_Address : Physical_Address_T;
       Result                       : out Function_Result) is
@@ -183,6 +184,7 @@ package body Devices.Virtio.Graphics is
       Attach_Framebuffer_To_Resource_Unlocked
         (Reading_Process,
          Device,
+         State,
          Resource_Id,
          Framebuffer_Physical_Address,
          Result);
@@ -192,7 +194,8 @@ package body Devices.Virtio.Graphics is
 
    procedure Get_Display_Info_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Result          : out Function_Result)
    is
       Device_Registers : Virtio_MMIO_Device_Registers_T
@@ -210,7 +213,7 @@ package body Devices.Virtio.Graphics is
           (Logging_Enabled,
            Log_Debug ("Getting display info from Virtio Graphics Device"));
 
-      Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
+      Allocate_Descriptors (State.Virtio, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -235,13 +238,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
+           Address   => State.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
+           Address   => State.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -274,7 +277,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -308,7 +311,7 @@ package body Devices.Virtio.Graphics is
 
       --  Reached once the request is complete and control is returned to
       --  the calling process.
-      Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
+      Free_Descriptor_Chain (State.Virtio, Descriptor_Indexes (0), Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -325,19 +328,21 @@ package body Devices.Virtio.Graphics is
 
    procedure Get_Display_Info
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Result          : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
 
-      Get_Display_Info_Unlocked (Reading_Process, Device, Result);
+      Get_Display_Info_Unlocked (Reading_Process, Device, State, Result);
 
       Release_Spinlock (Device.Spinlock);
    end Get_Display_Info;
 
    procedure Created_2d_Resource_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       Result          : out Function_Result)
    is
@@ -352,7 +357,7 @@ package body Devices.Virtio.Graphics is
         Request_Resource_Create_2D'Size / 8;
       Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
-      Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
+      Allocate_Descriptors (State.Virtio, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -374,21 +379,21 @@ package body Devices.Virtio.Graphics is
            (Hdr         => (Ctrl_Type => Cmd_Resource_Create_2D, others => <>),
             Resource_Id => Resource_Id,
             Format      => VIRTIO_GPU_FORMAT_R8G8B8A8_UNORM,
-            Width       => Device.Framebuffer_Width,
-            Height      => Device.Framebuffer_Height);
+            Width       => State.Framebuffer_Width,
+            Height      => State.Framebuffer_Height);
       end Setup_Request;
 
       Setup_Queues : declare
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
+           Address   => State.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
+           Address   => State.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -421,7 +426,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -445,7 +450,7 @@ package body Devices.Virtio.Graphics is
 
       --  Reached once the request is complete and control is returned to
       --  the calling process.
-      Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
+      Free_Descriptor_Chain (State.Virtio, Descriptor_Indexes (0), Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -462,21 +467,23 @@ package body Devices.Virtio.Graphics is
 
    procedure Created_2d_Resource
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       Result          : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
 
       Created_2d_Resource_Unlocked
-        (Reading_Process, Device, Resource_Id, Result);
+        (Reading_Process, Device, State, Resource_Id, Result);
 
       Release_Spinlock (Device.Spinlock);
    end Created_2d_Resource;
 
    procedure Set_Scanout_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       Scanout_Id      : Unsigned_32;
       Width           : Unsigned_32;
@@ -493,7 +500,7 @@ package body Devices.Virtio.Graphics is
       Request_Size : constant Storage_Count := Request_Set_Scanout'Size / 8;
       Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
-      Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
+      Allocate_Descriptors (State.Virtio, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -522,13 +529,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
+           Address   => State.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
+           Address   => State.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -561,7 +568,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -585,7 +592,7 @@ package body Devices.Virtio.Graphics is
 
       --  Reached once the request is complete and control is returned to
       --  the calling process.
-      Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
+      Free_Descriptor_Chain (State.Virtio, Descriptor_Indexes (0), Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -602,7 +609,8 @@ package body Devices.Virtio.Graphics is
 
    procedure Set_Scanout
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       Scanout_Id      : Unsigned_32;
       Width           : Unsigned_32;
@@ -614,6 +622,7 @@ package body Devices.Virtio.Graphics is
       Set_Scanout_Unlocked
         (Reading_Process,
          Device,
+         State,
          Resource_Id,
          Scanout_Id,
          Width,
@@ -625,7 +634,8 @@ package body Devices.Virtio.Graphics is
 
    procedure Transfer_To_Host_2d_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       X               : Unsigned_32;
       Y               : Unsigned_32;
@@ -644,7 +654,7 @@ package body Devices.Virtio.Graphics is
         Request_Transfer_To_Host_2D'Size / 8;
       Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
-      Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
+      Allocate_Descriptors (State.Virtio, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -672,7 +682,7 @@ package body Devices.Virtio.Graphics is
             --  this is the address of the new pixel data that was copied in.
             Offset      =>
               (Unsigned_64 (Y)
-               * Unsigned_64 (Device.Framebuffer_Width)
+               * Unsigned_64 (State.Framebuffer_Width)
                + Unsigned_64 (X))
               * 4,
             Resource_Id => Resource_Id,
@@ -683,13 +693,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
+           Address   => State.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
+           Address   => State.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -722,7 +732,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -746,7 +756,7 @@ package body Devices.Virtio.Graphics is
 
       --  Reached once the request is complete and control is returned to
       --  the calling process.
-      Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
+      Free_Descriptor_Chain (State.Virtio, Descriptor_Indexes (0), Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -763,7 +773,8 @@ package body Devices.Virtio.Graphics is
 
    procedure Transfer_To_Host_2d
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       X               : Unsigned_32;
       Y               : Unsigned_32;
@@ -774,14 +785,23 @@ package body Devices.Virtio.Graphics is
       Acquire_Spinlock (Device.Spinlock);
 
       Transfer_To_Host_2d_Unlocked
-        (Reading_Process, Device, Resource_Id, X, Y, Width, Height, Result);
+        (Reading_Process,
+         Device,
+         State,
+         Resource_Id,
+         X,
+         Y,
+         Width,
+         Height,
+         Result);
 
       Release_Spinlock (Device.Spinlock);
    end Transfer_To_Host_2d;
 
    procedure Resource_Flush_Unlocked
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       X               : Unsigned_32;
       Y               : Unsigned_32;
@@ -799,7 +819,7 @@ package body Devices.Virtio.Graphics is
       Request_Size : constant Storage_Count := Request_Resource_Flush'Size / 8;
       Response_Size : constant Storage_Count := Virtio_Gpu_Ctrl_Hdr'Size / 8;
 
-      Allocate_Descriptors (Device, 2, Descriptor_Indexes, Result);
+      Allocate_Descriptors (State.Virtio, 2, Descriptor_Indexes, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -828,13 +848,13 @@ package body Devices.Virtio.Graphics is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
+           Address   => State.Virtio.Q_Descriptor.Virtual_Address,
            Alignment => 1;
 
          Q_Available : Virtqueue_Available_T
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Available.Virtual_Address,
+           Address   => State.Virtio.Q_Available.Virtual_Address,
            Alignment => 1;
 
       begin
@@ -867,7 +887,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      Device.Bus_Info.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
+      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
         Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
@@ -891,7 +911,7 @@ package body Devices.Virtio.Graphics is
 
       --  Reached once the request is complete and control is returned to
       --  the calling process.
-      Free_Descriptor_Chain (Device, Descriptor_Indexes (0), Result);
+      Free_Descriptor_Chain (State.Virtio, Descriptor_Indexes (0), Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -908,7 +928,8 @@ package body Devices.Virtio.Graphics is
 
    procedure Resource_Flush
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       X               : Unsigned_32;
       Y               : Unsigned_32;
@@ -919,7 +940,15 @@ package body Devices.Virtio.Graphics is
       Acquire_Spinlock (Device.Spinlock);
 
       Resource_Flush_Unlocked
-        (Reading_Process, Device, Resource_Id, X, Y, Width, Height, Result);
+        (Reading_Process,
+         Device,
+         State,
+         Resource_Id,
+         X,
+         Y,
+         Width,
+         Height,
+         Result);
 
       Release_Spinlock (Device.Spinlock);
    end Resource_Flush;

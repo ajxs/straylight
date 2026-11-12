@@ -261,12 +261,15 @@ package body Filesystems.Block_Cache is
       Sectors_Per_Block : constant Natural :=
         Get_Sectors_Per_Block (Sector_Size);
 
-      case Filesystem.all.Device.all.Device_Bus is
-         when Device_Bus_Virtio_MMIO   =>
+      Device : Device_T renames Filesystem.all.Device.all;
+
+      case Device.Driver_Type is
+         when Driver_Type_Virtio_Block =>
             if Write then
                Devices.Virtio.Block.Write_Sectors
                  (Process,
-                  Filesystem.all.Device.all,
+                  Device.Common,
+                  Device.Virtio_Block,
                   Data_Addr_Physical,
                   Start_Sector,
                   Sectors_Per_Block,
@@ -274,24 +277,25 @@ package body Filesystems.Block_Cache is
             else
                Devices.Virtio.Block.Read_Sectors
                  (Process,
-                  Filesystem.all.Device.all,
+                  Device.Common,
+                  Device.Virtio_Block,
                   Data_Addr_Physical,
                   Start_Sector,
                   Sectors_Per_Block,
                   Result);
             end if;
 
-         when Device_Bus_Memory_Mapped =>
+         when Driver_Type_Ramdisk      =>
             if Write then
                Devices.Ramdisk.Write_Sectors
-                 (Filesystem.all.Device.all,
+                 (Device.Common,
                   Start_Sector,
                   Sectors_Per_Block,
                   Data_Addr_Virtual,
                   Result);
             else
                Devices.Ramdisk.Read_Sectors
-                 (Filesystem.all.Device.all,
+                 (Device.Common,
                   Start_Sector,
                   Sectors_Per_Block,
                   Data_Addr_Virtual,
@@ -299,7 +303,8 @@ package body Filesystems.Block_Cache is
             end if;
 
          when others                   =>
-            Log_Error ("Unsupported device bus");
+            Log_Error
+              ("Unsupported driver type: " & Device.Driver_Type'Image);
             Result := Not_Supported;
 
       end case;

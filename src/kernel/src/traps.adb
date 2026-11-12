@@ -7,17 +7,18 @@ with GNAT.Debug_Utilities;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Devices;          use Devices;
+with Devices;                         use Devices;
+with Devices.Attached_System_Devices; use Devices.Attached_System_Devices;
 with Devices.Virtio;
 with Devices.PLIC;
 with Devices.UART;
-with Function_Results; use Function_Results;
-with Logging;          use Logging;
+with Function_Results;                use Function_Results;
+with Logging;                         use Logging;
 with Processes.Scheduler;
-with RISCV;            use RISCV;
-with RISCV.SBI;        use RISCV.SBI;
+with RISCV;                           use RISCV;
+with RISCV.SBI;                       use RISCV.SBI;
 with System_Calls;
-with Hart_State;       use Hart_State;
+with Hart_State;                      use Hart_State;
 
 package body Traps is
    procedure Handle_Supervisor_Mode_Exception
@@ -90,13 +91,11 @@ package body Traps is
       Supervisor_Interrupt_Context : constant Integer :=
         Get_Current_Hart_Supervisor_Interrupt_Context;
 
-      PLIC_Device renames Devices.System_Devices (1);
-
       Result : Function_Result := Unset;
    begin
       Interrupt_ID :=
         Devices.PLIC.Claim_Supervisor_Interrupt
-          (PLIC_Device, Supervisor_Interrupt_Context);
+          (Interrupt_Controller.all.Common, Supervisor_Interrupt_Context);
 
       pragma
         Debug
@@ -113,37 +112,59 @@ package body Traps is
          return;
       end if;
 
-      for System_Device of System_Devices loop
-         if System_Device.Record_Used
-           and then System_Device.Interrupt_Line = Integer (Interrupt_ID)
-         then
+      if Interrupt_ID not in Devices.PLIC.Interrupt_Line_T
+        or else
+          Interrupt_Controller.all.PLIC.Interrupt_Devices (Interrupt_ID) = null
+      then
+         Log_Error ("Unable to handle interrupt for unknown device.");
+      else
+         Handle_Device_Interrupt : declare
+            System_Device : Device_T renames
+              Interrupt_Controller.all.PLIC.Interrupt_Devices
+                (Interrupt_ID).all;
+         begin
             pragma
               Debug
                 (Debug_Traps,
                  Log_Debug
                    ("Handling Interrupt for Device: addr_virt="
                     & GNAT.Debug_Utilities.Image_C
-                        (System_Device.Virtual_Address)));
+                        (System_Device.Common.Virtual_Address)));
 
-            if System_Device.Device_Bus = Device_Bus_Virtio_MMIO then
-               Devices.Virtio.Acknowledge_Interrupt (System_Device, Result);
-            elsif System_Device.Device_Class = Device_Class_Serial then
-               Devices.UART.Acknowledge_Interrupt (System_Device, Result);
-            else
-               Log_Error ("Unable to handle interrupt for unknown device.");
-               Result := Success;
-            end if;
+            case System_Device.Driver_Type is
+               when Driver_Type_Virtio_Block =>
+                  Devices.Virtio.Acknowledge_Interrupt
+                    (System_Device.Common,
+                     System_Device.Virtio_Block.Virtio,
+                     Result);
+
+               when Driver_Type_Virtio_GPU   =>
+                  Devices.Virtio.Acknowledge_Interrupt
+                    (System_Device.Common,
+                     System_Device.Virtio_GPU.Virtio,
+                     Result);
+
+               when Driver_Type_UART         =>
+                  Devices.UART.Acknowledge_Interrupt
+                    (System_Device.Common, System_Device.UART, Result);
+
+               when others                   =>
+                  Log_Error ("Unable to handle interrupt for unknown device.");
+                  Result := Success;
+            end case;
 
             if Is_Error (Result) then
                Panic
                  ("Error acknowledging device interrupt: result="
                   & Result'Image);
             end if;
-         end if;
-      end loop;
+         end Handle_Device_Interrupt;
+      end if;
 
       Devices.PLIC.Complete_Supervisor_Interrupt
-        (PLIC_Device, Supervisor_Interrupt_Context, Interrupt_ID);
+        (Interrupt_Controller.all.Common,
+         Supervisor_Interrupt_Context,
+         Interrupt_ID);
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;

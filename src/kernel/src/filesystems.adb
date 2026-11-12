@@ -378,28 +378,30 @@ package body Filesystems is
       Data_To_Read : Storage_Array (1 .. Storage_Count (Bytes_To_Read))
       with Import, Alignment => 1, Address => Buffer_Address;
    begin
-      case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
-         when Device_Class_Serial  =>
+      Device : Device_T renames File_Handle.all.File.all.Mounted_Device.all;
+
+      case Device.Driver_Type is
+         when Driver_Type_UART    =>
             Devices.UART.Read_Bytes
-              (File_Handle.all.File.all.Mounted_Device.all,
+              (Device.Common,
+               Device.UART,
                Process,
                Data_To_Read,
                Storage_Count (Bytes_Read),
                Result);
 
-         when Device_Class_Console =>
+         when Driver_Type_Console =>
             Devices.Console.Read_Bytes
-              (File_Handle.all.File.all.Mounted_Device.all,
+              (Device.Common,
+               Device.Console,
                Process,
                Data_To_Read,
                Storage_Count (Bytes_Read),
                Result);
 
-         when others               =>
+         when others              =>
             Log_Error
-              ("Unsupported device class: "
-               & File_Handle.all.File.all.Mounted_Device.all
-                   .Device_Class'Image);
+              ("Unsupported driver type: " & Device.Driver_Type'Image);
             Bytes_Read := 0;
             Result := Not_Supported;
       end case;
@@ -607,7 +609,8 @@ package body Filesystems is
       return
         Filesystem /= null
         and then Filesystem.all.Device /= null
-        and then Filesystem.all.Device.all.Device_Class = Device_Class_Storage;
+        and then Filesystem.all.Device.all.Driver_Type
+                 in Driver_Type_Ramdisk | Driver_Type_Virtio_Block;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
@@ -740,35 +743,35 @@ package body Filesystems is
       Buffer_Address : Virtual_Address_T;
       Bytes_To_Write : Natural;
       Bytes_Written  : out Natural;
-      Result         : out Function_Result) is
-   begin
+      Result         : out Function_Result)
+   is
       pragma Unreferenced (Process);
+   begin
       Bytes_Written := 0;
 
-      case File_Handle.all.File.all.Mounted_Device.all.Device_Class is
-         when Device_Class_Serial  =>
+      Device : Device_T renames File_Handle.all.File.all.Mounted_Device.all;
+
+      case Device.Driver_Type is
+         when Driver_Type_UART    =>
             Data_To_Write : Storage_Array (1 .. Storage_Count (Bytes_To_Write))
             with Import, Alignment => 1, Address => Buffer_Address;
 
-            Devices.UART.Put_Bytes
-              (File_Handle.all.File.all.Mounted_Device.all, Data_To_Write);
+            Devices.UART.Put_Bytes (Device.Common, Device.UART, Data_To_Write);
             Bytes_Written := Bytes_To_Write;
             Result := Success;
 
-         when Device_Class_Console =>
+         when Driver_Type_Console =>
             Data_To_Write : Storage_Array (1 .. Storage_Count (Bytes_To_Write))
             with Import, Alignment => 1, Address => Buffer_Address;
 
             Devices.Console.Put_Bytes
-              (File_Handle.all.File.all.Mounted_Device.all, Data_To_Write);
+              (Device.Common, Device.Console, Data_To_Write);
             Bytes_Written := Bytes_To_Write;
             Result := Success;
 
-         when others               =>
+         when others              =>
             Log_Error
-              ("Unsupported device class: "
-               & File_Handle.all.File.all.Mounted_Device.all
-                   .Device_Class'Image);
+              ("Unsupported driver type: " & Device.Driver_Type'Image);
             Result := Not_Supported;
       end case;
    exception

@@ -21,7 +21,10 @@ All build commands are run from the `src/` directory unless noted.
 | `make bios` | Build OpenSBI (requires `riscv64-linux-gnu-` toolchain) |
 | `make clean` | Clean all build artifacts |
 | `./run` | Convenience script: build + run from repo root |
-| `./run --quick` | As above, but only rebuilds the kernel |
+| `./run --quick` | As above, but only rebuilds the kernel (clean kernel build) |
+| `./run --quicker` | As `--quick`, but skips the kernel clean (incremental kernel build) |
+
+When working on the kernel, use `./run` for the first build, to check that the full build works. After that, if you've only changed the kernel (not userspace, libc or libstraylight), use `./run --quick` or `./run --quicker` to save time.
 
 The kernel is built with Alire: `alr -C kernel build`. Userspace is built with `make -C userspace`. OpenSBI is a git submodule.
 
@@ -62,13 +65,13 @@ Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Bo
 `Physical_Address_T` and `Virtual_Address_T` (a subtype of `System.Address`) are **distinct types** — the compiler enforces that they cannot be mixed. Use `Get_Lower_Physical_Address` / `Address_To_Unsigned_64` etc. to convert.
 
 ### Trap Handling
-`traps-entry.S` is the `stvec` handler. It saves context, determines user vs. supervisor mode, and calls either `Traps.Handle_User_Mode_Trap` or `Traps.Handle_Supervisor_Mode_Trap`. Timer interrupts trigger the scheduler; external interrupts are claimed from the PLIC and dispatched to the relevant device driver.
+`traps-entry.S` is the `stvec` handler. It saves context, determines user vs. supervisor mode, and calls either `Traps.Handle_User_Mode_Trap` or `Traps.Handle_Supervisor_Mode_Trap`. Timer interrupts trigger the scheduler; external interrupts are claimed from `Devices.Attached_System_Devices.Interrupt_Controller` (the PLIC) and dispatched to the relevant device driver. The PLIC's state maps each interrupt line to the device that raises it. `Boot.Initialise_Devices` fills that map from each device's `Interrupt_Parent` when it enables the device's interrupt line.
 
 ### Processes & Scheduler
 `Process_Control_Block_T` (`processes.ads`) holds registers, memory space, heap, kernel stack, and a linked-list `Next_Process` pointer. The process queue is a singly-linked list protected by a spinlock. The scheduler (`Processes.Scheduler`) is round-robin. Processes can be blocked waiting on a `Blocking_Channel_T` (a `Unsigned_64` identifier); `Wake_Processes_Waiting_For_Channel` unblocks them.
 
 ### Devices
-`Devices.System_Devices` is a fixed-size array of `Device_T` (discriminated record: class + bus type). Devices are statically assigned array slots in `Boot.Initialise_Devices`:
+`Devices.Attached_System_Devices.System_Devices` is the single fixed-size array of every device. Each `Device_T` slot is discriminated by `Driver_Type` (the driver), and holds a `Device_Common_State_T` (addresses, IRQ, spinlock) plus the state record owned by that driver, such as `Devices.UART.UART_Device_State_T`. Driver procedures take `(Device : Device_Common_State_T; State : <Driver>_Device_State_T)`, and callers pick the driver with a `case` on `Driver_Type`. A driver that refers to another device holds an `access Devices.Attached_System_Devices.Device_T`, declared through a `limited with`, as the console does for its backend. Devices are statically assigned array slots in `Boot.Initialise_Devices`:
 1. PLIC (interrupt controller)
 2. UART (serial)
 3. VirtIO block (FAT16 disk, `virtio-mmio-bus.0`)

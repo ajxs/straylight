@@ -9,11 +9,12 @@ with Locks;                   use Locks;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Devices;          use Devices;
-with Function_Results; use Function_Results;
-with Memory;           use Memory;
-with Processes;        use Processes;
-with Utilities;        use Utilities;
+with Devices;                         use Devices;
+with Devices.Attached_System_Devices; use Devices.Attached_System_Devices;
+with Function_Results;                use Function_Results;
+with Memory;                          use Memory;
+with Processes;                       use Processes;
+with Utilities;                       use Utilities;
 
 package Filesystems
   with Preelaborate
@@ -30,14 +31,6 @@ is
      Compile_Time_Error
        (Filesystem_Max_Read_Write_Byte_Count > Integer'Last,
         "Filesystem_Max_Read_Write_Byte_Count must fit in Integer");
-
-   --  This type is used to represent the *kernel's* internal representation
-   --  of a storage device sector. It's independent of any particular device's
-   --  specific implementation details.
-   --  This abstraction supports a single, consistent type used to index
-   --  sectors across all devices, regardless of the device's actual internal
-   --  addressing scheme, block size, etc.
-   subtype Sector_Index_T is Unsigned_64;
 
    type Filesystem_Type_T is
      (Filesystem_Type_None,

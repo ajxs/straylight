@@ -1,37 +1,23 @@
+with Devices.Attached_System_Devices; use Devices.Attached_System_Devices;
 with Devices.UART;
-with Hart_State;    use Hart_State;
-with Logging;       use Logging;
-with Memory.Kernel; use Memory.Kernel;
+with Logging;                         use Logging;
+with Memory.Kernel;                   use Memory.Kernel;
 
 package body Devices.Console is
-   function Is_Correct_Device_Class (Device : Device_T) return Boolean is
-   begin
-      return
-        Device.Device_Class = Device_Class_Console
-        and then Device.Console_Backend_Device /= null;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         return False;
-   end Is_Correct_Device_Class;
+   function Has_Backend (State : Console_Device_State_T) return Boolean
+   is (State.Backend /= null);
 
-   function Is_Device_Initialised (Device : Device_T) return Boolean is
-   begin
-      return
-        Device.Line_Buffer_Address /= Null_Address
-        and then Device.Line_Buffer_Size /= 0;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         return False;
-   end Is_Device_Initialised;
+   function Is_Device_Initialised
+     (State : Console_Device_State_T) return Boolean
+   is (State.Line_Buffer_Address /= Null_Address
+       and then State.Line_Buffer_Size /= 0);
 
-   function Is_Device_Valid_And_Initialised (Device : Device_T) return Boolean
-   is (Is_Correct_Device_Class (Device)
-       and then Is_Device_Initialised (Device));
+   function Is_Device_Valid_And_Initialised
+     (State : Console_Device_State_T) return Boolean
+   is (Has_Backend (State) and then Is_Device_Initialised (State));
 
    procedure Allocate_Line_Buffer
-     (Device : in out Device_T; Result : out Function_Result)
+     (State : in out Console_Device_State_T; Result : out Function_Result)
    is
       Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
@@ -40,34 +26,30 @@ package body Devices.Console is
          return;
       end if;
 
-      Device.Line_Buffer_Address := Allocation_Result.Virtual_Address;
-      Device.Line_Buffer_Size := 4096;
-      Device.Line_Buffer_Offset_Read := 0;
-      Device.Line_Buffer_Offset_Write := 0;
-      Device.Line_Buffer_Offset_Committed := 0;
+      State.Line_Buffer_Address := Allocation_Result.Virtual_Address;
+      State.Line_Buffer_Size := 4096;
+      State.Line_Buffer_Offset_Read := 0;
+      State.Line_Buffer_Offset_Write := 0;
+      State.Line_Buffer_Offset_Committed := 0;
 
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
    end Allocate_Line_Buffer;
 
-   procedure Put_Bytes_Unlocked (Device : Device_T; Data : Storage_Array) is
+   procedure Put_Bytes_Unlocked
+     (State : Console_Device_State_T; Data : Storage_Array) is
    begin
-      if Device.Device_Class /= Device_Class_Console
-        or else Device.Console_Backend_Device = null
-      then
+      if not Has_Backend (State) then
          return;
       end if;
 
-      case Device.Console_Backend_Device.all.Device_Class is
-         when Device_Class_Serial =>
-            Devices.UART.Put_Bytes (Device.Console_Backend_Device.all, Data);
+      Backend : Device_T renames State.Backend.all;
 
-         when others              =>
+      case Backend.Driver_Type is
+         when Driver_Type_UART =>
+            Devices.UART.Put_Bytes (Backend.Common, Backend.UART, Data);
+
+         when others           =>
             null;
-
       end case;
    exception
       when Constraint_Error =>
@@ -85,13 +67,13 @@ package body Devices.Console is
    --   - Control characters aren't echoed, since a serial terminal would act
    --     on them instead of displaying them.
    ----------------------------------------------------------------------------
-   procedure Echo_Byte (Device : Device_T; Byte : Unsigned_8) is
+   procedure Echo_Byte (State : Console_Device_State_T; Byte : Unsigned_8) is
    begin
       if Character'Val (Byte) = ASCII.LF then
          Put_Bytes_Unlocked
-           (Device, [Character'Pos (ASCII.CR), Character'Pos (ASCII.LF)]);
+           (State, [Character'Pos (ASCII.CR), Character'Pos (ASCII.LF)]);
       elsif Is_Printable (Byte) then
-         Put_Bytes_Unlocked (Device, [1 => Storage_Element (Byte)]);
+         Put_Bytes_Unlocked (State, [1 => Storage_Element (Byte)]);
       end if;
    end Echo_Byte;
 
@@ -104,7 +86,8 @@ package body Devices.Console is
    --     held. The spinlock is released while waiting for input.
    ----------------------------------------------------------------------------
    procedure Read_Line_Unlocked
-     (Device     : in out Device_T;
+     (Device     : in out Device_Common_State_T;
+      State      : in out Console_Device_State_T;
       Process    : in out Process_Control_Block_T;
       Buffer     : out Storage_Array;
       Bytes_Read : out Storage_Count;
@@ -115,34 +98,38 @@ package body Devices.Console is
       Bytes_Read := 0;
 
       Read_Line_Buffer : declare
-         Line_Buffer : Storage_Array (0 .. Device.Line_Buffer_Size - 1)
-         with Import, Alignment => 1, Address => Device.Line_Buffer_Address;
+         Line_Buffer : Storage_Array (0 .. State.Line_Buffer_Size - 1)
+         with Import, Alignment => 1, Address => State.Line_Buffer_Address;
       begin
          --  If there is no unread committed line, read a new line from the
          --  backend device. The line is only made available to the caller
          --  once it has been terminated with a newline or terminated with
          --  Ctrl+D.
-         if Device.Line_Buffer_Offset_Read
-           = Device.Line_Buffer_Offset_Committed
+         if State.Line_Buffer_Offset_Read = State.Line_Buffer_Offset_Committed
          then
-            Device.Line_Buffer_Offset_Read := 0;
-            Device.Line_Buffer_Offset_Write := 0;
-            Device.Line_Buffer_Offset_Committed := 0;
+            State.Line_Buffer_Offset_Read := 0;
+            State.Line_Buffer_Offset_Write := 0;
+            State.Line_Buffer_Offset_Committed := 0;
 
             loop
                Release_Spinlock (Device.Spinlock);
 
-               case Device.Console_Backend_Device.all.Device_Class is
-                  when Device_Class_Serial =>
-                     Devices.UART.Read_Byte
-                       (Device.Console_Backend_Device.all,
-                        Process,
-                        Incoming_Byte,
-                        Result);
+               Read_Backend_Byte : declare
+                  Backend : Device_T renames State.Backend.all;
+               begin
+                  case Backend.Driver_Type is
+                     when Driver_Type_UART =>
+                        Devices.UART.Read_Byte
+                          (Backend.Common,
+                           Backend.UART,
+                           Process,
+                           Incoming_Byte,
+                           Result);
 
-                  when others              =>
-                     Result := Not_Supported;
-               end case;
+                     when others           =>
+                        Result := Not_Supported;
+                  end case;
+               end Read_Backend_Byte;
 
                Acquire_Spinlock (Device.Spinlock);
 
@@ -161,14 +148,14 @@ package body Devices.Console is
                exit when Incoming_Byte = Character'Pos (ASCII.EOT);
 
                if Is_Backspace (Incoming_Byte) then
-                  if Device.Line_Buffer_Offset_Write
-                    > Device.Line_Buffer_Offset_Committed
+                  if State.Line_Buffer_Offset_Write
+                    > State.Line_Buffer_Offset_Committed
                   then
-                     Device.Line_Buffer_Offset_Write :=
-                       Device.Line_Buffer_Offset_Write - 1;
+                     State.Line_Buffer_Offset_Write :=
+                       State.Line_Buffer_Offset_Write - 1;
 
                      Put_Bytes_Unlocked
-                       (Device,
+                       (State,
                         [Character'Pos (ASCII.BS),
                          Character'Pos (' '),
                          Character'Pos (ASCII.BS)]);
@@ -177,45 +164,45 @@ package body Devices.Console is
                  or else
                    (Is_Printable (Incoming_Byte)
                     and then
-                      Device.Line_Buffer_Offset_Write
-                      < Device.Line_Buffer_Size - 1)
+                      State.Line_Buffer_Offset_Write
+                      < State.Line_Buffer_Size - 1)
                then
                   --  The last byte of the line buffer is reserved for the
                   --  newline, so that a line is always able to be terminated.
                   --  Any bytes received after the buffer is full are
                   --  discarded.
 
-                  Line_Buffer (Device.Line_Buffer_Offset_Write) :=
+                  Line_Buffer (State.Line_Buffer_Offset_Write) :=
                     Storage_Element (Incoming_Byte);
 
-                  Device.Line_Buffer_Offset_Write :=
-                    Device.Line_Buffer_Offset_Write + 1;
+                  State.Line_Buffer_Offset_Write :=
+                    State.Line_Buffer_Offset_Write + 1;
 
-                  Echo_Byte (Device, Incoming_Byte);
+                  Echo_Byte (State, Incoming_Byte);
                end if;
 
                exit when Character'Val (Incoming_Byte) = ASCII.LF;
             end loop;
 
-            Device.Line_Buffer_Offset_Committed :=
-              Device.Line_Buffer_Offset_Write;
+            State.Line_Buffer_Offset_Committed :=
+              State.Line_Buffer_Offset_Write;
          end if;
 
          --  Copy as much of the committed line as will fit in the caller's
          --  buffer. Any remainder is returned by subsequent calls.
          Number_Of_Bytes_To_Copy : constant Storage_Count :=
            Storage_Count'Min
-             (Device.Line_Buffer_Offset_Committed
-              - Device.Line_Buffer_Offset_Read,
+             (State.Line_Buffer_Offset_Committed
+              - State.Line_Buffer_Offset_Read,
               Buffer'Length);
 
          Buffer (Buffer'First .. Buffer'First + Number_Of_Bytes_To_Copy - 1) :=
            Line_Buffer
-             (Device.Line_Buffer_Offset_Read
-              .. Device.Line_Buffer_Offset_Read + Number_Of_Bytes_To_Copy - 1);
+             (State.Line_Buffer_Offset_Read
+              .. State.Line_Buffer_Offset_Read + Number_Of_Bytes_To_Copy - 1);
 
-         Device.Line_Buffer_Offset_Read :=
-           Device.Line_Buffer_Offset_Read + Number_Of_Bytes_To_Copy;
+         State.Line_Buffer_Offset_Read :=
+           State.Line_Buffer_Offset_Read + Number_Of_Bytes_To_Copy;
 
          Bytes_Read := Number_Of_Bytes_To_Copy;
       end Read_Line_Buffer;
@@ -229,58 +216,58 @@ package body Devices.Console is
    end Read_Line_Unlocked;
 
    procedure Read_Line
-     (Device     : in out Device_T;
+     (Device     : in out Device_Common_State_T;
+      State      : in out Console_Device_State_T;
       Process    : in out Process_Control_Block_T;
       Buffer     : out Storage_Array;
       Bytes_Read : out Storage_Count;
       Result     : out Function_Result) is
    begin
-      if not Is_Device_Valid_And_Initialised (Device) then
+      if not Is_Device_Valid_And_Initialised (State) then
          Result := Not_Initialised;
          Bytes_Read := 0;
          return;
       end if;
 
       Acquire_Spinlock (Device.Spinlock);
-      Acquire_Sleeplock (Device.Line_Read_Lock, Device.Spinlock, Process);
+      Acquire_Sleeplock (State.Line_Read_Lock, Device.Spinlock, Process);
 
-      Read_Line_Unlocked (Device, Process, Buffer, Bytes_Read, Result);
+      Read_Line_Unlocked (Device, State, Process, Buffer, Bytes_Read, Result);
 
-      Release_Sleeplock (Device.Line_Read_Lock);
+      Release_Sleeplock (State.Line_Read_Lock);
       Release_Spinlock (Device.Spinlock);
-   exception
-      when Constraint_Error =>
-         --  Because a constraint error in this procedure would potentially
-         --  deadlock other processes waiting for this device, panic.
-         Panic_Constraint_Error;
    end Read_Line;
 
    procedure Read_Bytes
-     (Device     : in out Device_T;
+     (Device     : in out Device_Common_State_T;
+      State      : in out Console_Device_State_T;
       Process    : in out Process_Control_Block_T;
       Buffer     : out Storage_Array;
       Bytes_Read : out Storage_Count;
       Result     : out Function_Result) is
    begin
-      Read_Line (Device, Process, Buffer, Bytes_Read, Result);
+      Read_Line (Device, State, Process, Buffer, Bytes_Read, Result);
    end Read_Bytes;
 
-   procedure Put_Bytes (Device : in out Device_T; Data : Storage_Array) is
+   procedure Put_Bytes
+     (Device : in out Device_Common_State_T;
+      State  : Console_Device_State_T;
+      Data   : Storage_Array) is
    begin
       Acquire_Spinlock (Device.Spinlock);
-      Put_Bytes_Unlocked (Device, Data);
+      Put_Bytes_Unlocked (State, Data);
       Release_Spinlock (Device.Spinlock);
    end Put_Bytes;
 
    procedure Initialise
-     (Device : in out Device_T; Result : out Function_Result) is
+     (State : in out Console_Device_State_T; Result : out Function_Result) is
    begin
-      if not Is_Correct_Device_Class (Device) then
+      if not Has_Backend (State) then
          Result := Invalid_Argument;
          return;
       end if;
 
-      Allocate_Line_Buffer (Device, Result);
+      Allocate_Line_Buffer (State, Result);
       if Is_Error (Result) then
          return;
       end if;

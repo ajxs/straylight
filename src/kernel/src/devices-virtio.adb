@@ -3,15 +3,16 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Devices.Virtio.Block; use Devices.Virtio.Block;
-with Logging;              use Logging;
-with Memory.Kernel;        use Memory.Kernel;
-with Processes.Scheduler;  use Processes.Scheduler;
-with RISCV.Atomics;        use RISCV.Atomics;
+with Logging;             use Logging;
+with Memory.Kernel;       use Memory.Kernel;
+with Processes.Scheduler; use Processes.Scheduler;
+with RISCV.Atomics;       use RISCV.Atomics;
 
 package body Devices.Virtio is
    procedure Acknowledge_Interrupt_Unlocked
-     (Device : in out Device_T; Result : out Function_Result)
+     (Device : Device_Common_State_T;
+      State  : in out Virtio_Device_State_T;
+      Result : out Function_Result)
    is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
@@ -25,22 +26,17 @@ package body Devices.Virtio is
       --  Wakeup any processes waiting on the completed request.
       Acknowledge_Interrupt_Channel : declare
          Q_Used : constant Virtqueue_Used_T
-         with
-           Import,
-           Address   => Device.Bus_Info.Virtio.Q_Used.Virtual_Address,
-           Alignment => 1;
+         with Import, Address => State.Q_Used.Virtual_Address, Alignment => 1;
       begin
          pragma
            Debug
              (Debug_Devices_Virtio,
               Log_Debug ("Q_Used.Index: " & Q_Used.Index'Image));
 
-         while Device.Bus_Info.Virtio.Request_Serviced_Index /= Q_Used.Index
-         loop
+         while State.Request_Serviced_Index /= Q_Used.Index loop
             --  Get the index of the next used descriptor in the queue.
             Queue_Index : constant Unsigned_16 :=
-              Device.Bus_Info.Virtio.Request_Serviced_Index
-              mod Maximum_Virtio_Queue_Length;
+              State.Request_Serviced_Index mod Maximum_Virtio_Queue_Length;
 
             Descriptor_Index : constant Unsigned_32 :=
               Q_Used.Ring (Queue_Index).Id;
@@ -52,8 +48,7 @@ package body Devices.Virtio is
                    ("Used descriptor index: " & Descriptor_Index'Image));
 
             Channel : constant Unsigned_64 :=
-              Device.Bus_Info.Virtio.Request_Info
-                (Virtio_Queue_Index_T (Descriptor_Index))
+              State.Request_Info (Virtio_Queue_Index_T (Descriptor_Index))
                 .Channel;
 
             pragma
@@ -61,15 +56,14 @@ package body Devices.Virtio is
                 (Debug_Devices_Virtio,
                  Log_Debug
                    ("Successfully acknowledged driver Q entry: "
-                    & Device.Bus_Info.Virtio.Request_Serviced_Index'Image));
+                    & State.Request_Serviced_Index'Image));
 
             Wake_Processes_Waiting_For_Channel (Channel);
 
             --  Tell the processor to not move loads or stores past this point.
             Fence;
 
-            Device.Bus_Info.Virtio.Request_Serviced_Index :=
-              Device.Bus_Info.Virtio.Request_Serviced_Index + 1;
+            State.Request_Serviced_Index := State.Request_Serviced_Index + 1;
          end loop;
       end Acknowledge_Interrupt_Channel;
 
@@ -91,35 +85,24 @@ package body Devices.Virtio is
    end Acknowledge_Interrupt_Unlocked;
 
    procedure Acknowledge_Interrupt
-     (Device : in out Device_T; Result : out Function_Result) is
+     (Device : in out Device_Common_State_T;
+      State  : in out Virtio_Device_State_T;
+      Result : out Function_Result) is
    begin
-      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
-         Log_Error ("Invalid device bus for Virtio device");
-         Result := Invalid_Argument;
-         return;
-      end if;
-
       Acquire_Spinlock (Device.Spinlock);
-      Acknowledge_Interrupt_Unlocked (Device, Result);
+      Acknowledge_Interrupt_Unlocked (Device, State, Result);
       Release_Spinlock (Device.Spinlock);
    end Acknowledge_Interrupt;
 
    procedure Allocate_Descriptor
-     (Device : in out Device_T;
+     (State  : in out Virtio_Device_State_T;
       Index  : out Descriptor_Index_T;
       Result : out Function_Result) is
    begin
-      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
-         Log_Error ("Device not Virtio");
-         Index := 0;
-         Result := Invalid_Argument;
-         return;
-      end if;
-
       for I in Virtio_Queue_Index_T loop
-         if Device.Bus_Info.Virtio.Descriptor_Status (I) then
+         if State.Descriptor_Status (I) then
             Index := I;
-            Device.Bus_Info.Virtio.Descriptor_Status (I) := False;
+            State.Descriptor_Status (I) := False;
 
             pragma
               Debug
@@ -133,14 +116,10 @@ package body Devices.Virtio is
 
       Log_Error ("No remaining Virtio Descriptors");
       Result := Unhandled_Exception;
-   exception
-      when Constraint_Error =>
-         Log_Error ("Constraint Error allocating descriptor");
-         Result := Constraint_Exception;
    end Allocate_Descriptor;
 
    procedure Allocate_Descriptors
-     (Device             : in out Device_T;
+     (State              : in out Virtio_Device_State_T;
       Num_Descriptors    : Positive;
       Descriptor_Indexes : out Allocated_Descriptor_Array_T;
       Result             : out Function_Result)
@@ -156,7 +135,7 @@ package body Devices.Virtio is
       for Index in
         Descriptor_Index_T range 0 .. Descriptor_Index_T (Num_Descriptors - 1)
       loop
-         Allocate_Descriptor (Device, Descriptor_Indexes (Index), Result);
+         Allocate_Descriptor (State, Descriptor_Indexes (Index), Result);
          if Is_Error (Result) then
             Log_Error ("Error allocating descriptors");
 
@@ -168,7 +147,7 @@ package body Devices.Virtio is
                loop
                   --  Result can be ignored here.
                   Free_Descriptor
-                    (Device,
+                    (State,
                      Descriptor_Indexes (Allocated_Index),
                      Free_Descriptor_Result);
                end loop;
@@ -186,16 +165,10 @@ package body Devices.Virtio is
    end Allocate_Descriptors;
 
    procedure Allocate_Virtio_Device_Resources
-     (Device : in out Device_T; Result : out Function_Result)
+     (State : in out Virtio_Device_State_T; Result : out Function_Result)
    is
       Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
-      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
-         Log_Error ("Device not Virtio MMIO");
-         Result := Invalid_Argument;
-         return;
-      end if;
-
       pragma
         Debug
           (Debug_Devices_Virtio,
@@ -206,9 +179,7 @@ package body Devices.Virtio is
            Log_Debug ("Allocating Request Status Array..."));
 
       Allocate_Kernel_Physical_Memory
-        (Maximum_Virtio_Queue_Length,
-         Device.Bus_Info.Virtio.Request_Status_Array,
-         Result);
+        (Maximum_Virtio_Queue_Length, State.Request_Status_Array, Result);
       if Is_Error (Result) then
          Log_Error ("Error allocating status array memory");
          return;
@@ -219,16 +190,12 @@ package body Devices.Virtio is
           (Debug_Devices_Virtio,
            Log_Debug
              ("Allocated Request Status Array: "
-              & Device
-                  .Bus_Info
-                  .Virtio
-                  .Request_Status_Array
-                  .Virtual_Address'Image));
+              & State.Request_Status_Array.Virtual_Address'Image));
 
       --  Initialise the request status array to 0.
       --  The entries are all contiguous, so we can use a single memset call.
       Set
-        (Device.Bus_Info.Virtio.Request_Status_Array.Virtual_Address,
+        (State.Request_Status_Array.Virtual_Address,
          0,
          Maximum_Virtio_Queue_Length);
 
@@ -246,26 +213,21 @@ package body Devices.Virtio is
          return;
       end if;
 
-      Device.Bus_Info.Virtio.Q_Descriptor.Physical_Address :=
+      State.Q_Descriptor.Physical_Address :=
         Allocation_Result.Physical_Address;
-      Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address :=
-        Allocation_Result.Virtual_Address;
+      State.Q_Descriptor.Virtual_Address := Allocation_Result.Virtual_Address;
 
-      Device.Bus_Info.Virtio.Q_Used.Physical_Address :=
+      State.Q_Used.Physical_Address :=
         Allocation_Result.Physical_Address + 16#1000#;
-      Device.Bus_Info.Virtio.Q_Used.Virtual_Address :=
+      State.Q_Used.Virtual_Address :=
         Allocation_Result.Virtual_Address + 16#1000#;
 
-      Device.Bus_Info.Virtio.Q_Available.Physical_Address :=
+      State.Q_Available.Physical_Address :=
         Allocation_Result.Physical_Address + 16#2000#;
-      Device.Bus_Info.Virtio.Q_Available.Virtual_Address :=
+      State.Q_Available.Virtual_Address :=
         Allocation_Result.Virtual_Address + 16#2000#;
 
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
    end Allocate_Virtio_Device_Resources;
 
    function Increment_Index (Index : Unsigned_16) return Unsigned_16 is
@@ -278,25 +240,19 @@ package body Devices.Virtio is
    end Increment_Index;
 
    procedure Free_Descriptor
-     (Device : in out Device_T;
+     (State  : in out Virtio_Device_State_T;
       Index  : Descriptor_Index_T;
       Result : out Function_Result) is
    begin
-      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
-         Log_Error ("Device not Virtio MMIO");
-         Result := Invalid_Argument;
-         return;
-      end if;
-
       if Index >= Maximum_Virtio_Queue_Length
-        or else Device.Bus_Info.Virtio.Descriptor_Status (Index)
+        or else State.Descriptor_Status (Index)
       then
          Log_Error ("Invalid descriptor index to free: " & Index'Image);
          Result := Invalid_Argument;
          return;
       end if;
 
-      Device.Bus_Info.Virtio.Descriptor_Status (Index) := True;
+      State.Descriptor_Status (Index) := True;
 
       pragma
         Debug
@@ -311,7 +267,7 @@ package body Devices.Virtio is
    end Free_Descriptor;
 
    procedure Free_Descriptor_Chain
-     (Device : in out Device_T;
+     (State  : in out Virtio_Device_State_T;
       Index  : Descriptor_Index_T;
       Result : out Function_Result)
    is
@@ -323,11 +279,11 @@ package body Devices.Virtio is
          Descriptors : Virtqueue_Descriptor_Array
          with
            Import,
-           Address   => Device.Bus_Info.Virtio.Q_Descriptor.Virtual_Address,
+           Address   => State.Q_Descriptor.Virtual_Address,
            Alignment => 1;
       begin
          loop
-            Free_Descriptor (Device, Current_Index, Result);
+            Free_Descriptor (State, Current_Index, Result);
             if Is_Error (Result) then
                return;
             end if;
@@ -349,7 +305,9 @@ package body Devices.Virtio is
    end Free_Descriptor_Chain;
 
    procedure Initialise_MMIO_Device_Unlocked
-     (Device : in out Device_T; Result : out Function_Result)
+     (Device : Device_Common_State_T;
+      State  : in out Virtio_Device_State_T;
+      Result : out Function_Result)
    is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
@@ -360,12 +318,6 @@ package body Devices.Virtio is
 
       Device_Features : Virtio_Device_Features_Pages_T := [others => 0];
    begin
-      if Device.Device_Bus /= Device_Bus_Virtio_MMIO then
-         Log_Error ("Device not Virtio MMIO");
-         Result := Invalid_Argument;
-         return;
-      end if;
-
       pragma
         Debug
           (Debug_Devices_Virtio,
@@ -405,7 +357,7 @@ package body Devices.Virtio is
               & "  Device ID:      "
               & Device_Registers.Device_ID'Image));
 
-      Allocate_Virtio_Device_Resources (Device, Result);
+      Allocate_Virtio_Device_Resources (State, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -426,7 +378,7 @@ package body Devices.Virtio is
       --  Iterate through each page of device features, load the supported
       --  features from the device, mask out any features not supported by
       --  the driver, then write the negotiated features back to the device.
-      for I in Device.Bus_Info.Virtio.Driver_Features'Range loop
+      for I in State.Driver_Features'Range loop
          --  Section 4.2.2.2 Driver Requirements states that:
          --  Before reading from DeviceFeatures, the driver MUST write a
          --  value to DeviceFeaturesSel.
@@ -436,7 +388,7 @@ package body Devices.Virtio is
          --  any features not supported by the driver.
          Device_Features (I) := Device_Registers.Device_Features;
          Device_Features (I) :=
-           Device_Features (I) and Device.Bus_Info.Virtio.Driver_Features (I);
+           Device_Features (I) and State.Driver_Features (I);
 
          --  Section 4.2.2.2 Driver Requirements states that:
          --  Before writing to the DriverFeatures register, the driver MUST
@@ -476,25 +428,19 @@ package body Devices.Virtio is
       Device_Registers.Queue_Select := 0;
 
       Device_Registers.Queue_Descriptor_Low :=
-        Get_Address_Word_Low
-          (Address (Device.Bus_Info.Virtio.Q_Descriptor.Physical_Address));
+        Get_Address_Word_Low (Address (State.Q_Descriptor.Physical_Address));
       Device_Registers.Queue_Descriptor_High :=
-        Get_Address_Word_High
-          (Address (Device.Bus_Info.Virtio.Q_Descriptor.Physical_Address));
+        Get_Address_Word_High (Address (State.Q_Descriptor.Physical_Address));
 
       Device_Registers.Queue_Device_Low :=
-        Get_Address_Word_Low
-          (Address (Device.Bus_Info.Virtio.Q_Used.Physical_Address));
+        Get_Address_Word_Low (Address (State.Q_Used.Physical_Address));
       Device_Registers.Queue_Device_High :=
-        Get_Address_Word_High
-          (Address (Device.Bus_Info.Virtio.Q_Used.Physical_Address));
+        Get_Address_Word_High (Address (State.Q_Used.Physical_Address));
 
       Device_Registers.Queue_Driver_Low :=
-        Get_Address_Word_Low
-          (Address (Device.Bus_Info.Virtio.Q_Available.Physical_Address));
+        Get_Address_Word_Low (Address (State.Q_Available.Physical_Address));
       Device_Registers.Queue_Driver_High :=
-        Get_Address_Word_High
-          (Address (Device.Bus_Info.Virtio.Q_Available.Physical_Address));
+        Get_Address_Word_High (Address (State.Q_Available.Physical_Address));
 
       Device_Registers.Queue_Ready := 1;
 
@@ -502,7 +448,7 @@ package body Devices.Virtio is
       Device_Registers.Status := Status;
 
       for I in Virtio_Queue_Index_T loop
-         Device.Bus_Info.Virtio.Descriptor_Status (I) := True;
+         State.Descriptor_Status (I) := True;
       end loop;
 
       pragma
@@ -510,30 +456,16 @@ package body Devices.Virtio is
           (Debug_Devices_Virtio,
            Log_Debug ("Initialised Virtio MMIO Device."));
 
-      case Device.Bus_Info.Virtio.Device_Type is
-         when Virtio_Device_Type_Block =>
-            Initialise_Block_Device (Device, Result);
-
-         when others                   =>
-            Result := Success;
-      end case;
-
-      if Is_Error (Result) then
-         return;
-      end if;
-
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
    end Initialise_MMIO_Device_Unlocked;
 
    procedure Initialise_MMIO_Device
-     (Device : in out Device_T; Result : out Function_Result) is
+     (Device : in out Device_Common_State_T;
+      State  : in out Virtio_Device_State_T;
+      Result : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
-      Initialise_MMIO_Device_Unlocked (Device, Result);
+      Initialise_MMIO_Device_Unlocked (Device, State, Result);
       Release_Spinlock (Device.Spinlock);
    end Initialise_MMIO_Device;
 

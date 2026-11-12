@@ -7,172 +7,40 @@ with Interfaces;              use Interfaces;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Locks;            use Locks;
-with Locks.Sleeplocks; use Locks.Sleeplocks;
-with Memory;           use Memory;
-with Processes;        use Processes;
+with Locks;  use Locks;
+with Memory; use Memory;
 
 package Devices
   with Preelaborate
 is
-   --  Describes the 'class' of the device, which is used to determine
-   --  which driver should be used to operate the device.
-   type Device_Class_T is
-     (Device_Class_None,
-      Device_Class_Console,
-      Device_Class_Graphics,
-      Device_Class_Network,
-      Device_Class_Interrupt_Controller,
-      Device_Class_Serial,
-      Device_Class_Storage);
+   --  Identifies the driver that operates a device.
+   --  Each driver owns the state record stored for its devices in
+   --  Devices.Attached_System_Devices.
+   type Driver_Type_T is
+     (Driver_Type_None,
+      Driver_Type_PLIC,
+      Driver_Type_UART,
+      Driver_Type_Console,
+      Driver_Type_Ramdisk,
+      Driver_Type_Virtio_Block,
+      Driver_Type_Virtio_GPU);
 
-   --  Describes how the device is physically attached to the system, and how
-   --  the kernel should communicate with it.
-   type Device_Bus_T is
-     (Device_Bus_None, Device_Bus_Memory_Mapped, Device_Bus_Virtio_MMIO);
+   --  This type is used to represent the *kernel's* internal representation
+   --  of a storage device sector. It's independent of any particular device's
+   --  specific implementation details.
+   --  This abstraction supports a single, consistent type used to index
+   --  sectors across all devices, regardless of the device's actual internal
+   --  addressing scheme, block size, etc.
+   subtype Sector_Index_T is Unsigned_64;
 
-   type Virtio_Device_Type_T is
-     (Virtio_Device_Type_Block,
-      Virtio_Device_Type_Graphics,
-      Virtio_Device_Type_Unknown);
-
-   Maximum_Virtio_Queue_Length : constant := 256;
-
-   --  The index of a descriptor within a single virtqueue.
-   subtype Virtio_Queue_Index_T is
-     Unsigned_16 range 0 .. Maximum_Virtio_Queue_Length - 1;
-
-   type Virtio_Descriptor_Status_Array_T is
-     array (Virtio_Queue_Index_T) of Boolean;
-
-   type Virtio_Device_Request_Info_T is record
-      Channel : Blocking_Channel_T := 0;
-   end record;
-
-   type Request_Info_Array_T is
-     array (Virtio_Queue_Index_T) of Virtio_Device_Request_Info_T;
-
-   --  Feature bits for Virtio devices are split into multiple 'pages' of
-   --  32-bit feature bitmaps. The first page (Page 0) is accessed by writing
-   --  0 to the DeviceFeaturesSel register, the second page (Page 1) is
-   --  accessed by writing 1, and so on.
-   --  Currently only two pages are defined in the Virtio specification.
-   --  Refer to section 4.2.2 of the Virtio specification for more details.
-   type Virtio_Device_Features_Pages_T is array (0 .. 1) of Unsigned_32;
-
-   type Device_Bus_Info_Virtio_T
-     (Device_Type : Virtio_Device_Type_T := Virtio_Device_Type_Unknown)
-   is record
-      --  Defines which features the driver supports.
-      --  During feature negotiation, this field will be combined with the
-      --  device's supported features to determine the final set of active
-      --  features.
-      Driver_Features : Virtio_Device_Features_Pages_T := [others => 0];
-      Request_Info    : Request_Info_Array_T := [others => (Channel => 0)];
-
-      --  The kernel is mapped into the higher-half, and needs to operate on
-      --  virtual addresses. However, devices operate on physical addresses, so
-      --  the kernel needs to maintain both virtual and physical addresses for
-      --  Virtio devices resources.
-      Request_Status_Array   : Virtual_Physical_Address_Pair_T;
-      --  This counter wraps at 2**16, like the used ring's index field.
-      --  It is not a descriptor index, so it must not be range-constrained.
-      Request_Serviced_Index : Unsigned_16 := 0;
-      Q_Used                 : Virtual_Physical_Address_Pair_T;
-      Q_Available            : Virtual_Physical_Address_Pair_T;
-      Q_Descriptor           : Virtual_Physical_Address_Pair_T;
-      Descriptor_Status      : Virtio_Descriptor_Status_Array_T;
-
-      case Device_Type is
-         when Virtio_Device_Type_Block =>
-            --  This array holds the Virtio block device request structures.
-            --  This needs to be allocated by the kernel at runtime, because
-            --  it needs to have a physical address for the device to access.
-            Block_Request_Array_Addresses : Virtual_Physical_Address_Pair_T;
-
-            Total_Sectors : Unsigned_64 := 0;
-
-         when Virtio_Device_Type_Graphics =>
-            Resource_Id : Unsigned_32 := 0;
-
-         when others =>
-            null;
-      end case;
-   end record;
-
-   type Device_Bus_Info_T (Device_Bus : Device_Bus_T := Device_Bus_None) is
-   record
-      case Device_Bus is
-         when Device_Bus_Virtio_MMIO =>
-            Virtio : Device_Bus_Info_Virtio_T;
-
-         when others =>
-            null;
-      end case;
-
-   end record;
-
-   type Device_T
-     (Device_Class : Device_Class_T := Device_Class_None;
-      Device_Bus   : Device_Bus_T := Device_Bus_None);
-
-   type Device_Access is access all Device_T;
-
-   type Device_T
-     (Device_Class : Device_Class_T := Device_Class_None;
-      Device_Bus   : Device_Bus_T := Device_Bus_None)
-   is record
+   --  The fields common to every device, regardless of its driver.
+   type Device_Common_State_T is record
       Virtual_Address    : Virtual_Address_T;
       Physical_Address   : Physical_Address_T;
       Memory_Size        : Storage_Offset := 0;
-      Record_Used        : Boolean := False;
       Interrupt_Line     : Integer := 0;
       Interrupt_Priority : Integer := 0;
       Spinlock           : Spinlock_T;
-
-      Bus_Info : Device_Bus_Info_T (Device_Bus);
-
-      case Device_Class is
-         when Device_Class_Graphics =>
-            Framebuffer_Addresses : Virtual_Physical_Address_Pair_T;
-            Framebuffer_Width     : Unsigned_32 := 0;
-            Framebuffer_Height    : Unsigned_32 := 0;
-
-         when Device_Class_Serial =>
-            Ring_Buffer_Address      : Virtual_Address_T := Null_Address;
-            Ring_Buffer_Size         : Storage_Count := 0;
-            Ring_Buffer_Offset_Read  : Storage_Offset := 0;
-            Ring_Buffer_Offset_Write : Storage_Offset := 0;
-
-         when Device_Class_Console =>
-            Line_Buffer_Address          : Virtual_Address_T := Null_Address;
-            Line_Buffer_Size             : Storage_Count := 0;
-            Line_Buffer_Offset_Read      : Storage_Offset := 0;
-            Line_Buffer_Offset_Write     : Storage_Offset := 0;
-            Line_Buffer_Offset_Committed : Storage_Offset := 0;
-
-            --  This lock is used to control access to the line read operation.
-            --  Because the line reading procedure releases the spinlock while
-            --  it's waiting for input, the spinlock alone isn't enough to
-            --  ensure that another process doesn't 'steal' incoming bytes from
-            --  another process that's waiting to receive input.
-            --  Once one process is waiting to receive a line, another
-            --  process must sleep on this lock until the current read call
-            --  returns.
-            Line_Read_Lock : Sleeplock_T;
-
-            --  The backend device responsible for handling the actual byte
-            --  input and output for the console.
-            Console_Backend_Device : Device_Access := null;
-
-         when others =>
-            null;
-      end case;
-
    end record;
-
-   type Device_Array_T is array (Positive range <>) of aliased Device_T;
-
-   System_Devices : Device_Array_T (1 .. 16);
 
 end Devices;

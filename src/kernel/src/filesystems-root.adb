@@ -43,7 +43,7 @@ package body Filesystems.Root is
            Import,
            Convention => Ada,
            Alignment  => 1,
-           Address    => Filesystem.all.Device.all.Virtual_Address;
+           Address    => Filesystem.all.Device.all.Common.Virtual_Address;
       begin
          Find_Free_Root_Filesystem_Node_Index
            (Root_Filesystem, New_Entry_Index, Result);
@@ -114,7 +114,7 @@ package body Filesystems.Root is
            Import,
            Convention => Ada,
            Alignment  => 1,
-           Address    => Filesystem.all.Device.all.Virtual_Address;
+           Address    => Filesystem.all.Device.all.Common.Virtual_Address;
       begin
          for Current_Node of Root_Filesystem.Nodes loop
             if Current_Node.Entry_Used then
@@ -188,7 +188,7 @@ package body Filesystems.Root is
            Import,
            Convention => Ada,
            Alignment  => 1,
-           Address    => Filesystem.all.Device.all.Virtual_Address;
+           Address    => Filesystem.all.Device.all.Common.Virtual_Address;
       begin
          for Index in Root_Filesystem.Nodes'Range loop
             Root_Filesystem.Nodes (Index).Entry_Used := False;

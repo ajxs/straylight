@@ -4,7 +4,6 @@
 -------------------------------------------------------------------------------
 
 with Function_Results; use Function_Results;
-with Filesystems;      use Filesystems;
 
 -------------------------------------------------------------------------------
 --  The ramdisk 'device' provides an interface for reading/writing sectors
@@ -14,15 +13,15 @@ with Filesystems;      use Filesystems;
 --  as follows, and point to it with a mounted filesystem:
 --
 --      System_Devices (5) :=
---        (Device_Class       => Device_Class_Storage,
---         Device_Bus         => Device_Bus_Memory_Mapped,
---         Memory_Size        => Ramdisk_Region_Size,
---         Virtual_Address    => Device_Virtual_Address,
---         Physical_Address   => Ramdisk_Address,
---         Interrupt_Line     => 0,
---         Interrupt_Priority => 0,
---         Spinlock           => Locks.Null_Spinlock,
---         Record_Used        => True);
+--        (Driver_Type      => Driver_Type_Ramdisk,
+--         Common           =>
+--           (Memory_Size        => Ramdisk_Region_Size,
+--            Virtual_Address    => Device_Virtual_Address,
+--            Physical_Address   => Ramdisk_Address,
+--            Interrupt_Line     => 0,
+--            Interrupt_Priority => 0,
+--            Spinlock           => Locks.Null_Spinlock),
+--         Interrupt_Parent => null);
 --
 --      Mounted_Filesystems (3) :=
 --        (Filesystem_Type              => Filesystem_Type_UStar,
@@ -36,26 +35,26 @@ package Devices.Ramdisk
   with Preelaborate
 is
    procedure Read_Sector
-     (Device               : in out Device_T;
+     (Device               : in out Device_Common_State_T;
       Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result);
 
    procedure Write_Sector
-     (Device               : in out Device_T;
+     (Device               : in out Device_Common_State_T;
       Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result);
 
    procedure Read_Sectors
-     (Device               : in out Device_T;
+     (Device               : in out Device_Common_State_T;
       Start_Sector         : Sector_Index_T;
       Sector_Count         : Natural;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result);
 
    procedure Write_Sectors
-     (Device               : in out Device_T;
+     (Device               : in out Device_Common_State_T;
       Start_Sector         : Sector_Index_T;
       Sector_Count         : Natural;
       Data_Virtual_Address : Virtual_Address_T;

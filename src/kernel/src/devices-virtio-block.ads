@@ -3,17 +3,29 @@
 --  SPDX-License-Identifier: GPL-3.0-or-later
 -------------------------------------------------------------------------------
 
-with Filesystems; use Filesystems;
-
 package Devices.Virtio.Block
   with Preelaborate
 is
+   type Virtio_Block_Device_State_T is record
+      Virtio : Virtio_Device_State_T;
+
+      --  This array holds the Virtio block device request structures.
+      --  This needs to be allocated by the kernel at runtime, because
+      --  it needs to have a physical address for the device to access.
+      Block_Request_Array_Addresses : Virtual_Physical_Address_Pair_T;
+
+      Total_Sectors : Unsigned_64 := 0;
+   end record;
+
    procedure Initialise_Block_Device
-     (Device : in out Device_T; Result : out Function_Result);
+     (Device : in out Device_Common_State_T;
+      State  : in out Virtio_Block_Device_State_T;
+      Result : out Function_Result);
 
    procedure Read_Sectors
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Start_Sector          : Sector_Index_T;
       Sector_Count          : Natural;
@@ -21,7 +33,8 @@ is
 
    procedure Write_Sectors
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Start_Sector          : Sector_Index_T;
       Sector_Count          : Natural;
@@ -29,14 +42,16 @@ is
 
    procedure Read_Sector
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Result                : out Function_Result);
 
    procedure Write_Sector
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Result                : out Function_Result);
@@ -63,7 +78,8 @@ private
 
    procedure Read_Write
      (Reading_Process       : in out Process_Control_Block_T;
-      Device                : in out Device_T;
+      Device                : in out Device_Common_State_T;
+      State                 : in out Virtio_Block_Device_State_T;
       Data_Physical_Address : Physical_Address_T;
       Sector                : Sector_Index_T;
       Write                 : Boolean;

@@ -10,8 +10,9 @@ package body Devices.Ramdisk is
    Ramdisk_Sector_Size : constant := 512;
 
    function Is_Valid_Sector_Range
-     (Device : Device_T; Start_Sector : Sector_Index_T; Sector_Count : Natural)
-      return Boolean is
+     (Device       : Device_Common_State_T;
+      Start_Sector : Sector_Index_T;
+      Sector_Count : Natural) return Boolean is
    begin
       Sector_Limit : constant Sector_Index_T :=
         Sector_Index_T (Device.Memory_Size / Ramdisk_Sector_Size);
@@ -26,7 +27,7 @@ package body Devices.Ramdisk is
    end Is_Valid_Sector_Range;
 
    procedure Read_Sectors_Unlocked
-     (Device               : Device_T;
+     (Device               : Device_Common_State_T;
       Start_Sector         : Sector_Index_T;
       Sector_Count         : Natural;
       Data_Virtual_Address : Virtual_Address_T;
@@ -76,7 +77,7 @@ package body Devices.Ramdisk is
    end Read_Sectors_Unlocked;
 
    procedure Read_Sector
-     (Device               : in out Device_T;
+     (Device               : in out Device_Common_State_T;
       Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result) is
@@ -88,7 +89,7 @@ package body Devices.Ramdisk is
    end Read_Sector;
 
    procedure Write_Sectors_Unlocked
-     (Device               : Device_T;
+     (Device               : Device_Common_State_T;
       Start_Sector         : Sector_Index_T;
       Sector_Count         : Natural;
       Data_Virtual_Address : Virtual_Address_T;
@@ -138,7 +139,7 @@ package body Devices.Ramdisk is
    end Write_Sectors_Unlocked;
 
    procedure Write_Sector
-     (Device               : in out Device_T;
+     (Device               : in out Device_Common_State_T;
       Sector_Index         : Sector_Index_T;
       Data_Virtual_Address : Virtual_Address_T;
       Result               : out Function_Result) is
@@ -150,7 +151,7 @@ package body Devices.Ramdisk is
    end Write_Sector;
 
    procedure Read_Sectors
-     (Device               : in out Device_T;
+     (Device               : in out Device_Common_State_T;
       Start_Sector         : Sector_Index_T;
       Sector_Count         : Natural;
       Data_Virtual_Address : Virtual_Address_T;
@@ -163,7 +164,7 @@ package body Devices.Ramdisk is
    end Read_Sectors;
 
    procedure Write_Sectors
-     (Device               : in out Device_T;
+     (Device               : in out Device_Common_State_T;
       Start_Sector         : Sector_Index_T;
       Sector_Count         : Natural;
       Data_Virtual_Address : Virtual_Address_T;

@@ -9,25 +9,14 @@ with Processes.Scheduler; use Processes.Scheduler;
 with Utilities;           use Utilities;
 
 package body Devices.UART is
-   function Is_Correct_Device_Class (Device : Device_T) return Boolean
-   is (Device.Device_Class = Device_Class_Serial);
-
-   function Is_Device_Initialised (Device : Device_T) return Boolean is
-   begin
-      return
-        Device.Ring_Buffer_Address /= Null_Address
-        and then Device.Ring_Buffer_Size /= 0;
-   exception
-      when Constraint_Error =>
-         return False;
-   end Is_Device_Initialised;
-
-   function Is_Device_Valid_And_Initialised (Device : Device_T) return Boolean
-   is (Is_Correct_Device_Class (Device)
-       and then Is_Device_Initialised (Device));
+   function Is_Device_Initialised (State : UART_Device_State_T) return Boolean
+   is (State.Ring_Buffer_Address /= Null_Address
+       and then State.Ring_Buffer_Size /= 0);
 
    procedure Handle_Rx_Data_Available_Interrupt
-     (Device : in out Device_T; Result : out Function_Result)
+     (Device : in out Device_Common_State_T;
+      State  : in out UART_Device_State_T;
+      Result : out Function_Result)
    is
       Bytes_Read : Integer := 0;
 
@@ -39,7 +28,7 @@ package body Devices.UART is
             null;
       end Log_Bytes_Read;
    begin
-      Read_All_Incoming_Data (Device, Bytes_Read, Result);
+      Read_All_Incoming_Data (Device, State, Bytes_Read, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -54,7 +43,9 @@ package body Devices.UART is
    end Handle_Rx_Data_Available_Interrupt;
 
    procedure Acknowledge_Interrupt
-     (Device : in out Device_T; Result : out Function_Result) is
+     (Device : in out Device_Common_State_T;
+      State  : in out UART_Device_State_T;
+      Result : out Function_Result) is
    begin
       Interrupt_Status : constant Interrupt_Ident_Register :=
         To_Interrupt_Ident_Register
@@ -88,7 +79,7 @@ package body Devices.UART is
          --  Interrupt already cleared by read to the IIR register.
 
          when UART_IRQ_Rx_Data_Available | UART_IRQ_Char_Timeout =>
-            Handle_Rx_Data_Available_Interrupt (Device, Result);
+            Handle_Rx_Data_Available_Interrupt (Device, State, Result);
             if Is_Error (Result) then
                return;
             end if;
@@ -113,7 +104,7 @@ package body Devices.UART is
    end Acknowledge_Interrupt;
 
    procedure Allocate_Ring_Buffer
-     (Device : in out Device_T; Result : out Function_Result)
+     (State : in out UART_Device_State_T; Result : out Function_Result)
    is
       Allocation_Result : Virtual_Physical_Address_Pair_T;
    begin
@@ -122,16 +113,12 @@ package body Devices.UART is
          return;
       end if;
 
-      Device.Ring_Buffer_Address := Allocation_Result.Virtual_Address;
-      Device.Ring_Buffer_Size := 4096;
-      Device.Ring_Buffer_Offset_Read := 0;
-      Device.Ring_Buffer_Offset_Write := 0;
+      State.Ring_Buffer_Address := Allocation_Result.Virtual_Address;
+      State.Ring_Buffer_Size := 4096;
+      State.Ring_Buffer_Offset_Read := 0;
+      State.Ring_Buffer_Offset_Write := 0;
 
       Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
    end Allocate_Ring_Buffer;
 
    ----------------------------------------------------------------------------
@@ -139,7 +126,8 @@ package body Devices.UART is
    --   - All interrupts are disabled during initialisation.
    ----------------------------------------------------------------------------
    procedure Initialise
-     (Device : in out Device_T;
+     (Device : Device_Common_State_T;
+      State  : in out UART_Device_State_T;
       Result : out Function_Result;
       Rate   : Baud_Rate := MAXIMUM_BAUD_RATE) is
    begin
@@ -160,7 +148,7 @@ package body Devices.UART is
          16#C7#);
 
       --  Result set by this call.
-      Allocate_Ring_Buffer (Device, Result);
+      Allocate_Ring_Buffer (State, Result);
 
    end Initialise;
 
@@ -168,7 +156,7 @@ package body Devices.UART is
    --  Implementation Notes:
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
-   procedure Put_Char (Device : Device_T; Data : Character) is
+   procedure Put_Char (Device : Device_Common_State_T; Data : Character) is
    begin
       Put_Byte (Device, Character'Pos (Data));
    end Put_Char;
@@ -177,14 +165,15 @@ package body Devices.UART is
    --  Implementation Notes:
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
-   procedure Put_String (Device : Device_T; Data : String) is
+   procedure Put_String (Device : Device_Common_State_T; Data : String) is
    begin
       Print_Loop : for C of Data loop
          Put_Char (Device, C);
       end loop Print_Loop;
    end Put_String;
 
-   procedure Put_String_Wide (Device : Device_T; Data : Wide_String) is
+   procedure Put_String_Wide
+     (Device : Device_Common_State_T; Data : Wide_String) is
    begin
       Print_Loop : for C of Data loop
          Put_Char (Device, Convert_Wide_Char_To_ASCII (C));
@@ -192,7 +181,8 @@ package body Devices.UART is
    end Put_String_Wide;
 
    function Wait_For_Byte
-     (Device : Device_T; Timeout : Positive := 1_000) return Unsigned_8 is
+     (Device : Device_Common_State_T; Timeout : Positive := 1_000)
+      return Unsigned_8 is
    begin
       for I in 1 .. Timeout loop
          if not Is_Rx_Empty (Device) then
@@ -207,7 +197,8 @@ package body Devices.UART is
    --  Implementation Notes:
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
-   procedure Set_Baud_Rate (Device : Device_T; Rate : Baud_Rate) is
+   procedure Set_Baud_Rate (Device : Device_Common_State_T; Rate : Baud_Rate)
+   is
       --  The baud rate divisor for this baud rate.
       Divisor           : Unsigned_16;
       --  The value to write into the divisor low register.
@@ -248,7 +239,9 @@ package body Devices.UART is
    --  Implementation Notes:
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
-   procedure Set_Divisor_Latch_State (Device : Device_T; State : Boolean) is
+   procedure Set_Divisor_Latch_State
+     (Device : Device_Common_State_T; State : Boolean)
+   is
       --  The existing line map status value.
       Line_Control_Status : Unsigned_8;
    begin
@@ -278,7 +271,7 @@ package body Devices.UART is
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
    procedure Set_Interrupt_Generation
-     (Device         : Device_T;
+     (Device         : Device_Common_State_T;
       Interrupt_Type : UART_Interrupt_Type;
       Status         : Boolean)
    is
@@ -317,9 +310,12 @@ package body Devices.UART is
          Port_Interrupt_Status_To_Byte (Interrupt_Status));
    end Set_Interrupt_Generation;
 
-   procedure Put_Bytes (Device : Device_T; Data : Storage_Array) is
+   procedure Put_Bytes
+     (Device : Device_Common_State_T;
+      State  : UART_Device_State_T;
+      Data   : Storage_Array) is
    begin
-      if not Is_Device_Valid_And_Initialised (Device) then
+      if not Is_Device_Initialised (State) then
          return;
       end if;
 
@@ -332,7 +328,7 @@ package body Devices.UART is
    --  Implementation Notes:
    --   - Does not determine whether the port has been initialised.
    ----------------------------------------------------------------------------
-   procedure Put_Byte (Device : Device_T; Data : Unsigned_8) is
+   procedure Put_Byte (Device : Device_Common_State_T; Data : Unsigned_8) is
       Put_Byte_Timeout : constant := 1_000_000;
    begin
       for I in 1 .. Put_Byte_Timeout loop
@@ -346,7 +342,8 @@ package body Devices.UART is
    end Put_Byte;
 
    procedure Read_Into_Ring_Buffer
-     (Device      : in out Device_T;
+     (Device      : Device_Common_State_T;
+      State       : in out UART_Device_State_T;
       Ring_Buffer : in out Storage_Array;
       Bytes_Read  : out Integer;
       Result      : out Function_Result)
@@ -363,8 +360,8 @@ package body Devices.UART is
       --  This sacrifices one byte of buffer space in the case that the buffer
       --  is full, but allows distinguishing between full and empty states.
       Buffer_Is_Full :=
-        (Device.Ring_Buffer_Offset_Write + 1) mod Device.Ring_Buffer_Size
-        = Device.Ring_Buffer_Offset_Read;
+        (State.Ring_Buffer_Offset_Write + 1) mod State.Ring_Buffer_Size
+        = State.Ring_Buffer_Offset_Read;
 
       while not Is_Rx_Empty (Device) loop
          --  Read incoming data even if the buffer is full to flush the FIFO.
@@ -374,18 +371,17 @@ package body Devices.UART is
          --  until space is available.
          if not Buffer_Is_Full then
             --  Store the incoming byte in the ring buffer.
-            Ring_Buffer (Device.Ring_Buffer_Offset_Write) :=
+            Ring_Buffer (State.Ring_Buffer_Offset_Write) :=
               Storage_Element (Incoming_Byte);
 
-            Device.Ring_Buffer_Offset_Write :=
-              (Device.Ring_Buffer_Offset_Write + 1)
-              mod Device.Ring_Buffer_Size;
+            State.Ring_Buffer_Offset_Write :=
+              (State.Ring_Buffer_Offset_Write + 1) mod State.Ring_Buffer_Size;
 
             Bytes_Read := Bytes_Read + 1;
 
             Buffer_Is_Full :=
-              (Device.Ring_Buffer_Offset_Write + 1) mod Device.Ring_Buffer_Size
-              = Device.Ring_Buffer_Offset_Read;
+              (State.Ring_Buffer_Offset_Write + 1) mod State.Ring_Buffer_Size
+              = State.Ring_Buffer_Offset_Read;
          end if;
       end loop;
 
@@ -397,59 +393,57 @@ package body Devices.UART is
    end Read_Into_Ring_Buffer;
 
    procedure Read_All_Incoming_Data_Unlocked
-     (Device     : in out Device_T;
+     (Device     : Device_Common_State_T;
+      State      : in out UART_Device_State_T;
       Bytes_Read : out Integer;
       Result     : out Function_Result) is
    begin
       Bytes_Read := 0;
 
-      if not Is_Device_Valid_And_Initialised (Device) then
+      if not Is_Device_Initialised (State) then
          Result := Not_Initialised;
          return;
       end if;
 
-      Ring_Buffer : Storage_Array (0 .. Device.Ring_Buffer_Size - 1)
-      with Import, Alignment => 1, Address => Device.Ring_Buffer_Address;
+      Ring_Buffer : Storage_Array (0 .. State.Ring_Buffer_Size - 1)
+      with Import, Alignment => 1, Address => State.Ring_Buffer_Address;
 
-      Read_Into_Ring_Buffer (Device, Ring_Buffer, Bytes_Read, Result);
+      Read_Into_Ring_Buffer (Device, State, Ring_Buffer, Bytes_Read, Result);
       if Is_Error (Result) then
          return;
       end if;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
    end Read_All_Incoming_Data_Unlocked;
 
    procedure Read_All_Incoming_Data
-     (Device     : in out Device_T;
+     (Device     : in out Device_Common_State_T;
+      State      : in out UART_Device_State_T;
       Bytes_Read : out Integer;
       Result     : out Function_Result) is
    begin
       Acquire_Spinlock (Device.Spinlock);
-      Read_All_Incoming_Data_Unlocked (Device, Bytes_Read, Result);
+      Read_All_Incoming_Data_Unlocked (Device, State, Bytes_Read, Result);
       Release_Spinlock (Device.Spinlock);
    end Read_All_Incoming_Data;
 
    procedure Claim_Buffered_Data
-     (Device     : in out Device_T;
+     (State      : in out UART_Device_State_T;
       Buffer     : out Storage_Array;
       Bytes_Read : out Storage_Count;
       Result     : out Function_Result) is
    begin
       Bytes_Read := 0;
 
-      if not Is_Device_Valid_And_Initialised (Device) then
+      if not Is_Device_Initialised (State) then
          Result := Not_Initialised;
          return;
       end if;
 
-      Ring_Buffer : Storage_Array (0 .. Device.Ring_Buffer_Size - 1)
-      with Import, Alignment => 1, Address => Device.Ring_Buffer_Address;
+      Ring_Buffer : Storage_Array (0 .. State.Ring_Buffer_Size - 1)
+      with Import, Alignment => 1, Address => State.Ring_Buffer_Address;
 
       while Bytes_Read < Buffer'Length
         and then
-          Device.Ring_Buffer_Offset_Read /= Device.Ring_Buffer_Offset_Write
+          State.Ring_Buffer_Offset_Read /= State.Ring_Buffer_Offset_Write
       loop
          --  Copy the largest contiguous run available, bounded by the
          --  ring buffer wrapping at its end and by the caller's buffer
@@ -457,10 +451,9 @@ package body Devices.UART is
          --  first contiguous run, and one to copy the second contiguous run
          --  if the ring buffer wraps around.
          Available_Bytes : constant Storage_Count :=
-           (if Device.Ring_Buffer_Offset_Read < Device.Ring_Buffer_Offset_Write
-            then
-              Device.Ring_Buffer_Offset_Write - Device.Ring_Buffer_Offset_Read
-            else Device.Ring_Buffer_Size - Device.Ring_Buffer_Offset_Read);
+           (if State.Ring_Buffer_Offset_Read < State.Ring_Buffer_Offset_Write
+            then State.Ring_Buffer_Offset_Write - State.Ring_Buffer_Offset_Read
+            else State.Ring_Buffer_Size - State.Ring_Buffer_Offset_Read);
 
          Number_Of_Bytes_To_Copy : constant Storage_Count :=
            Storage_Count'Min (Available_Bytes, Buffer'Length - Bytes_Read);
@@ -469,12 +462,12 @@ package body Devices.UART is
            (Buffer'First + Bytes_Read
             .. Buffer'First + Bytes_Read + Number_Of_Bytes_To_Copy - 1) :=
            Ring_Buffer
-             (Device.Ring_Buffer_Offset_Read
-              .. Device.Ring_Buffer_Offset_Read + Number_Of_Bytes_To_Copy - 1);
+             (State.Ring_Buffer_Offset_Read
+              .. State.Ring_Buffer_Offset_Read + Number_Of_Bytes_To_Copy - 1);
 
-         Device.Ring_Buffer_Offset_Read :=
-           (Device.Ring_Buffer_Offset_Read + Number_Of_Bytes_To_Copy)
-           mod Device.Ring_Buffer_Size;
+         State.Ring_Buffer_Offset_Read :=
+           (State.Ring_Buffer_Offset_Read + Number_Of_Bytes_To_Copy)
+           mod State.Ring_Buffer_Size;
 
          Bytes_Read := Bytes_Read + Number_Of_Bytes_To_Copy;
       end loop;
@@ -488,7 +481,8 @@ package body Devices.UART is
    end Claim_Buffered_Data;
 
    procedure Read_Byte
-     (Device  : in out Device_T;
+     (Device  : in out Device_Common_State_T;
+      State   : in out UART_Device_State_T;
       Process : in out Process_Control_Block_T;
       Byte    : out Unsigned_8;
       Result  : out Function_Result)
@@ -496,7 +490,7 @@ package body Devices.UART is
       Buffer     : Storage_Array (0 .. 0);
       Bytes_Read : Storage_Count := 0;
    begin
-      Read_Bytes (Device, Process, Buffer, Bytes_Read, Result);
+      Read_Bytes (Device, State, Process, Buffer, Bytes_Read, Result);
       if Is_Error (Result) then
          Byte := 0;
          return;
@@ -507,7 +501,8 @@ package body Devices.UART is
    end Read_Byte;
 
    procedure Read_Bytes
-     (Device     : in out Device_T;
+     (Device     : in out Device_Common_State_T;
+      State      : in out UART_Device_State_T;
       Process    : in out Process_Control_Block_T;
       Buffer     : out Storage_Array;
       Bytes_Read : out Storage_Count;
@@ -525,7 +520,7 @@ package body Devices.UART is
          --  Attempt to read any previously read and buffered data. If the
          --  incoming data ring buffer is empty, block the calling process
          --  until there is data to read.
-         Claim_Buffered_Data (Device, Buffer, Bytes_Read, Result);
+         Claim_Buffered_Data (State, Buffer, Bytes_Read, Result);
          --  Exit on error, or if any data was read. Otherwise, block.
          exit when Is_Error (Result) or else Bytes_Read > 0;
 

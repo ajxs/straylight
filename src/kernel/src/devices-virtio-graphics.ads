@@ -6,27 +6,40 @@
 package Devices.Virtio.Graphics
   with Preelaborate
 is
+   type Virtio_GPU_Device_State_T is record
+      Virtio      : Virtio_Device_State_T;
+      Resource_Id : Unsigned_32 := 0;
+
+      Framebuffer_Addresses : Virtual_Physical_Address_Pair_T;
+      Framebuffer_Width     : Unsigned_32 := 0;
+      Framebuffer_Height    : Unsigned_32 := 0;
+   end record;
+
    procedure Created_2d_Resource
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       Result          : out Function_Result);
 
    procedure Get_Display_Info
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Result          : out Function_Result);
 
    procedure Attach_Framebuffer_To_Resource
      (Reading_Process              : in out Process_Control_Block_T;
-      Device                       : in out Device_T;
+      Device                       : in out Device_Common_State_T;
+      State                        : in out Virtio_GPU_Device_State_T;
       Resource_Id                  : Unsigned_32;
       Framebuffer_Physical_Address : Physical_Address_T;
       Result                       : out Function_Result);
 
    procedure Set_Scanout
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       Scanout_Id      : Unsigned_32;
       Width           : Unsigned_32;
@@ -35,7 +48,8 @@ is
 
    procedure Transfer_To_Host_2d
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       X               : Unsigned_32;
       Y               : Unsigned_32;
@@ -45,7 +59,8 @@ is
 
    procedure Resource_Flush
      (Reading_Process : in out Process_Control_Block_T;
-      Device          : in out Device_T;
+      Device          : in out Device_Common_State_T;
+      State           : in out Virtio_GPU_Device_State_T;
       Resource_Id     : Unsigned_32;
       X               : Unsigned_32;
       Y               : Unsigned_32;

@@ -6,28 +6,29 @@
 with GNAT.Debug_Utilities;
 with System.Storage_Elements; use System.Storage_Elements;
 
-with Devices;              use Devices;
+with Devices;                         use Devices;
 with Devices.Console;
-with Devices.Virtio;       use Devices.Virtio;
-with Devices.Virtio.Block; use Devices.Virtio.Block;
+with Devices.Attached_System_Devices; use Devices.Attached_System_Devices;
+with Devices.Virtio;                  use Devices.Virtio;
+with Devices.Virtio.Block;            use Devices.Virtio.Block;
 with Devices.Virtio.Graphics;
 with Devices.UART;
 with Devices.PLIC;
 with Devicetree;
-with Filesystems;          use Filesystems;
-with Filesystems.Root;     use Filesystems.Root;
-with Function_Results;     use Function_Results;
-with Graphics;             use Graphics;
+with Filesystems;                     use Filesystems;
+with Filesystems.Root;                use Filesystems.Root;
+with Function_Results;                use Function_Results;
+with Graphics;                        use Graphics;
 with Loader;
-with Locks;                use Locks;
-with Logging;              use Logging;
-with Memory.Kernel;        use Memory.Kernel;
-with Memory.Physical;      use Memory.Physical;
-with Memory.Virtual;       use Memory.Virtual;
+with Locks;                           use Locks;
+with Logging;                         use Logging;
+with Memory.Kernel;                   use Memory.Kernel;
+with Memory.Physical;                 use Memory.Physical;
+with Memory.Virtual;                  use Memory.Virtual;
 with RISCV.SBI;
 with Processes.Scheduler;
 with Traps;
-with Utilities;            use Utilities;
+with Utilities;                       use Utilities;
 
 package body Boot is
    function Get_Early_Kernel_Stack_Virtual_Address
@@ -165,41 +166,49 @@ package body Boot is
       pragma Debug (Debug_Boot, Log_Debug ("Initialising devices..."));
 
       APIC_Device :=
-        (Device_Class     => Device_Class_Interrupt_Controller,
-         Device_Bus       => Device_Bus_Memory_Mapped,
-         Memory_Size      => 16#4000000#,
-         Virtual_Address  => Device_Virtual_Address,
-         Physical_Address => Physical_Address_T (To_Address (16#C00_0000#)),
-         Record_Used      => True,
-         others           => <>);
+        (Driver_Type      => Driver_Type_PLIC,
+         Common           =>
+           (Memory_Size        => 16#4000000#,
+            Virtual_Address    => Device_Virtual_Address,
+            Physical_Address   =>
+              Physical_Address_T (To_Address (16#C00_0000#)),
+            Interrupt_Line     => 0,
+            Interrupt_Priority => 0,
+            Spinlock           => Locks.Null_Spinlock),
+         Interrupt_Parent => null,
+         PLIC             => (Interrupt_Devices => [others => null]));
+
+      Interrupt_Controller := APIC_Device'Access;
 
       Device_Virtual_Address :=
-        Device_Virtual_Address + APIC_Device.Memory_Size;
+        Device_Virtual_Address + APIC_Device.Common.Memory_Size;
 
       UART_Device :=
-        (Device_Class       => Device_Class_Serial,
-         Device_Bus         => Device_Bus_Memory_Mapped,
-         Memory_Size        => 16#1000#,
-         Virtual_Address    => Device_Virtual_Address,
-         Physical_Address   => Physical_Address_T (To_Address (16#1000_0000#)),
-         Interrupt_Line     => 10,
-         Interrupt_Priority => 7,
-         Record_Used        => True,
-         others             => <>);
+        (Driver_Type      => Driver_Type_UART,
+         Common           =>
+           (Memory_Size        => 16#1000#,
+            Virtual_Address    => Device_Virtual_Address,
+            Physical_Address   =>
+              Physical_Address_T (To_Address (16#1000_0000#)),
+            Interrupt_Line     => 10,
+            Interrupt_Priority => 7,
+            Spinlock           => Locks.Null_Spinlock),
+         Interrupt_Parent => APIC_Device'Access,
+         UART             => (others => <>));
 
       Device_Virtual_Address :=
-        Device_Virtual_Address + UART_Device.Memory_Size;
+        Device_Virtual_Address + UART_Device.Common.Memory_Size;
 
       Console_Device :=
-        (Device_Class           => Device_Class_Console,
-         Device_Bus             => Device_Bus_None,
-         Virtual_Address        => Null_Address,
-         Physical_Address       => Null_Physical_Address,
-         Record_Used            => True,
-         Console_Backend_Device => UART_Device'Access,
-         others                 => <>);
+        (Driver_Type      => Driver_Type_Console,
+         Common           =>
+           (Virtual_Address  => Null_Address,
+            Physical_Address => Null_Physical_Address,
+            others           => <>),
+         Interrupt_Parent => null,
+         Console          => (Backend => UART_Device'Access, others => <>));
 
-      Console_Device.Line_Read_Lock.Spinlock.Lock_Id :=
+      Console_Device.Console.Line_Read_Lock.Spinlock.Lock_Id :=
         Lock_Id_Console_Line_Read;
 
       Disk_Device_Driver_Features : constant Virtio_Device_Features_Pages_T :=
@@ -222,32 +231,31 @@ package body Boot is
            Create_U32_Bitmask_From_Flags ([VIRTIO_F_VERSION_1])];
 
       Disk_Device :=
-        (Device_Class       => Device_Class_Storage,
-         Device_Bus         => Device_Bus_Virtio_MMIO,
-         Memory_Size        => 16#1000#,
-         Virtual_Address    => Device_Virtual_Address,
-         Physical_Address   => Physical_Address_T (To_Address (16#1000_1000#)),
-         Interrupt_Line     => 1,
-         Interrupt_Priority => 7,
-         Spinlock           => Locks.Null_Spinlock,
-         Record_Used        => True,
-         Bus_Info           =>
-           (Device_Bus => Device_Bus_Virtio_MMIO,
-            Virtio     =>
-              (Driver_Features               => Disk_Device_Driver_Features,
-               Device_Type                   => Virtio_Device_Type_Block,
-               Request_Info                  => [others => (Channel => 0)],
-               Request_Serviced_Index        => 0,
-               Request_Status_Array          => Default_Unallocated_Addresses,
-               Q_Used                        => Default_Unallocated_Addresses,
-               Q_Available                   => Default_Unallocated_Addresses,
-               Q_Descriptor                  => Default_Unallocated_Addresses,
-               Descriptor_Status             => [others => True],
-               Block_Request_Array_Addresses => Default_Unallocated_Addresses,
-               Total_Sectors                 => 0)));
+        (Driver_Type      => Driver_Type_Virtio_Block,
+         Common           =>
+           (Memory_Size        => 16#1000#,
+            Virtual_Address    => Device_Virtual_Address,
+            Physical_Address   =>
+              Physical_Address_T (To_Address (16#1000_1000#)),
+            Interrupt_Line     => 1,
+            Interrupt_Priority => 7,
+            Spinlock           => Locks.Null_Spinlock),
+         Interrupt_Parent => APIC_Device'Access,
+         Virtio_Block     =>
+           (Virtio                        =>
+              (Driver_Features        => Disk_Device_Driver_Features,
+               Request_Info           => [others => (Channel => 0)],
+               Request_Serviced_Index => 0,
+               Request_Status_Array   => Default_Unallocated_Addresses,
+               Q_Used                 => Default_Unallocated_Addresses,
+               Q_Available            => Default_Unallocated_Addresses,
+               Q_Descriptor           => Default_Unallocated_Addresses,
+               Descriptor_Status      => [others => True]),
+            Block_Request_Array_Addresses => Default_Unallocated_Addresses,
+            Total_Sectors                 => 0));
 
       Device_Virtual_Address :=
-        Device_Virtual_Address + Disk_Device.Memory_Size;
+        Device_Virtual_Address + Disk_Device.Common.Memory_Size;
 
       Allocate_Physical_Memory
         (16#1000#, Root_Filesystem_Physical_Address, Result);
@@ -256,84 +264,85 @@ package body Boot is
       end if;
 
       Root_Filesystem_Memory_Device :=
-        (Device_Class     => Device_Class_Storage,
-         Device_Bus       => Device_Bus_Memory_Mapped,
-         Memory_Size      => 16#1000#,
-         Virtual_Address  => Device_Virtual_Address,
-         Physical_Address => Root_Filesystem_Physical_Address,
-         Record_Used      => True,
-         others           => <>);
+        (Driver_Type      => Driver_Type_Ramdisk,
+         Common           =>
+           (Memory_Size        => 16#1000#,
+            Virtual_Address    => Device_Virtual_Address,
+            Physical_Address   =>
+              Root_Filesystem_Physical_Address,
+            Interrupt_Line     => 0,
+            Interrupt_Priority => 0,
+            Spinlock           => Locks.Null_Spinlock),
+         Interrupt_Parent => null);
 
       Device_Virtual_Address :=
-        Device_Virtual_Address + Root_Filesystem_Memory_Device.Memory_Size;
+        Device_Virtual_Address
+        + Root_Filesystem_Memory_Device.Common.Memory_Size;
 
       Disk_B_Device :=
-        (Device_Class       => Device_Class_Storage,
-         Device_Bus         => Device_Bus_Virtio_MMIO,
-         Memory_Size        => 16#1000#,
-         Virtual_Address    => Device_Virtual_Address,
-         Physical_Address   => Physical_Address_T (To_Address (16#1000_2000#)),
-         Interrupt_Line     => 2,
-         Interrupt_Priority => 7,
-         Spinlock           => Locks.Null_Spinlock,
-         Record_Used        => True,
-         Bus_Info           =>
-           (Device_Bus => Device_Bus_Virtio_MMIO,
-            Virtio     =>
-              (Driver_Features               => Disk_Device_Driver_Features,
-               Device_Type                   => Virtio_Device_Type_Block,
-               Request_Info                  => [others => (Channel => 0)],
-               Request_Serviced_Index        => 0,
-               Request_Status_Array          => Default_Unallocated_Addresses,
-               Q_Used                        => Default_Unallocated_Addresses,
-               Q_Available                   => Default_Unallocated_Addresses,
-               Q_Descriptor                  => Default_Unallocated_Addresses,
-               Descriptor_Status             => [others => True],
-               Block_Request_Array_Addresses => Default_Unallocated_Addresses,
-               Total_Sectors                 => 0)));
-
-      Device_Virtual_Address :=
-        Device_Virtual_Address + Disk_B_Device.Memory_Size;
-
-      Graphics_Device :=
-        (Device_Class          => Device_Class_Graphics,
-         Device_Bus            => Device_Bus_Virtio_MMIO,
-         Memory_Size           => 16#1000#,
-         Virtual_Address       => Device_Virtual_Address,
-         Physical_Address      =>
-           Physical_Address_T (To_Address (16#1000_3000#)),
-         Interrupt_Line        => 3,
-         Interrupt_Priority    => 7,
-         Spinlock              => Locks.Null_Spinlock,
-         Record_Used           => True,
-
-         Framebuffer_Addresses => Default_Unallocated_Addresses,
-         Framebuffer_Width     => 0,
-         Framebuffer_Height    => 0,
-
-         Bus_Info              =>
-           (Device_Bus => Device_Bus_Virtio_MMIO,
-            Virtio     =>
-              (Driver_Features        => Graphics_Device_Driver_Features,
-               Device_Type            => Virtio_Device_Type_Graphics,
+        (Driver_Type      => Driver_Type_Virtio_Block,
+         Common           =>
+           (Memory_Size        => 16#1000#,
+            Virtual_Address    => Device_Virtual_Address,
+            Physical_Address   =>
+              Physical_Address_T (To_Address (16#1000_2000#)),
+            Interrupt_Line     => 2,
+            Interrupt_Priority => 7,
+            Spinlock           => Locks.Null_Spinlock),
+         Interrupt_Parent => APIC_Device'Access,
+         Virtio_Block     =>
+           (Virtio                        =>
+              (Driver_Features        => Disk_Device_Driver_Features,
                Request_Info           => [others => (Channel => 0)],
                Request_Serviced_Index => 0,
                Request_Status_Array   => Default_Unallocated_Addresses,
                Q_Used                 => Default_Unallocated_Addresses,
                Q_Available            => Default_Unallocated_Addresses,
                Q_Descriptor           => Default_Unallocated_Addresses,
-               Descriptor_Status      => [others => True],
-               Resource_Id            => 0)));
+               Descriptor_Status      => [others => True]),
+            Block_Request_Array_Addresses => Default_Unallocated_Addresses,
+            Total_Sectors                 => 0));
 
       Device_Virtual_Address :=
-        Device_Virtual_Address + Graphics_Device.Memory_Size;
+        Device_Virtual_Address + Disk_B_Device.Common.Memory_Size;
+
+      Graphics_Device :=
+        (Driver_Type      => Driver_Type_Virtio_GPU,
+         Common           =>
+           (Memory_Size        => 16#1000#,
+            Virtual_Address    => Device_Virtual_Address,
+            Physical_Address   =>
+              Physical_Address_T (To_Address (16#1000_3000#)),
+            Interrupt_Line     => 3,
+            Interrupt_Priority => 7,
+            Spinlock           => Locks.Null_Spinlock),
+         Interrupt_Parent => APIC_Device'Access,
+         Virtio_GPU       =>
+           (Virtio                =>
+              (Driver_Features        => Graphics_Device_Driver_Features,
+               Request_Info           => [others => (Channel => 0)],
+               Request_Serviced_Index => 0,
+               Request_Status_Array   => Default_Unallocated_Addresses,
+               Q_Used                 => Default_Unallocated_Addresses,
+               Q_Available            => Default_Unallocated_Addresses,
+               Q_Descriptor           => Default_Unallocated_Addresses,
+               Descriptor_Status      => [others => True]),
+            Resource_Id           => 0,
+            Framebuffer_Addresses => Default_Unallocated_Addresses,
+            Framebuffer_Width     => 0,
+            Framebuffer_Height    => 0));
+
+      Device_Virtual_Address :=
+        Device_Virtual_Address + Graphics_Device.Common.Memory_Size;
 
       for I in System_Devices'Range loop
          --  Assign a unique Lock ID to the device spinlocks.
-         System_Devices (I).Spinlock.Lock_Id :=
+         System_Devices (I).Common.Spinlock.Lock_Id :=
            Lock_Id_Devices_Prefix + Lock_Id_T (I);
 
-         if System_Devices (I).Record_Used then
+         if System_Devices (I).Driver_Type /= Driver_Type_None then
+            Device : Device_T renames System_Devices (I);
+
             pragma
               Debug
                 (Debug_Boot,
@@ -341,28 +350,27 @@ package body Boot is
                    ("Mapping Device: id="
                     & I'Image (2 .. I'Image'Length)
                     --  Because the kernel uses pragma Discard_Names,
-                    --  Device_Class is printed as an integer. For this reason
+                    --  Driver_Type is printed as an integer. For this reason
                     --  the first space can be safely trimmed.
-                    & " class="
-                    & System_Devices (I).Device_Class'Image
-                        (2 .. System_Devices (I).Device_Class'Image'Length)
+                    & " driver_type="
+                    & Device.Driver_Type'Image
+                        (2 .. Device.Driver_Type'Image'Length)
                     & " addr_virt="
                     & GNAT.Debug_Utilities.Image_C
-                        (System_Devices (I).Virtual_Address)
+                        (Device.Common.Virtual_Address)
                     & " addr_phys="
                     & GNAT.Debug_Utilities.Image_C
-                        (Address (System_Devices (I).Physical_Address))
+                        (Address (Device.Common.Physical_Address))
                     & " irq="
-                    & System_Devices (I).Interrupt_Line'Image
-                        (2
-                         .. System_Devices (I).Interrupt_Line'Image'Length)));
+                    & Device.Common.Interrupt_Line'Image
+                        (2 .. Device.Common.Interrupt_Line'Image'Length)));
 
-            if System_Devices (I).Memory_Size /= 0 then
+            if Device.Common.Memory_Size /= 0 then
                --  Map each device into the kernel's address space.
                Map_Kernel_Memory
-                 (System_Devices (I).Virtual_Address,
-                  System_Devices (I).Physical_Address,
-                  System_Devices (I).Memory_Size,
+                 (Device.Common.Virtual_Address,
+                  Device.Common.Physical_Address,
+                  Device.Common.Memory_Size,
                   (True, True, False, False),
                   Result);
                if Is_Error (Result) then
@@ -372,33 +380,60 @@ package body Boot is
             end if;
 
             --  Initialise devices.
-            if System_Devices (I).Device_Bus = Device_Bus_Virtio_MMIO then
-               Devices.Virtio.Initialise_MMIO_Device
-                 (System_Devices (I), Result);
-               if Is_Error (Result) then
-                  Panic;
-               end if;
-            elsif System_Devices (I).Device_Class = Device_Class_Serial then
-               Devices.UART.Initialise (UART_Device, Result);
-               if Is_Error (Result) then
-                  Panic;
-               end if;
+            case Device.Driver_Type is
+               when Driver_Type_Virtio_Block =>
+                  Devices.Virtio.Initialise_MMIO_Device
+                    (Device.Common, Device.Virtio_Block.Virtio, Result);
+                  if Is_Error (Result) then
+                     Panic;
+                  end if;
 
-               Devices.UART.Set_Interrupt_Generation
-                 (UART_Device, Devices.UART.Rx_Data_Available, True);
-            elsif System_Devices (I).Device_Class = Device_Class_Console then
-               Devices.Console.Initialise (System_Devices (I), Result);
-               if Is_Error (Result) then
-                  Panic;
-               end if;
-            end if;
+                  Devices.Virtio.Block.Initialise_Block_Device
+                    (Device.Common, Device.Virtio_Block, Result);
+                  if Is_Error (Result) then
+                     Panic;
+                  end if;
 
-            --  If the device has an interrupt line, then enable it.
-            if System_Devices (I).Interrupt_Line /= 0 then
+               when Driver_Type_Virtio_GPU   =>
+                  Devices.Virtio.Initialise_MMIO_Device
+                    (Device.Common, Device.Virtio_GPU.Virtio, Result);
+                  if Is_Error (Result) then
+                     Panic;
+                  end if;
+
+               when Driver_Type_UART         =>
+                  Devices.UART.Initialise (Device.Common, Device.UART, Result);
+                  if Is_Error (Result) then
+                     Panic;
+                  end if;
+
+                  Devices.UART.Set_Interrupt_Generation
+                    (Device.Common, Devices.UART.Rx_Data_Available, True);
+
+               when Driver_Type_Console      =>
+                  Devices.Console.Initialise (Device.Console, Result);
+                  if Is_Error (Result) then
+                     Panic;
+                  end if;
+
+               when Driver_Type_None | Driver_Type_PLIC | Driver_Type_Ramdisk
+               =>
+                  null;
+            end case;
+
+            --  If the device raises interrupts, record it as the owner of its
+            --  interrupt line, then enable the line on its controller.
+            if Device.Interrupt_Parent /= null then
+               Parent : Device_T renames Device.Interrupt_Parent.all;
+
+               Parent.PLIC.Interrupt_Devices
+                 (Unsigned_32 (Device.Common.Interrupt_Line)) :=
+                 Device'Access;
+
                Devices.PLIC.Set_IRQ_Enable_State
-                 (APIC_Device,
+                 (Parent.Common,
                   Supervisor_Interrupt_Context,
-                  System_Devices (I).Interrupt_Line,
+                  Device.Common.Interrupt_Line,
                   True,
                   Result);
                if Is_Error (Result) then
@@ -406,9 +441,9 @@ package body Boot is
                end if;
 
                Devices.PLIC.Set_Interrupt_Priority
-                 (APIC_Device,
-                  System_Devices (I).Interrupt_Line,
-                  System_Devices (I).Interrupt_Priority,
+                 (Parent.Common,
+                  Device.Common.Interrupt_Line,
+                  Device.Common.Interrupt_Priority,
                   Result);
                if Is_Error (Result) then
                   Panic;
@@ -418,7 +453,7 @@ package body Boot is
       end loop;
 
       Devices.PLIC.Set_IRQ_Priority_Threshold
-        (APIC_Device, Supervisor_Interrupt_Context, 1);
+        (APIC_Device.Common, Supervisor_Interrupt_Context, 1);
 
       pragma Debug (Debug_Boot, Log_Debug ("Initialised devices."));
    exception
@@ -775,10 +810,13 @@ package body Boot is
 
       Framebuffer_Allocation : Virtual_Physical_Address_Pair_T;
 
-      Graphics_Device renames Devices.System_Devices (6);
+      Graphics_Device renames System_Devices (6);
    begin
       Devices.Virtio.Graphics.Get_Display_Info
-        (Init_Process.all, Graphics_Device, Result);
+        (Init_Process.all,
+         Graphics_Device.Common,
+         Graphics_Device.Virtio_GPU,
+         Result);
       if Is_Error (Result) then
          Panic;
       end if;
@@ -804,20 +842,26 @@ package body Boot is
               & GNAT.Debug_Utilities.Image_C
                   (Address (Framebuffer_Allocation.Physical_Address))));
 
-      Graphics_Device.Bus_Info.Virtio.Resource_Id := Resource_Id;
-      Graphics_Device.Framebuffer_Addresses := Framebuffer_Allocation;
-      Graphics_Device.Framebuffer_Width := Framebuffer_Width;
-      Graphics_Device.Framebuffer_Height := Framebuffer_Height;
+      Graphics_Device.Virtio_GPU.Resource_Id := Resource_Id;
+      Graphics_Device.Virtio_GPU.Framebuffer_Addresses :=
+        Framebuffer_Allocation;
+      Graphics_Device.Virtio_GPU.Framebuffer_Width := Framebuffer_Width;
+      Graphics_Device.Virtio_GPU.Framebuffer_Height := Framebuffer_Height;
 
       Devices.Virtio.Graphics.Created_2d_Resource
-        (Init_Process.all, Graphics_Device, Resource_Id, Result);
+        (Init_Process.all,
+         Graphics_Device.Common,
+         Graphics_Device.Virtio_GPU,
+         Resource_Id,
+         Result);
       if Is_Error (Result) then
          Panic;
       end if;
 
       Devices.Virtio.Graphics.Attach_Framebuffer_To_Resource
         (Init_Process.all,
-         Graphics_Device,
+         Graphics_Device.Common,
+         Graphics_Device.Virtio_GPU,
          Resource_Id,
          Framebuffer_Allocation.Physical_Address,
          Result);
@@ -827,7 +871,8 @@ package body Boot is
 
       Devices.Virtio.Graphics.Set_Scanout
         (Init_Process.all,
-         Graphics_Device,
+         Graphics_Device.Common,
+         Graphics_Device.Virtio_GPU,
          Resource_Id,
          0,
          Framebuffer_Width,
@@ -845,7 +890,8 @@ package body Boot is
 
       Devices.Virtio.Graphics.Transfer_To_Host_2d
         (Init_Process.all,
-         Graphics_Device,
+         Graphics_Device.Common,
+         Graphics_Device.Virtio_GPU,
          Resource_Id,
          0,
          0,
@@ -858,7 +904,8 @@ package body Boot is
 
       Devices.Virtio.Graphics.Resource_Flush
         (Init_Process.all,
-         Graphics_Device,
+         Graphics_Device.Common,
+         Graphics_Device.Virtio_GPU,
          Resource_Id,
          0,
          0,

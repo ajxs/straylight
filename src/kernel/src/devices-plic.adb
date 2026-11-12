@@ -8,7 +8,8 @@ with MMIO;
 
 package body Devices.PLIC is
    function Claim_Supervisor_Interrupt
-     (Device : in out Device_T; Context : Natural) return Unsigned_32 is
+     (Device : in out Device_Common_State_T; Context : Natural)
+      return Unsigned_32 is
    begin
       Acquire_Spinlock (Device.Spinlock);
       Result : constant Unsigned_32 :=
@@ -19,8 +20,9 @@ package body Devices.PLIC is
    end Claim_Supervisor_Interrupt;
 
    procedure Complete_Supervisor_Interrupt
-     (Device : in out Device_T; Context : Natural; Interrupt_ID : Unsigned_32)
-   is
+     (Device       : in out Device_Common_State_T;
+      Context      : Natural;
+      Interrupt_ID : Unsigned_32) is
    begin
       Acquire_Spinlock (Device.Spinlock);
       MMIO.Write_Unsigned_32
@@ -29,7 +31,7 @@ package body Devices.PLIC is
    end Complete_Supervisor_Interrupt;
 
    procedure Set_Interrupt_Priority_Unlocked
-     (Device       : Device_T;
+     (Device       : Device_Common_State_T;
       IRQ          : Natural;
       IRQ_Priority : Natural;
       Result       : out Function_Result)
@@ -56,7 +58,7 @@ package body Devices.PLIC is
    end Set_Interrupt_Priority_Unlocked;
 
    procedure Set_Interrupt_Priority
-     (Device       : in out Device_T;
+     (Device       : in out Device_Common_State_T;
       IRQ          : Natural;
       IRQ_Priority : Natural;
       Result       : out Function_Result) is
@@ -70,7 +72,7 @@ package body Devices.PLIC is
      Warnings
        (Off, "pragma Restrictions (No_Exception_Propagation) in effect");
    procedure Set_IRQ_Enable_State_Unlocked
-     (Device         : Device_T;
+     (Device         : Device_Common_State_T;
       Context        : Natural;
       Interrupt_Line : Natural;
       State          : Boolean;
@@ -120,7 +122,7 @@ package body Devices.PLIC is
      Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
 
    procedure Set_IRQ_Enable_State
-     (Device         : in out Device_T;
+     (Device         : in out Device_Common_State_T;
       Context        : Natural;
       Interrupt_Line : Natural;
       State          : Boolean;
@@ -133,7 +135,9 @@ package body Devices.PLIC is
    end Set_IRQ_Enable_State;
 
    procedure Set_IRQ_Priority_Threshold
-     (Device : in out Device_T; Context : Natural; Threshold : Natural)
+     (Device    : in out Device_Common_State_T;
+      Context   : Natural;
+      Threshold : Natural)
    is
       Priority_Threshold_Address : constant System.Address :=
         Device.Virtual_Address + 16#20_0000#;
