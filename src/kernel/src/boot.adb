@@ -243,14 +243,14 @@ package body Boot is
          Interrupt_Parent => APIC_Device'Access,
          Virtio_Block     =>
            (Virtio                        =>
-              (Driver_Features        => Disk_Device_Driver_Features,
-               Request_Info           => [others => (Channel => 0)],
-               Request_Serviced_Index => 0,
-               Request_Status_Array   => Default_Unallocated_Addresses,
-               Q_Used                 => Default_Unallocated_Addresses,
-               Q_Available            => Default_Unallocated_Addresses,
-               Q_Descriptor           => Default_Unallocated_Addresses,
-               Descriptor_Status      => [others => True]),
+              (Driver_Features           => Disk_Device_Driver_Features,
+               Request_Serviced_Index    => 0,
+               Request_Status_Array      => Default_Unallocated_Addresses,
+               Q_Used                    => Default_Unallocated_Addresses,
+               Q_Available               => Default_Unallocated_Addresses,
+               Q_Descriptor              => Default_Unallocated_Addresses,
+               Request_Info_Address      => Null_Address,
+               Descriptor_Status_Address => Null_Address),
             Block_Request_Array_Addresses => Default_Unallocated_Addresses,
             Total_Sectors                 => 0));
 
@@ -292,14 +292,14 @@ package body Boot is
          Interrupt_Parent => APIC_Device'Access,
          Virtio_Block     =>
            (Virtio                        =>
-              (Driver_Features        => Disk_Device_Driver_Features,
-               Request_Info           => [others => (Channel => 0)],
-               Request_Serviced_Index => 0,
-               Request_Status_Array   => Default_Unallocated_Addresses,
-               Q_Used                 => Default_Unallocated_Addresses,
-               Q_Available            => Default_Unallocated_Addresses,
-               Q_Descriptor           => Default_Unallocated_Addresses,
-               Descriptor_Status      => [others => True]),
+              (Driver_Features           => Disk_Device_Driver_Features,
+               Request_Serviced_Index    => 0,
+               Request_Status_Array      => Default_Unallocated_Addresses,
+               Q_Used                    => Default_Unallocated_Addresses,
+               Q_Available               => Default_Unallocated_Addresses,
+               Q_Descriptor              => Default_Unallocated_Addresses,
+               Request_Info_Address      => Null_Address,
+               Descriptor_Status_Address => Null_Address),
             Block_Request_Array_Addresses => Default_Unallocated_Addresses,
             Total_Sectors                 => 0));
 
@@ -319,14 +319,14 @@ package body Boot is
          Interrupt_Parent => APIC_Device'Access,
          Virtio_GPU       =>
            (Virtio                =>
-              (Driver_Features        => Graphics_Device_Driver_Features,
-               Request_Info           => [others => (Channel => 0)],
-               Request_Serviced_Index => 0,
-               Request_Status_Array   => Default_Unallocated_Addresses,
-               Q_Used                 => Default_Unallocated_Addresses,
-               Q_Available            => Default_Unallocated_Addresses,
-               Q_Descriptor           => Default_Unallocated_Addresses,
-               Descriptor_Status      => [others => True]),
+              (Driver_Features           => Graphics_Device_Driver_Features,
+               Request_Serviced_Index    => 0,
+               Request_Status_Array      => Default_Unallocated_Addresses,
+               Q_Used                    => Default_Unallocated_Addresses,
+               Q_Available               => Default_Unallocated_Addresses,
+               Q_Descriptor              => Default_Unallocated_Addresses,
+               Request_Info_Address      => Null_Address,
+               Descriptor_Status_Address => Null_Address),
             Resource_Id           => 0,
             Framebuffer_Addresses => Default_Unallocated_Addresses,
             Framebuffer_Width     => 0,

@@ -20,6 +20,12 @@ package body Devices.Virtio.Graphics is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
+      Request_Info : Request_Info_Array_T
+      with
+        Import,
+        Address   => State.Virtio.Request_Info_Address,
+        Alignment => 1;
+
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
       Resource_Allocation : Virtual_Physical_Address_Pair_T;
@@ -129,8 +135,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
-        Blocking_Channel;
+      Request_Info (Descriptor_Indexes (0)).Channel := Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
@@ -200,6 +205,12 @@ package body Devices.Virtio.Graphics is
    is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
+
+      Request_Info : Request_Info_Array_T
+      with
+        Import,
+        Address   => State.Virtio.Request_Info_Address,
+        Alignment => 1;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
@@ -277,8 +288,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
-        Blocking_Channel;
+      Request_Info (Descriptor_Indexes (0)).Channel := Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
@@ -348,6 +358,12 @@ package body Devices.Virtio.Graphics is
    is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
+
+      Request_Info : Request_Info_Array_T
+      with
+        Import,
+        Address   => State.Virtio.Request_Info_Address,
+        Alignment => 1;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
@@ -426,8 +442,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
-        Blocking_Channel;
+      Request_Info (Descriptor_Indexes (0)).Channel := Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
@@ -492,6 +507,12 @@ package body Devices.Virtio.Graphics is
    is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
+
+      Request_Info : Request_Info_Array_T
+      with
+        Import,
+        Address   => State.Virtio.Request_Info_Address,
+        Alignment => 1;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
@@ -568,8 +589,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
-        Blocking_Channel;
+      Request_Info (Descriptor_Indexes (0)).Channel := Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
@@ -645,6 +665,12 @@ package body Devices.Virtio.Graphics is
    is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
+
+      Request_Info : Request_Info_Array_T
+      with
+        Import,
+        Address   => State.Virtio.Request_Info_Address,
+        Alignment => 1;
 
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
@@ -732,8 +758,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
-        Blocking_Channel;
+      Request_Info (Descriptor_Indexes (0)).Channel := Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);
@@ -812,6 +837,12 @@ package body Devices.Virtio.Graphics is
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
 
+      Request_Info : Request_Info_Array_T
+      with
+        Import,
+        Address   => State.Virtio.Request_Info_Address,
+        Alignment => 1;
+
       Descriptor_Indexes : Allocated_Descriptor_Array_T;
 
       Resource_Allocation : Virtual_Physical_Address_Pair_T;
@@ -887,8 +918,7 @@ package body Devices.Virtio.Graphics is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Resource_Allocation.Virtual_Address));
 
-      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
-        Blocking_Channel;
+      Request_Info (Descriptor_Indexes (0)).Channel := Blocking_Channel;
 
       Lock_Process_Waiting_For_Channel
         (Blocking_Channel, Device.Spinlock, Reading_Process);

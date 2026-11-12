@@ -151,6 +151,12 @@ package body Devices.Virtio.Block is
 
       Device_Registers : Virtio_MMIO_Device_Registers_T
       with Import, Alignment => 1, Address => Device.Virtual_Address;
+
+      Request_Info : Request_Info_Array_T
+      with
+        Import,
+        Address   => State.Virtio.Request_Info_Address,
+        Alignment => 1;
    begin
       if Data_Length = 0 then
          Result := Invalid_Argument;
@@ -189,8 +195,7 @@ package body Devices.Virtio.Block is
       Blocking_Channel : constant Blocking_Channel_T :=
         Address_To_Unsigned_64 (Address (Data_Physical_Address));
 
-      State.Virtio.Request_Info (Descriptor_Indexes (0)).Channel :=
-        Blocking_Channel;
+      Request_Info (Descriptor_Indexes (0)).Channel := Blocking_Channel;
 
       Initialise_Status : declare
          Request_Status_Array : Virtio_Status_Byte_Array_T

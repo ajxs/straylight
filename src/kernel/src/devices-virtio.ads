@@ -41,7 +41,6 @@ is
       --  device's supported features to determine the final set of active
       --  features.
       Driver_Features : Virtio_Device_Features_Pages_T := [others => 0];
-      Request_Info    : Request_Info_Array_T := [others => (Channel => 0)];
 
       --  The kernel is mapped into the higher-half, and needs to operate on
       --  virtual addresses. However, devices operate on physical addresses, so
@@ -54,7 +53,11 @@ is
       Q_Used                 : Virtual_Physical_Address_Pair_T;
       Q_Available            : Virtual_Physical_Address_Pair_T;
       Q_Descriptor           : Virtual_Physical_Address_Pair_T;
-      Descriptor_Status      : Virtio_Descriptor_Status_Array_T;
+
+      --  The per-descriptor bookkeeping arrays, allocated from the kernel
+      --  heap when the device is initialised to save memory.
+      Request_Info_Address      : Virtual_Address_T := Null_Address;
+      Descriptor_Status_Address : Virtual_Address_T := Null_Address;
    end record;
 
    procedure Initialise_MMIO_Device

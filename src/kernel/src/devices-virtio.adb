@@ -27,6 +27,9 @@ package body Devices.Virtio is
       Acknowledge_Interrupt_Channel : declare
          Q_Used : constant Virtqueue_Used_T
          with Import, Address => State.Q_Used.Virtual_Address, Alignment => 1;
+
+         Request_Info : constant Request_Info_Array_T
+         with Import, Address => State.Request_Info_Address, Alignment => 1;
       begin
          pragma
            Debug
@@ -48,8 +51,7 @@ package body Devices.Virtio is
                    ("Used descriptor index: " & Descriptor_Index'Image));
 
             Channel : constant Unsigned_64 :=
-              State.Request_Info (Virtio_Queue_Index_T (Descriptor_Index))
-                .Channel;
+              Request_Info (Virtio_Queue_Index_T (Descriptor_Index)).Channel;
 
             pragma
               Debug
@@ -97,12 +99,15 @@ package body Devices.Virtio is
    procedure Allocate_Descriptor
      (State  : in out Virtio_Device_State_T;
       Index  : out Descriptor_Index_T;
-      Result : out Function_Result) is
+      Result : out Function_Result)
+   is
+      Descriptor_Status : Virtio_Descriptor_Status_Array_T
+      with Import, Address => State.Descriptor_Status_Address, Alignment => 1;
    begin
       for I in Virtio_Queue_Index_T loop
-         if State.Descriptor_Status (I) then
+         if Descriptor_Status (I) then
             Index := I;
-            State.Descriptor_Status (I) := False;
+            Descriptor_Status (I) := False;
 
             pragma
               Debug
@@ -203,6 +208,34 @@ package body Devices.Virtio is
         Debug
           (Debug_Devices_Virtio,
            Log_Debug ("Allocated Request Status Array."));
+
+      Allocate_Kernel_Memory
+        (Request_Info_Array_T'Size / 8,
+         State.Request_Info_Address,
+         Result,
+         Request_Info_Array_T'Alignment);
+      if Is_Error (Result) then
+         Log_Error ("Error allocating request info memory");
+         return;
+      end if;
+
+      Allocate_Kernel_Memory
+        (Virtio_Descriptor_Status_Array_T'Size / 8,
+         State.Descriptor_Status_Address,
+         Result);
+      if Is_Error (Result) then
+         Log_Error ("Error allocating descriptor status memory");
+         return;
+      end if;
+
+      --  Zero both arrays, so that no request has a channel, and no
+      --  descriptor is free until the queue has been set up.
+      Set (State.Request_Info_Address, 0, Request_Info_Array_T'Size / 8);
+      Set
+        (State.Descriptor_Status_Address,
+         0,
+         Virtio_Descriptor_Status_Array_T'Size / 8);
+
       pragma
         Debug
           (Debug_Devices_Virtio,
@@ -228,6 +261,10 @@ package body Devices.Virtio is
         Allocation_Result.Virtual_Address + 16#2000#;
 
       Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
    end Allocate_Virtio_Device_Resources;
 
    function Increment_Index (Index : Unsigned_16) return Unsigned_16 is
@@ -242,17 +279,19 @@ package body Devices.Virtio is
    procedure Free_Descriptor
      (State  : in out Virtio_Device_State_T;
       Index  : Descriptor_Index_T;
-      Result : out Function_Result) is
+      Result : out Function_Result)
+   is
+      Descriptor_Status : Virtio_Descriptor_Status_Array_T
+      with Import, Address => State.Descriptor_Status_Address, Alignment => 1;
    begin
-      if Index >= Maximum_Virtio_Queue_Length
-        or else State.Descriptor_Status (Index)
+      if Index >= Maximum_Virtio_Queue_Length or else Descriptor_Status (Index)
       then
          Log_Error ("Invalid descriptor index to free: " & Index'Image);
          Result := Invalid_Argument;
          return;
       end if;
 
-      State.Descriptor_Status (Index) := True;
+      Descriptor_Status (Index) := True;
 
       pragma
         Debug
@@ -447,9 +486,19 @@ package body Devices.Virtio is
       Status.Driver_OK := True;
       Device_Registers.Status := Status;
 
-      for I in Virtio_Queue_Index_T loop
-         State.Descriptor_Status (I) := True;
-      end loop;
+      --  The memory for the descriptor status array is allocated from the
+      --  kernel heap in the Allocate_Virtio_Device_Resources procedure.
+      Mark_Descriptors_Free : declare
+         Descriptor_Status : Virtio_Descriptor_Status_Array_T
+         with
+           Import,
+           Address   => State.Descriptor_Status_Address,
+           Alignment => 1;
+      begin
+         for I in Virtio_Queue_Index_T loop
+            Descriptor_Status (I) := True;
+         end loop;
+      end Mark_Descriptors_Free;
 
       pragma
         Debug
