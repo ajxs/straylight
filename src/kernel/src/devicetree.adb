@@ -1,5 +1,4 @@
 with GNAT.Source_Info;
-with System.Storage_Elements; use System.Storage_Elements;
 
 with Logging;   use Logging;
 with Utilities; use Utilities;
@@ -17,18 +16,19 @@ package body Devicetree is
    function Compare_Node_Name
      (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean;
 
-   --  A range of physical memory, as raw Devicetree values. The parser works
-   --  in Unsigned_64, and only converts to Physical_Memory_Region_T when it
-   --  returns the regions.
-   type Memory_Region_T is record
+   --  A range of physical memory, as raw Devicetree values. These values
+   --  are converted to Physical_Memory_Region_T when the regions are returned.
+   type Devicetree_Memory_Region_T is record
       Base : Unsigned_64 := 0;
       Size : Unsigned_64 := 0;
    end record;
 
    Maximum_Memory_Regions : constant := 16;
 
-   type Memory_Region_Array_T is
-     array (1 .. Maximum_Memory_Regions) of Memory_Region_T;
+   type Devicetree_Memory_Region_Array_T is
+     array (1 .. Maximum_Memory_Regions) of Devicetree_Memory_Region_T;
+
+   Maximum_Devices : constant := 16;
 
    subtype FDT_Token_T is Unsigned_32;
 
@@ -100,17 +100,28 @@ package body Devicetree is
       --  In future, this could be replaced by a 'Current_Node_Type' enum.
       Current_Node_Is_Memory : Boolean := False;
 
+      --  The type of device the current node describes, determined by its
+      --  'compatible' property.
+      Current_Node_Device_Type : Devicetree_Device_Type_T :=
+        Devicetree_Device_Type_None;
+
+      --  The first cell of the current node's 'interrupts' property.
+      Current_Node_Interrupt_Line : Unsigned_32 := 0;
+
       --  This variable is used to determine whether the parser is currently
       --  inside a 'reserved-memory' child node.
       --  When entering a reserved memory parent node, this is set to the
       --  current depth of the cells context stack.
       Reserved_Memory_Node_Depth : Natural := 0;
 
-      Memory_Regions      : Memory_Region_Array_T;
+      Memory_Regions      : Devicetree_Memory_Region_Array_T;
       Memory_Region_Count : Natural := 0;
 
-      Reserved_Memory_Regions      : Memory_Region_Array_T;
+      Reserved_Memory_Regions      : Devicetree_Memory_Region_Array_T;
       Reserved_Memory_Region_Count : Natural := 0;
+
+      Devices      : Devicetree_Device_Array_T (1 .. Maximum_Devices);
+      Device_Count : Natural := 0;
    end record;
 
    procedure Push_Cells_Context
@@ -285,7 +296,7 @@ package body Devicetree is
    end Read_Reg_Entry;
 
    procedure Add_Memory_Region
-     (Regions : in out Memory_Region_Array_T;
+     (Regions : in out Devicetree_Memory_Region_Array_T;
       Count   : in out Natural;
       Base    : Unsigned_64;
       Size    : Unsigned_64;
@@ -319,6 +330,50 @@ package body Devicetree is
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Add_Memory_Region;
+
+   procedure Add_Discovered_Device
+     (State  : in out FDT_Parser_State_T;
+      Base   : Unsigned_64;
+      Size   : Unsigned_64;
+      Result : out Function_Result) is
+   begin
+      if Size = 0 then
+         Result := Success;
+         return;
+      end if;
+
+      if Size > Unsigned_64'Last - Base then
+         Log_Error ("Device region exceeds the address space");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      --  Storage_Count can't hold sizes of 2**63 or more.
+      if Size > Unsigned_64 (Storage_Count'Last) then
+         Log_Error ("Device region is too large");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      if State.Device_Count >= State.Devices'Last then
+         Log_Error ("Too many devices in devicetree");
+         Result := Region_Array_Exhausted;
+         return;
+      end if;
+
+      State.Device_Count := State.Device_Count + 1;
+      State.Devices (State.Device_Count) :=
+        (Device_Type    => State.Current_Node_Device_Type,
+         Base           => Physical_Address_T (Unsigned_64_To_Address (Base)),
+         Size           => Storage_Count (Size),
+         Interrupt_Line => State.Current_Node_Interrupt_Line);
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Add_Discovered_Device;
 
    procedure Parse_Reserved_Memory_Regions
      (State                      : in out FDT_Parser_State_T;
@@ -692,26 +747,45 @@ package body Devicetree is
    end Log_Property;
 
    ----------------------------------------------------------------------------
+   --  Reads the first cell of a property, such as 'interrupts'. Any further
+   --  cells are ignored.
+   ----------------------------------------------------------------------------
+   procedure Read_First_Cell_Property
+     (Property   : Devicetree_Property_T;
+      Cell_Value : out Unsigned_32;
+      Result     : out Function_Result)
+   is
+      Property_Value : constant Unsigned_32
+      with Import, Address => Property.Value_Address, Alignment => 1;
+   begin
+      Cell_Value := 0;
+
+      if Property.Length < 4 then
+         Log_Error ("Invalid cell property length");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Cell_Value := Convert_BEU32_To_LEU32 (Property_Value);
+      Result := Success;
+   end Read_First_Cell_Property;
+
+   ----------------------------------------------------------------------------
    --  Reads the value of an #address-cells or #size-cells property.
    ----------------------------------------------------------------------------
    procedure Read_Cells_Property
      (Property    : Devicetree_Property_T;
       Cells_Value : out Unsigned_32;
-      Result      : out Function_Result)
-   is
-      Property_Value : constant Unsigned_32
-      with Import, Address => Property.Value_Address, Alignment => 1;
+      Result      : out Function_Result) is
    begin
-      Cells_Value := 0;
-
       if Property.Length /= 4 then
+         Cells_Value := 0;
          Log_Error ("Invalid cells property length");
          Result := Invalid_Argument;
          return;
       end if;
 
-      Cells_Value := Convert_BEU32_To_LEU32 (Property_Value);
-      Result := Success;
+      Read_First_Cell_Property (Property, Cells_Value, Result);
    end Read_Cells_Property;
 
    function Compare_Property_Value_With_String
@@ -750,14 +824,21 @@ package body Devicetree is
          return False;
    end Is_Reserved_Memory_Child_Node;
 
+   ----------------------------------------------------------------------------
+   --  Decodes the current node's 'reg' property into base and size pairs.
+   --  Entry_Count is 0 if the parent's cell sizes are too wide to decode.
+   ----------------------------------------------------------------------------
    procedure Parse_Reg_Property
-     (State : in out FDT_Parser_State_T; Result : out Function_Result)
+     (State       : FDT_Parser_State_T;
+      Entries     : out Devicetree_Memory_Region_Array_T;
+      Entry_Count : out Natural;
+      Result      : out Function_Result)
    is
       Parent_Cells_Context  : FDT_Cells_Context_T;
       Total_Reg_Entry_Count : Natural := 0;
-      Reg_Base              : Unsigned_64 := 0;
-      Reg_Size              : Unsigned_64 := 0;
    begin
+      Entry_Count := 0;
+
       --  A node's 'reg' uses its parent's cells context, which was pushed on
       --  entry to this node.
       Peek_Cells_Context
@@ -790,14 +871,27 @@ package body Devicetree is
          return;
       end if;
 
+      if Total_Reg_Entry_Count > Entries'Length then
+         Log_Error
+           ("Too many 'reg' entries in node '"
+            & State.Current_Node_Name.Value
+                (1 .. State.Current_Node_Name.Byte_Length)
+            & "'");
+         Result := Region_Array_Exhausted;
+         return;
+      end if;
+
       for Entry_Index in 0 .. Total_Reg_Entry_Count - 1 loop
+         Reg_Entry : Devicetree_Memory_Region_T renames
+           Entries (Entries'First + Entry_Index);
+
          Read_Reg_Entry
            (State.Current_Node_Reg_Property.Value_Address,
             State.Current_Node_Reg_Property.Length,
             Parent_Cells_Context,
             Entry_Index,
-            Reg_Base,
-            Reg_Size,
+            Reg_Entry.Base,
+            Reg_Entry.Size,
             Result);
          if Is_Error (Result) then
             return;
@@ -810,34 +904,12 @@ package body Devicetree is
                 ("  Reg"
                  & Entry_Index'Image
                  & ": Base="
-                 & Reg_Base'Image
+                 & Reg_Entry.Base'Image
                  & ", Size="
-                 & Reg_Size'Image));
-
-         if State.Current_Node_Is_Memory then
-            Add_Memory_Region
-              (State.Memory_Regions,
-               State.Memory_Region_Count,
-               Reg_Base,
-               Reg_Size,
-               Result);
-            if Is_Error (Result) then
-               return;
-            end if;
-
-         elsif Is_Reserved_Memory_Child_Node (State) then
-            Add_Memory_Region
-              (State.Reserved_Memory_Regions,
-               State.Reserved_Memory_Region_Count,
-               Reg_Base,
-               Reg_Size,
-               Result);
-            if Is_Error (Result) then
-               return;
-            end if;
-         end if;
-
+                 & Reg_Entry.Size'Image));
       end loop;
+
+      Entry_Count := Total_Reg_Entry_Count;
 
       Result := Success;
    exception
@@ -853,7 +925,6 @@ package body Devicetree is
    ----------------------------------------------------------------------------
    function Does_Stringlist_Property_Contain_String
      (Property : Devicetree_Property_T; Value : String) return Boolean
-   with Unreferenced
    is
       Start_Position : Positive := 1;
    begin
@@ -879,6 +950,21 @@ package body Devicetree is
          return False;
    end Does_Stringlist_Property_Contain_String;
 
+   function Get_Device_Type_From_Compatible
+     (Property : Devicetree_Property_T) return Devicetree_Device_Type_T is
+   begin
+      if Does_Stringlist_Property_Contain_String (Property, "riscv,plic0") then
+         return Devicetree_Device_Type_PLIC;
+      elsif Does_Stringlist_Property_Contain_String (Property, "ns16550a") then
+         return Devicetree_Device_Type_UART_NS16550A;
+      elsif Does_Stringlist_Property_Contain_String (Property, "virtio,mmio")
+      then
+         return Devicetree_Device_Type_Virtio_MMIO;
+      end if;
+
+      return Devicetree_Device_Type_None;
+   end Get_Device_Type_From_Compatible;
+
    ----------------------------------------------------------------------------
    --  'Finalise' the node after all its properties have been read, since the
    --  standard does not dictate the order in which a node's properties appear.
@@ -888,10 +974,57 @@ package body Devicetree is
    --  procedure needs to be idempotent.
    ----------------------------------------------------------------------------
    procedure Finalise_Node_Properties
-     (State : in out FDT_Parser_State_T; Result : out Function_Result) is
+     (State : in out FDT_Parser_State_T; Result : out Function_Result)
+   is
+      Reg_Entries     : Devicetree_Memory_Region_Array_T;
+      Reg_Entry_Count : Natural := 0;
    begin
-      if State.Current_Node_Reg_Property.Value_Address /= Null_Address then
-         Parse_Reg_Property (State, Result);
+      --  Only decode 'reg' for the nodes the parser uses.
+      if State.Current_Node_Reg_Property.Value_Address /= Null_Address
+        and then
+          (State.Current_Node_Is_Memory
+           or else Is_Reserved_Memory_Child_Node (State)
+           or else
+             State.Current_Node_Device_Type /= Devicetree_Device_Type_None)
+      then
+         Parse_Reg_Property (State, Reg_Entries, Reg_Entry_Count, Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+      end if;
+
+      if State.Current_Node_Is_Memory then
+         for Reg_Entry of Reg_Entries (1 .. Reg_Entry_Count) loop
+            Add_Memory_Region
+              (State.Memory_Regions,
+               State.Memory_Region_Count,
+               Reg_Entry.Base,
+               Reg_Entry.Size,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+         end loop;
+
+      elsif Is_Reserved_Memory_Child_Node (State) then
+         for Reg_Entry of Reg_Entries (1 .. Reg_Entry_Count) loop
+            Add_Memory_Region
+              (State.Reserved_Memory_Regions,
+               State.Reserved_Memory_Region_Count,
+               Reg_Entry.Base,
+               Reg_Entry.Size,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+         end loop;
+
+      elsif State.Current_Node_Device_Type /= Devicetree_Device_Type_None
+        and then Reg_Entry_Count > 0
+      then
+         --  Every recognised device has its registers in the first entry.
+         Add_Discovered_Device
+           (State, Reg_Entries (1).Base, Reg_Entries (1).Size, Result);
          if Is_Error (Result) then
             return;
          end if;
@@ -900,8 +1033,14 @@ package body Devicetree is
       --  Clear the current node's state.
       State.Current_Node_Reg_Property.Value_Address := Null_Address;
       State.Current_Node_Is_Memory := False;
+      State.Current_Node_Device_Type := Devicetree_Device_Type_None;
+      State.Current_Node_Interrupt_Line := 0;
 
       Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
    end Finalise_Node_Properties;
 
    procedure Handle_Begin_Node
@@ -1004,6 +1143,16 @@ package body Devicetree is
       then
          State.Current_Node_Is_Memory :=
            Compare_Property_Value_With_String (Property, "memory");
+      elsif Compare_Fixed_Length_String_With_String
+              (Property.Name, "compatible")
+      then
+         State.Current_Node_Device_Type :=
+           Get_Device_Type_From_Compatible (Property);
+      elsif Compare_Fixed_Length_String_With_String
+              (Property.Name, "interrupts")
+      then
+         Read_First_Cell_Property
+           (Property, State.Current_Node_Interrupt_Line, Result);
       end if;
 
       if Is_Error (Result) then
@@ -1073,10 +1222,10 @@ package body Devicetree is
    --  won't be added to the new set of regions.
    ----------------------------------------------------------------------------
    procedure Create_New_Regions_With_Reserved_Regions_Removed
-     (Regions         : in out Memory_Region_Array_T;
+     (Regions         : in out Devicetree_Memory_Region_Array_T;
       Count           : in out Natural;
-      Memory_Region   : Memory_Region_T;
-      Reserved_Region : Memory_Region_T;
+      Memory_Region   : Devicetree_Memory_Region_T;
+      Reserved_Region : Devicetree_Memory_Region_T;
       Result          : out Function_Result)
    is
       --  Add_Memory_Region rejects regions that wrap around the address
@@ -1113,14 +1262,14 @@ package body Devicetree is
    end Create_New_Regions_With_Reserved_Regions_Removed;
 
    procedure Remove_Region_From_Memory_Regions
-     (Regions : in out Memory_Region_Array_T;
+     (Regions : in out Devicetree_Memory_Region_Array_T;
       Count   : in out Natural;
-      Region  : Memory_Region_T;
+      Region  : Devicetree_Memory_Region_T;
       Result  : out Function_Result)
    is
       --  This array holds the memory regions that remain after removing the
       --  region.
-      Remaining_Regions      : Memory_Region_Array_T;
+      Remaining_Regions      : Devicetree_Memory_Region_Array_T;
       Remaining_Region_Count : Natural := 0;
    begin
       if Region.Size > Unsigned_64'Last - Region.Base then
@@ -1255,10 +1404,39 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Copy_Parsed_Memory_Regions_To_Result;
 
+   procedure Copy_Discovered_Devices_To_Result
+     (State        : FDT_Parser_State_T;
+      Devices      : out Devicetree_Device_Array_T;
+      Device_Count : out Natural;
+      Result       : out Function_Result) is
+   begin
+      Device_Count := 0;
+
+      if State.Device_Count > Devices'Length then
+         Log_Error ("Too many devices for the output array");
+         Result := Region_Array_Exhausted;
+         return;
+      end if;
+
+      Devices (Devices'First .. Devices'First + State.Device_Count - 1) :=
+        State.Devices (1 .. State.Device_Count);
+
+      Device_Count := State.Device_Count;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Device_Count := 0;
+         Result := Constraint_Exception;
+   end Copy_Discovered_Devices_To_Result;
+
    procedure Parse_Devicetree
      (DTB_Address         : Address;
       Memory_Regions      : out Physical_Memory_Region_Array_T;
       Memory_Region_Count : out Natural;
+      Devices             : out Devicetree_Device_Array_T;
+      Device_Count        : out Natural;
       Result              : out Function_Result)
    is
       Header : constant FDT_Header_T
@@ -1267,6 +1445,7 @@ package body Devicetree is
       State : FDT_Parser_State_T;
    begin
       Memory_Region_Count := 0;
+      Device_Count := 0;
 
       pragma Debug (Debug_Devicetree, Print_Devicetree_Header (Header));
 
@@ -1312,6 +1491,11 @@ package body Devicetree is
 
       Copy_Parsed_Memory_Regions_To_Result
         (State, Memory_Regions, Memory_Region_Count, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Copy_Discovered_Devices_To_Result (State, Devices, Device_Count, Result);
       if Is_Error (Result) then
          return;
       end if;

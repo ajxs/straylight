@@ -31,6 +31,15 @@ with Traps;
 with Utilities;                       use Utilities;
 
 package body Boot is
+   Maximum_Devicetree_Devices : constant := 16;
+
+   --  The devices found by parsing the Devicetree blob received at boot.
+   --  These values are copied out of the DTB by the parser, so they stay valid
+   --  after the DTB's memory is freed.
+   Devicetree_Devices      :
+     Devicetree.Devicetree_Device_Array_T (1 .. Maximum_Devicetree_Devices);
+   Devicetree_Device_Count : Natural := 0;
+
    function Get_Early_Kernel_Stack_Virtual_Address
      (Hart_Id : Hart_Index_T) return Virtual_Address_T
    is (Early_Kernel_Stack_Virtual_Address_Base
@@ -659,11 +668,30 @@ package body Boot is
         (Devicetree_Higher_Half_Address,
          Memory_Regions,
          Memory_Region_Count,
+         Devicetree_Devices,
+         Devicetree_Device_Count,
          Result);
       if Is_Error (Result) then
          --  Error already printed.
          Panic;
       end if;
+
+      for Device of Devicetree_Devices (1 .. Devicetree_Device_Count) loop
+         pragma
+           Debug
+             (Debug_Boot,
+              Log_Debug
+                ("Devicetree device: device_type="
+                 & Device.Device_Type'Image
+                     (2 .. Device.Device_Type'Image'Length)
+                 & " base="
+                 & GNAT.Debug_Utilities.Image_C (Address (Device.Base))
+                 & " size="
+                 & Device.Size'Image (2 .. Device.Size'Image'Length)
+                 & " interrupt_line="
+                 & Device.Interrupt_Line'Image
+                     (2 .. Device.Interrupt_Line'Image'Length)));
+      end loop;
 
       pragma
         Debug
