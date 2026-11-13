@@ -5,20 +5,32 @@
 
 package body Logging is
 
-   procedure Log_Error (Message : String) is
-      pragma Unreferenced (Message);
+   procedure Log_Error
+     (Message : String;
+      File    : String := GNAT.Source_Info.File;
+      Line    : Positive := GNAT.Source_Info.Line)
+   is
+      pragma Unreferenced (Message, File, Line);
    begin
       null;
    end Log_Error;
 
-   procedure Log_Debug (Message : String) is
-      pragma Unreferenced (Message);
+   procedure Log_Debug
+     (Message : String;
+      File    : String := GNAT.Source_Info.File;
+      Line    : Positive := GNAT.Source_Info.Line)
+   is
+      pragma Unreferenced (Message, File, Line);
    begin
       null;
    end Log_Debug;
 
-   procedure Log_Debug_Wide (Message : Wide_String) is
-      pragma Unreferenced (Message);
+   procedure Log_Debug_Wide
+     (Message : Wide_String;
+      File    : String := GNAT.Source_Info.File;
+      Line    : Positive := GNAT.Source_Info.Line)
+   is
+      pragma Unreferenced (Message, File, Line);
    begin
       null;
    end Log_Debug_Wide;
