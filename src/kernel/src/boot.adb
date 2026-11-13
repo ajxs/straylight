@@ -14,7 +14,7 @@ with Devices.Virtio.Block;            use Devices.Virtio.Block;
 with Devices.Virtio.Graphics;
 with Devices.UART;
 with Devices.PLIC;
-with Devicetree;
+with Devicetree;                      use Devicetree;
 with Filesystems;                     use Filesystems;
 with Filesystems.Root;                use Filesystems.Root;
 with Function_Results;                use Function_Results;
@@ -37,7 +37,7 @@ package body Boot is
    --  These values are copied out of the DTB by the parser, so they stay valid
    --  after the DTB's memory is freed.
    Devicetree_Devices      :
-     Devicetree.Devicetree_Device_Array_T (1 .. Maximum_Devicetree_Devices);
+     Devicetree_Device_Array_T (1 .. Maximum_Devicetree_Devices);
    Devicetree_Device_Count : Natural := 0;
 
    function Get_Early_Kernel_Stack_Virtual_Address
@@ -140,6 +140,33 @@ package body Boot is
          Panic_Constraint_Error;
    end Free_Boot_Memory;
 
+   ----------------------------------------------------------------------------
+   --  Finds the first device of the given type found in the Devicetree.
+   --  Result is Not_Found if there is none.
+   --  This will eventually be removed once a full device enumeration system
+   --  is implemented.
+   ----------------------------------------------------------------------------
+   procedure Find_Devicetree_Device
+     (Device_Type : Devicetree_Device_Type_T;
+      Device      : out Devicetree_Device_T;
+      Result      : out Function_Result) is
+   begin
+      for Found_Device of Devicetree_Devices (1 .. Devicetree_Device_Count)
+      loop
+         if Found_Device.Device_Type = Device_Type then
+            Device := Found_Device;
+            Result := Success;
+            return;
+         end if;
+      end loop;
+
+      Result := Not_Found;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Find_Devicetree_Device;
+
    procedure Initialise_Devices is
       --  The start of the virtual memory in which each device is mapped.
       --  This address will be incremented as each device is mapped.
@@ -170,17 +197,31 @@ package body Boot is
       Root_Filesystem_Physical_Address : Physical_Address_T :=
         Null_Physical_Address;
 
+      PLIC_Node : Devicetree_Device_T;
+      UART_Node : Devicetree_Device_T;
+
       Result : Function_Result := Unset;
    begin
       pragma Debug (Debug_Boot, Log_Debug ("Initialising devices..."));
 
+      Find_Devicetree_Device (Devicetree_Device_Type_PLIC, PLIC_Node, Result);
+      if Is_Error (Result) then
+         Panic ("No PLIC found in the Devicetree");
+      end if;
+
+      Find_Devicetree_Device
+        (Devicetree_Device_Type_UART_NS16550A, UART_Node, Result);
+      if Is_Error (Result) then
+         Panic ("No UART found in the Devicetree");
+      end if;
+
       APIC_Device :=
         (Driver_Type      => Driver_Type_PLIC,
          Common           =>
-           (Memory_Size        => 16#4000000#,
+           (Memory_Size        =>
+              (PLIC_Node.Size + 16#FFF#) / 16#1000# * 16#1000#,
             Virtual_Address    => Device_Virtual_Address,
-            Physical_Address   =>
-              Physical_Address_T (To_Address (16#C00_0000#)),
+            Physical_Address   => PLIC_Node.Base,
             Interrupt_Line     => 0,
             Interrupt_Priority => 0,
             Spinlock           => Locks.Null_Spinlock),
@@ -195,11 +236,11 @@ package body Boot is
       UART_Device :=
         (Driver_Type      => Driver_Type_UART,
          Common           =>
-           (Memory_Size        => 16#1000#,
+           (Memory_Size        =>
+              (UART_Node.Size + 16#FFF#) / 16#1000# * 16#1000#,
             Virtual_Address    => Device_Virtual_Address,
-            Physical_Address   =>
-              Physical_Address_T (To_Address (16#1000_0000#)),
-            Interrupt_Line     => 10,
+            Physical_Address   => UART_Node.Base,
+            Interrupt_Line     => Integer (UART_Node.Interrupt_Line),
             Interrupt_Priority => 7,
             Spinlock           => Locks.Null_Spinlock),
          Interrupt_Parent => APIC_Device'Access,
