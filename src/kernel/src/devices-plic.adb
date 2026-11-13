@@ -68,20 +68,22 @@ package body Devices.PLIC is
       Release_Spinlock (Device.Spinlock);
    end Set_Interrupt_Priority;
 
-   pragma
-     Warnings
-       (Off, "pragma Restrictions (No_Exception_Propagation) in effect");
    procedure Set_IRQ_Enable_State_Unlocked
      (Device         : Device_Common_State_T;
       Context        : Natural;
       Interrupt_Line : Natural;
-      State          : Boolean;
-      Result         : out Function_Result)
+      State          : Boolean)
    is
       Interrupt_Enable_Address : constant System.Address :=
         Device.Virtual_Address + 16#2000#;
 
       Current_IRQ_Enable_State : Unsigned_32 := 0;
+
+      --  The divisors below are non-zero constants, so this check can never
+      --  fail. Without this, GNAT warns that the divisions may call the last
+      --  chance handler, but also that a local handler for them can never be
+      --  entered.
+      pragma Suppress (Division_Check);
    begin
       --  The status of each individual interrupt line is represented by
       --  an individual bit in a 32-bit word. This variable holds the offset
@@ -111,26 +113,16 @@ package body Devices.PLIC is
       MMIO.Write_Unsigned_32
         (Interrupt_Enable_Address + Context_Offset + Register_Offset,
          Current_IRQ_Enable_State);
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
    end Set_IRQ_Enable_State_Unlocked;
-   pragma
-     Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
 
    procedure Set_IRQ_Enable_State
      (Device         : in out Device_Common_State_T;
       Context        : Natural;
       Interrupt_Line : Natural;
-      State          : Boolean;
-      Result         : out Function_Result) is
+      State          : Boolean) is
    begin
       Acquire_Spinlock (Device.Spinlock);
-      Set_IRQ_Enable_State_Unlocked
-        (Device, Context, Interrupt_Line, State, Result);
+      Set_IRQ_Enable_State_Unlocked (Device, Context, Interrupt_Line, State);
       Release_Spinlock (Device.Spinlock);
    end Set_IRQ_Enable_State;
 

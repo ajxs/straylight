@@ -268,8 +268,7 @@ package body Boot is
          Common           =>
            (Memory_Size        => 16#1000#,
             Virtual_Address    => Device_Virtual_Address,
-            Physical_Address   =>
-              Root_Filesystem_Physical_Address,
+            Physical_Address   => Root_Filesystem_Physical_Address,
             Interrupt_Line     => 0,
             Interrupt_Priority => 0,
             Spinlock           => Locks.Null_Spinlock),
@@ -381,7 +380,8 @@ package body Boot is
 
             --  Initialise devices.
             case Device.Driver_Type is
-               when Driver_Type_Virtio_Block =>
+               when Driver_Type_Virtio_Block
+               =>
                   Devices.Virtio.Initialise_MMIO_Device
                     (Device.Common, Device.Virtio_Block.Virtio, Result);
                   if Is_Error (Result) then
@@ -394,14 +394,16 @@ package body Boot is
                      Panic;
                   end if;
 
-               when Driver_Type_Virtio_GPU   =>
+               when Driver_Type_Virtio_GPU
+               =>
                   Devices.Virtio.Initialise_MMIO_Device
                     (Device.Common, Device.Virtio_GPU.Virtio, Result);
                   if Is_Error (Result) then
                      Panic;
                   end if;
 
-               when Driver_Type_UART         =>
+               when Driver_Type_UART
+               =>
                   Devices.UART.Initialise (Device.Common, Device.UART, Result);
                   if Is_Error (Result) then
                      Panic;
@@ -410,7 +412,8 @@ package body Boot is
                   Devices.UART.Set_Interrupt_Generation
                     (Device.Common, Devices.UART.Rx_Data_Available, True);
 
-               when Driver_Type_Console      =>
+               when Driver_Type_Console
+               =>
                   Devices.Console.Initialise (Device.Console, Result);
                   if Is_Error (Result) then
                      Panic;
@@ -434,11 +437,7 @@ package body Boot is
                  (Parent.Common,
                   Supervisor_Interrupt_Context,
                   Device.Common.Interrupt_Line,
-                  True,
-                  Result);
-               if Is_Error (Result) then
-                  Panic;
-               end if;
+                  True);
 
                Devices.PLIC.Set_Interrupt_Priority
                  (Parent.Common,

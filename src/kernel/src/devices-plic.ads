@@ -49,8 +49,7 @@ is
      (Device         : in out Device_Common_State_T;
       Context        : Natural;
       Interrupt_Line : Natural;
-      State          : Boolean;
-      Result         : out Function_Result);
+      State          : Boolean);
 
 private
    function Get_Interrupt_Claim_Address
