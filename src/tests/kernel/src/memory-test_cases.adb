@@ -192,4 +192,48 @@ package body Memory.Test_Cases is
          "Align_Up wraps at the top of the address space");
    end Run_Test;
 
+   overriding
+   procedure Run_Test (T : in out Test_Align_Virtual_Address) is
+      pragma Unreferenced (T);
+
+      function V (Value : Integer_Address) return Virtual_Address_T
+      is (To_Address (Value));
+
+      Page_Size : constant := 16#1000#;
+   begin
+      --  A higher-half address, as the kernel uses.
+      Assert
+        (Align_Down (V (16#FFFF_FFE8_C000_0000#), Page_Size)
+         = V (16#FFFF_FFE8_C000_0000#),
+         "Align_Down leaves an aligned address unchanged");
+      Assert
+        (Align_Down (V (16#FFFF_FFE8_C000_0FFF#), Page_Size)
+         = V (16#FFFF_FFE8_C000_0000#),
+         "Align_Down rounds down to the page start");
+
+      Assert
+        (Align_Up (V (16#FFFF_FFE8_C000_0000#), Page_Size)
+         = V (16#FFFF_FFE8_C000_0000#),
+         "Align_Up leaves an aligned address unchanged");
+      Assert
+        (Align_Up (V (16#FFFF_FFE8_C000_0001#), Page_Size)
+         = V (16#FFFF_FFE8_C000_1000#),
+         "Align_Up rounds up to the next page");
+
+      Assert
+        (Align_Up_To_Page_Boundary (V (16#FFFF_FFE8_C000_0100#))
+         = V (16#FFFF_FFE8_C000_1000#),
+         "Align_Up_To_Page_Boundary rounds up to the next page");
+      Assert
+        (Align_Down_To_Page_Boundary (V (16#FFFF_FFE8_C000_0100#))
+         = V (16#FFFF_FFE8_C000_0000#),
+         "Align_Down_To_Page_Boundary rounds down to the page start");
+
+      --  Documents the limit named in the spec, rather than desired
+      --  behaviour: rounding up within a page of the top wraps to zero.
+      Assert
+        (Align_Up (V (Integer_Address'Last), Page_Size) = V (0),
+         "Align_Up wraps at the top of the address space");
+   end Run_Test;
+
 end Memory.Test_Cases;

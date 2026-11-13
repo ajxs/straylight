@@ -14,6 +14,8 @@ package Memory.Test_Cases is
 
    type Test_Align_Physical_Address is new Test_Case with null record;
 
+   type Test_Align_Virtual_Address is new Test_Case with null record;
+
    overriding
    function Name
      (T : Test_Is_Valid_Userspace_Address_Range) return AUnit.Message_String
@@ -27,7 +29,12 @@ package Memory.Test_Cases is
    overriding
    function Name
      (T : Test_Align_Physical_Address) return AUnit.Message_String
-   is (AUnit.Format ("Memory.Align_Up/Align_Down"));
+   is (AUnit.Format ("Memory.Align_Up/Align_Down (physical addresses)"));
+
+   overriding
+   function Name
+     (T : Test_Align_Virtual_Address) return AUnit.Message_String
+   is (AUnit.Format ("Memory.Align_Up/Align_Down (virtual addresses)"));
 
    overriding
    procedure Run_Test (T : in out Test_Is_Valid_Userspace_Address_Range);
@@ -37,5 +44,8 @@ package Memory.Test_Cases is
 
    overriding
    procedure Run_Test (T : in out Test_Align_Physical_Address);
+
+   overriding
+   procedure Run_Test (T : in out Test_Align_Virtual_Address);
 
 end Memory.Test_Cases;

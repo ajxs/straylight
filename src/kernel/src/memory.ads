@@ -114,6 +114,23 @@ is
    with Inline, Pure_Function;
 
    ----------------------------------------------------------------------------
+   --  Rounds a virtual address down or up to a boundary, which must be a
+   --  power of two. Align_Up wraps around if the address is within
+   --  Boundary - 1 of the top of the address space.
+   ----------------------------------------------------------------------------
+   function Align_Down
+     (Addr : Virtual_Address_T; Boundary : Integer_Address)
+      return Virtual_Address_T
+   is (To_Address (To_Integer (Addr) and not (Boundary - 1)))
+   with Inline, Pure_Function;
+
+   function Align_Up
+     (Addr : Virtual_Address_T; Boundary : Integer_Address)
+      return Virtual_Address_T
+   is (Align_Down (To_Address (To_Integer (Addr) + (Boundary - 1)), Boundary))
+   with Inline, Pure_Function;
+
+   ----------------------------------------------------------------------------
    --  Rounds a physical address down or up to a boundary, which must be a
    --  power of two. Align_Up wraps around if the address is within
    --  Boundary - 1 of the top of the address space.
@@ -121,17 +138,13 @@ is
    function Align_Down
      (Addr : Physical_Address_T; Boundary : Integer_Address)
       return Physical_Address_T
-   is (Physical_Address_T
-         (To_Address (To_Integer (Address (Addr)) and not (Boundary - 1))))
+   is (Physical_Address_T (Align_Down (Virtual_Address_T (Addr), Boundary)))
    with Inline, Pure_Function;
 
    function Align_Up
      (Addr : Physical_Address_T; Boundary : Integer_Address)
       return Physical_Address_T
-   is (Align_Down
-         (Physical_Address_T
-            (To_Address (To_Integer (Address (Addr)) + (Boundary - 1))),
-          Boundary))
+   is (Physical_Address_T (Align_Up (Virtual_Address_T (Addr), Boundary)))
    with Inline, Pure_Function;
 
    ----------------------------------------------------------------------------
@@ -140,13 +153,25 @@ is
    --  This is to avoid a circular dependency with the RISCV.Paging package.
    ----------------------------------------------------------------------------
    function Align_Down_To_Page_Boundary
-     (Addr : Physical_Address_T) return Physical_Address_T
+     (Addr : Virtual_Address_T) return Virtual_Address_T
    is (Align_Down (Addr, 16#1000#))
    with Inline, Pure_Function;
 
    function Align_Up_To_Page_Boundary
-     (Addr : Physical_Address_T) return Physical_Address_T
+     (Addr : Virtual_Address_T) return Virtual_Address_T
    is (Align_Up (Addr, 16#1000#))
+   with Inline, Pure_Function;
+
+   function Align_Down_To_Page_Boundary
+     (Addr : Physical_Address_T) return Physical_Address_T
+   is (Physical_Address_T
+         (Align_Down_To_Page_Boundary (Virtual_Address_T (Addr))))
+   with Inline, Pure_Function;
+
+   function Align_Up_To_Page_Boundary
+     (Addr : Physical_Address_T) return Physical_Address_T
+   is (Physical_Address_T
+         (Align_Up_To_Page_Boundary (Virtual_Address_T (Addr))))
    with Inline, Pure_Function;
 
    function Convert_Higher_Half_Address_To_Lower
