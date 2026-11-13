@@ -206,11 +206,6 @@ private
    procedure Deallocate_Process_Heap
      (Process : in out Process_Control_Block_T; Result : out Function_Result);
 
-   procedure Get_Process_Kernel_Stack_Virtual_Address
-     (Process_Id             : Process_Id_T;
-      Kernel_Stack_Virt_Addr : out Virtual_Address_T;
-      Result                 : out Function_Result);
-
    procedure Cleanup_Stopped_Processes (Result : out Function_Result);
 
    --  This is the entry point for a newly-created process.

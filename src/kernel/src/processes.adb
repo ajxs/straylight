@@ -146,6 +146,14 @@ package body Processes is
          Result := Constraint_Exception;
    end Allocate_And_Map_New_Process_Stack;
 
+   --  This calculation leaves a single unmapped guard page between
+   --  each process' kernel stack.
+   function Get_Process_Kernel_Stack_Virtual_Address
+     (Process_Id : Process_Id_T) return Virtual_Address_T
+   is (Kernel_Stack_Area_Virtual_Address
+       + Storage_Offset (Process_Id) * (Process_Kernel_Stack_Size + 16#1000#)
+       + 16#1000#);
+
    procedure Allocate_And_Map_New_Process_Kernel_Stack
      (New_Process : in out Process_Control_Block_T;
       Result      : out Function_Result)
@@ -170,11 +178,8 @@ package body Processes is
       New_Process.Kernel_Stack_Phys_Addr := Kernel_Stack_Phys_Address;
       New_Process.Kernel_Stack_Size := Process_Kernel_Stack_Size;
 
-      Get_Process_Kernel_Stack_Virtual_Address
-        (New_Process.Process_Id, New_Process.Kernel_Stack_Virt_Addr, Result);
-      if Is_Error (Result) then
-         return;
-      end if;
+      New_Process.Kernel_Stack_Virt_Addr :=
+        Get_Process_Kernel_Stack_Virtual_Address (New_Process.Process_Id);
 
       --  Map the kernel stack into the kernel address space.
       --  It's important that this is mapped into the kernel address space,
@@ -209,6 +214,26 @@ package body Processes is
    procedure Allocate_Process_Id_Unlocked
      (New_Id : out Process_Id_T; Result : out Function_Result) is
    begin
+      Space_Between_Higher_Half_And_Process_Stack_Space :
+        constant Storage_Offset :=
+          To_Address (Higher_Half_Offset) - Kernel_Stack_Area_Virtual_Address;
+
+      --  This is the maximum number of process kernel stacks that can be fit
+      --  in the space between the process kernel stack start, and the
+      --  kernel's higher-half mapping offset.
+      Maximum_Process_Id : constant Process_Id_T :=
+        Process_Id_T
+          (Space_Between_Higher_Half_And_Process_Stack_Space
+           / (Process_Kernel_Stack_Size + 16#1000#));
+
+      if Next_Process_Id >= Maximum_Process_Id then
+         Log_Error
+           ("Exceeded maximum process id: " & Maximum_Process_Id'Image);
+         New_Id := 0;
+         Result := Unhandled_Exception;
+         return;
+      end if;
+
       New_Id := Next_Process_Id;
       Next_Process_Id := Next_Process_Id + 1;
 
@@ -329,30 +354,6 @@ package body Processes is
 
       Result := Success;
    end Deallocate_Process_Resources;
-
-   pragma
-     Warnings
-       (Off, "pragma Restrictions (No_Exception_Propagation) in effect");
-   procedure Get_Process_Kernel_Stack_Virtual_Address
-     (Process_Id             : Process_Id_T;
-      Kernel_Stack_Virt_Addr : out Virtual_Address_T;
-      Result                 : out Function_Result) is
-   begin
-      --  This calculation leaves a single unmapped guard page between
-      --  each process' kernel stack.
-      Kernel_Stack_Virt_Addr :=
-        Kernel_Stack_Area_Virtual_Address
-        + Storage_Offset (Process_Id * (Process_Kernel_Stack_Size + 16#1000#))
-        + 16#1000#;
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
-   end Get_Process_Kernel_Stack_Virtual_Address;
-   pragma
-     Warnings (On, "pragma Restrictions (No_Exception_Propagation) in effect");
 
    procedure Add_Process_To_Process_Queue_Unlocked
      (New_Process : Process_Control_Block_Access; Result : out Function_Result)
