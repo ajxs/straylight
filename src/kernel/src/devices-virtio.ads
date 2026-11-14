@@ -70,6 +70,18 @@ is
       State  : in out Virtio_Device_State_T;
       Result : out Function_Result);
 
+   --  Virtio device IDs. Refer to section 5 of the Virtio specification.
+   Virtio_Device_ID_Block : constant := 2;
+   Virtio_Device_ID_GPU   : constant := 16;
+
+   ----------------------------------------------------------------------------
+   --  Reads the registers of the Virtio MMIO device at the specified address,
+   --  returning the device ID if the device is valid. Returns 0 if there's no
+   --  valid device at the address.
+   ----------------------------------------------------------------------------
+   function Get_MMIO_Device_ID
+     (Device_Registers_Address : Virtual_Address_T) return Unsigned_32;
+
    --  Reserved feature bits.
    VIRTIO_F_ANY_LAYOUT    : constant := 2 ** 27;
    VIRTIO_F_INDIRECT_DESC : constant := 2 ** 28;

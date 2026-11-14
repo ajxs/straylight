@@ -343,6 +343,21 @@ package body Devices.Virtio is
          Result := Constraint_Exception;
    end Free_Descriptor_Chain;
 
+   function Get_MMIO_Device_ID
+     (Device_Registers_Address : Virtual_Address_T) return Unsigned_32
+   is
+      Device_Registers : constant Virtio_MMIO_Device_Registers_T
+      with Import, Alignment => 1, Address => Device_Registers_Address;
+   begin
+      --  As per section 4.2.3.1.1 of the Virtio specification,
+      --  Is_MMIO_Device_Valid reads no further than the device ID if it's 0.
+      if not Is_MMIO_Device_Valid (Device_Registers) then
+         return 0;
+      end if;
+
+      return Device_Registers.Device_ID;
+   end Get_MMIO_Device_ID;
+
    procedure Initialise_MMIO_Device_Unlocked
      (Device : Device_Common_State_T;
       State  : in out Virtio_Device_State_T;
