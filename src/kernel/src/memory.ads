@@ -262,4 +262,22 @@ is
       return Boolean
    is (Addr >= Region_Start and then Addr < Region_Start + Region_Length)
    with Pure_Function;
+
+   subtype Alignable_Size_T is Storage_Count range 0 .. Storage_Count'Last / 2;
+
+   subtype Alignment_T is Storage_Count range 1 .. Storage_Count'Last / 2;
+
+   ----------------------------------------------------------------------------
+   --  Rounds a memory size up to a multiple of the specified alignment
+   --  boundary. Note the constrained argument types: An out-of-range argument
+   --  will raise a Constraint_Error in the caller.
+   ----------------------------------------------------------------------------
+   function Align_Memory_Size_Up
+     (Size : Alignable_Size_T; Boundary : Alignment_T) return Storage_Count;
+
+   function Align_Memory_Size_Up_To_Page_Boundary
+     (Size : Alignable_Size_T) return Storage_Count
+   is (Align_Memory_Size_Up (Size, 16#1000#))
+   with Inline, Pure_Function;
+
 end Memory;

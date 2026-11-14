@@ -236,4 +236,90 @@ package body Memory.Test_Cases is
          "Align_Up wraps at the top of the address space");
    end Run_Test;
 
+   overriding
+   procedure Run_Test (T : in out Test_Align_Memory_Size_Up) is
+      pragma Unreferenced (T);
+
+      Page_Size : constant := 16#1000#;
+
+      -------------------------------------------------------------------------
+      --  Asserts that calling Align_Memory_Size_Up with these arguments
+      --  raises Constraint_Error.
+      --  The arguments are Storage_Count, not the function's parameter
+      --  subtypes, so each one is converted to the function parameter's
+      --  constrained subtype as part of the call (Ada RM 6.4.1).
+      --  That conversion is where an out-of-range argument would raise a
+      --  Constraint_Error, before the body runs.
+      -------------------------------------------------------------------------
+      procedure Assert_Raises_Constraint_Error
+        (Size : Storage_Count; Boundary : Storage_Count; Message : String) is
+      begin
+         --  The call is in the message, so its result is always used.
+         Assert
+           (False,
+            Message
+            & ", but it returned"
+            & Storage_Count'Image (Align_Memory_Size_Up (Size, Boundary)));
+      exception
+         when Constraint_Error =>
+            null;
+      end Assert_Raises_Constraint_Error;
+   begin
+      Assert
+        (Align_Memory_Size_Up (0, Page_Size) = 0, "A size of zero stays zero");
+      Assert
+        (Align_Memory_Size_Up (1, Page_Size) = Page_Size,
+         "A single byte rounds up to a page");
+      Assert
+        (Align_Memory_Size_Up (16#100#, Page_Size) = Page_Size,
+         "The UART's register size rounds up to a page");
+      Assert
+        (Align_Memory_Size_Up (Page_Size, Page_Size) = Page_Size,
+         "An aligned size is unchanged");
+      Assert
+        (Align_Memory_Size_Up (Page_Size + 1, Page_Size) = 2 * Page_Size,
+         "One byte over a page rounds up to two pages");
+      Assert
+        (Align_Memory_Size_Up (16#60_0000#, Page_Size) = 16#60_0000#,
+         "The PLIC's register size is already page aligned");
+
+      --  Unlike Align_Up for addresses, the boundary doesn't need to be a
+      --  power of two.
+      Assert
+        (Align_Memory_Size_Up (7, 3) = 9,
+         "A boundary that isn't a power of two rounds up");
+      Assert
+        (Align_Memory_Size_Up (9, 3) = 9,
+         "A multiple of a boundary that isn't a power of two is unchanged");
+
+      --  The largest arguments the subtypes allow.
+      Assert
+        (Align_Memory_Size_Up (Alignable_Size_T'Last, Page_Size)
+         = Alignable_Size_T'Last + 1,
+         "The largest size rounds up past Alignable_Size_T'Last");
+      Assert
+        (Align_Memory_Size_Up (Alignable_Size_T'Last, Alignment_T'Last)
+         = Alignable_Size_T'Last,
+         "The largest size is a multiple of the largest boundary");
+      Assert
+        (Align_Memory_Size_Up (1, Alignment_T'Last) = Alignment_T'Last,
+         "A single byte rounds up to the largest boundary");
+
+      Assert
+        (Align_Memory_Size_Up_To_Page_Boundary (16#100#) = Page_Size,
+         "Align_Memory_Size_Up_To_Page_Boundary rounds up to a page");
+
+      --  Arguments outside the parameter subtypes.
+      Assert_Raises_Constraint_Error
+        (Alignable_Size_T'Last + 1,
+         Page_Size,
+         "A size above Alignable_Size_T'Last should raise Constraint_Error");
+      Assert_Raises_Constraint_Error
+        (Page_Size, 0, "A boundary of zero should raise Constraint_Error");
+      Assert_Raises_Constraint_Error
+        (Page_Size,
+         Alignment_T'Last + 1,
+         "A boundary above Alignment_T'Last should raise Constraint_Error");
+   end Run_Test;
+
 end Memory.Test_Cases;
