@@ -8,6 +8,15 @@ with Filesystems.Node_Cache;  use Filesystems.Node_Cache;
 with Logging;                 use Logging;
 
 package body Filesystems.UStar is
+   function Is_UStar_Header
+     (Sector_Address : Virtual_Address_T) return Boolean
+   is
+      Header : constant Tar_File_Header
+      with Import, Alignment => 1, Address => Sector_Address;
+   begin
+      return Is_Valid_Record (Header);
+   end Is_UStar_Header;
+
    procedure Find_File
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;

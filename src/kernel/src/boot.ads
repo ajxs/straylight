@@ -46,6 +46,15 @@ private
 
    procedure Initialise_Filesystem;
 
+   ----------------------------------------------------------------------------
+   --  Works out which block device holds the FAT filesystem and which holds
+   --  the UStar filesystem, by reading the first sector of each. Then sets
+   --  each one as the device of its mounted filesystem.
+   --  Reading from a Virtio device needs a process context, so this is called
+   --  from the init process, before anything is read from either disk.
+   ----------------------------------------------------------------------------
+   procedure Mount_Disks;
+
    procedure Initialise_Graphics;
 
    procedure Initialise_Init_Process;

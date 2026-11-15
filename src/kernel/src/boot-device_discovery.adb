@@ -296,18 +296,18 @@ package body Boot.Device_Discovery is
       pragma Debug (Debug_Boot_Device_Discovery, Log_Probed_Virtio_Slot);
 
       case Virtio_Device_ID is
-         --  Because QEMU lists the Virtio MMIO devices in reverse address
-         --  order, bus 1 (USTAR disk) is found before bus 0 (FAT disk).
-         --  This implementation detail will be resolved in a future revision.
-
          when Virtio_Device_ID_Block =>
-            if Disk_B_Device = null then
-               Create_Virtio_Block_Device
-                 (Disk_B_Device, Node, Virtual_Address, Interrupt_Controller);
-            elsif Disk_Device = null then
-               Create_Virtio_Block_Device
-                 (Disk_Device, Node, Virtual_Address, Interrupt_Controller);
-            end if;
+            --  The device goes into the first unused entry of Block_Devices.
+            for Block_Device of Block_Devices loop
+               if Block_Device = null then
+                  Create_Virtio_Block_Device
+                    (Block_Device,
+                     Node,
+                     Virtual_Address,
+                     Interrupt_Controller);
+                  exit;
+               end if;
+            end loop;
 
          when Virtio_Device_ID_GPU   =>
             if Graphics_Device = null then
@@ -423,7 +423,7 @@ package body Boot.Device_Discovery is
          Panic ("No UART found in the Devicetree");
       end if;
 
-      if Disk_Device = null or else Disk_B_Device = null then
+      if (for some Block_Device of Block_Devices => Block_Device = null) then
          Panic ("Expected 2 Virtio block devices in the Devicetree");
       end if;
 

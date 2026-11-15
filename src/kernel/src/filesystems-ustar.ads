@@ -24,6 +24,13 @@ is
       Bytes_Read      : out Natural;
       Result          : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Determines whether the 512-byte sector at Sector_Address is a valid
+   --  UStar file header.
+   ----------------------------------------------------------------------------
+   function Is_UStar_Header
+     (Sector_Address : Virtual_Address_T) return Boolean;
+
 private
    subtype USTAR_Header_Name is String (1 .. 100);
 

@@ -53,6 +53,15 @@ is
       New_Size        : Storage_Count;
       Result          : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Determines whether a 512-byte sector at Sector_Address is a valid FAT
+   --  boot sector, by the 0x55 0xAA signature at offset 510.
+   --  An MBR partition table has the same signature, so this only tells an
+   --  unpartitioned FAT disk apart from an unpartitioned disk of another kind.
+   ----------------------------------------------------------------------------
+   function Is_FAT_Boot_Sector
+     (Sector_Address : Virtual_Address_T) return Boolean;
+
 private
    No_Free_Clusters : constant Function_Result := -1234_0000;
 

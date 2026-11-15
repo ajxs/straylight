@@ -125,6 +125,15 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Populate_Filesystem_Meta_Info;
 
+   function Is_FAT_Boot_Sector
+     (Sector_Address : Virtual_Address_T) return Boolean
+   is
+      Signature : constant Storage_Array (1 .. 2)
+      with Import, Alignment => 1, Address => Sector_Address + 510;
+   begin
+      return Signature = [16#55#, 16#AA#];
+   end Is_FAT_Boot_Sector;
+
    procedure Populate_Filesystem_Meta_Info_If_Needed
      (Filesystem      : Filesystem_Access;
       Reading_Process : in out Process_Control_Block_T;

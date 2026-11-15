@@ -80,7 +80,7 @@ Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Bo
 
 Code refers to devices through saved `Device_Access` values, never array indices:
 - `Interrupt_Controller` and `Graphics_Device` are in `Devices.Attached_System_Devices`, because code outside `Boot` uses them.
-- `UART_Device`, `Disk_Device` (FAT16, `virtio-mmio-bus.0`), `Disk_B_Device` (UStar, `virtio-mmio-bus.1`), `Console_Device` and `Root_Filesystem_Memory_Device` are in `Boot.Device_Discovery`.
+- `UART_Device`, `Console_Device`, `Root_Filesystem_Memory_Device` and the `Block_Devices` list are in `Boot.Device_Discovery`.
 
 A device must be created by assigning to `System_Devices (Index)` itself, with the index from `Boot.Device_Discovery.Allocate_System_Device_Index`. Through a `Device_Access`, the entry is constrained to its current `Driver_Type`, so assigning a new device through one raises `Constraint_Error`.
 
@@ -99,6 +99,8 @@ The line buffer is 4096 bytes. Its last byte is reserved for the newline, so inp
 A root virtual filesystem (`Filesystems.Root`) sits at the top. Two real filesystems are mounted under `/Devices/`:
 - `/Devices/Disk/` — FAT16 image (`Filesystems.FAT`, `Filesystems.FAT.FAT16`)
 - `/Devices/Disk_B/` — UStar/tar image (`Filesystems.UStar`)
+
+`Boot.Mount_Disks` works out which block device holds which filesystem by reading each device's first sector, so the order of the Virtio buses doesn't matter. It checks for a FAT boot sector signature (`Filesystems.FAT.Is_FAT_Boot_Sector`) and for a UStar header (`Filesystems.UStar.Is_UStar_Header`). It runs from `Boot.Start_Init_Process`, because reading a Virtio device needs a process context. Until then, the two disk mounts have no device.
 
 A block cache (`Filesystems.Block_Cache`) and a filesystem node cache (`Filesystems.Node_Cache`) are shared across all filesystems.
 

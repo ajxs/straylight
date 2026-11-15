@@ -46,7 +46,8 @@ is
       --  Some filesystems require addition runtime metadata for operation.
       --  These fields can be used to point to an arbitrary metadata structure,
       --  which can be used at runtime.
-      Filesystem_Meta_Info_Address : Virtual_Address_T;
+      Filesystem_Meta_Info_Address : Virtual_Address_T :=
+        System'To_Address (0);
       Filesystem_Meta_Info_Size    : Storage_Count := 0;
    end record;
 

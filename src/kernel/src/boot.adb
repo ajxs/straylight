@@ -10,10 +10,13 @@ with Boot.Device_Discovery;           use Boot.Device_Discovery;
 with Devices;                         use Devices;
 with Devices.Attached_System_Devices; use Devices.Attached_System_Devices;
 with Devices.Virtio;
+with Devices.Virtio.Block;
 with Devices.Virtio.Graphics;
 with Devicetree;
 with Filesystems;                     use Filesystems;
+with Filesystems.FAT;
 with Filesystems.Root;                use Filesystems.Root;
+with Filesystems.UStar;
 with Function_Results;                use Function_Results;
 with Graphics;                        use Graphics;
 with Loader;
@@ -156,17 +159,12 @@ package body Boot is
 
       Initialise_Root_Filesystem (Filesystems.System_Root_Filesystem, Result);
 
+      --  The devices of the two disk filesystems are set by Mount_Disks.
       Filesystems.Mounted_Filesystems (2) :=
-        (Filesystem_Type              => Filesystem_Type_FAT,
-         Filesystem_Meta_Info_Address => Null_Address,
-         Filesystem_Meta_Info_Size    => 0,
-         Device                       => Disk_Device);
+        (Filesystem_Type => Filesystem_Type_FAT, others => <>);
 
       Filesystems.Mounted_Filesystems (3) :=
-        (Filesystem_Type              => Filesystem_Type_UStar,
-         Filesystem_Meta_Info_Address => Null_Address,
-         Filesystem_Meta_Info_Size    => 0,
-         Device                       => Disk_B_Device);
+        (Filesystem_Type => Filesystem_Type_UStar, others => <>);
 
       Add_Filesystem_Node_To_Root_Filesystem
         (Filesystems.System_Root_Filesystem,
@@ -240,6 +238,68 @@ package body Boot is
 
       pragma Debug (Debug_Boot, Log_Debug ("Initialised filesystem."));
    end Initialise_Filesystem;
+
+   procedure Mount_Disks is
+      --  The device writes the sector to a buffer by its physical address.
+      --  The smallest physical allocation is a page.
+      Sector_Buffer_Size : constant := 16#1000#;
+
+      Sector_Buffer_Physical_Address : Physical_Address_T :=
+        Null_Physical_Address;
+
+      FAT_Filesystem   : Filesystem_T renames
+        Filesystems.Mounted_Filesystems (2);
+      UStar_Filesystem : Filesystem_T renames
+        Filesystems.Mounted_Filesystems (3);
+
+      Result : Function_Result := Unset;
+   begin
+      Allocate_Physical_Memory
+        (Sector_Buffer_Size, Sector_Buffer_Physical_Address, Result);
+      if Is_Error (Result) then
+         Panic ("Error allocating the disk sector buffer");
+      end if;
+
+      Sector_Buffer_Address : constant Virtual_Address_T :=
+        Get_Physical_Address_Virtual_Mapping (Sector_Buffer_Physical_Address);
+
+      for Block_Device of Block_Devices loop
+         exit when Block_Device = null;
+
+         Devices.Virtio.Block.Read_Sector
+           (Init_Process.all,
+            Block_Device.all.Common,
+            Block_Device.all.Virtio_Block,
+            Sector_Buffer_Physical_Address,
+            0,
+            Result);
+         if Is_Error (Result) then
+            Panic ("Error reading the first sector of a disk");
+         end if;
+
+         if Filesystems.FAT.Is_FAT_Boot_Sector (Sector_Buffer_Address) then
+            FAT_Filesystem.Device := Block_Device;
+         elsif Filesystems.UStar.Is_UStar_Header (Sector_Buffer_Address) then
+            UStar_Filesystem.Device := Block_Device;
+         end if;
+      end loop;
+
+      Free_Physical_Memory (Sector_Buffer_Physical_Address, Result);
+      if Is_Error (Result) then
+         Panic ("Error freeing the disk sector buffer");
+      end if;
+
+      if FAT_Filesystem.Device = null then
+         Panic ("No FAT disk found");
+      end if;
+
+      if UStar_Filesystem.Device = null then
+         Panic ("No UStar disk found");
+      end if;
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
+   end Mount_Disks;
 
    procedure Initialise_Hart (Hart_Id : Hart_Index_T) is
       procedure Save_Hart_State_Pointer (Hart_State_Address : Address)
@@ -607,6 +667,9 @@ package body Boot is
       --  The graphics system is initialised here because the Virtio driver
       --  requires a process context to operate in.
       Initialise_Graphics;
+
+      --  This must run before any program is loaded from either disk.
+      Mount_Disks;
 
       Loader.Load_New_Process_From_Filesystem
         (Init_Process.all,

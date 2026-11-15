@@ -10,6 +10,7 @@ with Devicetree;                      use Devicetree;
 --  This private package creates the system's devices from the devices found
 --  in the Devicetree, then maps and initialises them.
 -------------------------------------------------------------------------------
+
 private package Boot.Device_Discovery
   with Preelaborate
 is
@@ -28,10 +29,15 @@ is
    --  the GPU are Interrupt_Controller and Graphics_Device in
    --  Devices.Attached_System_Devices, since code outside Boot uses them.
    UART_Device                   : Device_Access := null;
-   Disk_Device                   : Device_Access := null;
-   Disk_B_Device                 : Device_Access := null;
    Console_Device                : Device_Access := null;
    Root_Filesystem_Memory_Device : Device_Access := null;
+
+   --  An array of attached block devices.
+   --  The order of the array doesn't matter. What filesystems are mounted is
+   --  determined at mount-time.
+   --  Currently limited to two devices, pending a more comprehensive device
+   --  discovery implementation.
+   Block_Devices : array (1 .. 2) of Device_Access := [others => null];
 
    ----------------------------------------------------------------------------
    --  Creates a device for each device found in the Devicetree, then maps and
