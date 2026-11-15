@@ -6,6 +6,7 @@
 with GNAT.Debug_Utilities;
 with System.Storage_Elements; use System.Storage_Elements;
 
+with Boot.Device_Discovery;           use Boot.Device_Discovery;
 with Devices;                         use Devices;
 with Devices.Attached_System_Devices; use Devices.Attached_System_Devices;
 with Devices.Virtio;
@@ -23,8 +24,6 @@ with Memory.Virtual;                  use Memory.Virtual;
 with RISCV.SBI;
 with Processes.Scheduler;
 with Traps;
-
-with Boot.Device_Discovery;           use Boot.Device_Discovery;
 
 package body Boot is
    function Get_Early_Kernel_Stack_Virtual_Address
@@ -150,7 +149,7 @@ package body Boot is
         (Filesystem_Type              => Filesystem_Type_Root,
          Filesystem_Meta_Info_Address => Null_Address,
          Filesystem_Meta_Info_Size    => 0,
-         Device                       => Root_Filesystem_Memory_Device'Access);
+         Device                       => Root_Filesystem_Memory_Device);
 
       Filesystems.System_Root_Filesystem :=
         Filesystems.Mounted_Filesystems (1)'Access;
@@ -161,13 +160,13 @@ package body Boot is
         (Filesystem_Type              => Filesystem_Type_FAT,
          Filesystem_Meta_Info_Address => Null_Address,
          Filesystem_Meta_Info_Size    => 0,
-         Device                       => Disk_Device'Access);
+         Device                       => Disk_Device);
 
       Filesystems.Mounted_Filesystems (3) :=
         (Filesystem_Type              => Filesystem_Type_UStar,
          Filesystem_Meta_Info_Address => Null_Address,
          Filesystem_Meta_Info_Size    => 0,
-         Device                       => Disk_B_Device'Access);
+         Device                       => Disk_B_Device);
 
       Add_Filesystem_Node_To_Root_Filesystem
         (Filesystems.System_Root_Filesystem,
@@ -222,7 +221,7 @@ package body Boot is
          UART_Filesystem_Node_Index,
          Result,
          Filesystem_Node_Type_Device,
-         Mounted_Device => UART_Device'Access);
+         Mounted_Device => UART_Device);
       if Is_Error (Result) then
          Panic;
       end if;
@@ -234,7 +233,7 @@ package body Boot is
          Console_Filesystem_Node_Index,
          Result,
          Filesystem_Node_Type_Device,
-         Mounted_Device => Console_Device'Access);
+         Mounted_Device => Console_Device);
       if Is_Error (Result) then
          Panic;
       end if;
@@ -491,8 +490,8 @@ package body Boot is
    begin
       Devices.Virtio.Graphics.Get_Display_Info
         (Init_Process.all,
-         Graphics_Device.Common,
-         Graphics_Device.Virtio_GPU,
+         Graphics_Device.all.Common,
+         Graphics_Device.all.Virtio_GPU,
          Result);
       if Is_Error (Result) then
          Panic;
@@ -519,16 +518,16 @@ package body Boot is
               & GNAT.Debug_Utilities.Image_C
                   (Address (Framebuffer_Allocation.Physical_Address))));
 
-      Graphics_Device.Virtio_GPU.Resource_Id := Resource_Id;
-      Graphics_Device.Virtio_GPU.Framebuffer_Addresses :=
+      Graphics_Device.all.Virtio_GPU.Resource_Id := Resource_Id;
+      Graphics_Device.all.Virtio_GPU.Framebuffer_Addresses :=
         Framebuffer_Allocation;
-      Graphics_Device.Virtio_GPU.Framebuffer_Width := Framebuffer_Width;
-      Graphics_Device.Virtio_GPU.Framebuffer_Height := Framebuffer_Height;
+      Graphics_Device.all.Virtio_GPU.Framebuffer_Width := Framebuffer_Width;
+      Graphics_Device.all.Virtio_GPU.Framebuffer_Height := Framebuffer_Height;
 
       Devices.Virtio.Graphics.Created_2d_Resource
         (Init_Process.all,
-         Graphics_Device.Common,
-         Graphics_Device.Virtio_GPU,
+         Graphics_Device.all.Common,
+         Graphics_Device.all.Virtio_GPU,
          Resource_Id,
          Result);
       if Is_Error (Result) then
@@ -537,8 +536,8 @@ package body Boot is
 
       Devices.Virtio.Graphics.Attach_Framebuffer_To_Resource
         (Init_Process.all,
-         Graphics_Device.Common,
-         Graphics_Device.Virtio_GPU,
+         Graphics_Device.all.Common,
+         Graphics_Device.all.Virtio_GPU,
          Resource_Id,
          Framebuffer_Allocation.Physical_Address,
          Result);
@@ -548,8 +547,8 @@ package body Boot is
 
       Devices.Virtio.Graphics.Set_Scanout
         (Init_Process.all,
-         Graphics_Device.Common,
-         Graphics_Device.Virtio_GPU,
+         Graphics_Device.all.Common,
+         Graphics_Device.all.Virtio_GPU,
          Resource_Id,
          0,
          Framebuffer_Width,
@@ -567,8 +566,8 @@ package body Boot is
 
       Devices.Virtio.Graphics.Transfer_To_Host_2d
         (Init_Process.all,
-         Graphics_Device.Common,
-         Graphics_Device.Virtio_GPU,
+         Graphics_Device.all.Common,
+         Graphics_Device.all.Virtio_GPU,
          Resource_Id,
          0,
          0,
@@ -581,8 +580,8 @@ package body Boot is
 
       Devices.Virtio.Graphics.Resource_Flush
         (Init_Process.all,
-         Graphics_Device.Common,
-         Graphics_Device.Virtio_GPU,
+         Graphics_Device.all.Common,
+         Graphics_Device.all.Virtio_GPU,
          Resource_Id,
          0,
          0,

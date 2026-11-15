@@ -20,12 +20,37 @@ with Memory.Virtual;       use Memory.Virtual;
 with Utilities;            use Utilities;
 
 package body Boot.Device_Discovery is
-   procedure Create_PLIC_Device
-     (Device          : out Device_T;
-      Node            : Devicetree_Device_T;
-      Virtual_Address : Virtual_Address_T) is
+   ----------------------------------------------------------------------------
+   --  Returns the index of the next unused System_Devices entry, in the order
+   --  devices are created. Panics if every entry is in use.
+   --  Each device is created by assigning to System_Devices (Index) directly.
+   --  Through a Device_Access, an entry is constrained to its current
+   --  Driver_Type, so assigning a new device through one raises
+   --  Constraint_Error. Only the Device_Access is kept, not the index.
+   ----------------------------------------------------------------------------
+   procedure Allocate_System_Device_Index (Index : out Positive) is
    begin
-      Device :=
+      if Attached_System_Device_Count >= System_Devices'Length then
+         Panic ("No unused system device entries");
+      end if;
+
+      Index := System_Devices'First + Attached_System_Device_Count;
+      Attached_System_Device_Count := Attached_System_Device_Count + 1;
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
+   end Allocate_System_Device_Index;
+
+   procedure Create_PLIC_Device
+     (Device          : out Device_Access;
+      Node            : Devicetree_Device_T;
+      Virtual_Address : Virtual_Address_T)
+   is
+      Index : Positive;
+   begin
+      Allocate_System_Device_Index (Index);
+
+      System_Devices (Index) :=
         (Driver_Type      => Driver_Type_PLIC,
          Common           =>
            (Memory_Size        =>
@@ -37,18 +62,24 @@ package body Boot.Device_Discovery is
             Spinlock           => Locks.Null_Spinlock),
          Interrupt_Parent => null,
          PLIC             => (Interrupt_Devices => [others => null]));
+
+      Device := System_Devices (Index)'Access;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
    end Create_PLIC_Device;
 
    procedure Create_UART_Device
-     (Device           : out Device_T;
+     (Device           : out Device_Access;
       Node             : Devicetree_Device_T;
       Virtual_Address  : Virtual_Address_T;
-      Interrupt_Parent : Device_Access) is
+      Interrupt_Parent : Device_Access)
+   is
+      Index : Positive;
    begin
-      Device :=
+      Allocate_System_Device_Index (Index);
+
+      System_Devices (Index) :=
         (Driver_Type      => Driver_Type_UART,
          Common           =>
            (Memory_Size        =>
@@ -60,15 +91,21 @@ package body Boot.Device_Discovery is
             Spinlock           => Locks.Null_Spinlock),
          Interrupt_Parent => Interrupt_Parent,
          UART             => (others => <>));
+
+      Device := System_Devices (Index)'Access;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
    end Create_UART_Device;
 
    procedure Create_Console_Device
-     (Device : out Device_T; Backend : Device_Access) is
+     (Device : out Device_Access; Backend : Device_Access)
+   is
+      Index : Positive;
    begin
-      Device :=
+      Allocate_System_Device_Index (Index);
+
+      System_Devices (Index) :=
         (Driver_Type      => Driver_Type_Console,
          Common           =>
            (Virtual_Address  => Null_Address,
@@ -77,20 +114,26 @@ package body Boot.Device_Discovery is
          Interrupt_Parent => null,
          Console          => (Backend => Backend, others => <>));
 
-      Device.Console.Line_Read_Lock.Spinlock.Lock_Id :=
+      System_Devices (Index).Console.Line_Read_Lock.Spinlock.Lock_Id :=
         Lock_Id_Console_Line_Read;
+
+      Device := System_Devices (Index)'Access;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
    end Create_Console_Device;
 
    procedure Create_Ramdisk_Device
-     (Device           : out Device_T;
+     (Device           : out Device_Access;
       Physical_Address : Physical_Address_T;
       Size             : Storage_Count;
-      Virtual_Address  : Virtual_Address_T) is
+      Virtual_Address  : Virtual_Address_T)
+   is
+      Index : Positive;
    begin
-      Device :=
+      Allocate_System_Device_Index (Index);
+
+      System_Devices (Index) :=
         (Driver_Type      => Driver_Type_Ramdisk,
          Common           =>
            (Memory_Size        => Size,
@@ -100,13 +143,15 @@ package body Boot.Device_Discovery is
             Interrupt_Priority => 0,
             Spinlock           => Locks.Null_Spinlock),
          Interrupt_Parent => null);
+
+      Device := System_Devices (Index)'Access;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
    end Create_Ramdisk_Device;
 
    procedure Create_Virtio_Block_Device
-     (Device           : out Device_T;
+     (Device           : out Device_Access;
       Node             : Devicetree_Device_T;
       Virtual_Address  : Virtual_Address_T;
       Interrupt_Parent : Device_Access)
@@ -131,8 +176,12 @@ package body Boot.Device_Discovery is
                  VIRTIO_F_INDIRECT_DESC,
                  VIRTIO_F_EVENT_IDX]),
          Create_U32_Bitmask_From_Flags ([VIRTIO_F_VERSION_1])];
+
+      Device_Index : Positive;
    begin
-      Device :=
+      Allocate_System_Device_Index (Device_Index);
+
+      System_Devices (Device_Index) :=
         (Driver_Type      => Driver_Type_Virtio_Block,
          Common           =>
            (Memory_Size        =>
@@ -155,13 +204,15 @@ package body Boot.Device_Discovery is
                Descriptor_Status_Address => Null_Address),
             Block_Request_Array_Addresses => Default_Unallocated_Addresses,
             Total_Sectors                 => 0));
+
+      Device := System_Devices (Device_Index)'Access;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
    end Create_Virtio_Block_Device;
 
    procedure Create_Virtio_GPU_Device
-     (Device           : out Device_T;
+     (Device           : out Device_Access;
       Node             : Devicetree_Device_T;
       Virtual_Address  : Virtual_Address_T;
       Interrupt_Parent : Device_Access)
@@ -176,8 +227,12 @@ package body Boot.Device_Discovery is
                  VIRTIO_F_INDIRECT_DESC,
                  VIRTIO_F_EVENT_IDX]),
          Create_U32_Bitmask_From_Flags ([VIRTIO_F_VERSION_1])];
+
+      Device_Index : Positive;
    begin
-      Device :=
+      Allocate_System_Device_Index (Device_Index);
+
+      System_Devices (Device_Index) :=
         (Driver_Type      => Driver_Type_Virtio_GPU,
          Common           =>
            (Memory_Size        =>
@@ -202,6 +257,8 @@ package body Boot.Device_Discovery is
             Framebuffer_Addresses => Default_Unallocated_Addresses,
             Framebuffer_Width     => 0,
             Framebuffer_Height    => 0));
+
+      Device := System_Devices (Device_Index)'Access;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
@@ -244,18 +301,21 @@ package body Boot.Device_Discovery is
          --  This implementation detail will be resolved in a future revision.
 
          when Virtio_Device_ID_Block =>
-            if Disk_B_Device.Driver_Type = Driver_Type_None then
+            if Disk_B_Device = null then
                Create_Virtio_Block_Device
-                 (Disk_B_Device, Node, Virtual_Address, APIC_Device'Access);
-            elsif Disk_Device.Driver_Type = Driver_Type_None then
+                 (Disk_B_Device, Node, Virtual_Address, Interrupt_Controller);
+            elsif Disk_Device = null then
                Create_Virtio_Block_Device
-                 (Disk_Device, Node, Virtual_Address, APIC_Device'Access);
+                 (Disk_Device, Node, Virtual_Address, Interrupt_Controller);
             end if;
 
          when Virtio_Device_ID_GPU   =>
-            if Graphics_Device.Driver_Type = Driver_Type_None then
+            if Graphics_Device = null then
                Create_Virtio_GPU_Device
-                 (Graphics_Device, Node, Virtual_Address, APIC_Device'Access);
+                 (Graphics_Device,
+                  Node,
+                  Virtual_Address,
+                  Interrupt_Controller);
             end if;
 
          when others                 =>
@@ -263,6 +323,48 @@ package body Boot.Device_Discovery is
             null;
       end case;
    end Create_Attached_Virtio_Device;
+
+   ----------------------------------------------------------------------------
+   --  Creates a system device from a parsed Devicetree node, if applicable.
+   --  This procedure assigns each created device their own virtual memory
+   --  space, as required.
+   --  Until a more comprehensive device discovery mechanism is implemented,
+   --  this procedure only creates a single UART/PLIC device, even if multiple
+   --  nodes of these types exist in the Devicetree.
+   ----------------------------------------------------------------------------
+   procedure Create_System_Device_From_Devicetree_Node
+     (Node : Devicetree_Device_T; Virtual_Address : in out Virtual_Address_T)
+   is
+   begin
+      case Node.Device_Type is
+         when Devicetree_Device_Type_PLIC          =>
+            if Interrupt_Controller = null then
+               Create_PLIC_Device
+                 (Interrupt_Controller, Node, Virtual_Address);
+            end if;
+
+         when Devicetree_Device_Type_UART_NS16550A =>
+            if UART_Device = null then
+               Create_UART_Device
+                 (UART_Device, Node, Virtual_Address, Interrupt_Controller);
+            end if;
+
+         when Devicetree_Device_Type_Virtio_MMIO   =>
+            Create_Attached_Virtio_Device (Node, Virtual_Address);
+
+         when Devicetree_Device_Type_None          =>
+            null;
+      end case;
+
+      --  Nodes without a device, such as empty Virtio slots, still occupy
+      --  virtual address space. This isn't a significant issue due to the
+      --  large amount of space reserved for devices.
+      Virtual_Address :=
+        Virtual_Address + Align_Memory_Size_Up_To_Page_Boundary (Node.Size);
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
+   end Create_System_Device_From_Devicetree_Node;
 
    procedure Initialise_Devices is
       --  The start of the virtual memory in which each device is mapped.
@@ -284,67 +386,52 @@ package body Boot.Device_Discovery is
         Debug
           (Debug_Boot_Device_Discovery, Log_Debug ("Initialising devices..."));
 
-      --  Create a device for each Devicetree node, in the first free slot for
-      --  its type. Devices that raise interrupts point at the PLIC's slot.
-      --  The PLIC node can come after the devices that use it, but its slot
-      --  is fixed, and nothing reads the PLIC until the devices are
-      --  initialised below.
+      --  First, scan for any interrupt controller device nodes.
+      --  Interrupt controllers are created first, because each interrupt
+      --  raising device references its interrupt controller.
+      --  In QEMU's Devicetree, the PLIC device node comes after the devices
+      --  that use it, so we can safely create it first, then reference it from
+      --  other devices.
+      --  Creating it first also gives it the first System_Devices entry, so
+      --  the init loop below maps it before any device enables an interrupt
+      --  line on it.
       for Node of Devicetree_Devices (1 .. Devicetree_Device_Count) loop
-         case Node.Device_Type is
-            when Devicetree_Device_Type_PLIC          =>
-               if APIC_Device.Driver_Type = Driver_Type_None then
-                  Create_PLIC_Device
-                    (APIC_Device, Node, Device_Virtual_Address);
-               end if;
-
-            when Devicetree_Device_Type_UART_NS16550A =>
-               if UART_Device.Driver_Type = Driver_Type_None then
-                  Create_UART_Device
-                    (UART_Device,
-                     Node,
-                     Device_Virtual_Address,
-                     APIC_Device'Access);
-               end if;
-
-            when Devicetree_Device_Type_Virtio_MMIO   =>
-               Create_Attached_Virtio_Device (Node, Device_Virtual_Address);
-
-            when Devicetree_Device_Type_None          =>
-               null;
-         end case;
-
-         --  Nodes without a device, such as empty Virtio slots, still occupy
-         --  virtual address space. This isn't a significant issue due to the
-         --  large amount of space reserved for devices.
-         Device_Virtual_Address :=
-           Device_Virtual_Address
-           + Align_Memory_Size_Up_To_Page_Boundary (Node.Size);
+         if Node.Device_Type = Devicetree_Device_Type_PLIC then
+            Create_System_Device_From_Devicetree_Node
+              (Node, Device_Virtual_Address);
+         end if;
       end loop;
 
-      if APIC_Device.Driver_Type = Driver_Type_None then
+      --  If there's no interrupt controller, panic.
+      --  The kernel can't currently handle this scenario.
+      if Interrupt_Controller = null then
          Panic ("No PLIC found in the Devicetree");
       end if;
 
-      Interrupt_Controller := APIC_Device'Access;
-
-      if UART_Device.Driver_Type = Driver_Type_None then
-         Panic ("No UART found in the Devicetree");
-      end if;
+      --  Next, scan the remaining nodes and create system devices for them.
+      for Node of Devicetree_Devices (1 .. Devicetree_Device_Count) loop
+         if Node.Device_Type /= Devicetree_Device_Type_PLIC then
+            Create_System_Device_From_Devicetree_Node
+              (Node, Device_Virtual_Address);
+         end if;
+      end loop;
 
       --  For temporary development puporses, panic if these devices aren't
       --  present. This will be removed when more comprehensive device
       --  discovery is implemented.
-      if Disk_Device.Driver_Type = Driver_Type_None
-        or else Disk_B_Device.Driver_Type = Driver_Type_None
-      then
+      if UART_Device = null then
+         Panic ("No UART found in the Devicetree");
+      end if;
+
+      if Disk_Device = null or else Disk_B_Device = null then
          Panic ("Expected 2 Virtio block devices in the Devicetree");
       end if;
 
-      if Graphics_Device.Driver_Type = Driver_Type_None then
+      if Graphics_Device = null then
          Panic ("No Virtio GPU found in the Devicetree");
       end if;
 
-      Create_Console_Device (Console_Device, UART_Device'Access);
+      Create_Console_Device (Console_Device, UART_Device);
 
       Allocate_Physical_Memory
         (Ramdisk_Size, Root_Filesystem_Physical_Address, Result);
@@ -476,7 +563,7 @@ package body Boot.Device_Discovery is
       end loop;
 
       Devices.PLIC.Set_IRQ_Priority_Threshold
-        (APIC_Device.Common, Supervisor_Interrupt_Context, 1);
+        (Interrupt_Controller.all.Common, Supervisor_Interrupt_Context, 1);
 
       pragma
         Debug

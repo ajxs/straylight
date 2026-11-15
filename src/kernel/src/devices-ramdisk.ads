@@ -9,25 +9,21 @@ with Function_Results; use Function_Results;
 --  The ramdisk 'device' provides an interface for reading/writing sectors
 --  from/to a mapped memory region as though it were a block storage device.
 --
---  To use it, you can create a device entry in the System_Devices array
---  as follows, and point to it with a mounted filesystem:
+--  To use it, create a ramdisk device with
+--  Boot.Device_Discovery.Create_Ramdisk_Device, then attach a mounted
+--  filesystem to it:
 --
---      System_Devices (5) :=
---        (Driver_Type      => Driver_Type_Ramdisk,
---         Common           =>
---           (Memory_Size        => Ramdisk_Region_Size,
---            Virtual_Address    => Device_Virtual_Address,
---            Physical_Address   => Ramdisk_Address,
---            Interrupt_Line     => 0,
---            Interrupt_Priority => 0,
---            Spinlock           => Locks.Null_Spinlock),
---         Interrupt_Parent => null);
+--      Create_Ramdisk_Device
+--        (Ramdisk_Device,
+--         Ramdisk_Address,
+--         Ramdisk_Region_Size,
+--         Device_Virtual_Address);
 --
 --      Mounted_Filesystems (3) :=
 --        (Filesystem_Type              => Filesystem_Type_UStar,
 --         Filesystem_Meta_Info_Address => Null_Address,
 --         Filesystem_Meta_Info_Size    => 0,
---         Device                       => Boot_Ramdisk_Device'Access);
+--         Device                       => Ramdisk_Device);
 --
 -------------------------------------------------------------------------------
 

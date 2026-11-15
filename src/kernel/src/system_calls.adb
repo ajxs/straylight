@@ -142,14 +142,16 @@ package body System_Calls is
         Convention => C,
         Alignment  => 1,
         Address    => Process.Trap_Context_Addr;
-
-      Graphics_Device renames
-        Devices.Attached_System_Devices.System_Devices (6);
    begin
       pragma
         Debug
           (Logging_Enabled,
            Log_Debug ("User Mode Syscall: Update Framebuffer"));
+
+      --  Declared in the function body so that the exception handler covers
+      --  the implicit null check on the dereference.
+      Graphics_Device : Devices.Attached_System_Devices.Device_T renames
+        Devices.Attached_System_Devices.Graphics_Device.all;
 
       User_Framebuffer_Address : constant Virtual_Address_T :=
         Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));

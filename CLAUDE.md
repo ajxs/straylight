@@ -65,20 +65,24 @@ Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Bo
 `Physical_Address_T` and `Virtual_Address_T` (a subtype of `System.Address`) are **distinct types** — the compiler enforces that they cannot be mixed. Use `Get_Lower_Physical_Address` / `Address_To_Unsigned_64` etc. to convert.
 
 ### Trap Handling
-`traps-entry.S` is the `stvec` handler. It saves context, determines user vs. supervisor mode, and calls either `Traps.Handle_User_Mode_Trap` or `Traps.Handle_Supervisor_Mode_Trap`. Timer interrupts trigger the scheduler; external interrupts are claimed from `Devices.Attached_System_Devices.Interrupt_Controller` (the PLIC) and dispatched to the relevant device driver. The PLIC's state maps each interrupt line to the device that raises it. `Boot.Initialise_Devices` fills that map from each device's `Interrupt_Parent` when it enables the device's interrupt line.
+`traps-entry.S` is the `stvec` handler. It saves context, determines user vs. supervisor mode, and calls either `Traps.Handle_User_Mode_Trap` or `Traps.Handle_Supervisor_Mode_Trap`. Timer interrupts trigger the scheduler; external interrupts are claimed from `Devices.Attached_System_Devices.Interrupt_Controller` (the PLIC) and dispatched to the relevant device driver. The PLIC's state maps each interrupt line to the device that raises it. `Boot.Device_Discovery.Initialise_Devices` fills that map from each device's `Interrupt_Parent` when it enables the device's interrupt line.
 
 ### Processes & Scheduler
 `Process_Control_Block_T` (`processes.ads`) holds registers, memory space, heap, kernel stack, and a linked-list `Next_Process` pointer. The process queue is a singly-linked list protected by a spinlock. The scheduler (`Processes.Scheduler`) is round-robin. Processes can be blocked waiting on a `Blocking_Channel_T` (a `Unsigned_64` identifier); `Wake_Processes_Waiting_For_Channel` unblocks them.
 
 ### Devices
-`Devices.Attached_System_Devices.System_Devices` is the single fixed-size array of every device. Each `Device_T` slot is discriminated by `Driver_Type` (the driver), and holds a `Device_Common_State_T` (addresses, IRQ, spinlock) plus the state record owned by that driver, such as `Devices.UART.UART_Device_State_T`. Driver procedures take `(Device : Device_Common_State_T; State : <Driver>_Device_State_T)`, and callers pick the driver with a `case` on `Driver_Type`. A driver that refers to another device holds an `access Devices.Attached_System_Devices.Device_T`, declared through a `limited with`, as the console does for its backend. Devices are statically assigned array slots in `Boot.Initialise_Devices`:
-1. PLIC (interrupt controller)
-2. UART (serial)
-3. VirtIO block (FAT16 disk, `virtio-mmio-bus.0`)
-4. Ramdisk (root filesystem memory device)
-5. VirtIO block B (UStar disk, `virtio-mmio-bus.1`)
-6. VirtIO GPU (`virtio-mmio-bus.2`)
-7. Console (backed by the UART)
+`Devices.Attached_System_Devices.System_Devices` is the single fixed-size array of every device. Each `Device_T` slot is discriminated by `Driver_Type` (the driver), and holds a `Device_Common_State_T` (addresses, IRQ, spinlock) plus the state record owned by that driver, such as `Devices.UART.UART_Device_State_T`. Driver procedures take `(Device : Device_Common_State_T; State : <Driver>_Device_State_T)`, and callers pick the driver with a `case` on `Driver_Type`. A driver that refers to another device holds an `access Devices.Attached_System_Devices.Device_T`, declared through a `limited with`, as the console does for its backend.
+
+`Boot.Device_Discovery.Initialise_Devices` creates a device for each Devicetree node the parser recognises. It uses `System_Devices` entries in creation order, counted by `Devices.Attached_System_Devices.Attached_System_Device_Count`:
+1. The PLIC, first, because every device that raises interrupts points at it.
+2. The other Devicetree devices, in Devicetree order. Virtio slots are probed for a device ID, and empty ones get no device.
+3. The console (backed by the UART) and the ramdisk.
+
+Code refers to devices through saved `Device_Access` values, never array indices:
+- `Interrupt_Controller` and `Graphics_Device` are in `Devices.Attached_System_Devices`, because code outside `Boot` uses them.
+- `UART_Device`, `Disk_Device` (FAT16, `virtio-mmio-bus.0`), `Disk_B_Device` (UStar, `virtio-mmio-bus.1`), `Console_Device` and `Root_Filesystem_Memory_Device` are in `Boot.Device_Discovery`.
+
+A device must be created by assigning to `System_Devices (Index)` itself, with the index from `Boot.Device_Discovery.Allocate_System_Device_Index`. Through a `Device_Access`, the entry is constrained to its current `Driver_Type`, so assigning a new device through one raises `Constraint_Error`.
 
 ### Console
 `Devices.Console` is a line-buffered terminal layer over a backend device. Only a serial backend is implemented. It is mounted at `/Devices/Console`, and libc opens it as `stdin`, `stdout`, and `stderr`.

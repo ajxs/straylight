@@ -57,9 +57,23 @@ is
 
    System_Devices : Device_Array_T (1 .. 16);
 
-   --  The interrupt controller that external interrupts are claimed from.
-   --  shortcut: one controller serves every hart; make this per hart once a
-   --  platform has more than one.
+   --  How many System_Devices entries are in use. Entries are used in order,
+   --  from System_Devices'First.
+   --  Currently this isn't locked, which is only safe because the boot hart
+   --  adds every device before the other harts start. If devices are ever
+   --  added later, this will need a lock.
+   Attached_System_Device_Count : Natural := 0;
+
+   --  The interrupt controller used to claim external interrupts.
+   --  Currently this interrupt serves every hart. At some point in the future,
+   --  when compatibility for other systems is added, this will need to be
+   --  updated to handle multiple interrupt controllers.
    Interrupt_Controller : Device_Access := null;
+
+   --  The graphics device used to drive the display.
+   --  Currently the system only supports a single output graphic device. At
+   --  some point in the future, when compatibility for other systems is added,
+   --  this implementation will need to be updated.
+   Graphics_Device : Device_Access := null;
 
 end Devices.Attached_System_Devices;
