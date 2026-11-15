@@ -360,6 +360,14 @@ package body Boot is
       Memory_Regions      :
         Physical_Memory_Region_Array_T (1 .. Maximum_Memory_Regions);
       Memory_Region_Count : Natural := 0;
+
+      --  The kernel image's physical address range. It starts with the boot
+      --  section, which Free_Boot_Memory frees once it's no longer needed.
+      Kernel_Start : constant Natural
+      with Import, External_Name => "__boot_start_physical";
+
+      Kernel_End : constant Natural
+      with Import, External_Name => "__kernel_end_physical";
    begin
       --  This needs to be the first function called on each hart to set up
       --  the hart's state structure. This needs be called before any logging
@@ -375,8 +383,15 @@ package body Boot is
       Devicetree_Higher_Half_Address : constant Address :=
         Address (DTB_Address) + Higher_Half_Offset;
 
+      --  The kernel image isn't free memory, so it's removed from the regions
+      --  that Parse_Devicetree returns.
+      Kernel_Image_Region : constant Physical_Memory_Region_T :=
+        (Base => Physical_Address_T (Kernel_Start'Address),
+         Size => Kernel_End'Address - Kernel_Start'Address);
+
       Devicetree.Parse_Devicetree
         (Devicetree_Higher_Half_Address,
+         Kernel_Image_Region,
          Memory_Regions,
          Memory_Region_Count,
          Devicetree_Devices,

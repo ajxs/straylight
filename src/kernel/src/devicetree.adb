@@ -1272,6 +1272,13 @@ package body Devicetree is
       Remaining_Regions      : Devicetree_Memory_Region_Array_T;
       Remaining_Region_Count : Natural := 0;
    begin
+      --  Removing an empty region would otherwise split the memory region
+      --  that contains it in two.
+      if Region.Size = 0 then
+         Result := Success;
+         return;
+      end if;
+
       if Region.Size > Unsigned_64'Last - Region.Base then
          Log_Error ("Removed memory region exceeds the address space");
          Result := Invalid_Argument;
@@ -1303,22 +1310,9 @@ package body Devicetree is
    end Remove_Region_From_Memory_Regions;
 
    procedure Remove_Reserved_Memory_Regions_From_Memory_Regions
-     (State : in out FDT_Parser_State_T; Result : out Function_Result)
-   is
-      --  The kernel image's physical address range. It starts with the boot
-      --  section, which Boot.Free_Boot_Memory frees once it's no longer
-      --  needed.
-      Kernel_Start : constant Natural
-      with Import, External_Name => "__boot_start_physical";
-
-      Kernel_End : constant Natural
-      with Import, External_Name => "__kernel_end_physical";
-
-      Kernel_Start_Phys_Addr_As_U64 : constant Unsigned_64 :=
-        Address_To_Unsigned_64 (Kernel_Start'Address);
-
-      Kernel_End_Phys_Addr_As_U64 : constant Unsigned_64 :=
-        Address_To_Unsigned_64 (Kernel_End'Address);
+     (State           : in out FDT_Parser_State_T;
+      Excluded_Region : Physical_Memory_Region_T;
+      Result          : out Function_Result) is
    begin
       --  Each pass removes one reserved region from every memory region, so
       --  later passes see the pieces that earlier ones left.
@@ -1335,23 +1329,24 @@ package body Devicetree is
          end if;
       end loop;
 
-      Size : constant Unsigned_64 :=
-        Kernel_End_Phys_Addr_As_U64 - Kernel_Start_Phys_Addr_As_U64;
+      Excluded_Base : constant Unsigned_64 :=
+        Address_To_Unsigned_64 (Address (Excluded_Region.Base));
+      Excluded_Size : constant Unsigned_64 :=
+        Unsigned_64 (Excluded_Region.Size);
 
       pragma
         Debug
           (Debug_Devicetree,
            Log_Debug
-             ("Removing kernel image from memory regions: Base = "
-              & Kernel_Start_Phys_Addr_As_U64'Image
+             ("Removing excluded region from memory regions: Base = "
+              & Excluded_Base'Image
               & ", Size = "
-              & Size'Image));
+              & Excluded_Size'Image));
 
-      --  Remove the kernel image from the available memory regions.
       Remove_Region_From_Memory_Regions
         (State.Memory_Regions,
          State.Memory_Region_Count,
-         (Base => Kernel_Start_Phys_Addr_As_U64, Size => Size),
+         (Base => Excluded_Base, Size => Excluded_Size),
          Result);
       if Is_Error (Result) then
          return;
@@ -1433,6 +1428,7 @@ package body Devicetree is
 
    procedure Parse_Devicetree
      (DTB_Address         : Address;
+      Excluded_Region     : Physical_Memory_Region_T;
       Memory_Regions      : out Physical_Memory_Region_Array_T;
       Memory_Region_Count : out Natural;
       Devices             : out Devicetree_Device_Array_T;
@@ -1484,7 +1480,8 @@ package body Devicetree is
          return;
       end if;
 
-      Remove_Reserved_Memory_Regions_From_Memory_Regions (State, Result);
+      Remove_Reserved_Memory_Regions_From_Memory_Regions
+        (State, Excluded_Region, Result);
       if Is_Error (Result) then
          return;
       end if;
