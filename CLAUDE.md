@@ -114,7 +114,13 @@ Procedures with `out Function_Result` parameters are preferred over functions wh
 `kernel.adc` disables: exceptions propagation, dynamic dispatch, finalization, allocators, tasking, protected types, fixed-point, IO, streams, and implicit heap allocations. Do not use these features in kernel code.
 
 ### Logging
-Debug output is filtered by tag and level. To enable per-subsystem debug logging, set the relevant tag to `True` in the `Active_Logging_Tags` array in `src/kernel/src/logging.ads`. All subsystem packages declare a `Logging_Tags` constant passed to `Log_Debug` / `Log_Error`.
+Debug logging is switched on per subsystem by the `Debug_*` constants at the top of `src/kernel/src/logging.ads`, such as `Debug_Boot` and `Debug_Boot_Device_Discovery`. Set one to `True` to enable that subsystem's debug output.
+
+- Write debug calls as `pragma Debug (Debug_X, Log_Debug ("..."));`. When the flag is `False`, the call is compiled out.
+- `Log_Error` and `Log_Constraint_Error` aren't gated, so they always print.
+- Don't pass `File` or `Line`. Their defaults record the caller's location.
+- Each line is loosely logfmt: `hart= process= time= level= location= message=`. New fields inside a message should stay `key=value`.
+- If the only thing that can raise `Constraint_Error` in a subprogram is a debug log message, put the log in its own small procedure with a handler, as `Boot.Log_Hart` does. Otherwise the build fails with the flag either on or off. Build with the flag both ways.
 
 ### Fixed-Length Strings
 `Fixed_Length_String_T` (in `utilities.ads`) is used for kernel-internal strings with a known maximum length (e.g., filesystem node names). It stores both the max-length buffer and the actual `Byte_Length`.

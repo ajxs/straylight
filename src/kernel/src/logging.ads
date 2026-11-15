@@ -15,6 +15,7 @@ is
    --  switch is disabled, the compiler will optimise out the logging call.
    ----------------------------------------------------------------------------
    Debug_Boot                    : constant Boolean := False;
+   Debug_Boot_Device_Discovery   : constant Boolean := False;
    Debug_Devices                 : constant Boolean := False;
    Debug_Devices_Ramdisk         : constant Boolean := False;
    Debug_Devices_Virtio          : constant Boolean := False;

@@ -48,14 +48,6 @@ private
 
    procedure Initialise_Graphics;
 
-   ----------------------------------------------------------------------------
-   --  Initialise the system's devices.
-   --  Currently the kernel is 'hardcoded' to support QEMU's 'virt' device.
-   --  In future this will be replaced with proper device discovery based upon
-   --  the devicetree.
-   ----------------------------------------------------------------------------
-   procedure Initialise_Devices;
-
    procedure Initialise_Init_Process;
 
    procedure Start_Init_Process;
