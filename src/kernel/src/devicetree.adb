@@ -41,26 +41,28 @@ package body Devicetree is
    end record
    with Convention => C;
 
-   --  The current address and size cells context is captured in a stack, so
-   --  that we can properly handle nested nodes that override the
-   --  #address-cells, #size-cells, and interrupt-parent properties.
-   type FDT_Cells_Context_T is record
+   --  The part of a node's state that its children inherit: the
+   --  #address-cells and #size-cells it declares for its children, and its
+   --  'interrupt-parent'. It's pushed onto a stack when a child node starts,
+   --  and popped when the child ends, so that nested nodes can override any
+   --  of these properties.
+   type FDT_Node_Context_T is record
       Address_Cells : Unsigned_32;
       Size_Cells    : Unsigned_32;
 
       --  The phandle from 'interrupt-parent', or 0 if none. A node without
       --  one inherits its parent's, as per Devicetree specification v0.4
-      --  section 2.4.1. It's kept here because it's inherited the same way.
+      --  section 2.4.1.
       Interrupt_Parent : Unsigned_32;
    end record;
 
-   Maximum_Cells_Context_Depth : constant := 16;
+   Maximum_Node_Context_Depth : constant := 16;
 
-   type FDT_Cells_Context_Array_T is
-     array (1 .. Maximum_Cells_Context_Depth) of FDT_Cells_Context_T;
+   type FDT_Node_Context_Array_T is
+     array (1 .. Maximum_Node_Context_Depth) of FDT_Node_Context_T;
 
-   type FDT_Cells_Context_Stack_T is record
-      Contexts : FDT_Cells_Context_Array_T;
+   type FDT_Node_Context_Stack_T is record
+      Contexts : FDT_Node_Context_Array_T;
       Count    : Natural := 0;
    end record;
 
@@ -82,14 +84,14 @@ package body Devicetree is
       String_Table_Address    : Address;
       String_Table_Size       : Storage_Count;
       Curr_Offset             : Storage_Offset := 0;
-      Cells_Context_Stack     : FDT_Cells_Context_Stack_T;
-      --  This is the context the current node declares for its children.
-      --  The node's own 'reg' uses its parent's context, which is on top
-      --  of Cells_Context_Stack.
+      Node_Context_Stack      : FDT_Node_Context_Stack_T;
+      --  This is the current node's context. Its cells are the ones the node
+      --  declares for its children. The node's own 'reg' uses its parent's
+      --  cells, from the context on top of Node_Context_Stack.
       --  Devicetree specification v0.4 section 2.3.5 states:
       --  'If missing, a client program should assume a default value of 2
       --  for #address-cells, and a value of 1 for #size-cells.'
-      Current_Cells_Context   : FDT_Cells_Context_T :=
+      Current_Node_Context    : FDT_Node_Context_T :=
         (Address_Cells => 2, Size_Cells => 1, Interrupt_Parent => 0);
 
       --  The name of the node currently being parsed.
@@ -130,7 +132,7 @@ package body Devicetree is
       --  This variable is used to determine whether the parser is currently
       --  inside a 'reserved-memory' child node.
       --  When entering a reserved memory parent node, this is set to the
-      --  current depth of the cells context stack.
+      --  current depth of the node context stack.
       Reserved_Memory_Node_Depth : Natural := 0;
 
       Memory_Regions      : Memory_Region_List_T;
@@ -164,19 +166,19 @@ package body Devicetree is
       Timebase_Frequency : Unsigned_64 := 0;
    end record;
 
-   procedure Push_Cells_Context
-     (Context_Stack : in out FDT_Cells_Context_Stack_T;
-      New_Context   : FDT_Cells_Context_T;
+   procedure Push_Node_Context
+     (Context_Stack : in out FDT_Node_Context_Stack_T;
+      New_Context   : FDT_Node_Context_T;
       Result        : out Function_Result) is
    begin
       if Context_Stack.Count >= Context_Stack.Contexts'Last then
          Log_Error
-           ("Cells context stack overflow: " & Context_Stack.Count'Image);
+           ("Node context stack overflow: " & Context_Stack.Count'Image);
          Result := Constraint_Exception;
          return;
       end if;
 
-      pragma Debug (Debug_Devicetree, Log_Debug ("Pushing cells context"));
+      pragma Debug (Debug_Devicetree, Log_Debug ("Pushing node context"));
 
       Context_Stack.Count := Context_Stack.Count + 1;
       Context_Stack.Contexts (Context_Stack.Count) := New_Context;
@@ -185,20 +187,20 @@ package body Devicetree is
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
-   end Push_Cells_Context;
+   end Push_Node_Context;
 
-   procedure Pop_Cells_Context
-     (Context_Stack  : in out FDT_Cells_Context_Stack_T;
-      Popped_Context : out FDT_Cells_Context_T;
+   procedure Pop_Node_Context
+     (Context_Stack  : in out FDT_Node_Context_Stack_T;
+      Popped_Context : out FDT_Node_Context_T;
       Result         : out Function_Result) is
    begin
       if Context_Stack.Count = 0 then
-         Log_Error ("Cells context stack underflow");
+         Log_Error ("Node context stack underflow");
          Result := Constraint_Exception;
          return;
       end if;
 
-      pragma Debug (Debug_Devicetree, Log_Debug ("Popping cells context"));
+      pragma Debug (Debug_Devicetree, Log_Debug ("Popping node context"));
 
       Popped_Context := Context_Stack.Contexts (Context_Stack.Count);
       Context_Stack.Count := Context_Stack.Count - 1;
@@ -207,15 +209,15 @@ package body Devicetree is
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
-   end Pop_Cells_Context;
+   end Pop_Node_Context;
 
-   procedure Peek_Cells_Context
-     (Context_Stack : FDT_Cells_Context_Stack_T;
-      Top_Context   : out FDT_Cells_Context_T;
+   procedure Peek_Node_Context
+     (Context_Stack : FDT_Node_Context_Stack_T;
+      Top_Context   : out FDT_Node_Context_T;
       Result        : out Function_Result) is
    begin
       if Context_Stack.Count = 0 then
-         Log_Error ("Cells context stack is empty");
+         Log_Error ("Node context stack is empty");
          Result := Constraint_Exception;
          return;
       end if;
@@ -226,7 +228,7 @@ package body Devicetree is
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
-   end Peek_Cells_Context;
+   end Peek_Node_Context;
 
    ----------------------------------------------------------------------------
    --  Combines up to 2 big-endian cells into one value. 0 cells gives 0.
@@ -257,7 +259,7 @@ package body Devicetree is
 
    procedure Get_Reg_Entry_Count
      (Property_Length : Unsigned_32;
-      Cells_Context   : FDT_Cells_Context_T;
+      Cells_Context   : FDT_Node_Context_T;
       Entry_Count     : out Natural;
       Result          : out Function_Result) is
    begin
@@ -282,7 +284,7 @@ package body Devicetree is
    procedure Read_Reg_Entry
      (Property_Address : Address;
       Property_Length  : Unsigned_32;
-      Cells_Context    : FDT_Cells_Context_T;
+      Cells_Context    : FDT_Node_Context_T;
       Entry_Index      : Natural;
       Reg_Base         : out Unsigned_64;
       Reg_Size         : out Unsigned_64;
@@ -410,7 +412,7 @@ package body Devicetree is
          Size             => Region.Size,
          Interrupt_Line   => State.Current_Node_Interrupt_Line,
          Phandle          => State.Current_Node_Phandle,
-         Interrupt_Parent => State.Current_Cells_Context.Interrupt_Parent);
+         Interrupt_Parent => State.Current_Node_Context.Interrupt_Parent);
 
       Result := Success;
    exception
@@ -785,24 +787,24 @@ package body Devicetree is
          Log_Constraint_Error;
    end Log_Node_Name;
 
-   procedure Log_Cells_Context
-     (Cells_Context : FDT_Cells_Context_T;
-      File          : String := GNAT.Source_Info.File;
-      Line          : Positive := GNAT.Source_Info.Line) is
+   procedure Log_Node_Context
+     (Node_Context : FDT_Node_Context_T;
+      File         : String := GNAT.Source_Info.File;
+      Line         : Positive := GNAT.Source_Info.Line) is
    begin
       Log_Debug
         ("Node cells context: ("
          & "Address_Cells: "
-         & Cells_Context.Address_Cells'Image
+         & Node_Context.Address_Cells'Image
          & ", Size_Cells: "
-         & Cells_Context.Size_Cells'Image
+         & Node_Context.Size_Cells'Image
          & ")",
          File,
          Line);
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
-   end Log_Cells_Context;
+   end Log_Node_Context;
 
    procedure Log_Property
      (Property : Devicetree_Property_T;
@@ -926,7 +928,7 @@ package body Devicetree is
       return
         State.Reserved_Memory_Node_Depth /= 0
         and then
-          State.Cells_Context_Stack.Count
+          State.Node_Context_Stack.Count
           = State.Reserved_Memory_Node_Depth + 1;
    exception
       when Constraint_Error =>
@@ -944,17 +946,17 @@ package body Devicetree is
       Entry_Count : out Natural;
       Result      : out Function_Result)
    is
-      Parent_Cells_Context  : FDT_Cells_Context_T;
+      Parent_Node_Context   : FDT_Node_Context_T;
       Total_Reg_Entry_Count : Natural := 0;
       Reg_Base              : Unsigned_64 := 0;
       Reg_Size              : Unsigned_64 := 0;
    begin
       Entry_Count := 0;
 
-      --  A node's 'reg' uses its parent's cells context, which was pushed on
-      --  entry to this node.
-      Peek_Cells_Context
-        (State.Cells_Context_Stack, Parent_Cells_Context, Result);
+      --  A node's 'reg' uses the cells from its parent's context, which was
+      --  pushed on entry to this node.
+      Peek_Node_Context
+        (State.Node_Context_Stack, Parent_Node_Context, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -962,8 +964,8 @@ package body Devicetree is
       --  If the parent node's address-cells or size-cells exceed 2, we cannot
       --  parse the 'reg' property into 64-bit values.
       --  This might occur in PCI device nodes.
-      if Parent_Cells_Context.Address_Cells > 2
-        or else Parent_Cells_Context.Size_Cells > 2
+      if Parent_Node_Context.Address_Cells > 2
+        or else Parent_Node_Context.Size_Cells > 2
       then
          Log_Error
            ("Skipping 'reg' with unsupported cell sizes in node '"
@@ -976,7 +978,7 @@ package body Devicetree is
 
       Get_Reg_Entry_Count
         (State.Current_Node_Reg_Property.Length,
-         Parent_Cells_Context,
+         Parent_Node_Context,
          Total_Reg_Entry_Count,
          Result);
       if Is_Error (Result) then
@@ -997,7 +999,7 @@ package body Devicetree is
          Read_Reg_Entry
            (State.Current_Node_Reg_Property.Value_Address,
             State.Current_Node_Reg_Property.Length,
-            Parent_Cells_Context,
+            Parent_Node_Context,
             Entry_Index,
             Reg_Base,
             Reg_Size,
@@ -1210,7 +1212,7 @@ package body Devicetree is
 
       --  Finalise the current node's properties before starting a new node.
       --  This runs before the push, so the parent node's 'reg' is still
-      --  decoded with its own parent's cells context.
+      --  decoded with the cells from its own parent's context.
       Finalise_Node_Properties (State, Result);
       if Is_Error (Result) then
          return;
@@ -1218,8 +1220,8 @@ package body Devicetree is
 
       State.Current_Node_Name.Byte_Length := 0;
 
-      Push_Cells_Context
-        (State.Cells_Context_Stack, State.Current_Cells_Context, Result);
+      Push_Node_Context
+        (State.Node_Context_Stack, State.Current_Node_Context, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -1235,7 +1237,7 @@ package body Devicetree is
       end if;
 
       if Compare_Node_Name (State.Current_Node_Name, "reserved-memory") then
-         State.Reserved_Memory_Node_Depth := State.Cells_Context_Stack.Count;
+         State.Reserved_Memory_Node_Depth := State.Node_Context_Stack.Count;
       end if;
 
       Align_Offset_To_Word (State.Curr_Offset, Result);
@@ -1251,7 +1253,7 @@ package body Devicetree is
    begin
       pragma
         Debug
-          (Debug_Devicetree, Log_Cells_Context (State.Current_Cells_Context));
+          (Debug_Devicetree, Log_Node_Context (State.Current_Node_Context));
 
       --  If the node hasn't already been finalised before parsing its first
       --  child node, finalise it here.
@@ -1260,13 +1262,13 @@ package body Devicetree is
          return;
       end if;
 
-      if State.Cells_Context_Stack.Count = State.Reserved_Memory_Node_Depth
+      if State.Node_Context_Stack.Count = State.Reserved_Memory_Node_Depth
       then
          State.Reserved_Memory_Node_Depth := 0;
       end if;
 
-      Pop_Cells_Context
-        (State.Cells_Context_Stack, State.Current_Cells_Context, Result);
+      Pop_Node_Context
+        (State.Node_Context_Stack, State.Current_Node_Context, Result);
       if Is_Error (Result) then
          return;
       end if;
@@ -1290,12 +1292,12 @@ package body Devicetree is
            (Property.Name, "#address-cells")
       then
          Read_Cells_Property
-           (Property, State.Current_Cells_Context.Address_Cells, Result);
+           (Property, State.Current_Node_Context.Address_Cells, Result);
       elsif Compare_Fixed_Length_String_With_String
               (Property.Name, "#size-cells")
       then
          Read_Cells_Property
-           (Property, State.Current_Cells_Context.Size_Cells, Result);
+           (Property, State.Current_Node_Context.Size_Cells, Result);
       elsif Compare_Fixed_Length_String_With_String (Property.Name, "reg") then
          State.Current_Node_Reg_Property := Property;
       elsif Compare_Fixed_Length_String_With_String
@@ -1326,7 +1328,7 @@ package body Devicetree is
               (Property.Name, "interrupt-parent")
       then
          Read_First_Cell_Property
-           (Property, State.Current_Cells_Context.Interrupt_Parent, Result);
+           (Property, State.Current_Node_Context.Interrupt_Parent, Result);
       elsif Compare_Fixed_Length_String_With_String
               (Property.Name, "interrupts-extended")
       then
@@ -1341,7 +1343,7 @@ package body Devicetree is
       elsif Compare_Fixed_Length_String_With_String
               (Property.Name, "timebase-frequency")
         --  The root node is at depth 1, so '/cpus' is at depth 2.
-        and then State.Cells_Context_Stack.Count = 2
+        and then State.Node_Context_Stack.Count = 2
         and then Compare_Node_Name (State.Current_Node_Name, "cpus")
       then
          Read_Numeric_Property (Property, State.Timebase_Frequency, Result);
