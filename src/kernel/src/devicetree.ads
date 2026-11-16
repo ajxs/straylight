@@ -30,15 +30,29 @@ is
    type Devicetree_Device_Array_T is
      array (Positive range <>) of Devicetree_Device_T;
 
-   type Hart_Id_Array_T is array (Positive range <>) of Unsigned_64;
+   --  A hart described by the devicetree.
+   type Devicetree_Hart_T is record
+      Hart_Id                     : Unsigned_64;
+      --  Whether the PLIC has a context for this hart's supervisor-mode
+      --  external interrupts, from the PLIC's 'interrupts-extended'.
+      Has_Supervisor_PLIC_Context : Boolean;
+      --  The index of that context.
+      --  Only valid if Has_Supervisor_PLIC_Context is True.
+      Supervisor_PLIC_Context     : Natural;
+   end record;
+
+   type Devicetree_Hart_Array_T is
+     array (Positive range <>) of Devicetree_Hart_T;
 
    --  Memory_Regions returns the physical memory regions described by the
    --  devicetree, with the devicetree's own reserved regions removed.
    --  Note that the returned physical memory regions include the memory
    --  range used by the loaded kernel image. This needs to be removed
    --  by the caller prior to mapping these regions as free memory.
-   --  Hart_Ids returns the ID of each available hart, from the 'reg' of each
-   --  '/cpus' child node with 'device_type = "cpu"', in Devicetree order.
+   --  Harts returns information about each available hart, constructed
+   --  from the 'reg' of each '/cpus' child node with 'device_type = "cpu"',
+   --  in Devicetree order. Each hart's supervisor-mode context comes from the
+   --  first PLIC.
    --  Timebase_Frequency is the frequency of the timer that the 'time' CSR
    --  reads, in Hz, from '/cpus/timebase-frequency'. The value will be 0 if
    --  the Devicetree doesn't have a 'timebase-frequency' property.
@@ -48,7 +62,7 @@ is
       Memory_Region_Count : out Natural;
       Devices             : out Devicetree_Device_Array_T;
       Device_Count        : out Natural;
-      Hart_Ids            : out Hart_Id_Array_T;
+      Harts               : out Devicetree_Hart_Array_T;
       Hart_Count          : out Natural;
       Timebase_Frequency  : out Unsigned_64;
       Result              : out Function_Result);

@@ -32,12 +32,43 @@
 			device_type = "cpu";
 			reg = <0x00>;
 			status = "disabled";
+
+			cpu0_intc: interrupt-controller {
+				compatible = "riscv,cpu-intc";
+				interrupt-controller;
+				#address-cells = <0>;
+				#interrupt-cells = <1>;
+			};
 		};
 
 		cpu@1 {
 			device_type = "cpu";
 			reg = <0x01>;
 			status = "okay";
+
+			cpu1_intc: interrupt-controller {
+				compatible = "riscv,cpu-intc";
+				interrupt-controller;
+				#address-cells = <0>;
+				#interrupt-cells = <1>;
+			};
+		};
+
+		/*
+		 * A disabled hart after an available one, so that its
+		 * 'riscv,cpu-intc' isn't taken for hart 1's.
+		 */
+		cpu@2 {
+			device_type = "cpu";
+			reg = <0x02>;
+			status = "disabled";
+
+			cpu2_intc: interrupt-controller {
+				compatible = "riscv,cpu-intc";
+				interrupt-controller;
+				#address-cells = <0>;
+				#interrupt-cells = <1>;
+			};
 		};
 	};
 
@@ -79,5 +110,20 @@
 		compatible = "ns16550a";
 		reg = <0x00 0x10004000 0x00 0x100>;
 		status = "fail";
+	};
+
+	/*
+	 * Hart 0 only has a machine-mode context, like the monitor core on some
+	 * boards, so hart 1's supervisor-mode context is 2, not 3. Context 3
+	 * belongs to the disabled hart 2.
+	 */
+	plic@c000000 {
+		compatible = "riscv,plic0";
+		reg = <0x00 0x0c000000 0x00 0x600000>;
+		interrupts-extended = <&cpu0_intc 11 &cpu1_intc 11 &cpu1_intc 9
+				       &cpu2_intc 9>;
+		interrupt-controller;
+		#address-cells = <0>;
+		#interrupt-cells = <1>;
 	};
 };

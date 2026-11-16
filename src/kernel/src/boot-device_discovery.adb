@@ -46,24 +46,36 @@ package body Boot.Device_Discovery is
       Node            : Devicetree_Device_T;
       Virtual_Address : Virtual_Address_T)
    is
-      Index : Positive;
+      Device_Index : Positive;
    begin
-      Allocate_System_Device_Index (Index);
+      Allocate_System_Device_Index (Device_Index);
 
-      System_Devices (Index) :=
+      System_Devices (Device_Index) :=
         (Driver_Type      => Driver_Type_PLIC,
          Common           =>
-           (Memory_Size        =>
+           (Memory_Size      =>
               Align_Memory_Size_Up_To_Page_Boundary (Node.Size),
-            Virtual_Address    => Virtual_Address,
-            Physical_Address   => Node.Base,
-            Interrupt_Line     => 0,
-            Interrupt_Priority => 0,
-            Spinlock           => Locks.Null_Spinlock),
+            Virtual_Address  => Virtual_Address,
+            Physical_Address => Node.Base,
+            others           => <>),
          Interrupt_Parent => null,
-         PLIC             => (Interrupt_Devices => [others => null]));
+         PLIC             => <>);
 
-      Device := System_Devices (Index)'Access;
+      --  Record each hart's supervisor-mode PLIC context in the device's
+      --  state. This allows the PLIC to route interrupts to the correct
+      --  context, depending on which hart the interrupt occurred on.
+      for Hart of Devicetree_Harts (1 .. Devicetree_Hart_Count) loop
+         Hart_Has_Valid_Index : constant Boolean :=
+           Hart.Hart_Id <= Unsigned_64 (Hart_Index_T'Last);
+
+         if Hart.Has_Supervisor_PLIC_Context and then Hart_Has_Valid_Index then
+            System_Devices (Device_Index).PLIC.Supervisor_Contexts
+              (Hart_Index_T (Hart.Hart_Id)) :=
+              Hart.Supervisor_PLIC_Context;
+         end if;
+      end loop;
+
+      Device := System_Devices (Device_Index)'Access;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
@@ -385,9 +397,6 @@ package body Boot.Device_Discovery is
       Device_Virtual_Address : Virtual_Address_T :=
         Device_Mapping_Virtual_Address;
 
-      Supervisor_Interrupt_Context : constant Natural :=
-        Get_Current_Hart_Supervisor_Interrupt_Context;
-
       Root_Filesystem_Physical_Address : Physical_Address_T :=
         Null_Physical_Address;
 
@@ -420,6 +429,19 @@ package body Boot.Device_Discovery is
       if Interrupt_Controller = null then
          Panic ("No PLIC found in the Devicetree");
       end if;
+
+      --  Only the boot hart enables PLIC interrupts, so we need to ensure it
+      --  has a valid supervisor interrupt context.
+      if not (for some Hart of Devicetree_Harts (1 .. Devicetree_Hart_Count) =>
+                Hart.Hart_Id = Unsigned_64 (Get_Current_Hart_Id)
+                and then Hart.Has_Supervisor_PLIC_Context)
+      then
+         Panic ("No PLIC supervisor context for the boot hart");
+      end if;
+
+      Supervisor_Interrupt_Context : constant Natural :=
+        Interrupt_Controller.all.PLIC.Supervisor_Contexts
+          (Get_Current_Hart_Id);
 
       --  Next, scan the remaining nodes and create system devices for them.
       for Node of Devicetree_Devices (1 .. Devicetree_Device_Count) loop

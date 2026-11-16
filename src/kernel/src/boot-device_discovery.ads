@@ -24,6 +24,16 @@ is
      Devicetree_Device_Array_T (1 .. Maximum_Devicetree_Devices);
    Devicetree_Device_Count : Natural := 0;
 
+   Maximum_Devicetree_Harts : constant := 16;
+
+   --  Information about the available harts in the Devicetree.
+   --  Kernel_Main fills this list.
+   --  Start_Non_Boot_Harts starts only these harts, and Create_PLIC_Device
+   --  records each one's supervisor-mode PLIC context.
+   Devicetree_Harts : Devicetree_Hart_Array_T (1 .. Maximum_Devicetree_Harts);
+
+   Devicetree_Hart_Count : Natural := 0;
+
    --  The devices that the rest of Boot uses, set by Initialise_Devices. Each
    --  one is null until its device is created. The interrupt controller and
    --  the GPU are Interrupt_Controller and Graphics_Device in

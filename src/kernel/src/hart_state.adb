@@ -7,15 +7,6 @@ with Logging; use Logging;
 with RISCV.Interrupts;
 
 package body Hart_State is
-   function Get_Current_Hart_Supervisor_Interrupt_Context return Natural is
-   begin
-      --  This is the supervisor interrupt context for the current hart.
-      --  Each Hart has two contexts, one for machine mode, and one for
-      --  supervisor mode.
-      --  Refer to: https://stackoverflow.com/a/73171828/5931673
-      return ((Get_Current_Hart_Id * 2) + 1);
-   end Get_Current_Hart_Supervisor_Interrupt_Context;
-
    procedure Panic
      (Message : String := "Kernel Panic";
       File    : String := GNAT.Source_Info.File;

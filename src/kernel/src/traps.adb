@@ -88,11 +88,14 @@ package body Traps is
    procedure Handle_External_Interrupt is
       Interrupt_ID : Unsigned_32 := 0;
 
-      Supervisor_Interrupt_Context : constant Integer :=
-        Get_Current_Hart_Supervisor_Interrupt_Context;
-
       Result : Function_Result := Unset;
    begin
+      --  This is declared after 'begin', so that the exception handler below
+      --  covers the access check on Interrupt_Controller.
+      Supervisor_Interrupt_Context : constant Natural :=
+        Interrupt_Controller.all.PLIC.Supervisor_Contexts
+          (Get_Current_Hart_Id);
+
       Interrupt_ID :=
         Devices.PLIC.Claim_Supervisor_Interrupt
           (Interrupt_Controller.all.Common, Supervisor_Interrupt_Context);

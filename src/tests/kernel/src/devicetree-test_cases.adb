@@ -59,7 +59,7 @@ package body Devicetree.Test_Cases is
       Memory_Region_Count : Natural := 0;
       Devices             : Devicetree_Device_Array_T (1 .. 16);
       Device_Count        : Natural := 0;
-      Hart_Ids            : Hart_Id_Array_T (1 .. 16);
+      Harts               : Devicetree_Hart_Array_T (1 .. 16);
       Hart_Count          : Natural := 0;
       Timebase_Frequency  : Unsigned_64 := 0;
       Result              : Function_Result := Unset;
@@ -91,7 +91,7 @@ package body Devicetree.Test_Cases is
          Memory_Region_Count,
          Devices,
          Device_Count,
-         Hart_Ids,
+         Harts,
          Hart_Count,
          Timebase_Frequency,
          Result);
@@ -101,8 +101,17 @@ package body Devicetree.Test_Cases is
         (Timebase_Frequency = 10_000_000,
          "The timebase is QEMU's 10 MHz, from /cpus");
 
+      --  Each hart has a machine-mode PLIC context, then a supervisor-mode
+      --  one, so hart N's supervisor-mode context is N * 2 + 1.
       Assert (Hart_Count = 3, "There are three harts");
-      Assert (Hart_Ids (1 .. 3) = [0, 1, 2], "The harts are 0 to 2, in order");
+      for Hart in 0 .. 2 loop
+         Assert
+           (Harts (Hart + 1)
+            = (Hart_Id                     => Unsigned_64 (Hart),
+               Has_Supervisor_PLIC_Context => True,
+               Supervisor_PLIC_Context     => Hart * 2 + 1),
+            "Hart" & Hart'Image & " is wrong");
+      end loop;
 
       --  The memory node is 0x80000000 to 0x88000000, and OpenSBI's two
       --  'reserved-memory' children cover 0x80000000 to 0x80060000. The
@@ -139,7 +148,7 @@ package body Devicetree.Test_Cases is
 
       Memory_Regions      : Physical_Memory_Region_Array_T (1 .. 16);
       Memory_Region_Count : Natural := 0;
-      Hart_Ids            : Hart_Id_Array_T (1 .. 16);
+      Harts               : Devicetree_Hart_Array_T (1 .. 16);
       Hart_Count          : Natural := 0;
       Timebase_Frequency  : Unsigned_64 := 0;
       Result              : Function_Result := Unset;
@@ -160,7 +169,7 @@ package body Devicetree.Test_Cases is
          Memory_Region_Count,
          Too_Few_Devices,
          Device_Count,
-         Hart_Ids,
+         Harts,
          Hart_Count,
          Timebase_Frequency,
          Result);
@@ -177,7 +186,7 @@ package body Devicetree.Test_Cases is
          Memory_Region_Count,
          Devices,
          Device_Count,
-         Hart_Ids,
+         Harts,
          Hart_Count,
          Timebase_Frequency,
          Result);
@@ -192,7 +201,7 @@ package body Devicetree.Test_Cases is
       Memory_Region_Count : Natural := 0;
       Devices             : Devicetree_Device_Array_T (1 .. 16);
       Device_Count        : Natural := 0;
-      Hart_Ids            : Hart_Id_Array_T (1 .. 16);
+      Harts               : Devicetree_Hart_Array_T (1 .. 16);
       Hart_Count          : Natural := 0;
       Timebase_Frequency  : Unsigned_64 := 0;
       Result              : Function_Result := Unset;
@@ -208,7 +217,7 @@ package body Devicetree.Test_Cases is
          Memory_Region_Count,
          Devices,
          Device_Count,
-         Hart_Ids,
+         Harts,
          Hart_Count,
          Timebase_Frequency,
          Result);
@@ -223,12 +232,16 @@ package body Devicetree.Test_Cases is
          "The region is the whole of the enabled memory node");
 
       --  The UARTs with "okay", "ok" and no 'status' are kept, and the ones
-      --  with "disabled" and "fail" are skipped.
-      Assert (Device_Count = 3, "There are three available devices");
+      --  with "disabled" and "fail" are skipped. The PLIC comes after them.
+      Assert (Device_Count = 4, "There are four available devices");
 
+      Assert (Hart_Count = 1, "Only the available hart is returned");
       Assert
-        (Hart_Count = 1 and then Hart_Ids (1) = 1,
-         "Only the available hart is returned");
+        (Harts (1)
+         = (Hart_Id                     => 1,
+            Has_Supervisor_PLIC_Context => True,
+            Supervisor_PLIC_Context     => 2),
+         "Hart 1's supervisor context comes from interrupts-extended");
 
       for Index in 1 .. 3 loop
          Assert

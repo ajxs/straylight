@@ -5,6 +5,7 @@
 limited with Devices.Attached_System_Devices;
 
 with Function_Results; use Function_Results;
+with Hart_State;
 
 package Devices.PLIC
   with Preelaborate
@@ -19,10 +20,18 @@ is
      array (Interrupt_Line_T)
      of access Devices.Attached_System_Devices.Device_T;
 
+   type Hart_Context_Array_T is array (Hart_State.Hart_Index_T) of Natural;
+
    type PLIC_Device_State_T is record
       --  The device that raises each interrupt line, so that a claimed
       --  interrupt can be dispatched to its device.
       Interrupt_Devices : Interrupt_Device_Array_T := [others => null];
+
+      --  The context that receives each hart's supervisor-mode external
+      --  interrupts, from the Devicetree. A hart without one keeps 0, which
+      --  is never used, since only the boot hart enables PLIC interrupts,
+      --  and Boot checks that the boot hart has one.
+      Supervisor_Contexts : Hart_Context_Array_T := [others => 0];
    end record;
 
    function Claim_Supervisor_Interrupt

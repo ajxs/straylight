@@ -25,6 +25,8 @@ package body Devicetree is
 
    Maximum_Harts : constant := 16;
 
+   type Phandle_Array_T is array (Positive range <>) of Unsigned_32;
+
    subtype FDT_Token_T is Unsigned_32;
 
    type FDT_Property_T is record
@@ -96,6 +98,17 @@ package body Devicetree is
       Current_Node_Is_Memory : Boolean := False;
       Current_Node_Is_CPU    : Boolean := False;
 
+      --  True if the current node is a hart's local interrupt controller,
+      --  from 'compatible = "riscv,cpu-intc"'.
+      Current_Node_Is_CPU_Interrupt_Controller : Boolean := False;
+
+      --  The current node's 'phandle', or 0 if it has none.
+      Current_Node_Phandle : Unsigned_32 := 0;
+
+      --  Value_Address is null if the current node has no
+      --  'interrupts-extended'.
+      Current_Node_Interrupts_Extended_Property : Devicetree_Property_T;
+
       --  The type of device the current node describes, determined by its
       --  'compatible' property.
       Current_Node_Device_Type : Devicetree_Device_Type_T :=
@@ -124,8 +137,23 @@ package body Devicetree is
       Devices      : Devicetree_Device_Array_T (1 .. Maximum_Devices);
       Device_Count : Natural := 0;
 
-      Hart_Ids   : Hart_Id_Array_T (1 .. Maximum_Harts);
+      Harts      : Devicetree_Hart_Array_T (1 .. Maximum_Harts);
       Hart_Count : Natural := 0;
+
+      --  The phandle of each hart's 'riscv,cpu-intc' node, by index in
+      --  Harts, or 0 if not found. The PLIC's 'interrupts-extended' refers
+      --  to each hart by this phandle.
+      Hart_Interrupt_Controller_Phandles :
+        Phandle_Array_T (1 .. Maximum_Harts) := [others => 0];
+
+      --  The index in Harts of the hart that the most recent cpu node added,
+      --  or 0 if it added none. A 'riscv,cpu-intc' node is a child of its
+      --  hart's cpu node, so this is the hart it belongs to.
+      Last_CPU_Hart_Index : Natural := 0;
+
+      --  The first PLIC's 'interrupts-extended'. It's decoded once the whole
+      --  structure block is parsed, so every hart's phandle is known.
+      PLIC_Interrupts_Extended_Property : Devicetree_Property_T;
 
       --  From '/cpus/timebase-frequency', or 0 if it hasn't been found.
       Timebase_Frequency : Unsigned_64 := 0;
@@ -387,12 +415,17 @@ package body Devicetree is
    ----------------------------------------------------------------------------
    --  Harts that don't fit are left out with an error, rather than halting the
    --  parsing process, since the kernel can continue running on the available
-   --  harts.
+   --  harts. Index is the hart's index in State.Harts, or 0 if it was left
+   --  out.
    ----------------------------------------------------------------------------
-   procedure Add_Hart_Id
-     (State : in out FDT_Parser_State_T; Hart_Id : Unsigned_64) is
+   procedure Add_Hart
+     (State   : in out FDT_Parser_State_T;
+      Hart_Id : Unsigned_64;
+      Index   : out Natural) is
    begin
-      if State.Hart_Count >= State.Hart_Ids'Last then
+      Index := 0;
+
+      if State.Hart_Count >= State.Harts'Last then
          Log_Error
            ("Too many harts in devicetree, ignoring hart: hart_id="
             & Hart_Id'Image (2 .. Hart_Id'Image'Length));
@@ -400,11 +433,17 @@ package body Devicetree is
       end if;
 
       State.Hart_Count := State.Hart_Count + 1;
-      State.Hart_Ids (State.Hart_Count) := Hart_Id;
+      State.Harts (State.Hart_Count) :=
+        (Hart_Id                     => Hart_Id,
+         Has_Supervisor_PLIC_Context => False,
+         Supervisor_PLIC_Context     => 0);
+
+      Index := State.Hart_Count;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
-   end Add_Hart_Id;
+         Index := 0;
+   end Add_Hart;
 
    procedure Parse_Reserved_Memory_Regions
      (State                      : in out FDT_Parser_State_T;
@@ -1047,6 +1086,9 @@ package body Devicetree is
    is
       Reg_Entries     : Memory_Region_List_T;
       Reg_Entry_Count : Natural := 0;
+
+      --  The index in State.Harts of the hart a cpu node adds, or 0 if none.
+      Hart_Index : Natural := 0;
    begin
       --  Only decode 'reg' for the nodes the parser uses. An unavailable
       --  node's 'reg' isn't decoded.
@@ -1089,13 +1131,21 @@ package body Devicetree is
             end if;
          end loop;
 
-      elsif State.Current_Node_Is_CPU and then Reg_Entry_Count > 0 then
+      elsif State.Current_Node_Is_CPU then
          --  As per Devicetree specification v0.4 section 3.8, a cpu node's
          --  'reg' property value is its hart ID, not an address range.
          --  It's decoded like any other 'reg', so the ID is the first entry's
          --  base.
-         Add_Hart_Id
-           (State, Address_To_Unsigned_64 (Address (Reg_Entries (1).Base)));
+         if Reg_Entry_Count > 0 then
+            Add_Hart
+              (State,
+               Address_To_Unsigned_64 (Address (Reg_Entries (1).Base)),
+               Hart_Index);
+         end if;
+
+         --  An unavailable cpu node adds no hart, so its 'riscv,cpu-intc'
+         --  child belongs to no hart.
+         State.Last_CPU_Hart_Index := Hart_Index;
 
       elsif State.Current_Node_Device_Type /= Devicetree_Device_Type_None
         and then Reg_Entry_Count > 0
@@ -1105,12 +1155,36 @@ package body Devicetree is
          if Is_Error (Result) then
             return;
          end if;
+
+         --  The kernel only uses the first PLIC.
+         if State.Current_Node_Device_Type = Devicetree_Device_Type_PLIC
+           and then
+             State.PLIC_Interrupts_Extended_Property.Value_Address
+             = Null_Address
+         then
+            State.PLIC_Interrupts_Extended_Property :=
+              State.Current_Node_Interrupts_Extended_Property;
+         end if;
+      end if;
+
+      --  A 'riscv,cpu-intc' node has no 'reg', so it's handled separately.
+      if State.Current_Node_Is_CPU_Interrupt_Controller
+        and then State.Current_Node_Is_Available
+        and then State.Last_CPU_Hart_Index /= 0
+      then
+         State.Hart_Interrupt_Controller_Phandles
+           (State.Last_CPU_Hart_Index) :=
+           State.Current_Node_Phandle;
       end if;
 
       --  Clear the current node's state.
       State.Current_Node_Reg_Property.Value_Address := Null_Address;
       State.Current_Node_Is_Memory := False;
       State.Current_Node_Is_CPU := False;
+      State.Current_Node_Is_CPU_Interrupt_Controller := False;
+      State.Current_Node_Phandle := 0;
+      State.Current_Node_Interrupts_Extended_Property.Value_Address :=
+        Null_Address;
       State.Current_Node_Device_Type := Devicetree_Device_Type_None;
       State.Current_Node_Interrupt_Line := 0;
       State.Current_Node_Is_Available := True;
@@ -1229,11 +1303,22 @@ package body Devicetree is
       then
          State.Current_Node_Device_Type :=
            Get_Device_Type_From_Compatible (Property);
+         State.Current_Node_Is_CPU_Interrupt_Controller :=
+           Does_Stringlist_Property_Contain_String
+             (Property, "riscv,cpu-intc");
       elsif Compare_Fixed_Length_String_With_String
               (Property.Name, "interrupts")
       then
          Read_First_Cell_Property
            (Property, State.Current_Node_Interrupt_Line, Result);
+      elsif Compare_Fixed_Length_String_With_String (Property.Name, "phandle")
+      then
+         Read_First_Cell_Property
+           (Property, State.Current_Node_Phandle, Result);
+      elsif Compare_Fixed_Length_String_With_String
+              (Property.Name, "interrupts-extended")
+      then
+         State.Current_Node_Interrupts_Extended_Property := Property;
       elsif Compare_Fixed_Length_String_With_String (Property.Name, "status")
       then
          --  According to Devicetree specification v0.4 section 2.3.4, "ok" is
@@ -1334,6 +1419,66 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Remove_Reserved_Memory_Regions_From_Memory_Regions;
 
+   ----------------------------------------------------------------------------
+   --  Finds each hart's supervisor-mode context in the first PLIC's
+   --  'interrupts-extended'. It has one entry per PLIC context, in context
+   --  order: the phandle of a hart's 'riscv,cpu-intc' node, then the
+   --  interrupt that the context raises on that hart. OpenSBI sets the
+   --  machine-mode entries to 16#FFFF_FFFF#, so supervisor mode skips them.
+   --  Each entry is 2 cells, because the PLIC binding only allows
+   --  'riscv,cpu-intc' targets, which have '#interrupt-cells = <1>'.
+   --  Entries for harts that aren't in State.Harts, such as disabled ones,
+   --  are skipped.
+   ----------------------------------------------------------------------------
+   procedure Find_Supervisor_PLIC_Contexts
+     (State : in out FDT_Parser_State_T; Result : out Function_Result)
+   is
+      --  The RISC-V supervisor external interrupt.
+      Supervisor_External_Interrupt : constant := 9;
+
+      Property : Devicetree_Property_T renames
+        State.PLIC_Interrupts_Extended_Property;
+   begin
+      if Property.Value_Address = Null_Address then
+         Result := Success;
+         return;
+      end if;
+
+      if Property.Length mod 8 /= 0 then
+         Log_Error ("Invalid PLIC 'interrupts-extended' length");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      for Context in 0 .. Natural (Property.Length / 8) - 1 loop
+         Entry_Address : constant Address :=
+           Property.Value_Address + Storage_Offset (Context * 8);
+
+         Phandle : constant Unsigned_64 := Read_Cells_Value (Entry_Address, 1);
+         Interrupt : constant Unsigned_64 :=
+           Read_Cells_Value (Entry_Address + 4, 1);
+
+         if Phandle /= 0 and then Interrupt = Supervisor_External_Interrupt
+         then
+            for Index in 1 .. State.Hart_Count loop
+               if Unsigned_64
+                    (State.Hart_Interrupt_Controller_Phandles (Index))
+                 = Phandle
+               then
+                  State.Harts (Index).Has_Supervisor_PLIC_Context := True;
+                  State.Harts (Index).Supervisor_PLIC_Context := Context;
+               end if;
+            end loop;
+         end if;
+      end loop;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Find_Supervisor_PLIC_Contexts;
+
    procedure Copy_Parsed_Memory_Regions_To_Result
      (State               : FDT_Parser_State_T;
       Memory_Regions      : out Physical_Memory_Region_Array_T;
@@ -1390,22 +1535,22 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Copy_Discovered_Devices_To_Result;
 
-   procedure Copy_Hart_Ids_To_Result
+   procedure Copy_Harts_To_Result
      (State      : FDT_Parser_State_T;
-      Hart_Ids   : out Hart_Id_Array_T;
+      Harts      : out Devicetree_Hart_Array_T;
       Hart_Count : out Natural;
       Result     : out Function_Result) is
    begin
       Hart_Count := 0;
 
-      if State.Hart_Count > Hart_Ids'Length then
+      if State.Hart_Count > Harts'Length then
          Log_Error ("Too many harts for the output array");
          Result := Region_Array_Exhausted;
          return;
       end if;
 
-      Hart_Ids (Hart_Ids'First .. Hart_Ids'First + State.Hart_Count - 1) :=
-        State.Hart_Ids (1 .. State.Hart_Count);
+      Harts (Harts'First .. Harts'First + State.Hart_Count - 1) :=
+        State.Harts (1 .. State.Hart_Count);
 
       Hart_Count := State.Hart_Count;
 
@@ -1415,7 +1560,7 @@ package body Devicetree is
          Log_Constraint_Error;
          Hart_Count := 0;
          Result := Constraint_Exception;
-   end Copy_Hart_Ids_To_Result;
+   end Copy_Harts_To_Result;
 
    procedure Parse_Devicetree
      (DTB_Address         : Address;
@@ -1423,7 +1568,7 @@ package body Devicetree is
       Memory_Region_Count : out Natural;
       Devices             : out Devicetree_Device_Array_T;
       Device_Count        : out Natural;
-      Hart_Ids            : out Hart_Id_Array_T;
+      Harts               : out Devicetree_Hart_Array_T;
       Hart_Count          : out Natural;
       Timebase_Frequency  : out Unsigned_64;
       Result              : out Function_Result)
@@ -1475,6 +1620,11 @@ package body Devicetree is
          return;
       end if;
 
+      Find_Supervisor_PLIC_Contexts (State, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
       Remove_Reserved_Memory_Regions_From_Memory_Regions (State, Result);
       if Is_Error (Result) then
          return;
@@ -1491,7 +1641,7 @@ package body Devicetree is
          return;
       end if;
 
-      Copy_Hart_Ids_To_Result (State, Hart_Ids, Hart_Count, Result);
+      Copy_Harts_To_Result (State, Harts, Hart_Count, Result);
       if Is_Error (Result) then
          return;
       end if;

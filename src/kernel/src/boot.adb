@@ -29,14 +29,6 @@ with Processes.Scheduler;
 with Traps;
 
 package body Boot is
-   --  The IDs of the available harts in the Devicetree. Kernel_Main fills
-   --  this list, and Start_Non_Boot_Harts starts only these harts.
-   Maximum_Devicetree_Harts : constant := 16;
-
-   Devicetree_Hart_Ids   :
-     Devicetree.Hart_Id_Array_T (1 .. Maximum_Devicetree_Harts);
-   Devicetree_Hart_Count : Natural := 0;
-
    function Get_Early_Kernel_Stack_Virtual_Address
      (Hart_Id : Hart_Index_T) return Virtual_Address_T
    is (Early_Kernel_Stack_Virtual_Address_Base
@@ -399,7 +391,7 @@ package body Boot is
          Memory_Region_Count,
          Devicetree_Devices,
          Devicetree_Device_Count,
-         Devicetree_Hart_Ids,
+         Devicetree_Harts,
          Devicetree_Hart_Count,
          Timebase_Frequency,
          Result);
@@ -799,18 +791,18 @@ package body Boot is
    begin
       pragma Debug (Debug_Boot, Log_Debug ("Starting non-boot harts..."));
 
-      for Id of Devicetree_Hart_Ids (1 .. Devicetree_Hart_Count) loop
-         if Id > Unsigned_64 (Hart_Index_T'Last) then
+      for Hart of Devicetree_Harts (1 .. Devicetree_Hart_Count) loop
+         if Hart.Hart_Id > Unsigned_64 (Hart_Index_T'Last) then
             Log_Error
               ("Not starting a hart above the kernel's maximum: hart_id="
-               & Id'Image (2 .. Id'Image'Length));
+               & Hart.Hart_Id'Image (2 .. Hart.Hart_Id'Image'Length));
          end if;
       end loop;
 
       for Hart_Id in 0 .. Hart_State.Maximum_Harts - 1 loop
          Was_Hart_Described_As_Available_in_Devicetree : constant Boolean :=
-           (for some Id of Devicetree_Hart_Ids (1 .. Devicetree_Hart_Count) =>
-              Id = Unsigned_64 (Hart_Id));
+           (for some Hart of Devicetree_Harts (1 .. Devicetree_Hart_Count) =>
+              Hart.Hart_Id = Unsigned_64 (Hart_Id));
 
          if Hart_Id = Get_Current_Hart_Id then
             --  This hart is already running.

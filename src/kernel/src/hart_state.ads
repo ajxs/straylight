@@ -12,7 +12,6 @@ with Processes; use Processes;
 package Hart_State
   with Preelaborate
 is
-
    Maximum_Harts : constant := 8;
    subtype Hart_Index_T is Natural range 0 .. (Maximum_Harts - 1);
 
@@ -109,9 +108,6 @@ is
    procedure Push_Interrupts_Off;
 
    procedure Pop_Interrupts_Off;
-
-   function Get_Current_Hart_Supervisor_Interrupt_Context return Natural
-   with Inline, Volatile_Function;
 
    procedure Handle_Kernel_Stack_Overflow
    with
