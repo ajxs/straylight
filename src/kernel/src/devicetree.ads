@@ -25,6 +25,14 @@ is
       Size           : Storage_Count;
       --  The first cell of the device's 'interrupts' property, or 0 if none.
       Interrupt_Line : Unsigned_32;
+
+      --  The device node's 'phandle', or 0 if it has none.
+      Phandle : Unsigned_32;
+
+      --  The phandle of the interrupt controller that the device raises
+      --  interrupts on, from 'interrupt-parent', or 0 if none. A node
+      --  without one inherits it from its nearest ancestor with one.
+      Interrupt_Parent : Unsigned_32;
    end record;
 
    type Devicetree_Device_Array_T is

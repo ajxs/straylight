@@ -20,6 +20,10 @@ with Memory.Virtual;       use Memory.Virtual;
 with Utilities;            use Utilities;
 
 package body Boot.Device_Discovery is
+   --  The Devicetree phandle of Interrupt_Controller's node, so that devices
+   --  can find it by their 'interrupt-parent'. 0 until the PLIC is created.
+   Interrupt_Controller_Phandle : Unsigned_32 := 0;
+
    ----------------------------------------------------------------------------
    --  Returns the index of the next unused System_Devices entry, in the order
    --  devices are created. Panics if every entry is in use.
@@ -277,14 +281,34 @@ package body Boot.Device_Discovery is
    end Create_Virtio_GPU_Device;
 
    ----------------------------------------------------------------------------
-   --  The interrupt controller that a node's device raises interrupts on.
+   --  The interrupt controller that a node's device raises interrupts on,
+   --  found by the node's 'interrupt-parent' phandle.
    --  A node with no 'interrupts' property gets given a default interrupt
    --  line value of 0. Since it doesn't raise interrupts, don't assign it an
    --  interrupt parent.
+   --  The PLIC is the only interrupt controller the kernel supports, so a
+   --  device whose interrupt parent is anything else gets none, and its
+   --  interrupts are never enabled.
    ----------------------------------------------------------------------------
    function Get_Interrupt_Parent
-     (Node : Devicetree_Device_T) return Device_Access
-   is (if Node.Interrupt_Line = 0 then null else Interrupt_Controller);
+     (Node : Devicetree_Device_T) return Device_Access is
+   begin
+      if Node.Interrupt_Line = 0 then
+         return null;
+      end if;
+
+      if Node.Interrupt_Parent = 0
+        or else Node.Interrupt_Parent /= Interrupt_Controller_Phandle
+      then
+         Log_Error
+           ("Device's interrupt parent isn't the PLIC, so its interrupts are"
+            & " disabled: addr_phys="
+            & GNAT.Debug_Utilities.Image_C (Address (Node.Base)));
+         return null;
+      end if;
+
+      return Interrupt_Controller;
+   end Get_Interrupt_Parent;
 
    ----------------------------------------------------------------------------
    --  Creates a system device for a 'virtio,mmio' compatible Devicetree node.
@@ -363,6 +387,8 @@ package body Boot.Device_Discovery is
             if Interrupt_Controller = null then
                Create_PLIC_Device
                  (Interrupt_Controller, Node, Virtual_Address);
+
+               Interrupt_Controller_Phandle := Node.Phandle;
             end if;
 
          when Devicetree_Device_Type_UART_NS16550A =>

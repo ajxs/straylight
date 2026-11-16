@@ -67,19 +67,27 @@ package body Devicetree.Test_Cases is
       DTB : DTB_Buffer_T
       with Alignment => 8;
 
+      --  The PLIC's phandle, which every other device's 'interrupt-parent'
+      --  refers to.
+      PLIC_Phandle : constant := 7;
+
       procedure Assert_Device
-        (Index          : Positive;
-         Device_Type    : Devicetree_Device_Type_T;
-         Base           : Integer_Address;
-         Size           : Storage_Count;
-         Interrupt_Line : Unsigned_32) is
+        (Index            : Positive;
+         Device_Type      : Devicetree_Device_Type_T;
+         Base             : Integer_Address;
+         Size             : Storage_Count;
+         Interrupt_Line   : Unsigned_32;
+         Phandle          : Unsigned_32;
+         Interrupt_Parent : Unsigned_32) is
       begin
          Assert
            (Devices (Index)
-            = (Device_Type    => Device_Type,
-               Base           => Create_Phys_Addr (Base),
-               Size           => Size,
-               Interrupt_Line => Interrupt_Line),
+            = (Device_Type      => Device_Type,
+               Base             => Create_Phys_Addr (Base),
+               Size             => Size,
+               Interrupt_Line   => Interrupt_Line,
+               Phandle          => Phandle,
+               Interrupt_Parent => Interrupt_Parent),
             "Device" & Index'Image & " is wrong");
       end Assert_Device;
    begin
@@ -127,7 +135,13 @@ package body Devicetree.Test_Cases is
       --  slots from the highest address down, then the PLIC.
       Assert (Device_Count = 10, "There are ten recognised devices");
       Assert_Device
-        (1, Devicetree_Device_Type_UART_NS16550A, 16#1000_0000#, 16#100#, 10);
+        (1,
+         Devicetree_Device_Type_UART_NS16550A,
+         16#1000_0000#,
+         16#100#,
+         10,
+         0,
+         PLIC_Phandle);
 
       for Slot in 1 .. 8 loop
          Assert_Device
@@ -135,11 +149,19 @@ package body Devicetree.Test_Cases is
             Devicetree_Device_Type_Virtio_MMIO,
             16#1000_0000# + Integer_Address (9 - Slot) * 16#1000#,
             16#1000#,
-            Unsigned_32 (9 - Slot));
+            Unsigned_32 (9 - Slot),
+            0,
+            PLIC_Phandle);
       end loop;
 
       Assert_Device
-        (10, Devicetree_Device_Type_PLIC, 16#0C00_0000#, 16#60_0000#, 0);
+        (10,
+         Devicetree_Device_Type_PLIC,
+         16#0C00_0000#,
+         16#60_0000#,
+         0,
+         PLIC_Phandle,
+         0);
    end Run_Test;
 
    overriding
@@ -250,6 +272,20 @@ package body Devicetree.Test_Cases is
                 (16#1000_0000# + Integer_Address (Index - 1) * 16#1000#),
             "Device" & Index'Image & " is wrong");
       end loop;
+
+      --  The root's 'interrupt-parent' is the PLIC, and the second UART has
+      --  its own. The third UART comes after it, so it must get the root's
+      --  again.
+      Assert (Devices (4).Phandle = 16#20#, "The PLIC's phandle is read");
+      Assert
+        (Devices (1).Interrupt_Parent = 16#20#,
+         "The first UART inherits the root's interrupt parent");
+      Assert
+        (Devices (2).Interrupt_Parent = 16#21#,
+         "The second UART's own interrupt parent overrides the root's");
+      Assert
+        (Devices (3).Interrupt_Parent = 16#20#,
+         "The third UART inherits the root's interrupt parent");
    end Run_Test;
 
 end Devicetree.Test_Cases;

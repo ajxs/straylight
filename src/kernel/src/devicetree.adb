@@ -43,10 +43,15 @@ package body Devicetree is
 
    --  The current address and size cells context is captured in a stack, so
    --  that we can properly handle nested nodes that override the
-   --  #address-cells and #size-cells properties.
+   --  #address-cells, #size-cells, and interrupt-parent properties.
    type FDT_Cells_Context_T is record
       Address_Cells : Unsigned_32;
       Size_Cells    : Unsigned_32;
+
+      --  The phandle from 'interrupt-parent', or 0 if none. A node without
+      --  one inherits its parent's, as per Devicetree specification v0.4
+      --  section 2.4.1. It's kept here because it's inherited the same way.
+      Interrupt_Parent : Unsigned_32;
    end record;
 
    Maximum_Cells_Context_Depth : constant := 16;
@@ -85,7 +90,7 @@ package body Devicetree is
       --  'If missing, a client program should assume a default value of 2
       --  for #address-cells, and a value of 1 for #size-cells.'
       Current_Cells_Context   : FDT_Cells_Context_T :=
-        (Address_Cells => 2, Size_Cells => 1);
+        (Address_Cells => 2, Size_Cells => 1, Interrupt_Parent => 0);
 
       --  The name of the node currently being parsed.
       Current_Node_Name : Devicetree_String_T;
@@ -400,10 +405,12 @@ package body Devicetree is
 
       State.Device_Count := State.Device_Count + 1;
       State.Devices (State.Device_Count) :=
-        (Device_Type    => State.Current_Node_Device_Type,
-         Base           => Region.Base,
-         Size           => Region.Size,
-         Interrupt_Line => State.Current_Node_Interrupt_Line);
+        (Device_Type      => State.Current_Node_Device_Type,
+         Base             => Region.Base,
+         Size             => Region.Size,
+         Interrupt_Line   => State.Current_Node_Interrupt_Line,
+         Phandle          => State.Current_Node_Phandle,
+         Interrupt_Parent => State.Current_Cells_Context.Interrupt_Parent);
 
       Result := Success;
    exception
@@ -1315,6 +1322,11 @@ package body Devicetree is
       then
          Read_First_Cell_Property
            (Property, State.Current_Node_Phandle, Result);
+      elsif Compare_Fixed_Length_String_With_String
+              (Property.Name, "interrupt-parent")
+      then
+         Read_First_Cell_Property
+           (Property, State.Current_Cells_Context.Interrupt_Parent, Result);
       elsif Compare_Fixed_Length_String_With_String
               (Property.Name, "interrupts-extended")
       then

@@ -1,6 +1,8 @@
 /*
  * A small Devicetree for the host tests of the 'status' property.
  * Nodes whose 'status' isn't "okay" or "ok" must be skipped.
+ * It also has cases that QEMU's Devicetree doesn't: PLIC contexts that
+ * aren't 'hart * 2 + 1', and an inherited 'interrupt-parent'.
  *
  * status.dtb is built from this file, and both are committed. After changing
  * this file, rebuild it from this directory with:
@@ -12,6 +14,7 @@
 / {
 	#address-cells = <2>;
 	#size-cells = <2>;
+	interrupt-parent = <&plic>;
 
 	memory@80000000 {
 		device_type = "memory";
@@ -93,6 +96,8 @@
 		compatible = "ns16550a";
 		reg = <0x00 0x10001000 0x00 0x100>;
 		status = "ok";
+		interrupt-parent = <&gpio>;
+		interrupts = <3>;
 	};
 
 	serial@10002000 {
@@ -117,11 +122,24 @@
 	 * boards, so hart 1's supervisor-mode context is 2, not 3. Context 3
 	 * belongs to the disabled hart 2.
 	 */
-	plic@c000000 {
+	plic: plic@c000000 {
 		compatible = "riscv,plic0";
+		phandle = <0x20>;
 		reg = <0x00 0x0c000000 0x00 0x600000>;
 		interrupts-extended = <&cpu0_intc 11 &cpu1_intc 11 &cpu1_intc 9
 				       &cpu2_intc 9>;
+		interrupt-controller;
+		#address-cells = <0>;
+		#interrupt-cells = <1>;
+	};
+
+	/*
+	 * An interrupt controller the parser doesn't recognise, for the second
+	 * UART's own 'interrupt-parent'.
+	 */
+	gpio: gpio@10010000 {
+		reg = <0x00 0x10010000 0x00 0x100>;
+		phandle = <0x21>;
 		interrupt-controller;
 		#address-cells = <0>;
 		#interrupt-cells = <1>;
