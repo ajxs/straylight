@@ -16,12 +16,14 @@ package body Devicetree.Test_Cases is
    subtype DTB_Buffer_T is Stream_Element_Array (1 .. Maximum_DTB_Size);
 
    ----------------------------------------------------------------------------
-   --  Reads the DTB that the kernel receives on QEMU's 'virt' machine, which
-   --  scripts/capture_virt_dtb.sh captures. It's found relative to the test
-   --  executable, at bin/../data/virt.dtb, so the tests can be run from any
+   --  Reads a DTB from the tests' data directory. It's found relative to the
+   --  test executable, at bin/../data/, so the tests can be run from any
    --  directory.
+   --  virt.dtb is the DTB that the kernel receives on QEMU's 'virt' machine,
+   --  which scripts/capture_virt_dtb.sh captures. The others are built from
+   --  the .dts file with the same name.
    ----------------------------------------------------------------------------
-   procedure Read_Virt_DTB (DTB : out DTB_Buffer_T) is
+   procedure Read_DTB (File_Name : String; DTB : out DTB_Buffer_T) is
       package Directories renames Ada.Directories;
 
       Tests_Directory : constant String :=
@@ -31,7 +33,7 @@ package body Devicetree.Test_Cases is
 
       DTB_Path : constant String :=
         Directories.Compose
-          (Directories.Compose (Tests_Directory, "data"), "virt.dtb");
+          (Directories.Compose (Tests_Directory, "data"), File_Name);
 
       File : Stream_IO.File_Type;
       Last : Stream_Element_Offset := 0;
@@ -42,8 +44,8 @@ package body Devicetree.Test_Cases is
 
       Assert
         (Last > 0 and then Last < DTB'Last,
-         "virt.dtb was read, and fits in the buffer");
-   end Read_Virt_DTB;
+         File_Name & " was read, and fits in the buffer");
+   end Read_DTB;
 
    function Create_Phys_Addr
      (Value : Integer_Address) return Physical_Address_T
@@ -79,7 +81,7 @@ package body Devicetree.Test_Cases is
             "Device" & Index'Image & " is wrong");
       end Assert_Device;
    begin
-      Read_Virt_DTB (DTB);
+      Read_DTB ("virt.dtb", DTB);
 
       Parse_Devicetree
         (DTB'Address,
@@ -141,7 +143,7 @@ package body Devicetree.Test_Cases is
       DTB : DTB_Buffer_T
       with Alignment => 8;
    begin
-      Read_Virt_DTB (DTB);
+      Read_DTB ("virt.dtb", DTB);
 
       Parse_Devicetree
         (DTB'Address,
@@ -167,6 +169,53 @@ package body Devicetree.Test_Cases is
          Timebase_Frequency,
          Result);
       Assert (Is_Error (Result), "A DTB with a bad magic number fails");
+   end Run_Test;
+
+   overriding
+   procedure Run_Test (T : in out Test_Parse_Node_Status) is
+      pragma Unreferenced (T);
+
+      Memory_Regions      : Physical_Memory_Region_Array_T (1 .. 16);
+      Memory_Region_Count : Natural := 0;
+      Devices             : Devicetree_Device_Array_T (1 .. 16);
+      Device_Count        : Natural := 0;
+      Timebase_Frequency  : Unsigned_64 := 0;
+      Result              : Function_Result := Unset;
+
+      DTB : DTB_Buffer_T
+      with Alignment => 8;
+   begin
+      Read_DTB ("status.dtb", DTB);
+
+      Parse_Devicetree
+        (DTB'Address,
+         Memory_Regions,
+         Memory_Region_Count,
+         Devices,
+         Device_Count,
+         Timebase_Frequency,
+         Result);
+      Assert (Result = Success, "Parse_Devicetree succeeds");
+
+      --  The disabled memory node isn't added, and the disabled reservation
+      --  doesn't split the enabled memory node.
+      Assert (Memory_Region_Count = 1, "There is one memory region");
+      Assert
+        (Memory_Regions (1)
+         = (Base => Create_Phys_Addr (16#8000_0000#), Size => 16#100_0000#),
+         "The region is the whole of the enabled memory node");
+
+      --  The UARTs with "okay", "ok" and no 'status' are kept, and the ones
+      --  with "disabled" and "fail" are skipped.
+      Assert (Device_Count = 3, "There are three available devices");
+
+      for Index in 1 .. 3 loop
+         Assert
+           (Devices (Index).Base
+            = Create_Phys_Addr
+                (16#1000_0000# + Integer_Address (Index - 1) * 16#1000#),
+            "Device" & Index'Image & " is wrong");
+      end loop;
    end Run_Test;
 
 end Devicetree.Test_Cases;

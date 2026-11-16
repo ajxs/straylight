@@ -101,6 +101,11 @@ package body Devicetree is
       --  The first cell of the current node's 'interrupts' property.
       Current_Node_Interrupt_Line : Unsigned_32 := 0;
 
+      --  False if the current node's 'status' is anything other than "okay"
+      --  or "ok", such as "disabled". A node with no 'status' property is
+      --  considered available.
+      Current_Node_Is_Available : Boolean := True;
+
       --  This variable is used to determine whether the parser is currently
       --  inside a 'reserved-memory' child node.
       --  When entering a reserved memory parent node, this is set to the
@@ -1015,8 +1020,10 @@ package body Devicetree is
       Reg_Entries     : Memory_Region_List_T;
       Reg_Entry_Count : Natural := 0;
    begin
-      --  Only decode 'reg' for the nodes the parser uses.
-      if State.Current_Node_Reg_Property.Value_Address /= Null_Address
+      --  Only decode 'reg' for the nodes the parser uses. An unavailable
+      --  node's 'reg' isn't decoded.
+      if State.Current_Node_Is_Available
+        and then State.Current_Node_Reg_Property.Value_Address /= Null_Address
         and then
           (State.Current_Node_Is_Memory
            or else Is_Reserved_Memory_Child_Node (State)
@@ -1068,6 +1075,7 @@ package body Devicetree is
       State.Current_Node_Is_Memory := False;
       State.Current_Node_Device_Type := Devicetree_Device_Type_None;
       State.Current_Node_Interrupt_Line := 0;
+      State.Current_Node_Is_Available := True;
 
       Result := Success;
    exception
@@ -1186,6 +1194,13 @@ package body Devicetree is
       then
          Read_First_Cell_Property
            (Property, State.Current_Node_Interrupt_Line, Result);
+      elsif Compare_Fixed_Length_String_With_String (Property.Name, "status")
+      then
+         --  According to Devicetree specification v0.4 section 2.3.4, "ok" is
+         --  a deprecated form of "okay".
+         State.Current_Node_Is_Available :=
+           Compare_Property_Value_With_String (Property, "okay")
+           or else Compare_Property_Value_With_String (Property, "ok");
       elsif Compare_Fixed_Length_String_With_String
               (Property.Name, "timebase-frequency")
         --  The root node is at depth 1, so '/cpus' is at depth 2.

@@ -1,0 +1,66 @@
+/*
+ * A small Devicetree for the host tests of the 'status' property.
+ * Nodes whose 'status' isn't "okay" or "ok" must be skipped.
+ *
+ * status.dtb is built from this file, and both are committed. After changing
+ * this file, rebuild it from this directory with:
+ *   dtc -I dts -O dtb -o status.dtb status.dts
+ */
+
+/dts-v1/;
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x00 0x80000000 0x00 0x1000000>;
+	};
+
+	memory@90000000 {
+		device_type = "memory";
+		reg = <0x00 0x90000000 0x00 0x1000000>;
+		status = "disabled";
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		reservation@80000000 {
+			reg = <0x00 0x80000000 0x00 0x1000>;
+			status = "disabled";
+		};
+	};
+
+	serial@10000000 {
+		compatible = "ns16550a";
+		reg = <0x00 0x10000000 0x00 0x100>;
+		status = "okay";
+	};
+
+	serial@10001000 {
+		compatible = "ns16550a";
+		reg = <0x00 0x10001000 0x00 0x100>;
+		status = "ok";
+	};
+
+	serial@10002000 {
+		compatible = "ns16550a";
+		reg = <0x00 0x10002000 0x00 0x100>;
+	};
+
+	serial@10003000 {
+		compatible = "ns16550a";
+		reg = <0x00 0x10003000 0x00 0x100>;
+		status = "disabled";
+	};
+
+	serial@10004000 {
+		compatible = "ns16550a";
+		reg = <0x00 0x10004000 0x00 0x100>;
+		status = "fail";
+	};
+};

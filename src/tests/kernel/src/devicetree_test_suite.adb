@@ -14,6 +14,7 @@ begin
      (Test_Case_Access'(new Test_Parse_Virt_Devicetree));
    Test_Suite_Ptr.all.Add_Test
      (Test_Case_Access'(new Test_Parse_Devicetree_Errors));
+   Test_Suite_Ptr.all.Add_Test (Test_Case_Access'(new Test_Parse_Node_Status));
 
    return Test_Suite_Ptr;
 end Devicetree_Test_Suite;
