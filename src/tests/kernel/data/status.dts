@@ -24,6 +24,23 @@
 		status = "disabled";
 	};
 
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			reg = <0x00>;
+			status = "disabled";
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			reg = <0x01>;
+			status = "okay";
+		};
+	};
+
 	reserved-memory {
 		#address-cells = <2>;
 		#size-cells = <2>;

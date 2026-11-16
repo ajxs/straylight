@@ -23,6 +23,8 @@ package body Devicetree is
 
    Maximum_Devices : constant := 16;
 
+   Maximum_Harts : constant := 16;
+
    subtype FDT_Token_T is Unsigned_32;
 
    type FDT_Property_T is record
@@ -92,6 +94,7 @@ package body Devicetree is
 
       --  In future, this could be replaced by a 'Current_Node_Type' enum.
       Current_Node_Is_Memory : Boolean := False;
+      Current_Node_Is_CPU    : Boolean := False;
 
       --  The type of device the current node describes, determined by its
       --  'compatible' property.
@@ -120,6 +123,9 @@ package body Devicetree is
 
       Devices      : Devicetree_Device_Array_T (1 .. Maximum_Devices);
       Device_Count : Natural := 0;
+
+      Hart_Ids   : Hart_Id_Array_T (1 .. Maximum_Harts);
+      Hart_Count : Natural := 0;
 
       --  From '/cpus/timebase-frequency', or 0 if it hasn't been found.
       Timebase_Frequency : Unsigned_64 := 0;
@@ -377,6 +383,28 @@ package body Devicetree is
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Add_Discovered_Device;
+
+   ----------------------------------------------------------------------------
+   --  Harts that don't fit are left out with an error, rather than halting the
+   --  parsing process, since the kernel can continue running on the available
+   --  harts.
+   ----------------------------------------------------------------------------
+   procedure Add_Hart_Id
+     (State : in out FDT_Parser_State_T; Hart_Id : Unsigned_64) is
+   begin
+      if State.Hart_Count >= State.Hart_Ids'Last then
+         Log_Error
+           ("Too many harts in devicetree, ignoring hart: hart_id="
+            & Hart_Id'Image (2 .. Hart_Id'Image'Length));
+         return;
+      end if;
+
+      State.Hart_Count := State.Hart_Count + 1;
+      State.Hart_Ids (State.Hart_Count) := Hart_Id;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+   end Add_Hart_Id;
 
    procedure Parse_Reserved_Memory_Regions
      (State                      : in out FDT_Parser_State_T;
@@ -1026,6 +1054,7 @@ package body Devicetree is
         and then State.Current_Node_Reg_Property.Value_Address /= Null_Address
         and then
           (State.Current_Node_Is_Memory
+           or else State.Current_Node_Is_CPU
            or else Is_Reserved_Memory_Child_Node (State)
            or else
              State.Current_Node_Device_Type /= Devicetree_Device_Type_None)
@@ -1060,6 +1089,14 @@ package body Devicetree is
             end if;
          end loop;
 
+      elsif State.Current_Node_Is_CPU and then Reg_Entry_Count > 0 then
+         --  As per Devicetree specification v0.4 section 3.8, a cpu node's
+         --  'reg' property value is its hart ID, not an address range.
+         --  It's decoded like any other 'reg', so the ID is the first entry's
+         --  base.
+         Add_Hart_Id
+           (State, Address_To_Unsigned_64 (Address (Reg_Entries (1).Base)));
+
       elsif State.Current_Node_Device_Type /= Devicetree_Device_Type_None
         and then Reg_Entry_Count > 0
       then
@@ -1073,6 +1110,7 @@ package body Devicetree is
       --  Clear the current node's state.
       State.Current_Node_Reg_Property.Value_Address := Null_Address;
       State.Current_Node_Is_Memory := False;
+      State.Current_Node_Is_CPU := False;
       State.Current_Node_Device_Type := Devicetree_Device_Type_None;
       State.Current_Node_Interrupt_Line := 0;
       State.Current_Node_Is_Available := True;
@@ -1184,6 +1222,8 @@ package body Devicetree is
       then
          State.Current_Node_Is_Memory :=
            Compare_Property_Value_With_String (Property, "memory");
+         State.Current_Node_Is_CPU :=
+           Compare_Property_Value_With_String (Property, "cpu");
       elsif Compare_Fixed_Length_String_With_String
               (Property.Name, "compatible")
       then
@@ -1350,12 +1390,41 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Copy_Discovered_Devices_To_Result;
 
+   procedure Copy_Hart_Ids_To_Result
+     (State      : FDT_Parser_State_T;
+      Hart_Ids   : out Hart_Id_Array_T;
+      Hart_Count : out Natural;
+      Result     : out Function_Result) is
+   begin
+      Hart_Count := 0;
+
+      if State.Hart_Count > Hart_Ids'Length then
+         Log_Error ("Too many harts for the output array");
+         Result := Region_Array_Exhausted;
+         return;
+      end if;
+
+      Hart_Ids (Hart_Ids'First .. Hart_Ids'First + State.Hart_Count - 1) :=
+        State.Hart_Ids (1 .. State.Hart_Count);
+
+      Hart_Count := State.Hart_Count;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Hart_Count := 0;
+         Result := Constraint_Exception;
+   end Copy_Hart_Ids_To_Result;
+
    procedure Parse_Devicetree
      (DTB_Address         : Address;
       Memory_Regions      : out Physical_Memory_Region_Array_T;
       Memory_Region_Count : out Natural;
       Devices             : out Devicetree_Device_Array_T;
       Device_Count        : out Natural;
+      Hart_Ids            : out Hart_Id_Array_T;
+      Hart_Count          : out Natural;
       Timebase_Frequency  : out Unsigned_64;
       Result              : out Function_Result)
    is
@@ -1366,6 +1435,7 @@ package body Devicetree is
    begin
       Memory_Region_Count := 0;
       Device_Count := 0;
+      Hart_Count := 0;
       Timebase_Frequency := 0;
 
       pragma Debug (Debug_Devicetree, Print_Devicetree_Header (Header));
@@ -1417,6 +1487,11 @@ package body Devicetree is
       end if;
 
       Copy_Discovered_Devices_To_Result (State, Devices, Device_Count, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Copy_Hart_Ids_To_Result (State, Hart_Ids, Hart_Count, Result);
       if Is_Error (Result) then
          return;
       end if;

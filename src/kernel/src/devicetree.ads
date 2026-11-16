@@ -30,11 +30,15 @@ is
    type Devicetree_Device_Array_T is
      array (Positive range <>) of Devicetree_Device_T;
 
+   type Hart_Id_Array_T is array (Positive range <>) of Unsigned_64;
+
    --  Memory_Regions returns the physical memory regions described by the
    --  devicetree, with the devicetree's own reserved regions removed.
    --  Note that the returned physical memory regions include the memory
    --  range used by the loaded kernel image. This needs to be removed
    --  by the caller prior to mapping these regions as free memory.
+   --  Hart_Ids returns the ID of each available hart, from the 'reg' of each
+   --  '/cpus' child node with 'device_type = "cpu"', in Devicetree order.
    --  Timebase_Frequency is the frequency of the timer that the 'time' CSR
    --  reads, in Hz, from '/cpus/timebase-frequency'. The value will be 0 if
    --  the Devicetree doesn't have a 'timebase-frequency' property.
@@ -44,6 +48,8 @@ is
       Memory_Region_Count : out Natural;
       Devices             : out Devicetree_Device_Array_T;
       Device_Count        : out Natural;
+      Hart_Ids            : out Hart_Id_Array_T;
+      Hart_Count          : out Natural;
       Timebase_Frequency  : out Unsigned_64;
       Result              : out Function_Result);
 
