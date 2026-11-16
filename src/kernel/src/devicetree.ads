@@ -30,14 +30,13 @@ is
    type Devicetree_Device_Array_T is
      array (Positive range <>) of Devicetree_Device_T;
 
-   --  Memory_Regions returns an array of usable physical memory regions
-   --  described by the devicetree, with the reserved regions and
-   --  Excluded_Region removed. Boot passes the kernel image as
-   --  Excluded_Region. Devices returns the recognised devices, in devicetree
-   --  order.
+   --  Memory_Regions returns the physical memory regions described by the
+   --  devicetree, with the devicetree's own reserved regions removed.
+   --  Note that the returned physical memory regions include the memory
+   --  range used by the loaded kernel image. This needs to be removed
+   --  by the caller prior to mapping these regions as free memory.
    procedure Parse_Devicetree
      (DTB_Address         : Address;
-      Excluded_Region     : Physical_Memory_Region_T;
       Memory_Regions      : out Physical_Memory_Region_Array_T;
       Memory_Region_Count : out Natural;
       Devices             : out Devicetree_Device_Array_T;

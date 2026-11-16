@@ -20,6 +20,10 @@ begin
      (Test_Case_Access'(new Test_Align_Virtual_Address));
    Test_Suite_Ptr.all.Add_Test
      (Test_Case_Access'(new Test_Align_Memory_Size_Up));
+   Test_Suite_Ptr.all.Add_Test
+     (Test_Case_Access'(new Test_Append_Physical_Memory_Region_To_Array));
+   Test_Suite_Ptr.all.Add_Test
+     (Test_Case_Access'(new Test_Remove_Physical_Memory_Region_From_Array));
 
    return Test_Suite_Ptr;
 end Memory_Test_Suite;

@@ -6,6 +6,13 @@
 with AUnit.Assertions; use AUnit.Assertions;
 
 package body Memory.Test_Cases is
+   use Function_Results;
+
+   function Create_Region
+     (Base : Integer_Address; Size : Storage_Count)
+      return Physical_Memory_Region_T
+   is ((Base => Physical_Address_T (To_Address (Base)), Size => Size));
+
    overriding
    procedure Run_Test (T : in out Test_Is_Valid_Userspace_Address_Range) is
       pragma Unreferenced (T);
@@ -320,6 +327,141 @@ package body Memory.Test_Cases is
         (Page_Size,
          Alignment_T'Last + 1,
          "A boundary above Alignment_T'Last should raise Constraint_Error");
+   end Run_Test;
+
+   overriding
+   procedure Run_Test (T : in out Test_Append_Physical_Memory_Region_To_Array)
+   is
+      pragma Unreferenced (T);
+
+      --  Starting the array at 5 checks that entries are placed from
+      --  Regions'First, not from 1.
+      Regions : Physical_Memory_Region_Array_T (5 .. 6);
+      Count   : Natural := 0;
+      Result  : Function_Result := Unset;
+   begin
+      Append_Physical_Memory_Region_To_Array
+        (Regions, Count, Create_Region (16#1000#, 16#1000#), Result);
+      Assert
+        (Result = Success and then Count = 1, "The first region is appended");
+      Assert
+        (Regions (5) = Create_Region (16#1000#, 16#1000#),
+         "The first region goes in the first entry");
+
+      Append_Physical_Memory_Region_To_Array
+        (Regions, Count, Create_Region (16#3000#, 0), Result);
+      Assert
+        (Result = Success and then Count = 1, "A zero-size region is skipped");
+
+      Append_Physical_Memory_Region_To_Array
+        (Regions, Count, Create_Region (16#3000#, 16#1000#), Result);
+      Assert
+        (Result = Success
+         and then Count = 2
+         and then Regions (6) = Create_Region (16#3000#, 16#1000#),
+         "The second region goes in the second entry");
+
+      Append_Physical_Memory_Region_To_Array
+        (Regions, Count, Create_Region (16#5000#, 16#1000#), Result);
+      Assert
+        (Result = Region_Array_Exhausted and then Count = 2,
+         "Appending to a full array fails with Region_Array_Exhausted");
+   end Run_Test;
+
+   overriding
+   procedure Run_Test
+     (T : in out Test_Remove_Physical_Memory_Region_From_Array)
+   is
+      pragma Unreferenced (T);
+
+      --  Every case starts from the one region 0x1000 to 0x5000.
+      Region : constant Physical_Memory_Region_T :=
+        Create_Region (16#1000#, 16#4000#);
+
+      Regions : Physical_Memory_Region_Array_T (1 .. 4);
+      Count   : Natural := 0;
+      Result  : Function_Result := Unset;
+
+      --  Removes Base .. Base + Size from the one starting region.
+      procedure Remove (Base : Integer_Address; Size : Storage_Count) is
+      begin
+         Regions := [others => <>];
+         Regions (1) := Region;
+         Count := 1;
+         Remove_Physical_Memory_Region_From_Array
+           (Regions, Count, Create_Region (Base, Size), Result);
+      end Remove;
+   begin
+      Remove (16#2000#, 16#1000#);
+      Assert
+        (Result = Success
+         and then Count = 2
+         and then Regions (1) = Create_Region (16#1000#, 16#1000#)
+         and then Regions (2) = Create_Region (16#3000#, 16#2000#),
+         "Removing the middle splits the region in two");
+
+      Remove (16#0800#, 16#1800#);
+      Assert
+        (Result = Success
+         and then Count = 1
+         and then Regions (1) = Create_Region (16#2000#, 16#3000#),
+         "Removing across the start keeps the part above");
+
+      Remove (16#4000#, 16#2000#);
+      Assert
+        (Result = Success
+         and then Count = 1
+         and then Regions (1) = Create_Region (16#1000#, 16#3000#),
+         "Removing across the end keeps the part below");
+
+      Remove (16#1000#, 16#4000#);
+      Assert
+        (Result = Success and then Count = 0,
+         "Removing exactly the region leaves nothing");
+
+      Remove (16#0000#, 16#8000#);
+      Assert
+        (Result = Success and then Count = 0,
+         "Removing more than the region leaves nothing");
+
+      Remove (16#8000#, 16#1000#);
+      Assert
+        (Result = Success and then Count = 1 and then Regions (1) = Region,
+         "Removing a region that doesn't overlap changes nothing");
+
+      Remove (16#2000#, 0);
+      Assert
+        (Result = Success and then Count = 1 and then Regions (1) = Region,
+         "Removing an empty region changes nothing, and doesn't split");
+
+      --  One removal across two regions trims both.
+      Regions := [others => <>];
+      Regions (1) := Create_Region (16#1000#, 16#1000#);
+      Regions (2) := Create_Region (16#3000#, 16#1000#);
+      Count := 2;
+      Remove_Physical_Memory_Region_From_Array
+        (Regions, Count, Create_Region (16#1800#, 16#2000#), Result);
+      Assert
+        (Result = Success
+         and then Count = 2
+         and then Regions (1) = Create_Region (16#1000#, 16#800#)
+         and then Regions (2) = Create_Region (16#3800#, 16#800#),
+         "Removing across two regions trims the end of one and the start of "
+         & "the other");
+
+      --  A split needs one more entry than there is room for.
+      Full_Regions : Physical_Memory_Region_Array_T (1 .. 1) := [Region];
+      Full_Count : Natural := 1;
+      Remove_Physical_Memory_Region_From_Array
+        (Full_Regions, Full_Count, Create_Region (16#2000#, 16#1000#), Result);
+      Assert
+        (Result = Region_Array_Exhausted,
+         "A split with no room left fails with Region_Array_Exhausted");
+
+      Remove (Integer_Address'Last - 16#FFF#, 16#2000#);
+      Assert
+        (Result = Invalid_Argument,
+         "Removing a region that wraps around the address space fails");
    end Run_Test;
 
 end Memory.Test_Cases;

@@ -16,17 +16,10 @@ package body Devicetree is
    function Compare_Node_Name
      (Node_Name : Devicetree_String_T; Target_Name : String) return Boolean;
 
-   --  A range of physical memory, as raw Devicetree values. These values
-   --  are converted to Physical_Memory_Region_T when the regions are returned.
-   type Devicetree_Memory_Region_T is record
-      Base : Unsigned_64 := 0;
-      Size : Unsigned_64 := 0;
-   end record;
-
    Maximum_Memory_Regions : constant := 16;
 
-   type Devicetree_Memory_Region_Array_T is
-     array (1 .. Maximum_Memory_Regions) of Devicetree_Memory_Region_T;
+   subtype Memory_Region_List_T is
+     Physical_Memory_Region_Array_T (1 .. Maximum_Memory_Regions);
 
    Maximum_Devices : constant := 16;
 
@@ -114,10 +107,10 @@ package body Devicetree is
       --  current depth of the cells context stack.
       Reserved_Memory_Node_Depth : Natural := 0;
 
-      Memory_Regions      : Devicetree_Memory_Region_Array_T;
+      Memory_Regions      : Memory_Region_List_T;
       Memory_Region_Count : Natural := 0;
 
-      Reserved_Memory_Regions      : Devicetree_Memory_Region_Array_T;
+      Reserved_Memory_Regions      : Memory_Region_List_T;
       Reserved_Memory_Region_Count : Natural := 0;
 
       Devices      : Devicetree_Device_Array_T (1 .. Maximum_Devices);
@@ -295,63 +288,65 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Read_Reg_Entry;
 
-   procedure Add_Memory_Region
-     (Regions : in out Devicetree_Memory_Region_Array_T;
-      Count   : in out Natural;
-      Base    : Unsigned_64;
-      Size    : Unsigned_64;
-      Result  : out Function_Result) is
+   ----------------------------------------------------------------------------
+   --  Converts a base and size pair read from the devicetree into a physical
+   --  memory region. The conversion is invalid if the region wraps around
+   --  the address space, or if its size is 2**63 or more, which can't be
+   --  represented by the native Storage_Count type.
+   ----------------------------------------------------------------------------
+   procedure Convert_To_Physical_Memory_Region
+     (Base   : Unsigned_64;
+      Size   : Unsigned_64;
+      Region : out Physical_Memory_Region_T;
+      Result : out Function_Result) is
    begin
-      if Size = 0 then
-         Result := Success;
-         return;
-      end if;
+      Region := (others => <>);
 
-      --  Ensure that the memory region size doesn't overflow the address
-      --  space, and wrap around.
       if Size > Unsigned_64'Last - Base then
-         Log_Error ("Memory region exceeds the address space");
+         Log_Error ("Devicetree region exceeds the address space");
          Result := Invalid_Argument;
          return;
       end if;
 
-      if Count >= Regions'Last then
-         Log_Error ("Too many memory regions in devicetree");
-         Result := Region_Array_Exhausted;
+      if Size > Unsigned_64 (Storage_Count'Last) then
+         Log_Error ("Devicetree region is too large");
+         Result := Invalid_Argument;
          return;
       end if;
 
-      Count := Count + 1;
-      Regions (Count) := (Base, Size);
+      Region :=
+        (Base => Physical_Address_T (Unsigned_64_To_Address (Base)),
+         Size => Storage_Count (Size));
 
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
+   end Convert_To_Physical_Memory_Region;
+
+   procedure Add_Memory_Region
+     (Regions : in out Memory_Region_List_T;
+      Count   : in out Natural;
+      Region  : Physical_Memory_Region_T;
+      Result  : out Function_Result) is
+   begin
+      Append_Physical_Memory_Region_To_Array (Regions, Count, Region, Result);
+      if Is_Error (Result) then
+         Log_Error ("Too many memory regions in devicetree");
+         return;
+      end if;
+
+      Result := Success;
    end Add_Memory_Region;
 
    procedure Add_Discovered_Device
      (State  : in out FDT_Parser_State_T;
-      Base   : Unsigned_64;
-      Size   : Unsigned_64;
+      Region : Physical_Memory_Region_T;
       Result : out Function_Result) is
    begin
-      if Size = 0 then
+      if Region.Size = 0 then
          Result := Success;
-         return;
-      end if;
-
-      if Size > Unsigned_64'Last - Base then
-         Log_Error ("Device region exceeds the address space");
-         Result := Invalid_Argument;
-         return;
-      end if;
-
-      --  Storage_Count can't hold sizes of 2**63 or more.
-      if Size > Unsigned_64 (Storage_Count'Last) then
-         Log_Error ("Device region is too large");
-         Result := Invalid_Argument;
          return;
       end if;
 
@@ -364,8 +359,8 @@ package body Devicetree is
       State.Device_Count := State.Device_Count + 1;
       State.Devices (State.Device_Count) :=
         (Device_Type    => State.Current_Node_Device_Type,
-         Base           => Physical_Address_T (Unsigned_64_To_Address (Base)),
-         Size           => Storage_Count (Size),
+         Base           => Region.Base,
+         Size           => Region.Size,
          Interrupt_Line => State.Current_Node_Interrupt_Line);
 
       Result := Success;
@@ -382,7 +377,8 @@ package body Devicetree is
       Total_Header_Size          : Storage_Count;
       Result                     : out Function_Result)
    is
-      Curr_Offset : Storage_Offset := 0;
+      Curr_Offset     : Storage_Offset := 0;
+      Reserved_Region : Physical_Memory_Region_T;
    begin
       if Reserved_Memory_Map_Offset >= Total_Header_Size then
          Log_Error
@@ -420,11 +416,19 @@ package body Devicetree is
             --  address and size set to zero.
             exit when Block.Size = 0 and then Block.Addr = 0;
 
+            Convert_To_Physical_Memory_Region
+              (Convert_BEU64_To_LEU64 (Block.Addr),
+               Convert_BEU64_To_LEU64 (Block.Size),
+               Reserved_Region,
+               Result);
+            if Is_Error (Result) then
+               return;
+            end if;
+
             Add_Memory_Region
               (State.Reserved_Memory_Regions,
                State.Reserved_Memory_Region_Count,
-               Convert_BEU64_To_LEU64 (Block.Addr),
-               Convert_BEU64_To_LEU64 (Block.Size),
+               Reserved_Region,
                Result);
             if Is_Error (Result) then
                return;
@@ -830,12 +834,14 @@ package body Devicetree is
    ----------------------------------------------------------------------------
    procedure Parse_Reg_Property
      (State       : FDT_Parser_State_T;
-      Entries     : out Devicetree_Memory_Region_Array_T;
+      Entries     : out Memory_Region_List_T;
       Entry_Count : out Natural;
       Result      : out Function_Result)
    is
       Parent_Cells_Context  : FDT_Cells_Context_T;
       Total_Reg_Entry_Count : Natural := 0;
+      Reg_Base              : Unsigned_64 := 0;
+      Reg_Size              : Unsigned_64 := 0;
    begin
       Entry_Count := 0;
 
@@ -882,16 +888,13 @@ package body Devicetree is
       end if;
 
       for Entry_Index in 0 .. Total_Reg_Entry_Count - 1 loop
-         Reg_Entry : Devicetree_Memory_Region_T renames
-           Entries (Entries'First + Entry_Index);
-
          Read_Reg_Entry
            (State.Current_Node_Reg_Property.Value_Address,
             State.Current_Node_Reg_Property.Length,
             Parent_Cells_Context,
             Entry_Index,
-            Reg_Entry.Base,
-            Reg_Entry.Size,
+            Reg_Base,
+            Reg_Size,
             Result);
          if Is_Error (Result) then
             return;
@@ -904,9 +907,15 @@ package body Devicetree is
                 ("  Reg"
                  & Entry_Index'Image
                  & ": Base="
-                 & Reg_Entry.Base'Image
+                 & Reg_Base'Image
                  & ", Size="
-                 & Reg_Entry.Size'Image));
+                 & Reg_Size'Image));
+
+         Convert_To_Physical_Memory_Region
+           (Reg_Base, Reg_Size, Entries (Entries'First + Entry_Index), Result);
+         if Is_Error (Result) then
+            return;
+         end if;
       end loop;
 
       Entry_Count := Total_Reg_Entry_Count;
@@ -976,7 +985,7 @@ package body Devicetree is
    procedure Finalise_Node_Properties
      (State : in out FDT_Parser_State_T; Result : out Function_Result)
    is
-      Reg_Entries     : Devicetree_Memory_Region_Array_T;
+      Reg_Entries     : Memory_Region_List_T;
       Reg_Entry_Count : Natural := 0;
    begin
       --  Only decode 'reg' for the nodes the parser uses.
@@ -998,8 +1007,7 @@ package body Devicetree is
             Add_Memory_Region
               (State.Memory_Regions,
                State.Memory_Region_Count,
-               Reg_Entry.Base,
-               Reg_Entry.Size,
+               Reg_Entry,
                Result);
             if Is_Error (Result) then
                return;
@@ -1011,8 +1019,7 @@ package body Devicetree is
             Add_Memory_Region
               (State.Reserved_Memory_Regions,
                State.Reserved_Memory_Region_Count,
-               Reg_Entry.Base,
-               Reg_Entry.Size,
+               Reg_Entry,
                Result);
             if Is_Error (Result) then
                return;
@@ -1023,8 +1030,7 @@ package body Devicetree is
         and then Reg_Entry_Count > 0
       then
          --  Every recognised device has its registers in the first entry.
-         Add_Discovered_Device
-           (State, Reg_Entries (1).Base, Reg_Entries (1).Size, Result);
+         Add_Discovered_Device (State, Reg_Entries (1), Result);
          if Is_Error (Result) then
             return;
          end if;
@@ -1213,144 +1219,24 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Parse_Structure_Block;
 
-   ----------------------------------------------------------------------------
-   --  Takes a memory region and a reserved region, and creates a new set of
-   --  regions representing the parts of the memory region not covered by the
-   --  reserved region.
-   --  This works because Add_Memory_Region ignores empty regions, so any part
-   --  of the memory region that is completely covered by the reserved region
-   --  won't be added to the new set of regions.
-   ----------------------------------------------------------------------------
-   procedure Create_New_Regions_With_Reserved_Regions_Removed
-     (Regions         : in out Devicetree_Memory_Region_Array_T;
-      Count           : in out Natural;
-      Memory_Region   : Devicetree_Memory_Region_T;
-      Reserved_Region : Devicetree_Memory_Region_T;
-      Result          : out Function_Result)
-   is
-      --  Add_Memory_Region rejects regions that wrap around the address
-      --  space, and Remove_Region_From_Memory_Regions checks the region it
-      --  removes, so neither end can overflow.
-      Memory_End : constant Unsigned_64 :=
-        Memory_Region.Base + Memory_Region.Size;
-
-      Reserved_End : constant Unsigned_64 :=
-        Reserved_Region.Base + Reserved_Region.Size;
-
-      --  The reserved region's ends, clamped to the memory region.
-      Lower_End : constant Unsigned_64 :=
-        Unsigned_64'Min
-          (Unsigned_64'Max (Reserved_Region.Base, Memory_Region.Base),
-           Memory_End);
-
-      Upper_Base : constant Unsigned_64 :=
-        Unsigned_64'Min
-          (Unsigned_64'Max (Reserved_End, Memory_Region.Base), Memory_End);
-   begin
-      Add_Memory_Region
-        (Regions,
-         Count,
-         Memory_Region.Base,
-         Lower_End - Memory_Region.Base,
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Add_Memory_Region
-        (Regions, Count, Upper_Base, Memory_End - Upper_Base, Result);
-   end Create_New_Regions_With_Reserved_Regions_Removed;
-
-   procedure Remove_Region_From_Memory_Regions
-     (Regions : in out Devicetree_Memory_Region_Array_T;
-      Count   : in out Natural;
-      Region  : Devicetree_Memory_Region_T;
-      Result  : out Function_Result)
-   is
-      --  This array holds the memory regions that remain after removing the
-      --  region.
-      Remaining_Regions      : Devicetree_Memory_Region_Array_T;
-      Remaining_Region_Count : Natural := 0;
-   begin
-      --  Removing an empty region would otherwise split the memory region
-      --  that contains it in two.
-      if Region.Size = 0 then
-         Result := Success;
-         return;
-      end if;
-
-      if Region.Size > Unsigned_64'Last - Region.Base then
-         Log_Error ("Removed memory region exceeds the address space");
-         Result := Invalid_Argument;
-         return;
-      end if;
-
-      --  A split adds a region, so the remainder is built in a separate
-      --  array rather than edited in place.
-      for Memory_Region of Regions (1 .. Count) loop
-         Create_New_Regions_With_Reserved_Regions_Removed
-           (Remaining_Regions,
-            Remaining_Region_Count,
-            Memory_Region,
-            Region,
-            Result);
-         if Is_Error (Result) then
-            return;
-         end if;
-      end loop;
-
-      Regions := Remaining_Regions;
-      Count := Remaining_Region_Count;
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Result := Constraint_Exception;
-   end Remove_Region_From_Memory_Regions;
-
    procedure Remove_Reserved_Memory_Regions_From_Memory_Regions
-     (State           : in out FDT_Parser_State_T;
-      Excluded_Region : Physical_Memory_Region_T;
-      Result          : out Function_Result) is
+     (State : in out FDT_Parser_State_T; Result : out Function_Result) is
    begin
       --  Each pass removes one reserved region from every memory region, so
       --  later passes see the pieces that earlier ones left.
       for Reserved_Region of
         State.Reserved_Memory_Regions (1 .. State.Reserved_Memory_Region_Count)
       loop
-         Remove_Region_From_Memory_Regions
+         Remove_Physical_Memory_Region_From_Array
            (State.Memory_Regions,
             State.Memory_Region_Count,
             Reserved_Region,
             Result);
          if Is_Error (Result) then
+            Log_Error ("Error removing a reserved region from memory");
             return;
          end if;
       end loop;
-
-      Excluded_Base : constant Unsigned_64 :=
-        Address_To_Unsigned_64 (Address (Excluded_Region.Base));
-      Excluded_Size : constant Unsigned_64 :=
-        Unsigned_64 (Excluded_Region.Size);
-
-      pragma
-        Debug
-          (Debug_Devicetree,
-           Log_Debug
-             ("Removing excluded region from memory regions: Base = "
-              & Excluded_Base'Image
-              & ", Size = "
-              & Excluded_Size'Image));
-
-      Remove_Region_From_Memory_Regions
-        (State.Memory_Regions,
-         State.Memory_Region_Count,
-         (Base => Excluded_Base, Size => Excluded_Size),
-         Result);
-      if Is_Error (Result) then
-         return;
-      end if;
 
       Result := Success;
    exception
@@ -1373,21 +1259,10 @@ package body Devicetree is
          return;
       end if;
 
-      for I in 1 .. State.Memory_Region_Count loop
-         --  Storage_Count can't hold sizes of 2**63 or more.
-         if State.Memory_Regions (I).Size > Unsigned_64 (Storage_Count'Last)
-         then
-            Log_Error ("Memory region is too large");
-            Result := Invalid_Argument;
-            return;
-         end if;
-
-         Memory_Regions (Memory_Regions'First + I - 1) :=
-           (Base =>
-              Physical_Address_T
-                (Unsigned_64_To_Address (State.Memory_Regions (I).Base)),
-            Size => Storage_Count (State.Memory_Regions (I).Size));
-      end loop;
+      Memory_Regions
+        (Memory_Regions'First
+         .. Memory_Regions'First + State.Memory_Region_Count - 1) :=
+        State.Memory_Regions (1 .. State.Memory_Region_Count);
 
       Memory_Region_Count := State.Memory_Region_Count;
 
@@ -1428,7 +1303,6 @@ package body Devicetree is
 
    procedure Parse_Devicetree
      (DTB_Address         : Address;
-      Excluded_Region     : Physical_Memory_Region_T;
       Memory_Regions      : out Physical_Memory_Region_Array_T;
       Memory_Region_Count : out Natural;
       Devices             : out Devicetree_Device_Array_T;
@@ -1480,8 +1354,7 @@ package body Devicetree is
          return;
       end if;
 
-      Remove_Reserved_Memory_Regions_From_Memory_Regions
-        (State, Excluded_Region, Result);
+      Remove_Reserved_Memory_Regions_From_Memory_Regions (State, Result);
       if Is_Error (Result) then
          return;
       end if;

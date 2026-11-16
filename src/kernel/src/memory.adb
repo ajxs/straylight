@@ -1,4 +1,118 @@
 package body Memory is
+   use Function_Results;
+
+   function Does_Region_Wrap (Region : Physical_Memory_Region_T) return Boolean
+   is (To_Integer (Address (Region.Base))
+       > Integer_Address'Last - Integer_Address (Region.Size));
+
+   --  'Min and 'Max only work on scalar types, and System.Address, which
+   --  Physical_Address_T is derived from, is a private type.
+   function Minimum
+     (Left, Right : Physical_Address_T) return Physical_Address_T
+   is (if Left < Right then Left else Right);
+
+   function Maximum
+     (Left, Right : Physical_Address_T) return Physical_Address_T
+   is (if Left > Right then Left else Right);
+
+   procedure Append_Physical_Memory_Region_To_Array
+     (Regions : in out Physical_Memory_Region_Array_T;
+      Count   : in out Natural;
+      Region  : Physical_Memory_Region_T;
+      Result  : out Function_Result) is
+   begin
+      if Region.Size = 0 then
+         Result := Success;
+         return;
+      end if;
+
+      if Count >= Regions'Length then
+         Result := Region_Array_Exhausted;
+         return;
+      end if;
+
+      Regions (Regions'First + Count) := Region;
+      Count := Count + 1;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Result := Constraint_Exception;
+   end Append_Physical_Memory_Region_To_Array;
+
+   procedure Remove_Physical_Memory_Region_From_Array
+     (Regions        : in out Physical_Memory_Region_Array_T;
+      Count          : in out Natural;
+      Removed_Region : Physical_Memory_Region_T;
+      Result         : out Function_Result) is
+   begin
+      --  Removing an empty region would otherwise split the region that
+      --  contains it in two.
+      if Removed_Region.Size = 0 then
+         Result := Success;
+         return;
+      end if;
+
+      if Does_Region_Wrap (Removed_Region) then
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      --  A split adds an entry, so what remains is built in a separate array
+      --  rather than edited in place. This is declared after 'begin', so that
+      --  the handler below covers its elaboration.
+      Remaining_Regions : Physical_Memory_Region_Array_T (Regions'Range);
+      Remaining_Region_Count : Natural := 0;
+
+      for Region of Regions (Regions'First .. Regions'First + Count - 1) loop
+         if Does_Region_Wrap (Region) then
+            Result := Invalid_Argument;
+            return;
+         end if;
+
+         Region_End : constant Physical_Address_T := Region.Base + Region.Size;
+
+         Removed_End : constant Physical_Address_T :=
+           Removed_Region.Base + Removed_Region.Size;
+
+         --  The removed region's ends, clamped to this region.
+         Lower_End : constant Physical_Address_T :=
+           Minimum (Maximum (Removed_Region.Base, Region.Base), Region_End);
+
+         Upper_Base : constant Physical_Address_T :=
+           Minimum (Maximum (Removed_End, Region.Base), Region_End);
+
+         --  Keep the parts below and above the removed region. Either part
+         --  can be empty, and Append_Physical_Memory_Region_To_Array skips
+         --  empty regions.
+         Append_Physical_Memory_Region_To_Array
+           (Remaining_Regions,
+            Remaining_Region_Count,
+            (Base => Region.Base, Size => Lower_End - Region.Base),
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         Append_Physical_Memory_Region_To_Array
+           (Remaining_Regions,
+            Remaining_Region_Count,
+            (Base => Upper_Base, Size => Region_End - Upper_Base),
+            Result);
+         if Is_Error (Result) then
+            return;
+         end if;
+      end loop;
+
+      Regions := Remaining_Regions;
+      Count := Remaining_Region_Count;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Result := Constraint_Exception;
+   end Remove_Physical_Memory_Region_From_Array;
+
    function Get_Dword_Word_Low (Dword : Unsigned_64) return Unsigned_32 is
    begin
       return Unsigned_32 (Dword and 16#FFFF_FFFF#);

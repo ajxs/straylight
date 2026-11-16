@@ -7,6 +7,8 @@ with Interfaces;              use Interfaces;
 with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
+with Function_Results;
+
 package Memory
   with Preelaborate
 is
@@ -53,6 +55,35 @@ is
 
    type Physical_Memory_Region_Array_T is
      array (Natural range <>) of Physical_Memory_Region_T;
+
+   ----------------------------------------------------------------------------
+   --  Adds a physical memory region after the first Count entries of Regions,
+   --  then adds 1 to Count. A zero-size Region is skipped.
+   --  The result is Region_Array_Exhausted if Regions is already full.
+   ----------------------------------------------------------------------------
+   procedure Append_Physical_Memory_Region_To_Array
+     (Regions : in out Physical_Memory_Region_Array_T;
+      Count   : in out Natural;
+      Region  : Physical_Memory_Region_T;
+      Result  : out Function_Results.Function_Result);
+
+   ----------------------------------------------------------------------------
+   --  Removes the region specified by Removed_Region from the first Count
+   --  entries of Regions.
+   --  Any part of a region that Removed_Region covers is removed, so a region
+   --  that it's inside of would be split into two. This operation adds an
+   --  entry to the array, so Count can grow. A zero-size Removed_Region
+   --  removes nothing.
+   --  The result is Invalid_Argument if Removed_Region, or one of the regions,
+   --  wraps around the top of the address space.
+   --  The result is Region_Array_Exhausted if what remains doesn't fit in
+   --  the Regions array.
+   ----------------------------------------------------------------------------
+   procedure Remove_Physical_Memory_Region_From_Array
+     (Regions        : in out Physical_Memory_Region_Array_T;
+      Count          : in out Natural;
+      Removed_Region : Physical_Memory_Region_T;
+      Result         : out Function_Results.Function_Result);
 
    --  This is kept as a constant because it's used in address arithmetic.
    Higher_Half_Offset : constant := 16#FFFF_FFFF_0000_0000#;

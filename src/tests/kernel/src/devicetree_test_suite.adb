@@ -13,8 +13,6 @@ begin
    Test_Suite_Ptr.all.Add_Test
      (Test_Case_Access'(new Test_Parse_Virt_Devicetree));
    Test_Suite_Ptr.all.Add_Test
-     (Test_Case_Access'(new Test_Parse_Virt_Devicetree_Without_Exclusion));
-   Test_Suite_Ptr.all.Add_Test
      (Test_Case_Access'(new Test_Parse_Devicetree_Errors));
 
    return Test_Suite_Ptr;

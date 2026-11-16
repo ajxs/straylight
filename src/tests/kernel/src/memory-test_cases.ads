@@ -18,6 +18,12 @@ package Memory.Test_Cases is
 
    type Test_Align_Memory_Size_Up is new Test_Case with null record;
 
+   type Test_Append_Physical_Memory_Region_To_Array is new Test_Case
+   with null record;
+
+   type Test_Remove_Physical_Memory_Region_From_Array is new Test_Case
+   with null record;
+
    overriding
    function Name
      (T : Test_Is_Valid_Userspace_Address_Range) return AUnit.Message_String
@@ -54,5 +60,24 @@ package Memory.Test_Cases is
 
    overriding
    procedure Run_Test (T : in out Test_Align_Memory_Size_Up);
+
+   overriding
+   function Name
+     (T : Test_Append_Physical_Memory_Region_To_Array)
+      return AUnit.Message_String
+   is (AUnit.Format ("Memory.Append_Physical_Memory_Region_To_Array"));
+
+   overriding
+   function Name
+     (T : Test_Remove_Physical_Memory_Region_From_Array)
+      return AUnit.Message_String
+   is (AUnit.Format ("Memory.Remove_Physical_Memory_Region_From_Array"));
+
+   overriding
+   procedure Run_Test (T : in out Test_Append_Physical_Memory_Region_To_Array);
+
+   overriding
+   procedure Run_Test
+     (T : in out Test_Remove_Physical_Memory_Region_From_Array);
 
 end Memory.Test_Cases;

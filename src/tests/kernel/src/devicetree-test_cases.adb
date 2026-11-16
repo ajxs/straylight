@@ -49,15 +49,6 @@ package body Devicetree.Test_Cases is
      (Value : Integer_Address) return Physical_Address_T
    is (Physical_Address_T (To_Address (Value)));
 
-   --  Any range will do here, since the tests only check that it's removed.
-   --  This one is the kernel image's range when the DTB was captured.
-   Kernel_Image_Region : constant Physical_Memory_Region_T :=
-     (Base => Create_Phys_Addr (16#8020_0000#), Size => 16#16_2000#);
-
-   --  A zero-size region excludes nothing.
-   No_Region : constant Physical_Memory_Region_T :=
-     (Base => Null_Physical_Address, Size => 0);
-
    overriding
    procedure Run_Test (T : in out Test_Parse_Virt_Devicetree) is
       pragma Unreferenced (T);
@@ -91,7 +82,6 @@ package body Devicetree.Test_Cases is
 
       Parse_Devicetree
         (DTB'Address,
-         Kernel_Image_Region,
          Memory_Regions,
          Memory_Region_Count,
          Devices,
@@ -99,18 +89,15 @@ package body Devicetree.Test_Cases is
          Result);
       Assert (Result = Success, "Parse_Devicetree succeeds");
 
-      --  The memory node is 0x80000000 to 0x88000000. OpenSBI's two
-      --  'reserved-memory' children cover 0x80000000 to 0x80060000, and the
-      --  kernel image is removed from the middle of what's left.
-      Assert (Memory_Region_Count = 2, "There are two free memory regions");
+      --  The memory node is 0x80000000 to 0x88000000, and OpenSBI's two
+      --  'reserved-memory' children cover 0x80000000 to 0x80060000. The
+      --  parser doesn't know about the kernel image, so the rest is one
+      --  region.
+      Assert (Memory_Region_Count = 1, "There is one memory region");
       Assert
         (Memory_Regions (1)
-         = (Base => Create_Phys_Addr (16#8006_0000#), Size => 16#1A_0000#),
-         "The first region runs from OpenSBI's memory to the kernel image");
-      Assert
-        (Memory_Regions (2)
-         = (Base => Create_Phys_Addr (16#8036_2000#), Size => 16#7C9_E000#),
-         "The second region runs from the kernel image to the end of memory");
+         = (Base => Create_Phys_Addr (16#8006_0000#), Size => 16#7FA_0000#),
+         "The region runs from OpenSBI's memory to the end of memory");
 
       --  Devices are in Devicetree order: the UART, then the eight Virtio
       --  slots from the highest address down, then the PLIC.
@@ -129,40 +116,6 @@ package body Devicetree.Test_Cases is
 
       Assert_Device
         (10, Devicetree_Device_Type_PLIC, 16#0C00_0000#, 16#60_0000#, 0);
-   end Run_Test;
-
-   overriding
-   procedure Run_Test (T : in out Test_Parse_Virt_Devicetree_Without_Exclusion)
-   is
-      pragma Unreferenced (T);
-
-      Memory_Regions      : Physical_Memory_Region_Array_T (1 .. 16);
-      Memory_Region_Count : Natural := 0;
-      Devices             : Devicetree_Device_Array_T (1 .. 16);
-      Device_Count        : Natural := 0;
-      Result              : Function_Result := Unset;
-
-      DTB : DTB_Buffer_T
-      with Alignment => 8;
-   begin
-      Read_Virt_DTB (DTB);
-
-      Parse_Devicetree
-        (DTB'Address,
-         No_Region,
-         Memory_Regions,
-         Memory_Region_Count,
-         Devices,
-         Device_Count,
-         Result);
-      Assert (Result = Success, "Parse_Devicetree succeeds");
-
-      --  Only OpenSBI's memory is removed, so the rest stays in one piece.
-      Assert (Memory_Region_Count = 1, "There is one free memory region");
-      Assert
-        (Memory_Regions (1)
-         = (Base => Create_Phys_Addr (16#8006_0000#), Size => 16#7FA_0000#),
-         "The region runs from OpenSBI's memory to the end of memory");
    end Run_Test;
 
    overriding
@@ -185,7 +138,6 @@ package body Devicetree.Test_Cases is
 
       Parse_Devicetree
         (DTB'Address,
-         No_Region,
          Memory_Regions,
          Memory_Region_Count,
          Too_Few_Devices,
@@ -200,7 +152,6 @@ package body Devicetree.Test_Cases is
       DTB (DTB'First) := 0;
       Parse_Devicetree
         (DTB'Address,
-         No_Region,
          Memory_Regions,
          Memory_Region_Count,
          Devices,

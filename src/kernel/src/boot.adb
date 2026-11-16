@@ -383,15 +383,8 @@ package body Boot is
       Devicetree_Higher_Half_Address : constant Address :=
         Address (DTB_Address) + Higher_Half_Offset;
 
-      --  The kernel image isn't free memory, so it's removed from the regions
-      --  that Parse_Devicetree returns.
-      Kernel_Image_Region : constant Physical_Memory_Region_T :=
-        (Base => Physical_Address_T (Kernel_Start'Address),
-         Size => Kernel_End'Address - Kernel_Start'Address);
-
       Devicetree.Parse_Devicetree
         (Devicetree_Higher_Half_Address,
-         Kernel_Image_Region,
          Memory_Regions,
          Memory_Region_Count,
          Devicetree_Devices,
@@ -400,6 +393,18 @@ package body Boot is
       if Is_Error (Result) then
          --  Error already printed.
          Panic;
+      end if;
+
+      --  The kernel image isn't free memory, so it's removed from the regions
+      --  that Parse_Devicetree returns.
+      Kernel_Image_Region : constant Physical_Memory_Region_T :=
+        (Base => Physical_Address_T (Kernel_Start'Address),
+         Size => Kernel_End'Address - Kernel_Start'Address);
+
+      Remove_Physical_Memory_Region_From_Array
+        (Memory_Regions, Memory_Region_Count, Kernel_Image_Region, Result);
+      if Is_Error (Result) then
+         Panic ("Error removing the kernel image from the memory regions");
       end if;
 
       for Device of Devicetree_Devices (1 .. Devicetree_Device_Count) loop
