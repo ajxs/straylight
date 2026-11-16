@@ -1479,88 +1479,63 @@ package body Devicetree is
          Result := Constraint_Exception;
    end Find_Supervisor_PLIC_Contexts;
 
-   procedure Copy_Parsed_Memory_Regions_To_Result
-     (State               : FDT_Parser_State_T;
-      Memory_Regions      : out Physical_Memory_Region_Array_T;
-      Memory_Region_Count : out Natural;
-      Result              : out Function_Result) is
-   begin
-      Memory_Region_Count := 0;
+   ----------------------------------------------------------------------------
+   --  Copies the first Source_Count entries of one of the parser's arrays to
+   --  the start of the caller's array. Error_Message is logged if they don't
+   --  fit.
+   ----------------------------------------------------------------------------
+   generic
+      type Index_T is range <>;
+      type Element_T is private;
+      type Array_T is array (Index_T range <>) of Element_T;
+   procedure Copy_To_Result
+     (Source        : Array_T;
+      Source_Count  : Natural;
+      Target        : out Array_T;
+      Target_Count  : out Natural;
+      Error_Message : String;
+      Result        : out Function_Result);
 
-      if State.Memory_Region_Count > Memory_Regions'Length then
-         Log_Error ("Too many memory regions for the output array");
+   procedure Copy_To_Result
+     (Source        : Array_T;
+      Source_Count  : Natural;
+      Target        : out Array_T;
+      Target_Count  : out Natural;
+      Error_Message : String;
+      Result        : out Function_Result) is
+   begin
+      Target_Count := 0;
+
+      if Source_Count > Target'Length then
+         Log_Error (Error_Message);
          Result := Region_Array_Exhausted;
          return;
       end if;
 
-      Memory_Regions
-        (Memory_Regions'First
-         .. Memory_Regions'First + State.Memory_Region_Count - 1) :=
-        State.Memory_Regions (1 .. State.Memory_Region_Count);
+      Target (Target'First .. Target'First + Index_T (Source_Count) - 1) :=
+        Source (Source'First .. Source'First + Index_T (Source_Count) - 1);
 
-      Memory_Region_Count := State.Memory_Region_Count;
+      Target_Count := Source_Count;
 
       Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
-         Memory_Region_Count := 0;
+         Target_Count := 0;
          Result := Constraint_Exception;
-   end Copy_Parsed_Memory_Regions_To_Result;
+   end Copy_To_Result;
 
-   procedure Copy_Discovered_Devices_To_Result
-     (State        : FDT_Parser_State_T;
-      Devices      : out Devicetree_Device_Array_T;
-      Device_Count : out Natural;
-      Result       : out Function_Result) is
-   begin
-      Device_Count := 0;
+   procedure Copy_Memory_Regions_To_Result is new
+     Copy_To_Result
+       (Natural,
+        Physical_Memory_Region_T,
+        Physical_Memory_Region_Array_T);
 
-      if State.Device_Count > Devices'Length then
-         Log_Error ("Too many devices for the output array");
-         Result := Region_Array_Exhausted;
-         return;
-      end if;
+   procedure Copy_Devices_To_Result is new
+     Copy_To_Result (Positive, Devicetree_Device_T, Devicetree_Device_Array_T);
 
-      Devices (Devices'First .. Devices'First + State.Device_Count - 1) :=
-        State.Devices (1 .. State.Device_Count);
-
-      Device_Count := State.Device_Count;
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Device_Count := 0;
-         Result := Constraint_Exception;
-   end Copy_Discovered_Devices_To_Result;
-
-   procedure Copy_Harts_To_Result
-     (State      : FDT_Parser_State_T;
-      Harts      : out Devicetree_Hart_Array_T;
-      Hart_Count : out Natural;
-      Result     : out Function_Result) is
-   begin
-      Hart_Count := 0;
-
-      if State.Hart_Count > Harts'Length then
-         Log_Error ("Too many harts for the output array");
-         Result := Region_Array_Exhausted;
-         return;
-      end if;
-
-      Harts (Harts'First .. Harts'First + State.Hart_Count - 1) :=
-        State.Harts (1 .. State.Hart_Count);
-
-      Hart_Count := State.Hart_Count;
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-         Hart_Count := 0;
-         Result := Constraint_Exception;
-   end Copy_Harts_To_Result;
+   procedure Copy_Harts_To_Result is new
+     Copy_To_Result (Positive, Devicetree_Hart_T, Devicetree_Hart_Array_T);
 
    procedure Parse_Devicetree
      (DTB_Address         : Address;
@@ -1630,18 +1605,35 @@ package body Devicetree is
          return;
       end if;
 
-      Copy_Parsed_Memory_Regions_To_Result
-        (State, Memory_Regions, Memory_Region_Count, Result);
+      Copy_Memory_Regions_To_Result
+        (State.Memory_Regions,
+         State.Memory_Region_Count,
+         Memory_Regions,
+         Memory_Region_Count,
+         "Too many memory regions for the output array",
+         Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Copy_Discovered_Devices_To_Result (State, Devices, Device_Count, Result);
+      Copy_Devices_To_Result
+        (State.Devices,
+         State.Device_Count,
+         Devices,
+         Device_Count,
+         "Too many devices for the output array",
+         Result);
       if Is_Error (Result) then
          return;
       end if;
 
-      Copy_Harts_To_Result (State, Harts, Hart_Count, Result);
+      Copy_Harts_To_Result
+        (State.Harts,
+         State.Hart_Count,
+         Harts,
+         Hart_Count,
+         "Too many harts for the output array",
+         Result);
       if Is_Error (Result) then
          return;
       end if;
