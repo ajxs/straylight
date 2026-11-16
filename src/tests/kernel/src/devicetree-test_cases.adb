@@ -57,6 +57,7 @@ package body Devicetree.Test_Cases is
       Memory_Region_Count : Natural := 0;
       Devices             : Devicetree_Device_Array_T (1 .. 16);
       Device_Count        : Natural := 0;
+      Timebase_Frequency  : Unsigned_64 := 0;
       Result              : Function_Result := Unset;
 
       DTB : DTB_Buffer_T
@@ -86,8 +87,13 @@ package body Devicetree.Test_Cases is
          Memory_Region_Count,
          Devices,
          Device_Count,
+         Timebase_Frequency,
          Result);
       Assert (Result = Success, "Parse_Devicetree succeeds");
+
+      Assert
+        (Timebase_Frequency = 10_000_000,
+         "The timebase is QEMU's 10 MHz, from /cpus");
 
       --  The memory node is 0x80000000 to 0x88000000, and OpenSBI's two
       --  'reserved-memory' children cover 0x80000000 to 0x80060000. The
@@ -124,6 +130,7 @@ package body Devicetree.Test_Cases is
 
       Memory_Regions      : Physical_Memory_Region_Array_T (1 .. 16);
       Memory_Region_Count : Natural := 0;
+      Timebase_Frequency  : Unsigned_64 := 0;
       Result              : Function_Result := Unset;
 
       --  Room for only 5 of the 10 devices.
@@ -142,6 +149,7 @@ package body Devicetree.Test_Cases is
          Memory_Region_Count,
          Too_Few_Devices,
          Device_Count,
+         Timebase_Frequency,
          Result);
       Assert
         (Result = Region_Array_Exhausted,
@@ -156,6 +164,7 @@ package body Devicetree.Test_Cases is
          Memory_Region_Count,
          Devices,
          Device_Count,
+         Timebase_Frequency,
          Result);
       Assert (Is_Error (Result), "A DTB with a bad magic number fails");
    end Run_Test;

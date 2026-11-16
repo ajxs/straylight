@@ -115,6 +115,9 @@ package body Devicetree is
 
       Devices      : Devicetree_Device_Array_T (1 .. Maximum_Devices);
       Device_Count : Natural := 0;
+
+      --  From '/cpus/timebase-frequency', or 0 if it hasn't been found.
+      Timebase_Frequency : Unsigned_64 := 0;
    end record;
 
    procedure Push_Cells_Context
@@ -792,6 +795,30 @@ package body Devicetree is
       Read_First_Cell_Property (Property, Cells_Value, Result);
    end Read_Cells_Property;
 
+   ----------------------------------------------------------------------------
+   --  Reads a property that holds one 32-bit or 64-bit number, such as
+   --  'timebase-frequency'.
+   ----------------------------------------------------------------------------
+   procedure Read_Numeric_Property
+     (Property : Devicetree_Property_T;
+      Value    : out Unsigned_64;
+      Result   : out Function_Result) is
+   begin
+      Value := 0;
+
+      if Property.Length = 4 then
+         Value := Read_Cells_Value (Property.Value_Address, 1);
+      elsif Property.Length = 8 then
+         Value := Read_Cells_Value (Property.Value_Address, 2);
+      else
+         Log_Error ("Invalid number property length");
+         Result := Invalid_Argument;
+         return;
+      end if;
+
+      Result := Success;
+   end Read_Numeric_Property;
+
    function Compare_Property_Value_With_String
      (Property : Devicetree_Property_T; Value : String) return Boolean is
    begin
@@ -1159,6 +1186,13 @@ package body Devicetree is
       then
          Read_First_Cell_Property
            (Property, State.Current_Node_Interrupt_Line, Result);
+      elsif Compare_Fixed_Length_String_With_String
+              (Property.Name, "timebase-frequency")
+        --  The root node is at depth 1, so '/cpus' is at depth 2.
+        and then State.Cells_Context_Stack.Count = 2
+        and then Compare_Node_Name (State.Current_Node_Name, "cpus")
+      then
+         Read_Numeric_Property (Property, State.Timebase_Frequency, Result);
       end if;
 
       if Is_Error (Result) then
@@ -1307,6 +1341,7 @@ package body Devicetree is
       Memory_Region_Count : out Natural;
       Devices             : out Devicetree_Device_Array_T;
       Device_Count        : out Natural;
+      Timebase_Frequency  : out Unsigned_64;
       Result              : out Function_Result)
    is
       Header : constant FDT_Header_T
@@ -1316,6 +1351,7 @@ package body Devicetree is
    begin
       Memory_Region_Count := 0;
       Device_Count := 0;
+      Timebase_Frequency := 0;
 
       pragma Debug (Debug_Devicetree, Print_Devicetree_Header (Header));
 
@@ -1369,6 +1405,8 @@ package body Devicetree is
       if Is_Error (Result) then
          return;
       end if;
+
+      Timebase_Frequency := State.Timebase_Frequency;
 
       Result := Success;
    end Parse_Devicetree;

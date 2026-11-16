@@ -361,6 +361,8 @@ package body Boot is
         Physical_Memory_Region_Array_T (1 .. Maximum_Memory_Regions);
       Memory_Region_Count : Natural := 0;
 
+      Timebase_Frequency : Unsigned_64 := 0;
+
       --  The kernel image's physical address range. It starts with the boot
       --  section, which Free_Boot_Memory frees once it's no longer needed.
       Kernel_Start : constant Natural
@@ -389,11 +391,20 @@ package body Boot is
          Memory_Region_Count,
          Devicetree_Devices,
          Devicetree_Device_Count,
+         Timebase_Frequency,
          Result);
       if Is_Error (Result) then
          --  Error already printed.
          Panic;
       end if;
+
+      --  A frequency below the tick rate would give a tick interval of 0.
+      if Timebase_Frequency < Traps.System_Tick_Rate then
+         Panic ("No valid timebase-frequency in the Devicetree");
+      end if;
+
+      Traps.System_Tick_Interval :=
+        Timebase_Frequency / Traps.System_Tick_Rate;
 
       --  The kernel image isn't free memory, so it's removed from the regions
       --  that Parse_Devicetree returns.

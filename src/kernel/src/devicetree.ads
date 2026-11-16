@@ -35,12 +35,16 @@ is
    --  Note that the returned physical memory regions include the memory
    --  range used by the loaded kernel image. This needs to be removed
    --  by the caller prior to mapping these regions as free memory.
+   --  Timebase_Frequency is the frequency of the timer that the 'time' CSR
+   --  reads, in Hz, from '/cpus/timebase-frequency'. The value will be 0 if
+   --  the Devicetree doesn't have a 'timebase-frequency' property.
    procedure Parse_Devicetree
      (DTB_Address         : Address;
       Memory_Regions      : out Physical_Memory_Region_Array_T;
       Memory_Region_Count : out Natural;
       Devices             : out Devicetree_Device_Array_T;
       Device_Count        : out Natural;
+      Timebase_Frequency  : out Unsigned_64;
       Result              : out Function_Result);
 
    --  The header is a public definition, since it's used in the early

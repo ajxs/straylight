@@ -37,14 +37,18 @@ is
 
    procedure Setup_Next_Timer_Interrupt;
 
+   --  The kernel's 'tick' rate, in Hz.
+   System_Tick_Rate : constant := 100;
+
+   ----------------------------------------------------------------------------
+   --  The kernel's 'tick' interval, in timebase units. The boot hart sets
+   --  this from the Devicetree's timebase frequency before any timer is set.
+   --  The timebase in QEMU's RISC-V virt machine is 10_000_000 Hz, so the
+   --  interval there is 100_000.
+   ----------------------------------------------------------------------------
+   System_Tick_Interval : Unsigned_64 := 0;
+
 private
-   ----------------------------------------------------------------------------
-   --  The kernel's 'tick' interval.
-   --  The timebase in QEMU's RISC-V virt machine is 10_000_000 Hz,
-   --  so a tick interval of 10_000 corresponds to 1 ms.
-   --  The current tick rate is about 100 Hz.
-   ----------------------------------------------------------------------------
-   System_Tick_Interval : constant := 100_000;
 
    procedure Handle_Supervisor_Mode_Interrupt
      (Cause : Unsigned_64; Sepc : Virtual_Address_T; Stval : Unsigned_64);
