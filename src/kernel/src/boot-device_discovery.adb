@@ -265,6 +265,16 @@ package body Boot.Device_Discovery is
    end Create_Virtio_GPU_Device;
 
    ----------------------------------------------------------------------------
+   --  The interrupt controller that a node's device raises interrupts on.
+   --  A node with no 'interrupts' property gets given a default interrupt
+   --  line value of 0. Since it doesn't raise interrupts, don't assign it an
+   --  interrupt parent.
+   ----------------------------------------------------------------------------
+   function Get_Interrupt_Parent
+     (Node : Devicetree_Device_T) return Device_Access
+   is (if Node.Interrupt_Line = 0 then null else Interrupt_Controller);
+
+   ----------------------------------------------------------------------------
    --  Creates a system device for a 'virtio,mmio' compatible Devicetree node.
    --  The Devicetree populates a 'virtio,mmio' node for every Virtio slot,
    --  whether or not any device is actually attached. To determine whether
@@ -304,7 +314,7 @@ package body Boot.Device_Discovery is
                     (Block_Device,
                      Node,
                      Virtual_Address,
-                     Interrupt_Controller);
+                     Get_Interrupt_Parent (Node));
                   exit;
                end if;
             end loop;
@@ -315,7 +325,7 @@ package body Boot.Device_Discovery is
                  (Graphics_Device,
                   Node,
                   Virtual_Address,
-                  Interrupt_Controller);
+                  Get_Interrupt_Parent (Node));
             end if;
 
          when others                 =>
@@ -346,7 +356,10 @@ package body Boot.Device_Discovery is
          when Devicetree_Device_Type_UART_NS16550A =>
             if UART_Device = null then
                Create_UART_Device
-                 (UART_Device, Node, Virtual_Address, Interrupt_Controller);
+                 (UART_Device,
+                  Node,
+                  Virtual_Address,
+                  Get_Interrupt_Parent (Node));
             end if;
 
          when Devicetree_Device_Type_Virtio_MMIO   =>
