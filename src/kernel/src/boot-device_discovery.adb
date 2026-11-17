@@ -360,6 +360,7 @@ package body Boot.Device_Discovery is
    --  This procedure assigns each created device their own virtual memory
    --  space, as required.
    --  Only the first PLIC becomes a device, even if the Devicetree has more.
+   --  Each extra PLIC is logged.
    ----------------------------------------------------------------------------
    procedure Create_System_Device_From_Devicetree_Node
      (Node : Devicetree_Device_T; Virtual_Address : in out Virtual_Address_T)
@@ -372,6 +373,10 @@ package body Boot.Device_Discovery is
                  (Interrupt_Controller, Node, Virtual_Address);
 
                Interrupt_Controller_Phandle := Node.Phandle;
+            else
+               Log_Debug
+                 ("Ignoring extra PLIC device: addr_phys="
+                  & GNAT.Debug_Utilities.Image_C (Address (Node.Base)));
             end if;
 
          when Devicetree_Device_Type_UART_NS16550A =>
