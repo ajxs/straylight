@@ -103,6 +103,12 @@ A root virtual filesystem (`Filesystems.Root`) sits at the top. Two real filesys
 
 `Boot.Mount_Disks` works out which block device holds which filesystem by reading each device's first sector, so the order of the Virtio buses doesn't matter. It checks for a FAT boot sector signature (`Filesystems.FAT.Is_FAT_Boot_Sector`) and for a UStar header (`Filesystems.UStar.Is_UStar_Header`). It runs from `Boot.Start_Init_Process`, because reading a Virtio device needs a process context. Until then, the two disk mounts have no device.
 
+`/Devices/` also holds a node for each device:
+- `/Devices/Console` is added by hand in `Boot.Initialise_Filesystem`, before the other device nodes, so a full node table can't leave it out.
+- `Boot.Populate_Device_Nodes` adds `/Devices/Serial/<N>`, `/Devices/Disks/<N>` and `/Devices/Graphics/<N>`, one per device. Each type is numbered from 0, in `System_Devices` order (Devicetree order). The numbers depend on the Devicetree, so kernel code should never name a device by its number.
+- Only the console and serial nodes support reads and writes. The others return `Not_Supported`, which userspace sees as `-ENOTSUP`.
+- The root filesystem has 32 nodes. If they run out, `Add_Filesystem_Node_To_Root_Filesystem` logs an error, and the remaining devices get no node.
+
 A block cache (`Filesystems.Block_Cache`) and a filesystem node cache (`Filesystems.Node_Cache`) are shared across all filesystems.
 
 ### System Calls

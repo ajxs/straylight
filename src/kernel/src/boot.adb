@@ -129,6 +129,92 @@ package body Boot is
          Panic_Constraint_Error;
    end Free_Boot_Memory;
 
+   function Can_Device_Be_Mounted_In_Filesystem
+     (Device : Device_T) return Boolean
+   is (Device.Driver_Type
+       in Driver_Type_UART
+        | Driver_Type_Virtio_Block
+        | Driver_Type_Virtio_GPU);
+
+   ----------------------------------------------------------------------------
+   --  Adds a node under /Devices for each device that userspace can open,
+   --  grouped by the device class, e.g. /Devices/Serial/0.
+   ----------------------------------------------------------------------------
+   procedure Populate_Device_Nodes
+     (Devices_Node_Index : Filesystem_Node_Index_T)
+   is
+      --  Each device type's directory node, or 0 until it's created.
+      Directory_Node_Indexes :
+        array (Driver_Type_T) of Filesystem_Node_Index_T := [others => 0];
+
+      --  The number of each device type's next node.
+      Next_Device_Numbers : array (Driver_Type_T) of Natural := [others => 0];
+
+      Device_Node_Index : Filesystem_Node_Index_T := 0;
+
+      Result : Function_Result := Unset;
+   begin
+      for Device of
+        System_Devices (System_Devices'First .. Attached_System_Device_Count)
+        when Can_Device_Be_Mounted_In_Filesystem (Device)
+      loop
+         Driver_Type : constant Driver_Type_T := Device.Driver_Type;
+
+         Number_Image : constant String :=
+           Next_Device_Numbers (Driver_Type)'Image;
+
+         Device_Name : constant Filesystem_Path_T :=
+           Number_Image (2 .. Number_Image'Last);
+
+         Directory_Name : constant Filesystem_Path_T :=
+           (case Driver_Type is
+              when Driver_Type_UART         => "Serial",
+              when Driver_Type_Virtio_Block => "Disks",
+              when Driver_Type_Virtio_GPU   => "Graphics",
+              when others                   => "");
+
+         if Directory_Node_Indexes (Driver_Type) = 0 then
+            Add_Filesystem_Node_To_Root_Filesystem
+              (Filesystems.System_Root_Filesystem,
+               Directory_Name,
+               Devices_Node_Index,
+               Directory_Node_Indexes (Driver_Type),
+               Result,
+               Filesystem_Node_Type_Directory);
+            if Is_Error (Result) then
+               return;
+            end if;
+         end if;
+
+         Add_Filesystem_Node_To_Root_Filesystem
+           (Filesystems.System_Root_Filesystem,
+            Device_Name,
+            Directory_Node_Indexes (Driver_Type),
+            Device_Node_Index,
+            Result,
+            Filesystem_Node_Type_Device,
+            Mounted_Device => Device'Access);
+         if Is_Error (Result) then
+            return;
+         end if;
+
+         pragma
+           Debug
+             (Debug_Boot,
+              Log_Debug
+                ("Added device node: path=/Devices/"
+                 & Directory_Name
+                 & "/"
+                 & Device_Name));
+
+         Next_Device_Numbers (Driver_Type) :=
+           Next_Device_Numbers (Driver_Type) + 1;
+      end loop;
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
+   end Populate_Device_Nodes;
+
    procedure Initialise_Filesystem is
       Result : Function_Result := Unset;
 
@@ -136,7 +222,6 @@ package body Boot is
       Devices_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
       Disk_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
       Disk_B_Filesystem_Node_Index  : Filesystem_Node_Index_T := 0;
-      UART_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
       Console_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
    begin
       pragma Debug (Debug_Boot, Log_Debug ("Initialising filesystem..."));
@@ -214,18 +299,6 @@ package body Boot is
 
       Add_Filesystem_Node_To_Root_Filesystem
         (Filesystems.System_Root_Filesystem,
-         "Serial",
-         Devices_Filesystem_Node_Index,
-         UART_Filesystem_Node_Index,
-         Result,
-         Filesystem_Node_Type_Device,
-         Mounted_Device => Console_Device.all.Console.Backend);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      Add_Filesystem_Node_To_Root_Filesystem
-        (Filesystems.System_Root_Filesystem,
          "Console",
          Devices_Filesystem_Node_Index,
          Console_Filesystem_Node_Index,
@@ -236,10 +309,11 @@ package body Boot is
          Panic;
       end if;
 
+      --  The console's node is added first, so that it exists even if the
+      --  root filesystem runs out of nodes for the other devices.
+      Populate_Device_Nodes (Devices_Filesystem_Node_Index);
+
       pragma Debug (Debug_Boot, Log_Debug ("Initialised filesystem."));
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
    end Initialise_Filesystem;
 
    procedure Mount_Disks is

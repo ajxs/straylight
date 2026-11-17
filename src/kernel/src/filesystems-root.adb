@@ -32,10 +32,19 @@ package body Filesystems.Root is
       if Filename'Length = 0
         or else Filename'Length > Maximum_Root_Filesystem_Filename_Length
       then
+         Log_Error ("Invalid filename");
          New_Node_Index := 0;
          Result := Invalid_Filename;
          return;
       end if;
+
+      pragma
+        Debug
+          (Debug_Filesystems_Root,
+           Log_Debug
+             ("Adding filesystem node to root filesystem: '"
+              & Filename
+              & "'"));
 
       declare
          Root_Filesystem : Root_Filesystem_T
@@ -48,6 +57,7 @@ package body Filesystems.Root is
          Find_Free_Root_Filesystem_Node_Index
            (Root_Filesystem, New_Entry_Index, Result);
          if Is_Error (Result) then
+            Log_Error ("No free root filesystem node available");
             New_Node_Index := 0;
             return;
          end if;

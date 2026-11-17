@@ -86,7 +86,7 @@ int main()
 		return EXIT_FAILURE;
 	}
 
-	FILE *serial_device = fopen("/Devices/Serial", "w");
+	FILE *serial_device = fopen("/Devices/Serial/0", "w");
 	if (serial_device == NULL)
 	{
 		fprintf(stderr, "Failed to open serial device!\n");
