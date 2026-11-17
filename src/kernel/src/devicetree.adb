@@ -1070,7 +1070,13 @@ package body Devicetree is
    function Get_Device_Type_From_Compatible
      (Property : Devicetree_Property_T) return Devicetree_Device_Type_T is
    begin
-      if Does_Stringlist_Property_Contain_String (Property, "riscv,plic0") then
+      --  Linux's Devicetree bindings treat 'riscv,plic0' as legacy, and newer
+      --  SoCs list 'sifive,plic-1.0.0' after a SoC-specific name instead.
+      if Does_Stringlist_Property_Contain_String (Property, "riscv,plic0")
+        or else
+          Does_Stringlist_Property_Contain_String
+            (Property, "sifive,plic-1.0.0")
+      then
          return Devicetree_Device_Type_PLIC;
       elsif Does_Stringlist_Property_Contain_String (Property, "ns16550a") then
          return Devicetree_Device_Type_UART_NS16550A;
@@ -1262,8 +1268,7 @@ package body Devicetree is
          return;
       end if;
 
-      if State.Node_Context_Stack.Count = State.Reserved_Memory_Node_Depth
-      then
+      if State.Node_Context_Stack.Count = State.Reserved_Memory_Node_Depth then
          State.Reserved_Memory_Node_Depth := 0;
       end if;
 

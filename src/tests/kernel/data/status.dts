@@ -2,7 +2,8 @@
  * A small Devicetree for the host tests of the 'status' property.
  * Nodes whose 'status' isn't "okay" or "ok" must be skipped.
  * It also has cases that QEMU's Devicetree doesn't: PLIC contexts that
- * aren't 'hart * 2 + 1', and an inherited 'interrupt-parent'.
+ * aren't 'hart * 2 + 1', an inherited 'interrupt-parent', and a PLIC that's
+ * only compatible with 'sifive,plic-1.0.0'.
  *
  * status.dtb is built from this file, and both are committed. After changing
  * this file, rebuild it from this directory with:
@@ -123,7 +124,7 @@
 	 * belongs to the disabled hart 2.
 	 */
 	plic: plic@c000000 {
-		compatible = "riscv,plic0";
+		compatible = "starfive,jh7110-plic", "sifive,plic-1.0.0";
 		phandle = <0x20>;
 		reg = <0x00 0x0c000000 0x00 0x600000>;
 		interrupts-extended = <&cpu0_intc 11 &cpu1_intc 11 &cpu1_intc 9
