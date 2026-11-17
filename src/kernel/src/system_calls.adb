@@ -7,6 +7,7 @@ with System;                  use System;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Devices.Attached_System_Devices;
+use type Devices.Attached_System_Devices.Device_Access;
 with Devices.Virtio.Graphics;
 with Logging;            use Logging;
 with Memory;             use Memory;
@@ -148,8 +149,15 @@ package body System_Calls is
           (Logging_Enabled,
            Log_Debug ("User Mode Syscall: Update Framebuffer"));
 
-      --  Declared in the function body so that the exception handler covers
-      --  the implicit null check on the dereference.
+      if Devices.Attached_System_Devices.Graphics_Device = null then
+         Log_Error ("No graphics device");
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ENODEV);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      --  Declared after the null check, because the renaming dereferences
+      --  the access value.
       Graphics_Device : Devices.Attached_System_Devices.Device_T renames
         Devices.Attached_System_Devices.Graphics_Device.all;
 

@@ -585,6 +585,14 @@ package body Boot is
 
       Framebuffer_Allocation : Virtual_Physical_Address_Pair_T;
    begin
+      --  In the case that the system has no graphics device attached, any
+      --  attempt by a userspace program to send a framebuffer to the active
+      --  graphics device will return an error.
+      if Graphics_Device = null then
+         pragma Debug (Debug_Boot, Log_Debug ("No graphics device found."));
+         return;
+      end if;
+
       Devices.Virtio.Graphics.Get_Display_Info
         (Init_Process.all,
          Graphics_Device.all.Common,

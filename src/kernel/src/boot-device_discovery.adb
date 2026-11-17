@@ -472,10 +472,6 @@ package body Boot.Device_Discovery is
          Panic ("No UART found in the Devicetree");
       end if;
 
-      if Graphics_Device = null then
-         Panic ("No Virtio GPU found in the Devicetree");
-      end if;
-
       Create_Console_Device (Console_Device, UART_Device);
 
       Allocate_Physical_Memory
