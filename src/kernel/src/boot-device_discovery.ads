@@ -38,7 +38,6 @@ is
    --  one is null until its device is created. The interrupt controller and
    --  the GPU are Interrupt_Controller and Graphics_Device in
    --  Devices.Attached_System_Devices, since code outside Boot uses them.
-   UART_Device                   : Device_Access := null;
    Console_Device                : Device_Access := null;
    Root_Filesystem_Memory_Device : Device_Access := null;
 

@@ -86,8 +86,7 @@ package body Boot.Device_Discovery is
    end Create_PLIC_Device;
 
    procedure Create_UART_Device
-     (Device           : out Device_Access;
-      Node             : Devicetree_Device_T;
+     (Node             : Devicetree_Device_T;
       Virtual_Address  : Virtual_Address_T;
       Interrupt_Parent : Device_Access)
    is
@@ -107,8 +106,6 @@ package body Boot.Device_Discovery is
             Spinlock           => Locks.Null_Spinlock),
          Interrupt_Parent => Interrupt_Parent,
          UART             => (others => <>));
-
-      Device := System_Devices (Index)'Access;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
@@ -362,9 +359,7 @@ package body Boot.Device_Discovery is
    --  Creates a system device from a parsed Devicetree node, if applicable.
    --  This procedure assigns each created device their own virtual memory
    --  space, as required.
-   --  Until a more comprehensive device discovery mechanism is implemented,
-   --  this procedure only creates a single UART/PLIC device, even if multiple
-   --  nodes of these types exist in the Devicetree.
+   --  Only the first PLIC becomes a device, even if the Devicetree has more.
    ----------------------------------------------------------------------------
    procedure Create_System_Device_From_Devicetree_Node
      (Node : Devicetree_Device_T; Virtual_Address : in out Virtual_Address_T)
@@ -380,13 +375,8 @@ package body Boot.Device_Discovery is
             end if;
 
          when Devicetree_Device_Type_UART_NS16550A =>
-            if UART_Device = null then
-               Create_UART_Device
-                 (UART_Device,
-                  Node,
-                  Virtual_Address,
-                  Get_Interrupt_Parent (Node));
-            end if;
+            Create_UART_Device
+              (Node, Virtual_Address, Get_Interrupt_Parent (Node));
 
          when Devicetree_Device_Type_Virtio_MMIO   =>
             Create_Attached_Virtio_Device (Node, Virtual_Address);
@@ -465,14 +455,24 @@ package body Boot.Device_Discovery is
          end if;
       end loop;
 
-      --  For temporary development puporses, panic if these devices aren't
-      --  present. This will be removed when more comprehensive device
-      --  discovery is implemented.
-      if UART_Device = null then
+      --  The console's backend is the first UART. Only a serial backend is
+      --  implemented, so the console can't be created without one.
+      --  In future, this should be replaced with a lookup of the Devicetree's
+      --  /chosen/stdout-path property to determine the console backend.
+      Console_Backend : Device_Access := null;
+      for Device of
+        System_Devices (System_Devices'First .. Attached_System_Device_Count)
+        when Device.Driver_Type = Driver_Type_UART
+      loop
+         Console_Backend := Device'Access;
+         exit;
+      end loop;
+
+      if Console_Backend = null then
          Panic ("No UART found in the Devicetree");
       end if;
 
-      Create_Console_Device (Console_Device, UART_Device);
+      Create_Console_Device (Console_Device, Console_Backend);
 
       Allocate_Physical_Memory
         (Ramdisk_Size, Root_Filesystem_Physical_Address, Result);

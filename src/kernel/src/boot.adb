@@ -219,7 +219,7 @@ package body Boot is
          UART_Filesystem_Node_Index,
          Result,
          Filesystem_Node_Type_Device,
-         Mounted_Device => UART_Device);
+         Mounted_Device => Console_Device.all.Console.Backend);
       if Is_Error (Result) then
          Panic;
       end if;
@@ -237,6 +237,9 @@ package body Boot is
       end if;
 
       pragma Debug (Debug_Boot, Log_Debug ("Initialised filesystem."));
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
    end Initialise_Filesystem;
 
    procedure Mount_Disks is
