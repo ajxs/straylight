@@ -263,13 +263,14 @@ package body Boot is
       Sector_Buffer_Address : constant Virtual_Address_T :=
         Get_Physical_Address_Virtual_Mapping (Sector_Buffer_Physical_Address);
 
-      for Block_Device of Block_Devices loop
-         exit when Block_Device = null;
-
+      for Device of
+        System_Devices (System_Devices'First .. Attached_System_Device_Count)
+        when Device.Driver_Type = Driver_Type_Virtio_Block
+      loop
          Devices.Virtio.Block.Read_Sector
            (Init_Process.all,
-            Block_Device.all.Common,
-            Block_Device.all.Virtio_Block,
+            Device.Common,
+            Device.Virtio_Block,
             Sector_Buffer_Physical_Address,
             0,
             Result);
@@ -278,9 +279,9 @@ package body Boot is
          end if;
 
          if Filesystems.FAT.Is_FAT_Boot_Sector (Sector_Buffer_Address) then
-            FAT_Filesystem.Device := Block_Device;
+            FAT_Filesystem.Device := Device'Access;
          elsif Filesystems.UStar.Is_UStar_Header (Sector_Buffer_Address) then
-            UStar_Filesystem.Device := Block_Device;
+            UStar_Filesystem.Device := Device'Access;
          end if;
       end loop;
 
@@ -293,8 +294,11 @@ package body Boot is
          Panic ("No FAT disk found");
       end if;
 
+      --  Only test programs use the UStar disk, so the kernel can run
+      --  without it. In the case that it's not present, a read operation from
+      --  its mount point will return an error.
       if UStar_Filesystem.Device = null then
-         Panic ("No UStar disk found");
+         Log_Error ("No UStar disk found");
       end if;
    exception
       when Constraint_Error =>

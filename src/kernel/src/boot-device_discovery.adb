@@ -167,8 +167,7 @@ package body Boot.Device_Discovery is
    end Create_Ramdisk_Device;
 
    procedure Create_Virtio_Block_Device
-     (Device           : out Device_Access;
-      Node             : Devicetree_Device_T;
+     (Node             : Devicetree_Device_T;
       Virtual_Address  : Virtual_Address_T;
       Interrupt_Parent : Device_Access)
    is
@@ -220,8 +219,6 @@ package body Boot.Device_Discovery is
                Descriptor_Status_Address => Null_Address),
             Block_Request_Array_Addresses => Default_Unallocated_Addresses,
             Total_Sectors                 => 0));
-
-      Device := System_Devices (Device_Index)'Access;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
@@ -343,17 +340,8 @@ package body Boot.Device_Discovery is
 
       case Virtio_Device_ID is
          when Virtio_Device_ID_Block =>
-            --  The device goes into the first unused entry of Block_Devices.
-            for Block_Device of Block_Devices loop
-               if Block_Device = null then
-                  Create_Virtio_Block_Device
-                    (Block_Device,
-                     Node,
-                     Virtual_Address,
-                     Get_Interrupt_Parent (Node));
-                  exit;
-               end if;
-            end loop;
+            Create_Virtio_Block_Device
+              (Node, Virtual_Address, Get_Interrupt_Parent (Node));
 
          when Virtio_Device_ID_GPU   =>
             if Graphics_Device = null then
@@ -482,10 +470,6 @@ package body Boot.Device_Discovery is
       --  discovery is implemented.
       if UART_Device = null then
          Panic ("No UART found in the Devicetree");
-      end if;
-
-      if (for some Block_Device of Block_Devices => Block_Device = null) then
-         Panic ("Expected 2 Virtio block devices in the Devicetree");
       end if;
 
       if Graphics_Device = null then

@@ -42,13 +42,6 @@ is
    Console_Device                : Device_Access := null;
    Root_Filesystem_Memory_Device : Device_Access := null;
 
-   --  An array of attached block devices.
-   --  The order of the array doesn't matter. What filesystems are mounted is
-   --  determined at mount-time.
-   --  Currently limited to two devices, pending a more comprehensive device
-   --  discovery implementation.
-   Block_Devices : array (1 .. 2) of Device_Access := [others => null];
-
    ----------------------------------------------------------------------------
    --  Creates a device for each device found in the Devicetree, then maps and
    --  initialises every device.

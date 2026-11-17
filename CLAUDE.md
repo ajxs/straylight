@@ -80,7 +80,8 @@ Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Bo
 
 Code refers to devices through saved `Device_Access` values, never array indices:
 - `Interrupt_Controller` and `Graphics_Device` are in `Devices.Attached_System_Devices`, because code outside `Boot` uses them.
-- `UART_Device`, `Console_Device`, `Root_Filesystem_Memory_Device` and the `Block_Devices` list are in `Boot.Device_Discovery`.
+- `UART_Device`, `Console_Device` and `Root_Filesystem_Memory_Device` are in `Boot.Device_Discovery`.
+- Nothing keeps a reference to a block device. `Boot.Mount_Disks` finds them in `System_Devices` by `Driver_Type`.
 
 A device must be created by assigning to `System_Devices (Index)` itself, with the index from `Boot.Device_Discovery.Allocate_System_Device_Index`. Through a `Device_Access`, the entry is constrained to its current `Driver_Type`, so assigning a new device through one raises `Constraint_Error`.
 
