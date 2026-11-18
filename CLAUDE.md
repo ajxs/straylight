@@ -81,7 +81,7 @@ Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Bo
 Code refers to devices through saved `Device_Access` values, never array indices:
 - `Interrupt_Controller` and `Graphics_Device` are in `Devices.Attached_System_Devices`, because code outside `Boot` uses them.
 - `Console_Device` and `Root_Filesystem_Memory_Device` are in `Boot.Device_Discovery`. The console's backend UART is `Console_Device.all.Console.Backend`.
-- Nothing keeps a reference to a block device. `Boot.Mount_Disks` finds them in `System_Devices` by `Driver_Type`.
+- Nothing keeps a reference to a block device. `Boot.Mount_Disk_Filesystems` finds them in `System_Devices` by `Driver_Type`.
 
 A device must be created by assigning to `System_Devices (Index)` itself, with the index from `Boot.Device_Discovery.Allocate_System_Device_Index`. Through a `Device_Access`, the entry is constrained to its current `Driver_Type`, so assigning a new device through one raises `Constraint_Error`.
 
@@ -97,11 +97,12 @@ Reads block until a line is complete. `Read_Line_Unlocked` does the input proces
 The line buffer is 4096 bytes. Its last byte is reserved for the newline, so input past that point is discarded. `Line_Read_Lock` allows one read at a time, so other readers sleep until the current `read` returns. This isn't fair: a process that keeps reading can starve the others.
 
 ### Filesystem
-A root virtual filesystem (`Filesystems.Root`) sits at the top. Two real filesystems are mounted under `/Devices/`:
-- `/Devices/Disk/` — FAT16 image (`Filesystems.FAT`, `Filesystems.FAT.FAT16`)
-- `/Devices/Disk_B/` — UStar/tar image (`Filesystems.UStar`)
+A root virtual filesystem (`Filesystems.Root`) sits at the top. Disk filesystems are mounted under `/Volumes/<N>`. Two filesystem types are supported: FAT16 (`Filesystems.FAT`, `Filesystems.FAT.FAT16`) and UStar/tar (`Filesystems.UStar`).
 
-`Boot.Mount_Disks` works out which block device holds which filesystem by reading each device's first sector, so the order of the Virtio buses doesn't matter. It checks for a FAT boot sector signature (`Filesystems.FAT.Is_FAT_Boot_Sector`) and for a UStar header (`Filesystems.UStar.Is_UStar_Header`). It runs from `Boot.Start_Init_Process`, because reading a Virtio device needs a process context. Until then, the two disk mounts have no device.
+`Boot.Mount_Disk_Filesystems` reads the first sector of each block device, and checks for a FAT boot sector signature (`Filesystems.FAT.Is_FAT_Boot_Sector`) or a UStar header (`Filesystems.UStar.Is_UStar_Header`). It mounts each one it recognises in the next free `Filesystems.Mounted_Filesystems` slot, and adds its `/Volumes/<N>` node. Other disks are skipped. It runs from `Boot.Start_Init_Process`, because reading a Virtio device needs a process context.
+- Volumes are numbered from 0 in `System_Devices` order. On QEMU, `/Volumes/0` is the UStar disk and `/Volumes/1` the FAT disk, because the Devicetree lists the Virtio buses from the highest address down. Kernel code should never name a volume by its number.
+- Init loads its startup programs from the first volume that has a `/Programs` directory, and panics if none does.
+- A filesystem must be mounted at one path only. The node cache keys a filesystem's root directory entries by the mount node's index, so a second mount of the same filesystem would get its own cached nodes for those entries, which could go stale.
 
 `/Devices/` also holds a node for each device:
 - `/Devices/Console` is added by hand in `Boot.Initialise_Filesystem`, before the other device nodes, so a full node table can't leave it out.
@@ -123,6 +124,10 @@ The kernel restrictions (`kernel.adc`) disable exception propagation. Every pack
 
 Procedures with `out Function_Result` parameters are preferred over functions where a `Constraint_Error` is possible, and where no in-band way of handling the constraint exception exists.
 
+- Make `Result := Success;` the last statement, never the first, so that a path that forgets to set `Result` doesn't report success. If an early `return` can happen before every path has set `Result`, also set `Result := Unset;` at the top. `Unset` is 0, so `Is_Error` treats it as an error.
+- Check each call that can fail straight after it, with `if Is_Error (Result) then return; end if;`. Don't share one check after an `if`/`elsif` chain.
+- Log an error once, in the procedure where it happens, then pass the `Function_Result` back up. Callers check it and return without logging it again. Context that only the caller knows, such as a path it built, goes in a `pragma Debug` line. A caller can still decide what a failure means, such as whether to `Panic`.
+
 ### Ada Restrictions
 `kernel.adc` disables: exceptions propagation, dynamic dispatch, finalization, allocators, tasking, protected types, fixed-point, IO, streams, and implicit heap allocations. Do not use these features in kernel code.
 
@@ -134,6 +139,23 @@ Debug logging is switched on per subsystem by the `Debug_*` constants at the top
 - Don't pass `File` or `Line`. Their defaults record the caller's location.
 - Each line is loosely logfmt: `hart= process= time= level= location= message=`. New fields inside a message should stay `key=value`.
 - If the only thing that can raise `Constraint_Error` in a subprogram is a debug log message, put the log in its own small procedure with a handler, as `Boot.Log_Hart` does. Otherwise the build fails with the flag either on or off. Build with the flag both ways.
+
+### Code Style
+- A procedure does only what its name says. Put new behaviour at the level that owns the decision, not in whichever helper is convenient. For example, `Devicetree.Parse_Reg_Property` only decodes `reg` into entries, and `Finalise_Node_Properties` decides whether they become memory regions, reserved regions or a device.
+- When a loop handles only the items that match a condition, use an Ada 2022 iterator filter instead of an `if` around the whole loop body. The `when` filter also works in quantified expressions, aggregates and `'Reduce`. Don't rewrite existing loops just for this, unless the code is already being changed.
+  ```ada
+  for Device of
+    System_Devices (System_Devices'First .. Attached_System_Device_Count)
+    when Device.Driver_Type = Driver_Type_Virtio_Block
+  loop
+  ```
+- In comments, in all code including C, don't use the word "shortcut", and don't refer to plans: no `_dev/*-plan.md` files, phases or plan items. To record a known limit, describe the limit and what would fix it in plain words:
+  ```ada
+  --  The console's backend is the first UART. Only a serial backend is
+  --  implemented, so the console can't be created without one.
+  --  In future, this should be replaced with a lookup of the Devicetree's
+  --  /chosen/stdout-path property to determine the console backend.
+  ```
 
 ### Fixed-Length Strings
 `Fixed_Length_String_T` (in `utilities.ads`) is used for kernel-internal strings with a known maximum length (e.g., filesystem node names). It stores both the max-length buffer and the actual `Byte_Length`.

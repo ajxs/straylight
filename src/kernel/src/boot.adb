@@ -29,6 +29,10 @@ with Processes.Scheduler;
 with Traps;
 
 package body Boot is
+   --  Set by Initialise_Filesystem. Mount_Disk_Filesystems adds a node under
+   --  it for each volume.
+   Volumes_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
+
    function Get_Early_Kernel_Stack_Virtual_Address
      (Hart_Id : Hart_Index_T) return Virtual_Address_T
    is (Early_Kernel_Stack_Virtual_Address_Base
@@ -220,8 +224,6 @@ package body Boot is
 
       Root_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
       Devices_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
-      Disk_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
-      Disk_B_Filesystem_Node_Index  : Filesystem_Node_Index_T := 0;
       Console_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
    begin
       pragma Debug (Debug_Boot, Log_Debug ("Initialising filesystem..."));
@@ -243,13 +245,6 @@ package body Boot is
         Filesystems.Mounted_Filesystems (1)'Access;
 
       Initialise_Root_Filesystem (Filesystems.System_Root_Filesystem, Result);
-
-      --  The devices of the two disk filesystems are set by Mount_Disks.
-      Filesystems.Mounted_Filesystems (2) :=
-        (Filesystem_Type => Filesystem_Type_FAT, others => <>);
-
-      Filesystems.Mounted_Filesystems (3) :=
-        (Filesystem_Type => Filesystem_Type_UStar, others => <>);
 
       Add_Filesystem_Node_To_Root_Filesystem
         (Filesystems.System_Root_Filesystem,
@@ -275,24 +270,11 @@ package body Boot is
 
       Add_Filesystem_Node_To_Root_Filesystem
         (Filesystems.System_Root_Filesystem,
-         "Disk",
-         Devices_Filesystem_Node_Index,
-         Disk_Filesystem_Node_Index,
+         "Volumes",
+         Root_Filesystem_Node_Index,
+         Volumes_Filesystem_Node_Index,
          Result,
-         Filesystem_Node_Type_Mounted_Filesystem,
-         Mounted_Filesystem => Filesystems.Mounted_Filesystems (2)'Access);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      Add_Filesystem_Node_To_Root_Filesystem
-        (Filesystems.System_Root_Filesystem,
-         "Disk_B",
-         Devices_Filesystem_Node_Index,
-         Disk_B_Filesystem_Node_Index,
-         Result,
-         Filesystem_Node_Type_Mounted_Filesystem,
-         Mounted_Filesystem => Filesystems.Mounted_Filesystems (3)'Access);
+         Filesystem_Node_Type_Directory);
       if Is_Error (Result) then
          Panic;
       end if;
@@ -316,7 +298,69 @@ package body Boot is
       pragma Debug (Debug_Boot, Log_Debug ("Initialised filesystem."));
    end Initialise_Filesystem;
 
-   procedure Mount_Disks is
+   ----------------------------------------------------------------------------
+   --  Mounts a disk's filesystem in the next free mounted filesystem slot,
+   --  and adds its node at /Volumes/<Volume_Number>.
+   ----------------------------------------------------------------------------
+   procedure Mount_Volume
+     (Filesystem_Type : Filesystem_Type_T;
+      Device          : Device_Access;
+      Volume_Number   : Natural;
+      Result          : out Function_Result)
+   is
+      Filesystem_Index  : Natural := 0;
+      Volume_Node_Index : Filesystem_Node_Index_T := 0;
+   begin
+      for Index in
+        Filesystems.Mounted_Filesystems'Range
+        when Filesystems.Mounted_Filesystems (Index).Filesystem_Type
+        = Filesystem_Type_None
+      loop
+         Filesystem_Index := Index;
+         exit;
+      end loop;
+
+      if Filesystem_Index = 0 then
+         Log_Error ("No free mounted filesystem slot available");
+         Result := No_Free_Entries;
+         return;
+      end if;
+
+      Number_Image : constant String := Volume_Number'Image;
+
+      Volume_Name : constant Filesystem_Path_T :=
+        Number_Image (2 .. Number_Image'Last);
+
+      --  The node is added before the slot is filled, so that the slot stays
+      --  free if the root filesystem has no free nodes.
+      Add_Filesystem_Node_To_Root_Filesystem
+        (Filesystems.System_Root_Filesystem,
+         Volume_Name,
+         Volumes_Filesystem_Node_Index,
+         Volume_Node_Index,
+         Result,
+         Filesystem_Node_Type_Mounted_Filesystem,
+         Mounted_Filesystem =>
+           Filesystems.Mounted_Filesystems (Filesystem_Index)'Access);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Filesystems.Mounted_Filesystems (Filesystem_Index) :=
+        (Filesystem_Type => Filesystem_Type, Device => Device, others => <>);
+
+      pragma
+        Debug
+          (Debug_Boot,
+           Log_Debug ("Mounted volume: path=/Volumes/" & Volume_Name));
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
+   end Mount_Volume;
+
+   procedure Mount_Disk_Filesystems (Volume_Count : out Natural) is
       --  The device writes the sector to a buffer by its physical address.
       --  The smallest physical allocation is a page.
       Sector_Buffer_Size : constant := 16#1000#;
@@ -324,13 +368,10 @@ package body Boot is
       Sector_Buffer_Physical_Address : Physical_Address_T :=
         Null_Physical_Address;
 
-      FAT_Filesystem   : Filesystem_T renames
-        Filesystems.Mounted_Filesystems (2);
-      UStar_Filesystem : Filesystem_T renames
-        Filesystems.Mounted_Filesystems (3);
-
       Result : Function_Result := Unset;
    begin
+      Volume_Count := 0;
+
       Allocate_Physical_Memory
         (Sector_Buffer_Size, Sector_Buffer_Physical_Address, Result);
       if Is_Error (Result) then
@@ -355,10 +396,24 @@ package body Boot is
             Panic ("Error reading the first sector of a disk");
          end if;
 
-         if Filesystems.FAT.Is_FAT_Boot_Sector (Sector_Buffer_Address) then
-            FAT_Filesystem.Device := Device'Access;
-         elsif Filesystems.UStar.Is_UStar_Header (Sector_Buffer_Address) then
-            UStar_Filesystem.Device := Device'Access;
+         Filesystem_Type : constant Filesystem_Type_T :=
+           (if Filesystems.FAT.Is_FAT_Boot_Sector (Sector_Buffer_Address)
+            then Filesystem_Type_FAT
+            elsif Filesystems.UStar.Is_UStar_Header (Sector_Buffer_Address)
+            then Filesystem_Type_UStar
+            else Filesystem_Type_None);
+
+         if Filesystem_Type = Filesystem_Type_None then
+            pragma
+              Debug
+                (Debug_Boot,
+                 Log_Debug ("Disk has no known filesystem, so it's skipped."));
+         else
+            Mount_Volume
+              (Filesystem_Type, Device'Access, Volume_Count, Result);
+            exit when Is_Error (Result);
+
+            Volume_Count := Volume_Count + 1;
          end if;
       end loop;
 
@@ -366,21 +421,10 @@ package body Boot is
       if Is_Error (Result) then
          Panic ("Error freeing the disk sector buffer");
       end if;
-
-      if FAT_Filesystem.Device = null then
-         Panic ("No FAT disk found");
-      end if;
-
-      --  Only test programs use the UStar disk, so the kernel can run
-      --  without it. In the case that it's not present, a read operation from
-      --  its mount point will return an error.
-      if UStar_Filesystem.Device = null then
-         Log_Error ("No UStar disk found");
-      end if;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
-   end Mount_Disks;
+   end Mount_Disk_Filesystems;
 
    procedure Initialise_Hart (Hart_Id : Hart_Index_T) is
       procedure Save_Hart_State_Pointer (Hart_State_Address : Address)
@@ -778,8 +822,106 @@ package body Boot is
          Panic_Constraint_Error;
    end Initialise_Graphics;
 
-   procedure Start_Init_Process is
+   ----------------------------------------------------------------------------
+   --  Searches through all of the mounted volums for one that contains the
+   --  /Programs directory, which contains the startup programs.
+   --  Returns the index of the volume if found, panics if not.
+   ----------------------------------------------------------------------------
+   procedure Find_Volume_With_Startup_Programs
+     (Volume_Count : Natural; Startup_Volume_Index : out Natural)
+   is
+      Programs_Directory_Handle : Process_File_Handle_Access := null;
+      Result                    : Function_Result := Unset;
+   begin
+      for I in 0 .. Volume_Count - 1 loop
+         Volume_Index_String : constant String := I'Image;
+
+         Programs_Directory : constant Filesystem_Path_T :=
+           "/Volumes/"
+           & Volume_Index_String (2 .. Volume_Index_String'Last)
+           & "/Programs";
+
+         pragma
+           Debug
+             (Debug_Boot,
+              Log_Debug
+                ("Checking for 'Programs' directory: path="
+                 & Programs_Directory));
+
+         Open_File
+           (Init_Process.all,
+            Programs_Directory,
+            (Access_Mode    => Read_Only,
+             Creation_Flags => (others => False),
+             Status_Flags   => (others => False)),
+            Programs_Directory_Handle,
+            Result);
+         if Is_Error (Result) then
+            Panic;
+         end if;
+
+         if Result /= File_Not_Found then
+            Close_File (Programs_Directory_Handle, Result);
+            if Is_Error (Result) then
+               Panic;
+            end if;
+
+            Startup_Volume_Index := I;
+            return;
+         end if;
+      end loop;
+
+      Panic ("Unable to find volume with startup programs.");
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
+   end Find_Volume_With_Startup_Programs;
+
+   procedure Load_Startup_Programs (Startup_Volume_Index : Natural) is
       Result : Function_Result := Unset;
+   begin
+      Startup_Volume_Index_String : constant String :=
+        Startup_Volume_Index'Image;
+
+      Programs_Directory : constant Filesystem_Path_T :=
+        "/Volumes/"
+        & Startup_Volume_Index_String (2 .. Startup_Volume_Index_String'Last)
+        & "/Programs";
+
+      pragma
+        Debug
+          (Debug_Boot,
+           Log_Debug ("Loading startup programs: path=" & Programs_Directory));
+
+      Loader.Load_New_Process_From_Filesystem
+        (Init_Process.all,
+         Programs_Directory & "/print_fractal_pattern.elf",
+         Result);
+      if Is_Error (Result) then
+         Panic;
+      end if;
+
+      Loader.Load_New_Process_From_Filesystem
+        (Init_Process.all,
+         Programs_Directory & "/print_fractal_pattern_2.elf",
+         Result);
+      if Is_Error (Result) then
+         Panic;
+      end if;
+
+      Loader.Load_New_Process_From_Filesystem
+        (Init_Process.all, Programs_Directory & "/simple_shell.elf", Result);
+      if Is_Error (Result) then
+         Panic;
+      end if;
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
+   end Load_Startup_Programs;
+
+   procedure Start_Init_Process is
+      Volume_Count         : Natural := 0;
+      Startup_Volume_Index : Natural := 0;
    begin
       --  Note: There's no need to release the lock of any previous process
       --  when starting the init process, as it's impossible by design for any
@@ -790,39 +932,11 @@ package body Boot is
       --  requires a process context to operate in.
       Initialise_Graphics;
 
-      --  This must run before any program is loaded from either disk.
-      Mount_Disks;
+      Mount_Disk_Filesystems (Volume_Count);
 
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
-         "/Devices/Disk/Programs/print_fractal_pattern.elf",
-         Result);
-      if Is_Error (Result) then
-         Panic;
-      end if;
+      Find_Volume_With_Startup_Programs (Volume_Count, Startup_Volume_Index);
 
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
-         "/Devices/Disk/Programs/print_fractal_pattern_2.elf",
-         Result);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      --  Loader.Load_New_Process_From_Filesystem
-      --    (Init_Process.all, "/Devices/Disk/Programs/test_file_io.elf",
-      --  Result);
-
-      --  Loader.Load_New_Process_From_Filesystem
-      --    (Init_Process.all,
-      --     "/Devices/Disk/Programs/print_random_words.elf",
-      --     Result);
-
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all, "/Devices/Disk/Programs/simple_shell.elf", Result);
-      if Is_Error (Result) then
-         Panic;
-      end if;
+      Load_Startup_Programs (Startup_Volume_Index);
 
       --  Wait for all the harts to start before freeing the boot memory.
       --  Since their boot stacks are in the boot memory region that would be
@@ -833,9 +947,6 @@ package body Boot is
       --  Exit the init process via the scheduler.
       Processes.Scheduler.Run (Process_Stopped);
       Panic ("Init_Process still running after exit.");
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
    end Start_Init_Process;
 
    procedure Wait_For_All_Harts_To_Start is

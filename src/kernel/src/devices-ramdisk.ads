@@ -11,7 +11,7 @@ with Function_Results; use Function_Results;
 --
 --  To use it, create a ramdisk device with
 --  Boot.Device_Discovery.Create_Ramdisk_Device, then attach a mounted
---  filesystem to it:
+--  filesystem to it, in a free Mounted_Filesystems slot:
 --
 --      Create_Ramdisk_Device
 --        (Ramdisk_Device,
@@ -19,7 +19,7 @@ with Function_Results; use Function_Results;
 --         Ramdisk_Region_Size,
 --         Device_Virtual_Address);
 --
---      Mounted_Filesystems (3) :=
+--      Mounted_Filesystems (Free_Index) :=
 --        (Filesystem_Type              => Filesystem_Type_UStar,
 --         Filesystem_Meta_Info_Address => Null_Address,
 --         Filesystem_Meta_Info_Size    => 0,

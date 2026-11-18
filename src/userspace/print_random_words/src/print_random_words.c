@@ -15,7 +15,9 @@ int main()
 		exit(EXIT_FAILURE);
 	}
 
-	FILE *file = fopen("/Devices/Disk_B/seven_letter_words.txt", "r");
+	// Volumes are numbered in Devicetree order. On QEMU, /Volumes/0 is the
+	// UStar disk.
+	FILE *file = fopen("/Volumes/0/seven_letter_words.txt", "r");
 	if (file == NULL)
 	{
 		fprintf(stderr, "Failed to open file!\n");

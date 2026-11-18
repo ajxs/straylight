@@ -15,14 +15,16 @@ int main()
 		exit(EXIT_FAILURE);
 	}
 
-	FILE *words_file = fopen("/Devices/Disk_B/seven_letter_words.txt", "r");
+	// Volumes are numbered in Devicetree order. On QEMU, /Volumes/0 is the
+	// UStar disk and /Volumes/1 is the FAT disk.
+	FILE *words_file = fopen("/Volumes/0/seven_letter_words.txt", "r");
 	if (words_file == NULL)
 	{
 		fprintf(stderr, "Failed to open file!\n");
 		return EXIT_FAILURE;
 	}
 
-	FILE *test_write_file = fopen("/Devices/Disk/test_file.txt", "r+");
+	FILE *test_write_file = fopen("/Volumes/1/test_file.txt", "r+");
 	if (test_write_file == NULL)
 	{
 		fprintf(stderr, "Failed to open file!\n");
@@ -55,7 +57,7 @@ int main()
 		return EXIT_FAILURE;
 	}
 
-	FILE *new_file = fopen("/Devices/Disk/nonexistent_file.txt", "w+");
+	FILE *new_file = fopen("/Volumes/1/nonexistent_file.txt", "w+");
 	if (new_file == NULL)
 	{
 		fprintf(stderr, "Failed to create new_file!\n");
@@ -63,7 +65,7 @@ int main()
 	}
 
 	FILE *new_file_with_long_name =
-	    fopen("/Devices/Disk/Programs/"
+	    fopen("/Volumes/1/Programs/"
 	          "nonexistent_file_with_really_long_and_silly_name.txt",
 	          "w+");
 	if (new_file_with_long_name == NULL)
