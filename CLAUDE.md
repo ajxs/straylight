@@ -47,7 +47,7 @@ _dev/              Development notes, debug scripts, incident logs
 2. Calls `boot_initialise_boot_page_tables` (Ada) to build initial Sv39 page tables.
 3. Enables paging, switches to the higher-half stack, calls `adainit` (Ada runtime init).
 4. Jumps to `Boot.Kernel_Main` which: parses the Devicetree, initialises the PMM, sets up the kernel address space and heap, then calls `Boot.Initialise_Kernel_Services`.
-5. `Initialise_Kernel_Services` initialises devices, the block cache, filesystems, and creates the init process, then calls `Processes.Scheduler.Run`.
+5. `Initialise_Kernel_Services` initialises devices (`Boot.Device_Discovery`), the block cache, and the root filesystem (`Boot.Filesystem_Setup`). It creates the init process (`Boot.Init`), then calls `Processes.Scheduler.Run`. The init process mounts the disks and loads the startup programs.
 
 Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Boot_Hart_Entry`.
 
@@ -81,7 +81,7 @@ Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Bo
 Code refers to devices through saved `Device_Access` values, never array indices:
 - `Interrupt_Controller` and `Graphics_Device` are in `Devices.Attached_System_Devices`, because code outside `Boot` uses them.
 - `Console_Device` and `Root_Filesystem_Memory_Device` are in `Boot.Device_Discovery`. The console's backend UART is `Console_Device.all.Console.Backend`.
-- Nothing keeps a reference to a block device. `Boot.Mount_Disk_Filesystems` finds them in `System_Devices` by `Driver_Type`.
+- Nothing keeps a reference to a block device. `Boot.Filesystem_Setup.Mount_Disk_Filesystems` finds them in `System_Devices` by `Driver_Type`.
 
 A device must be created by assigning to `System_Devices (Index)` itself, with the index from `Boot.Device_Discovery.Allocate_System_Device_Index`. Through a `Device_Access`, the entry is constrained to its current `Driver_Type`, so assigning a new device through one raises `Constraint_Error`.
 
@@ -99,14 +99,14 @@ The line buffer is 4096 bytes. Its last byte is reserved for the newline, so inp
 ### Filesystem
 A root virtual filesystem (`Filesystems.Root`) sits at the top. Disk filesystems are mounted under `/Volumes/<N>`. Two filesystem types are supported: FAT16 (`Filesystems.FAT`, `Filesystems.FAT.FAT16`) and UStar/tar (`Filesystems.UStar`).
 
-`Boot.Mount_Disk_Filesystems` reads the first sector of each block device, and checks for a FAT boot sector signature (`Filesystems.FAT.Is_FAT_Boot_Sector`) or a UStar header (`Filesystems.UStar.Is_UStar_Header`). It mounts each one it recognises in the next free `Filesystems.Mounted_Filesystems` slot, and adds its `/Volumes/<N>` node. Other disks are skipped. It runs from `Boot.Start_Init_Process`, because reading a Virtio device needs a process context.
+`Boot.Filesystem_Setup.Mount_Disk_Filesystems` reads the first sector of each block device, and checks for a FAT boot sector signature (`Filesystems.FAT.Is_FAT_Boot_Sector`) or a UStar header (`Filesystems.UStar.Is_UStar_Header`). It mounts each one it recognises in the next free `Filesystems.Mounted_Filesystems` slot, and adds its `/Volumes/<N>` node. Other disks are skipped. It runs from `Boot.Init.Start_Init_Process`, because reading a Virtio device needs a process context.
 - Volumes are numbered from 0 in `System_Devices` order. On QEMU, `/Volumes/0` is the FAT disk on Virtio bus 0 and `/Volumes/1` the UStar disk on bus 1. Kernel code should never name a volume by its number.
 - Init reads the entries of `/Volumes` in order, and loads its startup programs from the first volume that has a `/Programs` directory. It panics if none does.
 - A filesystem must be mounted at one path only. The node cache keys a filesystem's root directory entries by the mount node's index, so a second mount of the same filesystem would get its own cached nodes for those entries, which could go stale.
 
 `/Devices/` also holds a node for each device:
-- `/Devices/Console` is added by hand in `Boot.Initialise_Filesystem`, before the other device nodes, so a full node table can't leave it out.
-- `Boot.Populate_Device_Nodes` adds `/Devices/Serial/<N>`, `/Devices/Disks/<N>` and `/Devices/Graphics/<N>`, one per device. Each type is numbered from 0, in `System_Devices` order (address order). The numbers depend on the Devicetree, so kernel code should never name a device by its number.
+- `/Devices/Console` is added by hand in `Boot.Filesystem_Setup.Initialise_Filesystem`, before the other device nodes, so a full node table can't leave it out.
+- `Boot.Filesystem_Setup.Populate_Device_Nodes` adds `/Devices/Serial/<N>`, `/Devices/Disks/<N>` and `/Devices/Graphics/<N>`, one per device. Each type is numbered from 0, in `System_Devices` order (address order). The numbers depend on the Devicetree, so kernel code should never name a device by its number.
 - Only the console and serial nodes support reads and writes. The others return `Not_Supported`, which userspace sees as `-ENOTSUP`.
 - The root filesystem has 32 nodes. If they run out, `Add_Filesystem_Node_To_Root_Filesystem` logs an error, and the remaining devices get no node.
 

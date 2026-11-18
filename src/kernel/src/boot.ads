@@ -44,22 +44,7 @@ private
    --  current hart id.
    procedure Initialise_Hart (Hart_Id : Hart_Index_T);
 
-   procedure Initialise_Filesystem;
-
-   ----------------------------------------------------------------------------
-   --  Mounts each block device that holds a recognised filesystem at
-   --  /Volumes/<N>, numbered from 0 in System_Devices order.
-   --  The filesystem type is detected by reading the device's first sector.
-   --  Reading from a block device needs a process context, so this is called
-   --  from the init process, before anything is read from a disk.
-   ----------------------------------------------------------------------------
-   procedure Mount_Disk_Filesystems;
-
    procedure Initialise_Graphics;
-
-   procedure Initialise_Init_Process;
-
-   procedure Start_Init_Process;
 
    procedure Start_Non_Boot_Harts;
 

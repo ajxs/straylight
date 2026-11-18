@@ -7,19 +7,16 @@ with GNAT.Debug_Utilities;
 with System.Storage_Elements; use System.Storage_Elements;
 
 with Boot.Device_Discovery;           use Boot.Device_Discovery;
+with Boot.Filesystem_Setup;
+with Boot.Init;
 with Devices;                         use Devices;
 with Devices.Attached_System_Devices; use Devices.Attached_System_Devices;
 with Devices.Virtio;
-with Devices.Virtio.Block;
 with Devices.Virtio.Graphics;
 with Devicetree;
 with Filesystems;                     use Filesystems;
-with Filesystems.FAT;
-with Filesystems.Root;                use Filesystems.Root;
-with Filesystems.UStar;
 with Function_Results;                use Function_Results;
 with Graphics;                        use Graphics;
-with Loader;
 with Logging;                         use Logging;
 with Memory.Kernel;                   use Memory.Kernel;
 with Memory.Physical;                 use Memory.Physical;
@@ -27,13 +24,8 @@ with Memory.Virtual;                  use Memory.Virtual;
 with RISCV.SBI;
 with Processes.Scheduler;
 with Traps;
-with Utilities;
 
 package body Boot is
-   --  Set by Initialise_Filesystem. Mount_Disk_Filesystems adds a node under
-   --  it for each volume.
-   Volumes_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
-
    function Get_Early_Kernel_Stack_Virtual_Address
      (Hart_Id : Hart_Index_T) return Virtual_Address_T
    is (Early_Kernel_Stack_Virtual_Address_Base
@@ -134,301 +126,6 @@ package body Boot is
          Panic_Constraint_Error;
    end Free_Boot_Memory;
 
-   function Can_Device_Be_Mounted_In_Filesystem
-     (Device : Device_T) return Boolean
-   is (Device.Driver_Type
-       in Driver_Type_UART
-        | Driver_Type_Virtio_Block
-        | Driver_Type_Virtio_GPU);
-
-   ----------------------------------------------------------------------------
-   --  Adds a node under /Devices for each device that userspace can open,
-   --  grouped by the device class, e.g. /Devices/Serial/0.
-   ----------------------------------------------------------------------------
-   procedure Populate_Device_Nodes
-     (Devices_Node_Index : Filesystem_Node_Index_T)
-   is
-      --  Each device type's directory node, or 0 until it's created.
-      Directory_Node_Indexes :
-        array (Driver_Type_T) of Filesystem_Node_Index_T := [others => 0];
-
-      --  The number of each device type's next node.
-      Next_Device_Numbers : array (Driver_Type_T) of Natural := [others => 0];
-
-      Device_Node_Index : Filesystem_Node_Index_T := 0;
-
-      Result : Function_Result := Unset;
-   begin
-      for Device of
-        System_Devices (System_Devices'First .. Attached_System_Device_Count)
-        when Can_Device_Be_Mounted_In_Filesystem (Device)
-      loop
-         Driver_Type : constant Driver_Type_T := Device.Driver_Type;
-
-         Number_Image : constant String :=
-           Next_Device_Numbers (Driver_Type)'Image;
-
-         Device_Name : constant Filesystem_Path_T :=
-           Number_Image (2 .. Number_Image'Last);
-
-         Directory_Name : constant Filesystem_Path_T :=
-           (case Driver_Type is
-              when Driver_Type_UART         => "Serial",
-              when Driver_Type_Virtio_Block => "Disks",
-              when Driver_Type_Virtio_GPU   => "Graphics",
-              when others                   => "");
-
-         if Directory_Node_Indexes (Driver_Type) = 0 then
-            Add_Filesystem_Node_To_Root_Filesystem
-              (Filesystems.System_Root_Filesystem,
-               Directory_Name,
-               Devices_Node_Index,
-               Directory_Node_Indexes (Driver_Type),
-               Result,
-               Filesystem_Node_Type_Directory);
-            if Is_Error (Result) then
-               return;
-            end if;
-         end if;
-
-         Add_Filesystem_Node_To_Root_Filesystem
-           (Filesystems.System_Root_Filesystem,
-            Device_Name,
-            Directory_Node_Indexes (Driver_Type),
-            Device_Node_Index,
-            Result,
-            Filesystem_Node_Type_Device,
-            Mounted_Device => Device'Access);
-         if Is_Error (Result) then
-            return;
-         end if;
-
-         pragma
-           Debug
-             (Debug_Boot,
-              Log_Debug
-                ("Added device node: path=/Devices/"
-                 & Directory_Name
-                 & "/"
-                 & Device_Name));
-
-         Next_Device_Numbers (Driver_Type) :=
-           Next_Device_Numbers (Driver_Type) + 1;
-      end loop;
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-   end Populate_Device_Nodes;
-
-   procedure Initialise_Filesystem is
-      Result : Function_Result := Unset;
-
-      Root_Filesystem_Node_Index    : Filesystem_Node_Index_T := 0;
-      Devices_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
-      Console_Filesystem_Node_Index : Filesystem_Node_Index_T := 0;
-   begin
-      pragma Debug (Debug_Boot, Log_Debug ("Initialising filesystem..."));
-
-      Filesystems.Mounted_Filesystems :=
-        [others =>
-           (Filesystem_Type              => Filesystem_Type_None,
-            Filesystem_Meta_Info_Address => Null_Address,
-            Filesystem_Meta_Info_Size    => 0,
-            Device                       => null)];
-
-      Filesystems.Mounted_Filesystems (1) :=
-        (Filesystem_Type              => Filesystem_Type_Root,
-         Filesystem_Meta_Info_Address => Null_Address,
-         Filesystem_Meta_Info_Size    => 0,
-         Device                       => Root_Filesystem_Memory_Device);
-
-      Filesystems.System_Root_Filesystem :=
-        Filesystems.Mounted_Filesystems (1)'Access;
-
-      Initialise_Root_Filesystem (Filesystems.System_Root_Filesystem, Result);
-
-      Add_Filesystem_Node_To_Root_Filesystem
-        (Filesystems.System_Root_Filesystem,
-         "/",
-         0,
-         Root_Filesystem_Node_Index,
-         Result,
-         Filesystem_Node_Type_Directory);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      Add_Filesystem_Node_To_Root_Filesystem
-        (Filesystems.System_Root_Filesystem,
-         "Devices",
-         Root_Filesystem_Node_Index,
-         Devices_Filesystem_Node_Index,
-         Result,
-         Filesystem_Node_Type_Directory);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      Add_Filesystem_Node_To_Root_Filesystem
-        (Filesystems.System_Root_Filesystem,
-         "Volumes",
-         Root_Filesystem_Node_Index,
-         Volumes_Filesystem_Node_Index,
-         Result,
-         Filesystem_Node_Type_Directory);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      Add_Filesystem_Node_To_Root_Filesystem
-        (Filesystems.System_Root_Filesystem,
-         "Console",
-         Devices_Filesystem_Node_Index,
-         Console_Filesystem_Node_Index,
-         Result,
-         Filesystem_Node_Type_Device,
-         Mounted_Device => Console_Device);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      --  The console's node is added first, so that it exists even if the
-      --  root filesystem runs out of nodes for the other devices.
-      Populate_Device_Nodes (Devices_Filesystem_Node_Index);
-
-      pragma Debug (Debug_Boot, Log_Debug ("Initialised filesystem."));
-   end Initialise_Filesystem;
-
-   ----------------------------------------------------------------------------
-   --  Mounts a disk's filesystem in the next free mounted filesystem slot,
-   --  and adds its node at /Volumes/<Volume_Number>.
-   ----------------------------------------------------------------------------
-   procedure Mount_Volume
-     (Filesystem_Type : Filesystem_Type_T;
-      Device          : Device_Access;
-      Volume_Number   : Natural;
-      Result          : out Function_Result)
-   is
-      Filesystem_Index  : Natural := 0;
-      Volume_Node_Index : Filesystem_Node_Index_T := 0;
-   begin
-      for Index in
-        Filesystems.Mounted_Filesystems'Range
-        when Filesystems.Mounted_Filesystems (Index).Filesystem_Type
-        = Filesystem_Type_None
-      loop
-         Filesystem_Index := Index;
-         exit;
-      end loop;
-
-      if Filesystem_Index = 0 then
-         Log_Error ("No free mounted filesystem slot available");
-         Result := No_Free_Entries;
-         return;
-      end if;
-
-      Number_Image : constant String := Volume_Number'Image;
-
-      Volume_Name : constant Filesystem_Path_T :=
-        Number_Image (2 .. Number_Image'Last);
-
-      --  The node is added before the slot is filled, so that the slot stays
-      --  free if the root filesystem has no free nodes.
-      Add_Filesystem_Node_To_Root_Filesystem
-        (Filesystems.System_Root_Filesystem,
-         Volume_Name,
-         Volumes_Filesystem_Node_Index,
-         Volume_Node_Index,
-         Result,
-         Filesystem_Node_Type_Mounted_Filesystem,
-         Mounted_Filesystem =>
-           Filesystems.Mounted_Filesystems (Filesystem_Index)'Access);
-      if Is_Error (Result) then
-         return;
-      end if;
-
-      Filesystems.Mounted_Filesystems (Filesystem_Index) :=
-        (Filesystem_Type => Filesystem_Type, Device => Device, others => <>);
-
-      pragma
-        Debug
-          (Debug_Boot,
-           Log_Debug ("Mounted volume: path=/Volumes/" & Volume_Name));
-
-      Result := Success;
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-   end Mount_Volume;
-
-   procedure Mount_Disk_Filesystems is
-      --  The device writes the sector to a buffer by its physical address.
-      --  The smallest physical allocation is a page.
-      Sector_Buffer_Size : constant := 16#1000#;
-
-      Sector_Buffer_Physical_Address : Physical_Address_T :=
-        Null_Physical_Address;
-
-      --  The number of volumes mounted so far, which is also the next
-      --  volume's number.
-      Volume_Count : Natural := 0;
-
-      Result : Function_Result := Unset;
-   begin
-      Allocate_Physical_Memory
-        (Sector_Buffer_Size, Sector_Buffer_Physical_Address, Result);
-      if Is_Error (Result) then
-         Panic ("Error allocating the disk sector buffer");
-      end if;
-
-      Sector_Buffer_Address : constant Virtual_Address_T :=
-        Get_Physical_Address_Virtual_Mapping (Sector_Buffer_Physical_Address);
-
-      for Device of
-        System_Devices (System_Devices'First .. Attached_System_Device_Count)
-        when Device.Driver_Type = Driver_Type_Virtio_Block
-      loop
-         Devices.Virtio.Block.Read_Sector
-           (Init_Process.all,
-            Device.Common,
-            Device.Virtio_Block,
-            Sector_Buffer_Physical_Address,
-            0,
-            Result);
-         if Is_Error (Result) then
-            Panic ("Error reading the first sector of a disk");
-         end if;
-
-         Filesystem_Type : constant Filesystem_Type_T :=
-           (if Filesystems.FAT.Is_FAT_Boot_Sector (Sector_Buffer_Address)
-            then Filesystem_Type_FAT
-            elsif Filesystems.UStar.Is_UStar_Header (Sector_Buffer_Address)
-            then Filesystem_Type_UStar
-            else Filesystem_Type_None);
-
-         if Filesystem_Type = Filesystem_Type_None then
-            pragma
-              Debug
-                (Debug_Boot,
-                 Log_Debug ("Disk has no known filesystem, so it's skipped."));
-         else
-            Mount_Volume
-              (Filesystem_Type, Device'Access, Volume_Count, Result);
-            exit when Is_Error (Result);
-
-            Volume_Count := Volume_Count + 1;
-         end if;
-      end loop;
-
-      Free_Physical_Memory (Sector_Buffer_Physical_Address, Result);
-      if Is_Error (Result) then
-         Panic ("Error freeing the disk sector buffer");
-      end if;
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-   end Mount_Disk_Filesystems;
-
    procedure Initialise_Hart (Hart_Id : Hart_Index_T) is
       procedure Save_Hart_State_Pointer (Hart_State_Address : Address)
       with
@@ -449,30 +146,6 @@ package body Boot is
       when Constraint_Error =>
          Panic_Constraint_Error;
    end Initialise_Hart;
-
-   procedure Initialise_Init_Process is
-      Result : Function_Result := Unset;
-   begin
-      Create_New_Process (Init_Process, Result);
-      if Is_Error (Result) then
-         --  Error already printed.
-         Panic;
-      end if;
-
-      --  Set the Init process' entry point.
-      --  Instead of 'returning' to the normal userland process initialisation
-      --  procedure, we jump to the kernel-level init process.
-      Init_Process.all.Kernel_Context (ra) :=
-        Address_To_Unsigned_64 (Start_Init_Process'Address);
-
-      Add_Process_To_Process_Queue (Init_Process, Result);
-      if Is_Error (Result) then
-         Panic ("Error adding init process");
-      end if;
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-   end Initialise_Init_Process;
 
    procedure Kernel_Main
      (Hart_Id : Hart_Index_T; DTB_Address : Physical_Address_T)
@@ -682,11 +355,11 @@ package body Boot is
 
       Initialise_Block_Cache;
 
-      Initialise_Filesystem;
+      Filesystem_Setup.Initialise_Filesystem;
 
       --  Certain kernel services, such as device IO, require a process context
       --  to operate in, so we create the init process here.
-      Initialise_Init_Process;
+      Init.Initialise_Init_Process;
 
       Start_Non_Boot_Harts;
 
@@ -824,163 +497,6 @@ package body Boot is
       when Constraint_Error =>
          Panic_Constraint_Error;
    end Initialise_Graphics;
-
-   ----------------------------------------------------------------------------
-   --  Searches the mounted volumes, in /Volumes entry order, for one that has
-   --  a /Programs directory, which holds the startup programs.
-   --  Returns the path of that directory if found, panics if not.
-   ----------------------------------------------------------------------------
-   procedure Find_Startup_Programs_Directory
-     (Programs_Directory : out Utilities.Fixed_Length_String_T)
-   is
-      Read_Only_Flags : constant File_Open_Flags_T :=
-        (Access_Mode    => Read_Only,
-         Creation_Flags => (others => False),
-         Status_Flags   => (others => False));
-
-      Volumes_Directory_Handle  : Process_File_Handle_Access := null;
-      Programs_Directory_Handle : Process_File_Handle_Access := null;
-      Volume_Name               : Filesystem_Node_Name_T :=
-        Null_Filesystem_Node_Name;
-      Volume_Type               : Filesystem_Node_Type_T :=
-        Filesystem_Node_Type_None;
-      Result                    : Function_Result := Unset;
-   begin
-      Programs_Directory.Byte_Length := 0;
-
-      Open_File
-        (Init_Process.all,
-         "/Volumes",
-         Read_Only_Flags,
-         Volumes_Directory_Handle,
-         Result);
-      if Is_Error (Result) or else Result = File_Not_Found then
-         Panic ("Unable to open /Volumes");
-      end if;
-
-      loop
-         Read_Next_Directory_Entry
-           (Volumes_Directory_Handle, Volume_Name, Volume_Type, Result);
-         if Is_Error (Result) then
-            Panic;
-         end if;
-
-         exit when Result = End_Of_Directory;
-
-         Path : constant Filesystem_Path_T :=
-           "/Volumes/"
-           & Volume_Name.Value (1 .. Volume_Name.Byte_Length)
-           & "/Programs";
-
-         pragma
-           Debug
-             (Debug_Boot,
-              Log_Debug ("Checking for 'Programs' directory: path=" & Path));
-
-         Open_File
-           (Init_Process.all,
-            Path,
-            Read_Only_Flags,
-            Programs_Directory_Handle,
-            Result);
-         if Is_Error (Result) then
-            Panic;
-         end if;
-
-         if Result /= File_Not_Found then
-            Close_File (Programs_Directory_Handle, Result);
-            if Is_Error (Result) then
-               Panic;
-            end if;
-
-            Programs_Directory.Value (1 .. Path'Length) := Path;
-            Programs_Directory.Byte_Length := Path'Length;
-            exit;
-         end if;
-      end loop;
-
-      Close_File (Volumes_Directory_Handle, Result);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      if Programs_Directory.Byte_Length = 0 then
-         Panic ("Unable to find volume with startup programs.");
-      end if;
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-   end Find_Startup_Programs_Directory;
-
-   procedure Load_Startup_Programs (Programs_Directory : Filesystem_Path_T) is
-      Result : Function_Result := Unset;
-   begin
-      pragma
-        Debug
-          (Debug_Boot,
-           Log_Debug ("Loading startup programs: path=" & Programs_Directory));
-
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
-         Programs_Directory & "/print_fractal_pattern.elf",
-         Result);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all,
-         Programs_Directory & "/print_fractal_pattern_2.elf",
-         Result);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-
-      Loader.Load_New_Process_From_Filesystem
-        (Init_Process.all, Programs_Directory & "/simple_shell.elf", Result);
-      if Is_Error (Result) then
-         Panic;
-      end if;
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-   end Load_Startup_Programs;
-
-   procedure Start_Init_Process is
-      --  Long enough for /Volumes/<name>/Programs, since root filesystem
-      --  names are much shorter than a filesystem node name.
-      Programs_Directory :
-        Utilities.Fixed_Length_String_T (Filesystem_Node_Name_Max_Byte_Length);
-   begin
-      --  Note: There's no need to release the lock of any previous process
-      --  when starting the init process, as it's impossible by design for any
-      --  other process to be running at this point in time.
-      pragma Debug (Debug_Boot, Log_Debug ("Starting init process..."));
-
-      --  The graphics system is initialised here because the Virtio driver
-      --  requires a process context to operate in.
-      Initialise_Graphics;
-
-      Mount_Disk_Filesystems;
-
-      Find_Startup_Programs_Directory (Programs_Directory);
-
-      Load_Startup_Programs
-        (Programs_Directory.Value (1 .. Programs_Directory.Byte_Length));
-
-      --  Wait for all the harts to start before freeing the boot memory.
-      --  Since their boot stacks are in the boot memory region that would be
-      --  freed here.
-      Wait_For_All_Harts_To_Start;
-      Free_Boot_Memory;
-
-      --  Exit the init process via the scheduler.
-      Processes.Scheduler.Run (Process_Stopped);
-      Panic ("Init_Process still running after exit.");
-   exception
-      when Constraint_Error =>
-         Panic_Constraint_Error;
-   end Start_Init_Process;
 
    procedure Wait_For_All_Harts_To_Start is
       --  A timeout is declared here to avoid an infinite loop in case
