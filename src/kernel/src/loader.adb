@@ -53,6 +53,9 @@ package body Loader is
 
       if Result = File_Not_Found then
          Log_Error ("Executable file not found.");
+         --  File_Not_Found is not considered an error, so translate the result
+         --  to a result which is classified as an error.
+         Result := Not_Found;
          return;
       end if;
 
