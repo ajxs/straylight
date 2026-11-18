@@ -73,10 +73,10 @@ Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Bo
 ### Devices
 `Devices.Attached_System_Devices.System_Devices` is the single fixed-size array of every device. Each `Device_T` slot is discriminated by `Driver_Type` (the driver), and holds a `Device_Common_State_T` (addresses, IRQ, spinlock) plus the state record owned by that driver, such as `Devices.UART.UART_Device_State_T`. Driver procedures take `(Device : Device_Common_State_T; State : <Driver>_Device_State_T)`, and callers pick the driver with a `case` on `Driver_Type`. A driver that refers to another device holds an `access Devices.Attached_System_Devices.Device_T`, declared through a `limited with`, as the console does for its backend.
 
-`Boot.Device_Discovery.Initialise_Devices` creates a device for each Devicetree node the parser recognises. It uses `System_Devices` entries in creation order, counted by `Devices.Attached_System_Devices.Attached_System_Device_Count`:
-1. The PLIC, first, because every device that raises interrupts points at it. Only the first PLIC is used, and any other is logged and ignored. A device gets the PLIC as its `Interrupt_Parent` only if its Devicetree `interrupt-parent` is the PLIC's phandle. That property can be inherited from an ancestor node. Any other device gets no `Interrupt_Parent`, and its interrupts are never enabled.
-2. The other Devicetree devices, in Devicetree order. Virtio slots are probed for a device ID, and empty ones get no device.
-3. The console (backed by the first UART) and the ramdisk.
+`Boot.Device_Discovery.Initialise_Devices` creates a device for each Devicetree node the parser recognises. It first sorts the parsed nodes by base address, lowest first, keeping Devicetree order for equal addresses, so devices are created in address order however the Devicetree lists them. It uses `System_Devices` entries in creation order, counted by `Devices.Attached_System_Devices.Attached_System_Device_Count`:
+1. The PLIC, first, because every device that raises interrupts points at it. Only the first PLIC (the one with the lowest address) is used, and any other is logged and ignored. A device gets the PLIC as its `Interrupt_Parent` only if its Devicetree `interrupt-parent` is the PLIC's phandle. That property can be inherited from an ancestor node. Any other device gets no `Interrupt_Parent`, and its interrupts are never enabled.
+2. The other Devicetree devices, in address order. Virtio slots are probed for a device ID, and empty ones get no device.
+3. The console (backed by the UART with the lowest address) and the ramdisk.
 
 Code refers to devices through saved `Device_Access` values, never array indices:
 - `Interrupt_Controller` and `Graphics_Device` are in `Devices.Attached_System_Devices`, because code outside `Boot` uses them.
@@ -100,13 +100,13 @@ The line buffer is 4096 bytes. Its last byte is reserved for the newline, so inp
 A root virtual filesystem (`Filesystems.Root`) sits at the top. Disk filesystems are mounted under `/Volumes/<N>`. Two filesystem types are supported: FAT16 (`Filesystems.FAT`, `Filesystems.FAT.FAT16`) and UStar/tar (`Filesystems.UStar`).
 
 `Boot.Mount_Disk_Filesystems` reads the first sector of each block device, and checks for a FAT boot sector signature (`Filesystems.FAT.Is_FAT_Boot_Sector`) or a UStar header (`Filesystems.UStar.Is_UStar_Header`). It mounts each one it recognises in the next free `Filesystems.Mounted_Filesystems` slot, and adds its `/Volumes/<N>` node. Other disks are skipped. It runs from `Boot.Start_Init_Process`, because reading a Virtio device needs a process context.
-- Volumes are numbered from 0 in `System_Devices` order. On QEMU, `/Volumes/0` is the UStar disk and `/Volumes/1` the FAT disk, because the Devicetree lists the Virtio buses from the highest address down. Kernel code should never name a volume by its number.
+- Volumes are numbered from 0 in `System_Devices` order. On QEMU, `/Volumes/0` is the FAT disk on Virtio bus 0 and `/Volumes/1` the UStar disk on bus 1. Kernel code should never name a volume by its number.
 - Init reads the entries of `/Volumes` in order, and loads its startup programs from the first volume that has a `/Programs` directory. It panics if none does.
 - A filesystem must be mounted at one path only. The node cache keys a filesystem's root directory entries by the mount node's index, so a second mount of the same filesystem would get its own cached nodes for those entries, which could go stale.
 
 `/Devices/` also holds a node for each device:
 - `/Devices/Console` is added by hand in `Boot.Initialise_Filesystem`, before the other device nodes, so a full node table can't leave it out.
-- `Boot.Populate_Device_Nodes` adds `/Devices/Serial/<N>`, `/Devices/Disks/<N>` and `/Devices/Graphics/<N>`, one per device. Each type is numbered from 0, in `System_Devices` order (Devicetree order). The numbers depend on the Devicetree, so kernel code should never name a device by its number.
+- `Boot.Populate_Device_Nodes` adds `/Devices/Serial/<N>`, `/Devices/Disks/<N>` and `/Devices/Graphics/<N>`, one per device. Each type is numbered from 0, in `System_Devices` order (address order). The numbers depend on the Devicetree, so kernel code should never name a device by its number.
 - Only the console and serial nodes support reads and writes. The others return `Not_Supported`, which userspace sees as `-ENOTSUP`.
 - The root filesystem has 32 nodes. If they run out, `Add_Filesystem_Node_To_Root_Filesystem` logs an error, and the remaining devices get no node.
 

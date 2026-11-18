@@ -400,6 +400,40 @@ package body Boot.Device_Discovery is
          Panic_Constraint_Error;
    end Create_System_Device_From_Devicetree_Node;
 
+   ----------------------------------------------------------------------------
+   --  Sorts the Devicetree devices by base address, lowest first, so that
+   --  devices are created in ascending address order, independent of the order
+   --  that Devicetree lists them.
+   --  This makes the /Devices and /Volumes numbering follow address order.
+   --  Devices with the same base address keep their Devicetree order.
+   ----------------------------------------------------------------------------
+   procedure Sort_Devicetree_Devices_By_Address is
+   begin
+      for Unsorted_Index in 2 .. Devicetree_Device_Count loop
+         declare
+            Device : constant Devicetree_Device_T :=
+              Devicetree_Devices (Unsorted_Index);
+
+            Insert_Index : Natural := Unsorted_Index;
+         begin
+            --  Shift each device with a larger address one index up, to open a
+            --  position for the inserted device.
+            while Insert_Index > 1
+              and then Devicetree_Devices (Insert_Index - 1).Base > Device.Base
+            loop
+               Devicetree_Devices (Insert_Index) :=
+                 Devicetree_Devices (Insert_Index - 1);
+               Insert_Index := Insert_Index - 1;
+            end loop;
+
+            Devicetree_Devices (Insert_Index) := Device;
+         end;
+      end loop;
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
+   end Sort_Devicetree_Devices_By_Address;
+
    procedure Initialise_Devices is
       --  The start of the virtual memory in which each device is mapped.
       --  This address will be incremented as each device is mapped.
@@ -416,6 +450,8 @@ package body Boot.Device_Discovery is
       pragma
         Debug
           (Debug_Boot_Device_Discovery, Log_Debug ("Initialising devices..."));
+
+      Sort_Devicetree_Devices_By_Address;
 
       --  First, scan for any interrupt controller device nodes.
       --  Interrupt controllers are created first, because each interrupt
