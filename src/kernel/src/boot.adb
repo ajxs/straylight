@@ -27,6 +27,7 @@ with Memory.Virtual;                  use Memory.Virtual;
 with RISCV.SBI;
 with Processes.Scheduler;
 with Traps;
+with Utilities;
 
 package body Boot is
    --  Set by Initialise_Filesystem. Mount_Disk_Filesystems adds a node under
@@ -360,7 +361,7 @@ package body Boot is
          Panic_Constraint_Error;
    end Mount_Volume;
 
-   procedure Mount_Disk_Filesystems (Volume_Count : out Natural) is
+   procedure Mount_Disk_Filesystems is
       --  The device writes the sector to a buffer by its physical address.
       --  The smallest physical allocation is a page.
       Sector_Buffer_Size : constant := 16#1000#;
@@ -368,10 +369,12 @@ package body Boot is
       Sector_Buffer_Physical_Address : Physical_Address_T :=
         Null_Physical_Address;
 
+      --  The number of volumes mounted so far, which is also the next
+      --  volume's number.
+      Volume_Count : Natural := 0;
+
       Result : Function_Result := Unset;
    begin
-      Volume_Count := 0;
-
       Allocate_Physical_Memory
         (Sector_Buffer_Size, Sector_Buffer_Physical_Address, Result);
       if Is_Error (Result) then
@@ -823,37 +826,61 @@ package body Boot is
    end Initialise_Graphics;
 
    ----------------------------------------------------------------------------
-   --  Searches through all of the mounted volums for one that contains the
-   --  /Programs directory, which contains the startup programs.
-   --  Returns the index of the volume if found, panics if not.
+   --  Searches the mounted volumes, in /Volumes entry order, for one that has
+   --  a /Programs directory, which holds the startup programs.
+   --  Returns the path of that directory if found, panics if not.
    ----------------------------------------------------------------------------
-   procedure Find_Volume_With_Startup_Programs
-     (Volume_Count : Natural; Startup_Volume_Index : out Natural)
+   procedure Find_Startup_Programs_Directory
+     (Programs_Directory : out Utilities.Fixed_Length_String_T)
    is
+      Read_Only_Flags : constant File_Open_Flags_T :=
+        (Access_Mode    => Read_Only,
+         Creation_Flags => (others => False),
+         Status_Flags   => (others => False));
+
+      Volumes_Directory_Handle  : Process_File_Handle_Access := null;
       Programs_Directory_Handle : Process_File_Handle_Access := null;
+      Volume_Name               : Filesystem_Node_Name_T :=
+        Null_Filesystem_Node_Name;
+      Volume_Type               : Filesystem_Node_Type_T :=
+        Filesystem_Node_Type_None;
       Result                    : Function_Result := Unset;
    begin
-      for I in 0 .. Volume_Count - 1 loop
-         Volume_Index_String : constant String := I'Image;
+      Programs_Directory.Byte_Length := 0;
 
-         Programs_Directory : constant Filesystem_Path_T :=
+      Open_File
+        (Init_Process.all,
+         "/Volumes",
+         Read_Only_Flags,
+         Volumes_Directory_Handle,
+         Result);
+      if Is_Error (Result) or else Result = File_Not_Found then
+         Panic ("Unable to open /Volumes");
+      end if;
+
+      loop
+         Read_Next_Directory_Entry
+           (Volumes_Directory_Handle, Volume_Name, Volume_Type, Result);
+         if Is_Error (Result) then
+            Panic;
+         end if;
+
+         exit when Result = End_Of_Directory;
+
+         Path : constant Filesystem_Path_T :=
            "/Volumes/"
-           & Volume_Index_String (2 .. Volume_Index_String'Last)
+           & Volume_Name.Value (1 .. Volume_Name.Byte_Length)
            & "/Programs";
 
          pragma
            Debug
              (Debug_Boot,
-              Log_Debug
-                ("Checking for 'Programs' directory: path="
-                 & Programs_Directory));
+              Log_Debug ("Checking for 'Programs' directory: path=" & Path));
 
          Open_File
            (Init_Process.all,
-            Programs_Directory,
-            (Access_Mode    => Read_Only,
-             Creation_Flags => (others => False),
-             Status_Flags   => (others => False)),
+            Path,
+            Read_Only_Flags,
             Programs_Directory_Handle,
             Result);
          if Is_Error (Result) then
@@ -866,28 +893,28 @@ package body Boot is
                Panic;
             end if;
 
-            Startup_Volume_Index := I;
-            return;
+            Programs_Directory.Value (1 .. Path'Length) := Path;
+            Programs_Directory.Byte_Length := Path'Length;
+            exit;
          end if;
       end loop;
 
-      Panic ("Unable to find volume with startup programs.");
+      Close_File (Volumes_Directory_Handle, Result);
+      if Is_Error (Result) then
+         Panic;
+      end if;
+
+      if Programs_Directory.Byte_Length = 0 then
+         Panic ("Unable to find volume with startup programs.");
+      end if;
    exception
       when Constraint_Error =>
          Panic_Constraint_Error;
-   end Find_Volume_With_Startup_Programs;
+   end Find_Startup_Programs_Directory;
 
-   procedure Load_Startup_Programs (Startup_Volume_Index : Natural) is
+   procedure Load_Startup_Programs (Programs_Directory : Filesystem_Path_T) is
       Result : Function_Result := Unset;
    begin
-      Startup_Volume_Index_String : constant String :=
-        Startup_Volume_Index'Image;
-
-      Programs_Directory : constant Filesystem_Path_T :=
-        "/Volumes/"
-        & Startup_Volume_Index_String (2 .. Startup_Volume_Index_String'Last)
-        & "/Programs";
-
       pragma
         Debug
           (Debug_Boot,
@@ -920,8 +947,10 @@ package body Boot is
    end Load_Startup_Programs;
 
    procedure Start_Init_Process is
-      Volume_Count         : Natural := 0;
-      Startup_Volume_Index : Natural := 0;
+      --  Long enough for /Volumes/<name>/Programs, since root filesystem
+      --  names are much shorter than a filesystem node name.
+      Programs_Directory :
+        Utilities.Fixed_Length_String_T (Filesystem_Node_Name_Max_Byte_Length);
    begin
       --  Note: There's no need to release the lock of any previous process
       --  when starting the init process, as it's impossible by design for any
@@ -932,11 +961,12 @@ package body Boot is
       --  requires a process context to operate in.
       Initialise_Graphics;
 
-      Mount_Disk_Filesystems (Volume_Count);
+      Mount_Disk_Filesystems;
 
-      Find_Volume_With_Startup_Programs (Volume_Count, Startup_Volume_Index);
+      Find_Startup_Programs_Directory (Programs_Directory);
 
-      Load_Startup_Programs (Startup_Volume_Index);
+      Load_Startup_Programs
+        (Programs_Directory.Value (1 .. Programs_Directory.Byte_Length));
 
       --  Wait for all the harts to start before freeing the boot memory.
       --  Since their boot stacks are in the boot memory region that would be
@@ -947,6 +977,9 @@ package body Boot is
       --  Exit the init process via the scheduler.
       Processes.Scheduler.Run (Process_Stopped);
       Panic ("Init_Process still running after exit.");
+   exception
+      when Constraint_Error =>
+         Panic_Constraint_Error;
    end Start_Init_Process;
 
    procedure Wait_For_All_Harts_To_Start is

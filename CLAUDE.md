@@ -101,7 +101,7 @@ A root virtual filesystem (`Filesystems.Root`) sits at the top. Disk filesystems
 
 `Boot.Mount_Disk_Filesystems` reads the first sector of each block device, and checks for a FAT boot sector signature (`Filesystems.FAT.Is_FAT_Boot_Sector`) or a UStar header (`Filesystems.UStar.Is_UStar_Header`). It mounts each one it recognises in the next free `Filesystems.Mounted_Filesystems` slot, and adds its `/Volumes/<N>` node. Other disks are skipped. It runs from `Boot.Start_Init_Process`, because reading a Virtio device needs a process context.
 - Volumes are numbered from 0 in `System_Devices` order. On QEMU, `/Volumes/0` is the UStar disk and `/Volumes/1` the FAT disk, because the Devicetree lists the Virtio buses from the highest address down. Kernel code should never name a volume by its number.
-- Init loads its startup programs from the first volume that has a `/Programs` directory, and panics if none does.
+- Init reads the entries of `/Volumes` in order, and loads its startup programs from the first volume that has a `/Programs` directory. It panics if none does.
 - A filesystem must be mounted at one path only. The node cache keys a filesystem's root directory entries by the mount node's index, so a second mount of the same filesystem would get its own cached nodes for those entries, which could go stale.
 
 `/Devices/` also holds a node for each device:
@@ -109,6 +109,12 @@ A root virtual filesystem (`Filesystems.Root`) sits at the top. Disk filesystems
 - `Boot.Populate_Device_Nodes` adds `/Devices/Serial/<N>`, `/Devices/Disks/<N>` and `/Devices/Graphics/<N>`, one per device. Each type is numbered from 0, in `System_Devices` order (Devicetree order). The numbers depend on the Devicetree, so kernel code should never name a device by its number.
 - Only the console and serial nodes support reads and writes. The others return `Not_Supported`, which userspace sees as `-ENOTSUP`.
 - The root filesystem has 32 nodes. If they run out, `Add_Filesystem_Node_To_Root_Filesystem` logs an error, and the remaining devices get no node.
+
+`Filesystems.Read_Next_Directory_Entry` reads the name and node type of the next entry in a directory opened with `Open_File`, like POSIX `readdir` with its `d_type`:
+- The handle's `Position` keeps the place between calls, so `Seek_File` to 0 starts again. In the root filesystem, the position is the node index of the last entry read.
+- At the end it returns `End_Of_Directory`, which isn't an error.
+- Only the root filesystem supports it. On a FAT or UStar directory, including a mount point, it returns `Not_Supported`.
+- `/` itself can't be opened yet, because `Filesystems.Find_File` returns no node for a path with no components.
 
 A block cache (`Filesystems.Block_Cache`) and a filesystem node cache (`Filesystems.Node_Cache`) are shared across all filesystems.
 

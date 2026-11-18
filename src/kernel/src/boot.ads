@@ -53,7 +53,7 @@ private
    --  Reading from a block device needs a process context, so this is called
    --  from the init process, before anything is read from a disk.
    ----------------------------------------------------------------------------
-   procedure Mount_Disk_Filesystems (Volume_Count : out Natural);
+   procedure Mount_Disk_Filesystems;
 
    procedure Initialise_Graphics;
 
