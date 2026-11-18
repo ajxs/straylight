@@ -33,6 +33,20 @@ is
    procedure Initialise_Root_Filesystem
      (Filesystem : Filesystem_Access; Result : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Reads the name and type of the next node in a directory, after the node
+   --  at Position. Position is the index of the last node read, or 0 before
+   --  the first, and is set to the index of the node read.
+   --  Returns End_Of_Directory when there are no more nodes.
+   ----------------------------------------------------------------------------
+   procedure Read_Next_Directory_Entry
+     (Filesystem      : Filesystem_Access;
+      Directory_Index : Filesystem_Node_Index_T;
+      Position        : in out Unsigned_64;
+      Entry_Name      : out Filesystem_Node_Name_T;
+      Entry_Type      : out Filesystem_Node_Type_T;
+      Result          : out Function_Result);
+
 private
    --  The maximum filename length for entries in the root filesystem
    --  is 32 characters. This has been drastically reduced from the 256

@@ -216,4 +216,58 @@ package body Filesystems.Root is
          Result := Constraint_Exception;
    end Initialise_Root_Filesystem;
 
+   procedure Read_Next_Directory_Entry
+     (Filesystem      : Filesystem_Access;
+      Directory_Index : Filesystem_Node_Index_T;
+      Position        : in out Unsigned_64;
+      Entry_Name      : out Filesystem_Node_Name_T;
+      Entry_Type      : out Filesystem_Node_Type_T;
+      Result          : out Function_Result) is
+   begin
+      Entry_Name := Null_Filesystem_Node_Name;
+      Entry_Type := Filesystem_Node_Type_None;
+
+      declare
+         Root_Filesystem : Root_Filesystem_T
+         with
+           Import,
+           Convention => Ada,
+           Alignment  => 1,
+           Address    => Filesystem.all.Device.all.Common.Virtual_Address;
+
+         Found_Index : Natural := 0;
+      begin
+         for Index in Natural (Position) + 1 .. Root_Filesystem.Nodes'Last loop
+            if Root_Filesystem.Nodes (Index).Entry_Used
+              and then
+                Root_Filesystem.Nodes (Index).Parent_Index = Directory_Index
+            then
+               Found_Index := Index;
+               exit;
+            end if;
+         end loop;
+
+         if Found_Index = 0 then
+            Result := End_Of_Directory;
+            return;
+         end if;
+
+         Name_Length : constant Natural :=
+           Root_Filesystem.Nodes (Found_Index).Filename_Byte_Length;
+
+         Entry_Name.Value (1 .. Name_Length) :=
+           Root_Filesystem.Nodes (Found_Index).Filename (1 .. Name_Length);
+         Entry_Name.Byte_Length := Name_Length;
+         Entry_Type := Root_Filesystem.Nodes (Found_Index).Node_Type;
+
+         Position := Unsigned_64 (Found_Index);
+      end;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Read_Next_Directory_Entry;
+
 end Filesystems.Root;

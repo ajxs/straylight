@@ -243,6 +243,20 @@ is
       New_Offset  : Unsigned_64;
       Result      : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Reads the name and node type of the next entry in a directory opened
+   --  with Open_File.
+   --  The handle's Position keeps the place between calls, so seeking to 0
+   --  starts again from the first entry.
+   --  Returns End_Of_Directory when there are no more entries, which is not
+   --  considered an error.
+   ----------------------------------------------------------------------------
+   procedure Read_Next_Directory_Entry
+     (File_Handle : Process_File_Handle_Access;
+      Entry_Name  : out Filesystem_Node_Name_T;
+      Entry_Type  : out Filesystem_Node_Type_T;
+      Result      : out Function_Result);
+
    --  This needs to stay in this package to avoid issues re: strict aliasing.
    --  This automatically suppresses the aliasing optimisations.
    --  refer to:

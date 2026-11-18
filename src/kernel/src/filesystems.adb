@@ -400,8 +400,7 @@ package body Filesystems is
                Result);
 
          when others              =>
-            Log_Error
-              ("Unsupported driver type: " & Device.Driver_Type'Image);
+            Log_Error ("Unsupported driver type: " & Device.Driver_Type'Image);
             Bytes_Read := 0;
             Result := Not_Supported;
       end case;
@@ -579,6 +578,55 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Seek_File;
 
+   procedure Read_Next_Directory_Entry
+     (File_Handle : Process_File_Handle_Access;
+      Entry_Name  : out Filesystem_Node_Name_T;
+      Entry_Type  : out Filesystem_Node_Type_T;
+      Result      : out Function_Result) is
+   begin
+      Entry_Name := Null_Filesystem_Node_Name;
+      Entry_Type := Filesystem_Node_Type_None;
+
+      Directory_Node : constant Filesystem_Node_Access := File_Handle.all.File;
+
+      if not Can_Filesystem_Node_Contain_Child_Nodes (Directory_Node.all) then
+         Log_Error ("Node isn't a directory");
+         Result := Invalid_File_Type;
+         return;
+      end if;
+
+      --  If the file handle refers to a mount point, the file entries being
+      --  read are located in the root directory of the mounted filesystem.
+      --  Otherwise, the entries are in a normal directory of the parent
+      --  filesystem.
+      Directory_Filesystem : constant Filesystem_Access :=
+        (if Directory_Node.all.Node_Type
+           = Filesystem_Node_Type_Mounted_Filesystem
+         then Directory_Node.all.Mounted_Filesystem
+         else Directory_Node.all.Parent_Filesystem);
+
+      case Directory_Filesystem.all.Filesystem_Type is
+         when Filesystem_Type_Root =>
+            Filesystems.Root.Read_Next_Directory_Entry
+              (Directory_Filesystem,
+               Directory_Node.all.Index,
+               File_Handle.all.Position,
+               Entry_Name,
+               Entry_Type,
+               Result);
+
+         when others               =>
+            Log_Error
+              ("Unsupported filesystem type: "
+               & Directory_Filesystem.all.Filesystem_Type'Image);
+            Result := Not_Supported;
+      end case;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Read_Next_Directory_Entry;
+
    procedure Set_Filesystem_Node_Name
      (Node      : in out Filesystem_Node_T;
       Node_Name : Filesystem_Path_T;
@@ -609,8 +657,9 @@ package body Filesystems is
       return
         Filesystem /= null
         and then Filesystem.all.Device /= null
-        and then Filesystem.all.Device.all.Driver_Type
-                 in Driver_Type_Ramdisk | Driver_Type_Virtio_Block;
+        and then
+          Filesystem.all.Device.all.Driver_Type
+          in Driver_Type_Ramdisk | Driver_Type_Virtio_Block;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
@@ -770,8 +819,7 @@ package body Filesystems is
             Result := Success;
 
          when others              =>
-            Log_Error
-              ("Unsupported driver type: " & Device.Driver_Type'Image);
+            Log_Error ("Unsupported driver type: " & Device.Driver_Type'Image);
             Result := Not_Supported;
       end case;
    exception
