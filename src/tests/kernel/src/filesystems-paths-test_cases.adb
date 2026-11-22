@@ -140,4 +140,56 @@ package body Filesystems.Paths.Test_Cases is
       Assert_Fails_With ("/", "/abcd", Path_Too_Long, Max_Length => 4);
    end Run_Test;
 
+   overriding
+   procedure Run_Test (T : in out Test_Split_Path) is
+      pragma Unreferenced (T);
+
+      --  Splits Path, and checks the parent directory and name it gives.
+      procedure Assert_Splits_To
+        (Path : String; Expected_Parent : String; Expected_Name : String)
+      is
+         Parent_Last : Natural := 0;
+         Name_First  : Natural := 0;
+         Result      : Function_Result := Unset;
+      begin
+         Split_Path (Path, Parent_Last, Name_First, Result);
+         Assert (Result = Success, "'" & Path & "' splits");
+
+         Actual_Parent : constant String := Path (Path'First .. Parent_Last);
+         Actual_Name : constant String := Path (Name_First .. Path'Last);
+         Assert
+           (Actual_Parent = Expected_Parent
+            and then Actual_Name = Expected_Name,
+            "'"
+            & Path
+            & "' splits into '"
+            & Expected_Parent
+            & "' and '"
+            & Expected_Name
+            & "', not '"
+            & Actual_Parent
+            & "' and '"
+            & Actual_Name
+            & "'");
+      end Assert_Splits_To;
+
+      --  The indexes are relative to the path's own bounds.
+      Offset_Path : constant String (5 .. 10) := "/a/bcd";
+
+      Parent_Last : Natural := 0;
+      Name_First  : Natural := 0;
+      Result      : Function_Result := Unset;
+   begin
+      Assert_Splits_To ("/a/b", "/a", "b");
+      Assert_Splits_To ("/a/b/c.txt", "/a/b", "c.txt");
+      --  A name directly under the root directory has "/" as its parent.
+      Assert_Splits_To ("/name", "/", "name");
+      Assert_Splits_To (Offset_Path, "/a", "bcd");
+
+      Split_Path ("name", Parent_Last, Name_First, Result);
+      Assert
+        (Result = Invalid_Filename,
+         "A path with no separator fails with Invalid_Filename");
+   end Run_Test;
+
 end Filesystems.Paths.Test_Cases;

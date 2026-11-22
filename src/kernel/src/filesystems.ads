@@ -311,12 +311,6 @@ private
    is (Compare_Fixed_Length_String_With_String
          (Node_Name, Path, Case_Insensitive));
 
-   procedure Get_Next_Path_Component
-     (Path                   : Filesystem_Path_T;
-      Start_Index            : in out Integer;
-      End_Index              : out Integer;
-      Next_Token_Byte_Length : out Integer);
-
    function Is_Searchable_Device_Node
      (Node : Filesystem_Node_Access) return Boolean
    is (Node /= null

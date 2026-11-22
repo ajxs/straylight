@@ -10,6 +10,7 @@ with Filesystems.FAT;
 with Filesystems.Root;
 with Filesystems.UStar;
 with Filesystems.Node_Cache; use Filesystems.Node_Cache;
+with Filesystems.Paths;
 with Logging;                use Logging;
 with Memory.Kernel;          use Memory.Kernel;
 with Hart_State;             use Hart_State;
@@ -31,34 +32,6 @@ package body Filesystems is
       Log_Error ("No unused file handle entries");
       Result := No_Free_Entries;
    end Find_Unused_File_Handle_Entry;
-
-   procedure Get_Next_Path_Component
-     (Path                   : Filesystem_Path_T;
-      Start_Index            : in out Integer;
-      End_Index              : out Integer;
-      Next_Token_Byte_Length : out Integer) is
-   begin
-      Next_Token_Byte_Length := 0;
-
-      --  Skip any leading slashes.
-      while Start_Index <= Path'Last loop
-         exit when Path (Start_Index) /= Filesystem_Node_Separator;
-         Start_Index := Start_Index + 1;
-      end loop;
-
-      End_Index := Start_Index;
-
-      while End_Index <= Path'Last loop
-         exit when Path (End_Index) = Filesystem_Node_Separator;
-
-         End_Index := End_Index + 1;
-      end loop;
-
-      Next_Token_Byte_Length := End_Index - Start_Index;
-   exception
-      when Constraint_Error =>
-         Log_Constraint_Error;
-   end Get_Next_Path_Component;
 
    ----------------------------------------------------------------------------
    --  Finds the node with the given name in a directory: first the node
@@ -168,7 +141,7 @@ package body Filesystems is
       Filesystem_Node_Parent := Filesystem_Node;
 
       loop
-         Get_Next_Path_Component
+         Paths.Get_Next_Path_Component
            (Path,
             Next_Token_Start_Index,
             Next_Token_End_Index,
@@ -1049,39 +1022,25 @@ package body Filesystems is
       New_Node : out Filesystem_Node_Access;
       Result   : out Function_Result)
    is
-      --  The index of the last separator character ('/') in the path, or 0
-      --  if it has none.
-      Last_Separator_Index : Natural := 0;
+      --  The parent directory is Path (Path'First .. Parent_Path_Last), and
+      --  the new file's name is Path (Child_Name_First .. Path'Last).
+      Parent_Path_Last : Natural := 0;
+      Child_Name_First : Natural := 0;
 
       Parent_File_Node : Filesystem_Node_Access := null;
    begin
-      --  Scan backwards through the path string looking for a separator
-      --  character.
-      for I in reverse Path'Range when Path (I) = Filesystem_Node_Separator
-      loop
-         Last_Separator_Index := I;
-         exit;
-      end loop;
-
-      --  A file is always created in a directory, so a path with no separator
-      --  has no parent to create it in.
-      if Last_Separator_Index = 0 then
-         Log_Error ("Path has no parent directory");
+      Paths.Split_Path (Path, Parent_Path_Last, Child_Name_First, Result);
+      if Is_Error (Result) then
          New_Node := null;
-         Result := Invalid_Filename;
          return;
       end if;
 
-      --  A file directly under the root directory, such as "/name", has the
-      --  root directory as its parent.
       Parent_File_Path : constant Filesystem_Path_T :=
-        (if Last_Separator_Index = Path'First
-         then [1 => Filesystem_Node_Separator]
-         else Path (Path'First .. Last_Separator_Index - 1));
+        Path (Path'First .. Parent_Path_Last);
 
       Child_File_Name :
-        constant Filesystem_Path_T (1 .. Path'Last - Last_Separator_Index) :=
-          Path (Last_Separator_Index + 1 .. Path'Last);
+        constant Filesystem_Path_T (1 .. Path'Last - Child_Name_First + 1) :=
+          Path (Child_Name_First .. Path'Last);
 
       pragma
         Debug

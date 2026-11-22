@@ -19,6 +19,7 @@ begin
      (Test_Case_Access'(new Test_Resolve_Relative_Path));
    Test_Suite_Ptr.all.Add_Test
      (Test_Case_Access'(new Test_Resolve_Invalid_Path));
+   Test_Suite_Ptr.all.Add_Test (Test_Case_Access'(new Test_Split_Path));
 
    return Test_Suite_Ptr;
 end Filesystems.Paths_Test_Suite;

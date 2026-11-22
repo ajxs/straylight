@@ -6,6 +6,34 @@
 with Logging; use Logging;
 
 package body Filesystems.Paths is
+   procedure Get_Next_Path_Component
+     (Path                   : Filesystem_Path_T;
+      Start_Index            : in out Integer;
+      End_Index              : out Integer;
+      Next_Token_Byte_Length : out Integer) is
+   begin
+      Next_Token_Byte_Length := 0;
+
+      --  Skip any leading slashes.
+      while Start_Index <= Path'Last loop
+         exit when Path (Start_Index) /= Filesystem_Node_Separator;
+         Start_Index := Start_Index + 1;
+      end loop;
+
+      End_Index := Start_Index;
+
+      while End_Index <= Path'Last loop
+         exit when Path (End_Index) = Filesystem_Node_Separator;
+
+         End_Index := End_Index + 1;
+      end loop;
+
+      Next_Token_Byte_Length := End_Index - Start_Index;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+   end Get_Next_Path_Component;
+
    ----------------------------------------------------------------------------
    --  Adds each component of Source to the end of Absolute_Path, with a
    --  separator before each one. "." is skipped, and ".." removes the last
@@ -115,5 +143,51 @@ package body Filesystems.Paths is
          Absolute_Path.Byte_Length := 0;
          Result := Constraint_Exception;
    end Resolve_Path;
+
+   procedure Split_Path
+     (Path        : Filesystem_Path_T;
+      Parent_Last : out Natural;
+      Name_First  : out Natural;
+      Result      : out Function_Result)
+   is
+      --  The index of the last separator character ('/') in the path, or 0
+      --  if it has none.
+      Last_Separator_Index : Natural := 0;
+   begin
+      Parent_Last := 0;
+      Name_First := 0;
+
+      --  Scan backwards through the path string looking for a separator
+      --  character.
+      for I in reverse Path'Range when Path (I) = Filesystem_Node_Separator
+      loop
+         Last_Separator_Index := I;
+         exit;
+      end loop;
+
+      --  A file is always in a directory, so a path with no separator has no
+      --  parent.
+      if Last_Separator_Index = 0 then
+         Log_Error ("Path has no parent directory");
+         Result := Invalid_Filename;
+         return;
+      end if;
+
+      --  A name directly under the root directory, such as "/name", has the
+      --  root directory as its parent, which is the separator itself.
+      Parent_Last :=
+        (if Last_Separator_Index = Path'First
+         then Path'First
+         else Last_Separator_Index - 1);
+      Name_First := Last_Separator_Index + 1;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Parent_Last := 0;
+         Name_First := 0;
+         Result := Constraint_Exception;
+   end Split_Path;
 
 end Filesystems.Paths;
