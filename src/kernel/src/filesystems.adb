@@ -88,6 +88,29 @@ package body Filesystems is
          Result := Constraint_Exception;
    end Find_Child_Node;
 
+   ----------------------------------------------------------------------------
+   --  Resolves a path against the process's working directory, so a relative
+   --  path becomes an absolute one. The result has the same length limit as a
+   --  working directory, so any directory a path names can become one.
+   ----------------------------------------------------------------------------
+   procedure Resolve_Process_Path
+     (Process       : Process_Control_Block_T;
+      Path          : Filesystem_Path_T;
+      Absolute_Path : out Fixed_Length_String_T;
+      Result        : out Function_Result) is
+   begin
+      Paths.Resolve_Path
+        (Process.Working_Directory.Value
+           (1 .. Process.Working_Directory.Byte_Length),
+         Path,
+         Absolute_Path,
+         Result);
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Resolve_Process_Path;
+
    procedure Find_File
      (Process         : in out Process_Control_Block_T;
       Path            : Filesystem_Path_T;
@@ -98,22 +121,30 @@ package body Filesystems is
 
       Filesystem_Node_Parent : Filesystem_Node_Access := null;
 
-      Next_Token_Start_Index : Integer := Path'First;
-      Next_Token_End_Index   : Integer := Path'First;
+      Next_Token_Start_Index : Integer := 0;
+      Next_Token_End_Index   : Integer := 0;
       Next_Token_Length      : Integer := 1;
+
+      Resolved_Path : Fixed_Length_String_T (Maximum_Working_Directory_Length);
    begin
       pragma
         Debug
           (Debug_Filesystems,
            Log_Debug ("Filesystems.Find_File: '" & Path & "'"));
 
-      if Path (Path'First) /= Filesystem_Node_Separator then
-         --  Relative path; start at process's current working directory.
-         Log_Error ("Relative paths not yet implemented.");
+      --  The path walking logic below only ever sees the absolute path
+      --  resolved by this procedure.
+      Resolve_Process_Path (Process, Path, Resolved_Path, Result);
+      if Is_Error (Result) then
          Filesystem_Node := null;
-         Result := File_Not_Found;
          return;
       end if;
+
+      Absolute_Path : constant Filesystem_Path_T :=
+        Resolved_Path.Value (1 .. Resolved_Path.Byte_Length);
+
+      Next_Token_Start_Index := Absolute_Path'First;
+      Next_Token_End_Index := Absolute_Path'First;
 
       --  An absolute path starts at the root directory. Its node is named
       --  "/" in the root filesystem, and is the only node with no parent.
@@ -142,7 +173,7 @@ package body Filesystems is
 
       loop
          Paths.Get_Next_Path_Component
-           (Path,
+           (Absolute_Path,
             Next_Token_Start_Index,
             Next_Token_End_Index,
             Next_Token_Length);
@@ -162,7 +193,8 @@ package body Filesystems is
          --  string indexes, which can be more complicated to work with.
          Next_Path_Token :
            constant Filesystem_Path_T (1 .. Next_Token_Length) :=
-             Path (Next_Token_Start_Index .. Next_Token_End_Index - 1);
+             Absolute_Path
+               (Next_Token_Start_Index .. Next_Token_End_Index - 1);
 
          pragma
            Debug
@@ -1022,25 +1054,41 @@ package body Filesystems is
       New_Node : out Filesystem_Node_Access;
       Result   : out Function_Result)
    is
-      --  The parent directory is Path (Path'First .. Parent_Path_Last), and
-      --  the new file's name is Path (Child_Name_First .. Path'Last).
+      --  The parent directory is Absolute_Path (Absolute_Path'First ..
+      --  Parent_Path_Last), and the new file's name is Absolute_Path
+      --  (Child_Name_First .. Absolute_Path'Last).
       Parent_Path_Last : Natural := 0;
       Child_Name_First : Natural := 0;
 
       Parent_File_Node : Filesystem_Node_Access := null;
+
+      Resolved_Path : Fixed_Length_String_T (Maximum_Working_Directory_Length);
    begin
-      Paths.Split_Path (Path, Parent_Path_Last, Child_Name_First, Result);
+      --  The path is resolved first, so that a relative path is split into
+      --  the right parent directory and name.
+      Resolve_Process_Path (Process, Path, Resolved_Path, Result);
+      if Is_Error (Result) then
+         New_Node := null;
+         return;
+      end if;
+
+      Absolute_Path : constant Filesystem_Path_T :=
+        Resolved_Path.Value (1 .. Resolved_Path.Byte_Length);
+
+      Paths.Split_Path
+        (Absolute_Path, Parent_Path_Last, Child_Name_First, Result);
       if Is_Error (Result) then
          New_Node := null;
          return;
       end if;
 
       Parent_File_Path : constant Filesystem_Path_T :=
-        Path (Path'First .. Parent_Path_Last);
+        Absolute_Path (Absolute_Path'First .. Parent_Path_Last);
 
       Child_File_Name :
-        constant Filesystem_Path_T (1 .. Path'Last - Child_Name_First + 1) :=
-          Path (Child_Name_First .. Path'Last);
+        constant Filesystem_Path_T
+                   (1 .. Absolute_Path'Last - Child_Name_First + 1) :=
+          Absolute_Path (Child_Name_First .. Absolute_Path'Last);
 
       pragma
         Debug

@@ -121,6 +121,14 @@ is
       Next_Process : Process_Control_Block_Access := null;
 
       --  The process's current directory, as an absolute path.
+      --  This field currently doesn't need to be protected by a spinlock
+      --  because it's only accessed by the process during system calls, and
+      --  currently a process can only make one system call at a time.
+      --  If threads or other processes ever share it, a more comprehensive
+      --  implementation will be required, such as copying it out under the
+      --  process's spinlock, and never holding that lock while walking a path,
+      --  since lookups can block on disk reads, and the scheduler would take
+      --  the same lock.
       Working_Directory :
         Fixed_Length_String_T (Maximum_Working_Directory_Length);
    end record;
