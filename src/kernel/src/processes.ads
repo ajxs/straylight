@@ -13,6 +13,7 @@ with Locks;            use Locks;
 with Memory;           use Memory;
 with Memory.Virtual;   use Memory.Virtual;
 with RISCV;
+with Utilities;        use Utilities;
 
 package Processes
   with Preelaborate
@@ -80,6 +81,10 @@ is
 
    subtype Process_File_Handle_Id_T is Unsigned_32;
 
+   --  The longest working directory path a process can have. This matches
+   --  the longest path that a system call accepts.
+   Maximum_Working_Directory_Length : constant := 256;
+
    ----------------------------------------------------------------------------
    --  System Process Control Block type.
    --  Represents a system process.
@@ -114,6 +119,10 @@ is
       Next_File_Handle_Id : Process_File_Handle_Id_T := 0;
 
       Next_Process : Process_Control_Block_Access := null;
+
+      --  The process's current directory, as an absolute path.
+      Working_Directory :
+        Fixed_Length_String_T (Maximum_Working_Directory_Length);
    end record;
 
    --  The components in this representation clause are those that are

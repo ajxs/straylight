@@ -433,6 +433,14 @@ package body Processes is
       New_Process.all.Spinlock.Lock_Id :=
         Lock_Id_Process_Prefix + Lock_Id_T (New_Process.all.Process_Id);
 
+      --  Every process starts in the root directory.
+      --  Since the record is created in-place in kernel memory, its default
+      --  values aren't applied, so specify this here explicitly.
+      New_Process.all.Working_Directory :=
+        (Max_Length  => Maximum_Working_Directory_Length,
+         Value       => [1 => '/', others => Character'Val (0)],
+         Byte_Length => 1);
+
       pragma
         Debug
           (Debug_Processes,

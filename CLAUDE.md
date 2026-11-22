@@ -85,6 +85,10 @@ Non-boot harts enter at `non_boot_hart_entry` (assembly), then call `Boot.Non_Bo
 ### Processes & Scheduler
 `Process_Control_Block_T` (`processes.ads`) holds registers, memory space, heap, kernel stack, and a linked-list `Next_Process` pointer. The process queue is a singly-linked list protected by a spinlock. The scheduler (`Processes.Scheduler`) is round-robin. Processes can be blocked waiting on a `Blocking_Channel_T` (a `Unsigned_64` identifier); `Wake_Processes_Waiting_For_Channel` unblocks them.
 
+Each process has a `Working_Directory`, its current directory as an absolute path. `Create_New_Process` sets it to `/` explicitly, because a process record is created in place in kernel memory, so its default values aren't applied. The same goes for any field added to the record.
+
+A process record is about 2.7 KB, which is too large, and should be shrunk in future. Most of it is `Memory_Space.Memory_Map`, a fixed table of `Maximum_Virtual_Memory_Mapping_Entries` (64) mappings, about 2 KB. `Working_Directory` is another 264 bytes. Allocating these from the kernel heap at the size each process needs would shrink the record.
+
 ### Devices
 `Devices.Attached_System_Devices.System_Devices` is the single fixed-size array of every device. Each `Device_T` slot is discriminated by `Driver_Type` (the driver), and holds a `Device_Common_State_T` (addresses, IRQ, spinlock) plus the state record owned by that driver, such as `Devices.UART.UART_Device_State_T`. Driver procedures take `(Device : Device_Common_State_T; State : <Driver>_Device_State_T)`, and callers pick the driver with a `case` on `Driver_Type`. A driver that refers to another device holds an `access Devices.Attached_System_Devices.Device_T`, declared through a `limited with`, as the console does for its backend.
 
