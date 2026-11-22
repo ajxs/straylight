@@ -200,6 +200,11 @@ is
 
    type Process_File_Handle_Access is access all Process_File_Handle_T;
 
+   ----------------------------------------------------------------------------
+   --  Opens the file or directory at Path. Returns File_Not_Found if it
+   --  doesn't exist and the flags don't ask for it to be created, or if it
+   --  should be created but its parent directory doesn't exist.
+   ----------------------------------------------------------------------------
    procedure Open_File
      (Process         : in out Process_Control_Block_T;
       Path            : Filesystem_Path_T;

@@ -1098,7 +1098,9 @@ package body Filesystems.FAT is
          end if;
       end loop;
 
-      Result := File_Not_Found;
+      --  Reached when the file isn't in these entries.
+      Filesystem_Node := null;
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;

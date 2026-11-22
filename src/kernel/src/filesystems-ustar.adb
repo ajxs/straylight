@@ -8,8 +8,7 @@ with Filesystems.Node_Cache;  use Filesystems.Node_Cache;
 with Logging;                 use Logging;
 
 package body Filesystems.UStar is
-   function Is_UStar_Header
-     (Sector_Address : Virtual_Address_T) return Boolean
+   function Is_UStar_Header (Sector_Address : Virtual_Address_T) return Boolean
    is
       Header : constant Tar_File_Header
       with Import, Alignment => 1, Address => Sector_Address;
@@ -150,8 +149,9 @@ package body Filesystems.UStar is
          Sector_Number := Sector_Number + File_Sector_Size + 1;
       end loop;
 
+      --  Reached when the file isn't found.
       Found_Node := null;
-      Result := File_Not_Found;
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;

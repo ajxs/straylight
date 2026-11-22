@@ -106,7 +106,7 @@ package body Filesystems is
               ("Unsupported filesystem type: "
                & Filesystem.all.Filesystem_Type'Image);
             Node := null;
-            Result := File_Not_Found;
+            Result := Not_Supported;
       end case;
    exception
       when Constraint_Error =>
@@ -345,10 +345,7 @@ package body Filesystems is
       pragma Debug (Debug_Filesystems, Log_Open_File);
 
       Find_File (Process, Path, Filesystem_Node, Result);
-      if Is_Error (Result) then
-         File_Handle := null;
-         return;
-      elsif Result = File_Not_Found then
+      if Result = File_Not_Found then
          pragma Debug (Debug_Filesystems, Print_File_Found_Status (False));
 
          --  If the open mode flags indicate that the missing file should be
@@ -371,6 +368,9 @@ package body Filesystems is
             File_Handle := null;
             return;
          end if;
+      elsif Is_Error (Result) then
+         File_Handle := null;
+         return;
       end if;
 
       pragma Debug (Debug_Filesystems, Print_File_Found_Status (True));
@@ -1098,9 +1098,7 @@ package body Filesystems is
               & "'"));
 
       Find_File (Process, Parent_File_Path, Parent_File_Node, Result);
-      if Is_Error (Result) then
-         return;
-      elsif Result = File_Not_Found then
+      if Result = File_Not_Found then
          pragma
            Debug
              (Debug_Filesystems,
@@ -1108,6 +1106,10 @@ package body Filesystems is
                 ("Filesystems.Create_File: File not found: '"
                  & Parent_File_Path
                  & "'"));
+         New_Node := null;
+         return;
+      elsif Is_Error (Result) then
+         New_Node := null;
          return;
       end if;
 

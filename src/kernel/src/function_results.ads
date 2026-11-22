@@ -46,7 +46,7 @@ package Function_Results is
    Sector_Out_Of_Bounds : constant := -3333_0003;
 
    --  Filesystem function result codes.
-   File_Not_Found           : constant := 1777_0000;
+   File_Not_Found           : constant := -1777_0000;
    End_Of_Directory         : constant := 1777_0001;
    Invalid_Filesystem       : constant := -1777_0003;
    Invalid_Filename         : constant := -1777_0004;

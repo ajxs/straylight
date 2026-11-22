@@ -47,15 +47,10 @@ package body Loader is
           Status_Flags   => (others => False)),
          Executable_File,
          Result);
-      if Is_Error (Result) then
-         return;
-      end if;
-
       if Result = File_Not_Found then
          Log_Error ("Executable file not found.");
-         --  File_Not_Found is not considered an error, so translate the result
-         --  to a result which is classified as an error.
-         Result := Not_Found;
+         return;
+      elsif Is_Error (Result) then
          return;
       end if;
 

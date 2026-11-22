@@ -67,7 +67,7 @@ package body Boot.Init is
          Read_Only_Flags,
          Volumes_Directory_Handle,
          Result);
-      if Is_Error (Result) or else Result = File_Not_Found then
+      if Is_Error (Result) then
          Panic ("Unable to open /Volumes");
       end if;
 
@@ -96,11 +96,12 @@ package body Boot.Init is
             Read_Only_Flags,
             Programs_Directory_Handle,
             Result);
-         if Is_Error (Result) then
+         if Result = File_Not_Found then
+            --  This volume has no Programs directory, so try the next one.
+            null;
+         elsif Is_Error (Result) then
             Panic;
-         end if;
-
-         if Result /= File_Not_Found then
+         else
             Close_File (Programs_Directory_Handle, Result);
             if Is_Error (Result) then
                Panic;

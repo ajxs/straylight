@@ -1068,7 +1068,7 @@ package body Filesystems.FAT.FAT16 is
 
             if Is_Error (Result) then
                return;
-            elsif Result = Success then
+            elsif Filesystem_Node /= null then
                pragma
                  Debug
                    (Debug_Filesystems_FAT,
@@ -1110,7 +1110,9 @@ package body Filesystems.FAT.FAT16 is
           (Debug_Filesystems_FAT,
            Log_Debug ("File not found in FAT directory."));
 
-      Result := File_Not_Found;
+      --  Reached when the file isn't found.
+      Filesystem_Node := null;
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;
@@ -1215,7 +1217,7 @@ package body Filesystems.FAT.FAT16 is
 
          if Is_Error (Result) then
             return;
-         elsif Result = Success then
+         elsif Filesystem_Node /= null then
             pragma
               Debug
                 (Debug_Filesystems_FAT,
@@ -1237,7 +1239,9 @@ package body Filesystems.FAT.FAT16 is
          exit Read_Sectors_Loop when Current_Sector >= Last_Sector;
       end loop Read_Sectors_Loop;
 
-      Result := File_Not_Found;
+      --  Reached when the file isn't found.
+      Filesystem_Node := null;
+      Result := Success;
    exception
       when Constraint_Error =>
          Log_Constraint_Error;

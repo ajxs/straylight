@@ -448,6 +448,17 @@ private
       Filesystem_Info : out FAT_Filesystem_Info_T;
       Result          : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Searches an array of FAT directory entries for a file.
+   --  The caller determines the length of the array being passed. In practice,
+   --  when searching a root directory, a full block's worth of entries is
+   --  passed. When a subdirectory is being searched, it's searched sector
+   --  by sector.
+   --  A Result of Success is returned with a null node if a matching file
+   --  entry isn't found.
+   --  Last_Entry_Reached is set when the directory's end marker is found,
+   --  indicating that there's nothing more to search.
+   ----------------------------------------------------------------------------
    procedure Search_FAT_Directory_For_File
      (Filesystem                   : Filesystem_Access;
       Filesystem_Info              : FAT_Filesystem_Info_T;
