@@ -98,8 +98,8 @@ package body Filesystems is
 
       Filesystem_Node_Parent : Filesystem_Node_Access := null;
 
-      Next_Token_Start_Index : Integer := 1;
-      Next_Token_End_Index   : Integer := 1;
+      Next_Token_Start_Index : Integer := Path'First;
+      Next_Token_End_Index   : Integer := Path'First;
       Next_Token_Length      : Integer := 1;
    begin
       pragma
