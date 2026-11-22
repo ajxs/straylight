@@ -60,6 +60,61 @@ package body Filesystems is
          Log_Constraint_Error;
    end Get_Next_Path_Component;
 
+   ----------------------------------------------------------------------------
+   --  Finds the node with the given name in a directory: first the node
+   --  cache is checked to see if the file is already cached, then the
+   --  directory's filesystem is searched.
+   --  Passing a null Parent_Node means to search for the root directory.
+   --  Returns a null node, without an error, if the specified file
+   --  doesn't exist in the directory.
+   ----------------------------------------------------------------------------
+   procedure Find_Child_Node
+     (Process     : in out Process_Control_Block_T;
+      Filesystem  : Filesystem_Access;
+      Parent_Node : Filesystem_Node_Access;
+      Child_Name  : Filesystem_Path_T;
+      Node        : out Filesystem_Node_Access;
+      Result      : out Function_Result) is
+   begin
+      --  The root directory is the only node with no parent.
+      Parent_Index : constant Filesystem_Node_Index_T :=
+        (if Parent_Node = null then 0 else Parent_Node.all.Index);
+
+      --  Check if the file is already cached.
+      Find_Filesystem_Node_In_Cache
+        (Filesystem, Parent_Index, Child_Name, Node, Result);
+      if Result /= Not_Found then
+         --  The node was found in the cache, or the search failed.
+         return;
+      end if;
+
+      case Filesystem.all.Filesystem_Type is
+         when Filesystem_Type_UStar =>
+            Filesystems.UStar.Find_File
+              (Filesystem, Process, Child_Name, Parent_Node, Node, Result);
+
+         when Filesystem_Type_Root  =>
+            Filesystems.Root.Find_File
+              (Filesystem, Child_Name, Parent_Index, Node, Result);
+
+         when Filesystem_Type_FAT   =>
+            Filesystems.FAT.Find_File
+              (Filesystem, Process, Child_Name, Parent_Node, Node, Result);
+
+         when others                =>
+            Log_Error
+              ("Unsupported filesystem type: "
+               & Filesystem.all.Filesystem_Type'Image);
+            Node := null;
+            Result := File_Not_Found;
+      end case;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Node := null;
+         Result := Constraint_Exception;
+   end Find_Child_Node;
+
    procedure Find_File
      (Process         : in out Process_Control_Block_T;
       Path            : Filesystem_Path_T;
@@ -70,8 +125,6 @@ package body Filesystems is
 
       Filesystem_Node_Parent : Filesystem_Node_Access := null;
 
-      Filesystem_Node_Parent_Index : Unsigned_64 := 0;
-
       Next_Token_Start_Index : Integer := 1;
       Next_Token_End_Index   : Integer := 1;
       Next_Token_Length      : Integer := 1;
@@ -81,17 +134,38 @@ package body Filesystems is
           (Debug_Filesystems,
            Log_Debug ("Filesystems.Find_File: '" & Path & "'"));
 
-      if Path (Path'First) = Filesystem_Node_Separator then
-         --  Absolute path; start at root filesystem.
-         Current_Filesystem := System_Root_Filesystem;
-         --  The root node index of the in-memory root filesystem is 1.
-         Filesystem_Node_Parent_Index := 1;
-      else
+      if Path (Path'First) /= Filesystem_Node_Separator then
          --  Relative path; start at process's current working directory.
          Log_Error ("Relative paths not yet implemented.");
+         Filesystem_Node := null;
          Result := File_Not_Found;
          return;
       end if;
+
+      --  An absolute path starts at the root directory. Its node is named
+      --  "/" in the root filesystem, and is the only node with no parent.
+      Current_Filesystem := System_Root_Filesystem;
+
+      --  Find the root directory node in the root filesystem.
+      Find_Child_Node
+        (Process,
+         Current_Filesystem,
+         null,
+         [1 => Filesystem_Node_Separator],
+         Filesystem_Node,
+         Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      if Filesystem_Node = null then
+         Log_Error ("Root directory node not found");
+         Result := File_Not_Found;
+         return;
+      end if;
+
+      --  Begin searching with the root filesystem node as the parent.
+      Filesystem_Node_Parent := Filesystem_Node;
 
       loop
          Get_Next_Path_Component
@@ -102,14 +176,12 @@ package body Filesystems is
 
          exit when Next_Token_Length = 0;
 
-         if Filesystem_Node_Parent /= null then
-            --  Ensure we can traverse the parent node.
-            if not Can_Filesystem_Node_Contain_Child_Nodes
-                     (Filesystem_Node_Parent.all)
-            then
-               Filesystem_Node := null;
-               exit;
-            end if;
+         --  Ensure we can traverse the parent node.
+         if not Can_Filesystem_Node_Contain_Child_Nodes
+                  (Filesystem_Node_Parent.all)
+         then
+            Filesystem_Node := null;
+            exit;
          end if;
 
          --  Create a new string for the next path token.
@@ -124,51 +196,14 @@ package body Filesystems is
              (Debug_Filesystems,
               Log_Debug ("Current path token: '" & Next_Path_Token & "'"));
 
-         Find_Filesystem_Node_In_Cache
-           (Current_Filesystem,
-            Filesystem_Node_Parent_Index,
+         Find_Child_Node
+           (Process,
+            Current_Filesystem,
+            Filesystem_Node_Parent,
             Next_Path_Token,
             Filesystem_Node,
             Result);
-         if Result = Not_Found then
-            case Current_Filesystem.all.Filesystem_Type is
-               when Filesystem_Type_UStar =>
-                  Filesystems.UStar.Find_File
-                    (Current_Filesystem,
-                     Process,
-                     Next_Path_Token,
-                     Filesystem_Node_Parent,
-                     Filesystem_Node,
-                     Result);
-
-               when Filesystem_Type_Root  =>
-                  Filesystems.Root.Find_File
-                    (Current_Filesystem,
-                     Next_Path_Token,
-                     Filesystem_Node_Parent_Index,
-                     Filesystem_Node,
-                     Result);
-
-               when Filesystem_Type_FAT   =>
-                  Filesystems.FAT.Find_File
-                    (Current_Filesystem,
-                     Process,
-                     Next_Path_Token,
-                     Filesystem_Node_Parent,
-                     Filesystem_Node,
-                     Result);
-
-               when others                =>
-                  Log_Error
-                    ("Unsupported filesystem type: "
-                     & Current_Filesystem.all.Filesystem_Type'Image);
-                  Result := File_Not_Found;
-            end case;
-
-            if Is_Error (Result) then
-               return;
-            end if;
-         elsif Is_Error (Result) then
+         if Is_Error (Result) then
             return;
          end if;
 
@@ -178,7 +213,7 @@ package body Filesystems is
                 (Debug_Filesystems,
                  Log_Debug
                    ("Filesystem node not found for token: '"
-                    & Path (Next_Token_Start_Index .. Next_Token_End_Index - 1)
+                    & Next_Path_Token
                     & "'"));
             exit;
          end if;
@@ -199,7 +234,6 @@ package body Filesystems is
 
          Next_Token_Start_Index := Next_Token_End_Index;
          Filesystem_Node_Parent := Filesystem_Node;
-         Filesystem_Node_Parent_Index := Filesystem_Node.all.Index;
       end loop;
 
       if Filesystem_Node = null then
@@ -1015,25 +1049,39 @@ package body Filesystems is
       New_Node : out Filesystem_Node_Access;
       Result   : out Function_Result)
    is
-      Parent_Path_Length : Integer := 0;
+      --  The index of the last separator character ('/') in the path, or 0
+      --  if it has none.
+      Last_Separator_Index : Natural := 0;
 
       Parent_File_Node : Filesystem_Node_Access := null;
    begin
-      for I in reverse Path'Range loop
-         if Path (I) = Filesystem_Node_Separator then
-            Parent_Path_Length := I - Path'First;
-            exit;
-         end if;
+      --  Scan backwards through the path string looking for a separator
+      --  character.
+      for I in reverse Path'Range when Path (I) = Filesystem_Node_Separator
+      loop
+         Last_Separator_Index := I;
+         exit;
       end loop;
 
-      Parent_File_Path :
-        constant Filesystem_Path_T
-                   (Path'First .. Path'First + Parent_Path_Length - 1) :=
-          Path (Path'First .. Path'First + Parent_Path_Length - 1);
+      --  A file is always created in a directory, so a path with no separator
+      --  has no parent to create it in.
+      if Last_Separator_Index = 0 then
+         Log_Error ("Path has no parent directory");
+         New_Node := null;
+         Result := Invalid_Filename;
+         return;
+      end if;
+
+      --  A file directly under the root directory, such as "/name", has the
+      --  root directory as its parent.
+      Parent_File_Path : constant Filesystem_Path_T :=
+        (if Last_Separator_Index = Path'First
+         then [1 => Filesystem_Node_Separator]
+         else Path (Path'First .. Last_Separator_Index - 1));
 
       Child_File_Name :
-        constant Filesystem_Path_T (1 .. Path'Last - Parent_Path_Length - 1) :=
-          Path (Path'First + Parent_Path_Length + 1 .. Path'Last);
+        constant Filesystem_Path_T (1 .. Path'Last - Last_Separator_Index) :=
+          Path (Last_Separator_Index + 1 .. Path'Last);
 
       pragma
         Debug

@@ -114,7 +114,8 @@ A root virtual filesystem (`Filesystems.Root`) sits at the top. Disk filesystems
 - The handle's `Position` keeps the place between calls, so `Seek_File` to 0 starts again. In the root filesystem, the position is the node index of the last entry read.
 - At the end it returns `End_Of_Directory`, which isn't an error.
 - Only the root filesystem supports it. On a FAT or UStar directory, including a mount point, it returns `Not_Supported`.
-- `/` itself can't be opened yet, because `Filesystems.Find_File` returns no node for a path with no components.
+
+`Filesystems.Find_File` starts every absolute path at the root directory's node, which is named `/` and is the only node with no parent, so `/` opens like any other directory. Each path component is looked up by `Find_Child_Node`: first in the node cache, then by the filesystem that holds the directory.
 
 A block cache (`Filesystems.Block_Cache`) and a filesystem node cache (`Filesystems.Node_Cache`) are shared across all filesystems.
 
