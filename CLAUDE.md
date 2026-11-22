@@ -28,6 +28,18 @@ When working on the kernel, use `./run` for the first build, to check that the f
 
 The kernel is built with Alire: `alr -C kernel build`. Userspace is built with `make -C userspace`. OpenSBI is a git submodule.
 
+## Host Tests
+
+The host tests are an AUnit program in `src/tests/kernel`, built with the native toolchain: run `alr build`, then `./bin/straylight_kernel_tests`, in that directory. The project compiles the kernel's own sources, with these replacements from `src/tests/kernel/src`:
+- `locks.adb` and `logging.adb` replace the kernel's bodies of those packages.
+- `Host_Stubs` exports the symbols that the kernel gets from its assembly files and linker script, so kernel packages that depend on them, such as `Filesystems`, link on the host. A routine that only makes sense on the target raises `Program_Error`.
+
+## Formatting
+
+The IDE formats files when they're saved: Ada with the Ada language server (the AdaCore VS Code extension), and C with clang-format. Code laid out any other way is reformatted the next time the user saves the file, which puts unrelated line changes into later diffs. So after changing files, format every one the change touched or created, then build again:
+- Ada (`.ads` and `.adb`): `_dev/scripts/format-ada.py FILE...` from the repository root. It sends a formatting request to the same language server the editor uses, with the editor's settings (3-space indent), started through `alr exec` in the file's crate. `_dev/` is gitignored, so the script isn't in the repository.
+- C: `clang-format -i FILE...`, which uses the repository's `.clang-format`.
+
 ## Repository Structure
 
 ```
@@ -36,6 +48,7 @@ src/
   libstraylight/   Ada userspace library (Alire project)
   libc/            Minimal C library for userspace (make)
   userspace/       Userspace programs + disk image creation (make)
+  tests/kernel/    Host unit tests for the kernel (Alire project, AUnit)
   opensbi/         OpenSBI bootloader (git submodule)
 _dev/              Development notes, debug scripts, incident logs
 ```

@@ -12,6 +12,11 @@ with Memory_Test_Suite;
 with Memory.Heap_Allocator_Test_Suite;
 with Memory.Page_Pool_Allocator_Test_Suite;
 
+--  Not referenced directly. This package is included so that its exported
+--  symbols are linked, for the kernel packages that need them.
+with Host_Stubs;
+pragma Unreferenced (Host_Stubs);
+
 procedure Straylight_Kernel_Tests is
    procedure Utilities_Test_Runner is new
      AUnit.Run.Test_Runner (Utilities_Test_Suite);
