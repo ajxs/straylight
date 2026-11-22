@@ -1044,7 +1044,7 @@ package body Filesystems.FAT.FAT16 is
               Address   => Block_Address + Sector_Offset_Within_Block,
               Alignment => 1;
 
-            Search_FAT_Directory_For_File
+            Search_FAT_Directory_Entries_For_File
               (Filesystem,
                Filesystem_Info,
                Directory,
@@ -1193,7 +1193,7 @@ package body Filesystems.FAT.FAT16 is
            Address   => Block_Address + Sector_Offset_Within_Block,
            Alignment => 1;
 
-         Search_FAT_Directory_For_File
+         Search_FAT_Directory_Entries_For_File
            (Filesystem,
             Filesystem_Info,
             Directory,

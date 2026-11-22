@@ -116,7 +116,7 @@ A root virtual filesystem (`Filesystems.Root`) sits at the top. Disk filesystems
 - Only the root filesystem supports it. On a FAT or UStar directory, including a mount point, it returns `Not_Supported`.
 
 `Filesystems.Find_File` starts every absolute path at the root directory's node, which is named `/` and is the only node with no parent, so `/` opens like any other directory. Each path component is looked up by `Find_Child_Node`: first in the node cache, then by the filesystem that holds the directory.
-- Inside path lookup, a missing entry is `Success` with a null node, in the filesystem drivers and in `Find_Child_Node`. FAT's directory-entry search (`Search_FAT_Directory_For_File`) works the same way, so its callers test the node, not the result.
+- Inside path lookup, a missing entry is `Success` with a null node, in the filesystem drivers and in `Find_Child_Node`. FAT's directory-entry search (`Search_FAT_Directory_Entries_For_File`) works the same way, so its callers test the node, not the result.
 - `File_Not_Found` is an error. `Find_File` returns it when the walk ends without a node, and `Open_File` and `Create_File` pass it on. The open system call maps it to `-ENOENT`.
 
 A block cache (`Filesystems.Block_Cache`) and a filesystem node cache (`Filesystems.Node_Cache`) are shared across all filesystems.

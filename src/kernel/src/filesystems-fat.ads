@@ -459,7 +459,7 @@ private
    --  Last_Entry_Reached is set when the directory's end marker is found,
    --  indicating that there's nothing more to search.
    ----------------------------------------------------------------------------
-   procedure Search_FAT_Directory_For_File
+   procedure Search_FAT_Directory_Entries_For_File
      (Filesystem                   : Filesystem_Access;
       Filesystem_Info              : FAT_Filesystem_Info_T;
       Directory                    : Directory_Index_T;

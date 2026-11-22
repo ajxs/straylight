@@ -886,7 +886,7 @@ package body Filesystems.FAT is
          Result := Constraint_Exception;
    end Write_File;
 
-   procedure Search_FAT_Directory_For_File
+   procedure Search_FAT_Directory_Entries_For_File
      (Filesystem                   : Filesystem_Access;
       Filesystem_Info              : FAT_Filesystem_Info_T;
       Directory                    : Directory_Index_T;
@@ -1105,7 +1105,7 @@ package body Filesystems.FAT is
       when Constraint_Error =>
          Log_Constraint_Error;
          Result := Constraint_Exception;
-   end Search_FAT_Directory_For_File;
+   end Search_FAT_Directory_Entries_For_File;
 
    procedure Get_Directory_Entry_Sector_And_Index
      (Filesystem_Node     : Filesystem_Node_Access;
