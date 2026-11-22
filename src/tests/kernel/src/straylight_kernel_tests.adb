@@ -7,6 +7,7 @@ with AUnit.Reporter.Text;
 with AUnit.Run;
 
 with Devicetree_Test_Suite;
+with Filesystems.Paths_Test_Suite;
 with Utilities_Test_Suite;
 with Memory_Test_Suite;
 with Memory.Heap_Allocator_Test_Suite;
@@ -33,6 +34,9 @@ procedure Straylight_Kernel_Tests is
    procedure Devicetree_Test_Runner is new
      AUnit.Run.Test_Runner (Devicetree_Test_Suite);
 
+   procedure Filesystem_Paths_Test_Runner is new
+     AUnit.Run.Test_Runner (Filesystems.Paths_Test_Suite);
+
    Reporter : AUnit.Reporter.Text.Text_Reporter;
 begin
    AUnit.Reporter.Text.Set_Use_ANSI_Colors (Reporter, True);
@@ -45,5 +49,7 @@ begin
    Page_Test_Runner (Reporter);
 
    Devicetree_Test_Runner (Reporter);
+
+   Filesystem_Paths_Test_Runner (Reporter);
 
 end Straylight_Kernel_Tests;

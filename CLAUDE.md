@@ -34,6 +34,8 @@ The host tests are an AUnit program in `src/tests/kernel`, built with the native
 - `locks.adb` and `logging.adb` replace the kernel's bodies of those packages.
 - `Host_Stubs` exports the symbols that the kernel gets from its assembly files and linker script, so kernel packages that depend on them, such as `Filesystems`, link on the host. A routine that only makes sense on the target raises `Program_Error`.
 
+A unit outside a package's family can't `with` that package's private child, so a suite for a private child has to be a child of the parent, such as `Filesystems.Paths_Test_Suite` for `Filesystems.Paths`.
+
 ## Formatting
 
 The IDE formats files when they're saved: Ada with the Ada language server (the AdaCore VS Code extension), and C with clang-format. Code laid out any other way is reformatted the next time the user saves the file, which puts unrelated line changes into later diffs. So after changing files, format every one the change touched or created, then build again:
@@ -127,6 +129,8 @@ A root virtual filesystem (`Filesystems.Root`) sits at the top. Disk filesystems
 - The handle's `Position` keeps the place between calls, so `Seek_File` to 0 starts again. In the root filesystem, the position is the node index of the last entry read.
 - At the end it returns `End_Of_Directory`, which isn't an error.
 - Only the root filesystem supports it. On a FAT or UStar directory, including a mount point, it returns `Not_Supported`.
+
+`Filesystems.Paths`, a private child, handles the text of paths and never looks one up. Its `Resolve_Path` turns a path into an absolute one: a relative path is joined onto a working directory, `.` is dropped, `..` removes the component before it and stays at `/`, and repeated or trailing separators go. That's exact because there are no symbolic links. An empty path is `Invalid_Filename`, and a result that doesn't fit the caller's buffer is `Path_Too_Long`.
 
 `Filesystems.Find_File` starts every absolute path at the root directory's node, which is named `/` and is the only node with no parent, so `/` opens like any other directory. Each path component is looked up by `Find_Child_Node`: first in the node cache, then by the filesystem that holds the directory.
 - Inside path lookup, a missing entry is `Success` with a null node, in the filesystem drivers and in `Find_Child_Node`. FAT's directory-entry search (`Search_FAT_Directory_Entries_For_File`) works the same way, so its callers test the node, not the result.

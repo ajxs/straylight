@@ -47,6 +47,7 @@ package Function_Results is
 
    --  Filesystem function result codes.
    File_Not_Found           : constant := -1777_0000;
+   Path_Too_Long            : constant := -1777_0001;
    End_Of_Directory         : constant := 1777_0001;
    Invalid_Filesystem       : constant := -1777_0003;
    Invalid_Filename         : constant := -1777_0004;
