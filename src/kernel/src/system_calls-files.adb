@@ -439,4 +439,73 @@ package body System_Calls.Files is
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Truncate_File_Syscall;
+
+   procedure Handle_Get_Working_Directory_Syscall
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result)
+   is
+      Trap_Context : constant Process_Context_T
+      with
+        Import,
+        Convention => C,
+        Alignment  => 1,
+        Address    => Process.Trap_Context_Addr;
+   begin
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("User Mode Syscall: Get Working Directory"));
+
+      Buffer_Address : constant Virtual_Address_T :=
+        Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
+
+      Buffer_Size : constant Unsigned_64 := Trap_Context.Gp_Registers (a2);
+
+      Path_Length : constant Natural := Process.Working_Directory.Byte_Length;
+
+      if Trap_Context.Gp_Registers (a1) = 0 then
+         Log_Error ("Null buffer address");
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      if Buffer_Size < Unsigned_64 (Path_Length) then
+         Log_Error ("Buffer size too small for working directory path");
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ERANGE);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      --  Validate that the buffer address and size describe a range within the
+      --  valid userspace range.
+      if not Is_Valid_Userspace_Address_Range
+               (Buffer_Address, Storage_Count (Path_Length))
+      then
+         Log_Error ("Invalid non-userspace address range");
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      --  Copy the working directory path into the user-provided buffer.
+      declare
+         User_Buffer : String (1 .. Path_Length)
+         with Import, Alignment => 1, Address => Buffer_Address;
+      begin
+         User_Buffer := Process.Working_Directory.Value (1 .. Path_Length);
+      end;
+
+      Syscall_Result := Unsigned_64 (Path_Length);
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Handle_Get_Working_Directory_Syscall;
+
 end System_Calls.Files;

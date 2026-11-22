@@ -143,7 +143,20 @@ A root virtual filesystem (`Filesystems.Root`) sits at the top. Disk filesystems
 A block cache (`Filesystems.Block_Cache`) and a filesystem node cache (`Filesystems.Node_Cache`) are shared across all filesystems.
 
 ### System Calls
-Custom syscall numbers with the prefix `5446_0xxx` (defined in `system_calls.ads` and mirrored in `libstraylight/src/straylight.ads`). Arguments are passed in registers via `straylight_syscall` (assembly in `libstraylight`). Result is returned in `a0`; 0 = success, negative = error.
+Custom syscall numbers with the prefix `5446_0xxx`, defined in `system_calls.ads`. The ones libc uses are mirrored in `libc/include/straylight_syscall.h`, and the framebuffer call in `libstraylight/src/straylight.ads`. Arguments are passed in registers via `straylight_syscall` (assembly in `libstraylight`). Result is returned in `a0`; 0 = success, negative = error.
+
+A handler must turn every failure that a user can cause into a negative `errno` in `a0`, and return `Syscall_Unsuccessful_Without_Kernel_Error`. If it returns any other error result, `Handle_User_Mode_Syscall` panics.
+
+Not every handler follows that rule yet, so some user mistakes panic the kernel. Each handler maps only a few results to `errno`, and passes the rest back to the dispatcher. The open handler maps only `File_Not_Found`, so these all panic:
+- `Invalid_Filename`, from an empty path.
+- `Path_Too_Long`, from a 256-byte relative path, which is 257 bytes once resolved.
+- `Not_Supported`, from creating a file in the root filesystem.
+
+This needs revisiting in every handler. One fix is a shared mapping from `Function_Result` to `errno` that every handler uses, so a new error result can't reach the dispatcher unmapped. Results that only a kernel fault can cause, such as `Constraint_Exception`, would still panic.
+
+Handlers check a user buffer with `Memory.Is_Valid_Userspace_Address_Range`, which only checks that the range is below the userspace limit, not that its pages are mapped. A buffer at an unmapped user address, such as 8, passes the check. The kernel's access to it then page faults in supervisor mode, and `Handle_Supervisor_Mode_Exception` panics, so any process can bring down the kernel with a bad pointer. Every handler that takes a user buffer has this gap: open, read, write, `Get_Working_Directory` and the framebuffer call. This needs fixing in future: one shared check that the whole range is mapped in the process's memory map with user access, and with write access for a buffer the kernel writes to, called by every handler that touches user memory.
+
+`Get_Working_Directory` (`5446_0113`) copies the process's working directory into the buffer at `a1`, which holds `a2` bytes, without a terminator, and returns its length. It returns `-ERANGE` if the path doesn't fit, and `-EFAULT` for a null buffer or one outside userspace. A null buffer is rejected rather than given a meaning, so a mode such as asking for the length can be added later.
 
 ## Ada Conventions
 

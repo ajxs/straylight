@@ -80,43 +80,47 @@ package body System_Calls is
       Syscall_Number : constant Unsigned_64 := Trap_Context.Gp_Registers (a0);
 
       case Syscall_Number is
-         when Syscall_Exit_Process       =>
+         when Syscall_Exit_Process          =>
             --  This function does not return, so it doesn't need to set
             --  a result value. In the case that control ever returns to this
             --  point, it indicates the process didn't exit, so the kernel
             --  will panic.
             Handle_Process_Exit_Syscall;
 
-         when Syscall_Yield_Process      =>
+         when Syscall_Yield_Process         =>
             Handle_Process_Yield_Syscall;
             Result := Success;
 
-         when Syscall_Open_File          =>
+         when Syscall_Open_File             =>
             Handle_Open_File_Syscall (Process, Syscall_Result, Result);
 
-         when Syscall_Read_File          =>
+         when Syscall_Read_File             =>
             Handle_Read_File_Syscall (Process, Syscall_Result, Result);
 
-         when Syscall_Seek_File          =>
+         when Syscall_Seek_File             =>
             Handle_Seek_File_Syscall (Process, Syscall_Result, Result);
 
-         when Syscall_Write_File         =>
+         when Syscall_Write_File            =>
             Handle_Write_File_Syscall (Process, Syscall_Result, Result);
 
-         when Syscall_Close_File         =>
+         when Syscall_Close_File            =>
             Handle_Close_File_Syscall (Process, Syscall_Result, Result);
 
-         when Syscall_Truncate_File      =>
+         when Syscall_Truncate_File         =>
             Handle_Truncate_File_Syscall (Process, Syscall_Result, Result);
 
-         when Syscall_Update_Framebuffer =>
+         when Syscall_Get_Working_Directory =>
+            Handle_Get_Working_Directory_Syscall
+              (Process, Syscall_Result, Result);
+
+         when Syscall_Update_Framebuffer    =>
             Handle_Update_Framebuffer_Syscall
               (Process, Syscall_Result, Result);
 
-         when Syscall_Grow_Process_Heap  =>
+         when Syscall_Grow_Process_Heap     =>
             Handle_Grow_Process_Heap_Syscall (Process, Syscall_Result, Result);
 
-         when others                     =>
+         when others                        =>
             Panic ("Unknown Syscall Number: " & Syscall_Number'Image);
       end case;
 

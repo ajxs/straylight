@@ -40,6 +40,20 @@ is
       Syscall_Result : out Unsigned_64;
       Result         : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Copies the process's working directory into the buffer address in a1.
+   --  The a2 register holds the length of the buffer to copy into.
+   --  No null-terminating character is added.
+   --  Returns -ERANGE if the specified length in a2 is too small to hold the
+   --  working directory path.
+   --  Returns -EFAULT if a null  buffer address is passed, or a buffer range
+   --  outside userspace.
+   ----------------------------------------------------------------------------
+   procedure Handle_Get_Working_Directory_Syscall
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
+
 private
    Maximum_Path_String_Argument_Length : constant := 256;
 
