@@ -74,11 +74,34 @@ package body System_Calls.Files is
       begin
          Filesystems.Open_File
            (Process, New_Path_String, File_Open_Flags, File_Handle, Result);
-         if Result = File_Not_Found then
-            Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ENOENT);
+         if Is_Error (Result) then
+            Error_Number : constant Syscall_Error_Result_T :=
+              (case Result is
+                 --  Passing an empty path, the path of a file that already
+                 --  exists, or attempting to create a file whose parent
+                 --  isn't a directory, will return an Invalid_Filename
+                 --  result.
+                 when File_Not_Found | Invalid_Filename    => ENOENT,
+                 when Path_Too_Long                        => ENAMETOOLONG,
+                 when Not_Supported                        => ENOTSUP,
+                 --  Truncating a file that is opened read-only.
+                 when Invalid_File_Permissions             => EINVAL,
+                 --  The open file table, the node cache, or a FAT directory
+                 --  is full.
+                 when No_Free_Entries                      => ENFILE,
+                 when Device_IO_Error | Invalid_Filesystem => EIO,
+                 --  Any other result can only be caused by a kernel error.
+                 when others                               => 0);
+
+            --  If the result can't be mapped to a POSIX errno, it indicates
+            --  a kernel error. In this case return immediately.
+            if Error_Number = 0 then
+               return;
+            end if;
+
+            Syscall_Result :=
+              Syscall_Error_Result_To_Unsigned_64 (-Error_Number);
             Result := Syscall_Unsuccessful_Without_Kernel_Error;
-            return;
-         elsif Is_Error (Result) then
             return;
          end if;
 
