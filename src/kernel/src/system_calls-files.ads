@@ -54,6 +54,20 @@ is
       Syscall_Result : out Unsigned_64;
       Result         : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Changes the process's working directory to the path at the address in
+   --  a1. The a2 register holds the path's length.
+   --  If a relative path is specified, it's resolved against the process'
+   --  current working directory.
+   --  Returns -ENOENT if the path doesn't exist.
+   --  Returns -ENOTDIR if it isn't a directory or mount point.
+   --  Returns -EFAULT if the path's address range is outside userspace.
+   ----------------------------------------------------------------------------
+   procedure Handle_Change_Working_Directory_Syscall
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
+
 private
    Maximum_Path_String_Argument_Length : constant := 256;
 

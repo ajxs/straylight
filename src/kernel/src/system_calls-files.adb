@@ -8,38 +8,30 @@ with Logging;            use Logging;
 with Memory;             use Memory;
 with RISCV;              use RISCV;
 with System_Calls.Errno; use System_Calls.Errno;
+with Utilities;          use Utilities;
 
 package body System_Calls.Files is
    Logging_Enabled : constant Boolean :=
      Debug_Processes or else Debug_System_Calls;
 
-   procedure Handle_Open_File_Syscall
-     (Process        : in out Process_Control_Block_T;
-      Syscall_Result : out Unsigned_64;
-      Result         : out Function_Result)
-   is
-      Trap_Context : constant Process_Context_T
-      with
-        Import,
-        Convention => C,
-        Alignment  => 1,
-        Address    => Process.Trap_Context_Addr;
-
-      File_Handle : Process_File_Handle_Access := null;
+   ----------------------------------------------------------------------------
+   --  Copies a path argument from userspace to kernel memory.
+   --  Returns -ENAMETOOLONG if the full path is longer than the output
+   --  variable can hold.
+   --  Returns -EFAULT if its address range is outside userspace.
+   --  On these errors, Syscall_Result holds the errno and Result is
+   --  Syscall_Unsuccessful_Without_Kernel_Error.
+   ----------------------------------------------------------------------------
+   procedure Copy_Path_From_Userspace
+     (Path_String_Address : Virtual_Address_T;
+      Path_String_Length  : Unsigned_64;
+      Path                : out Fixed_Length_String_T;
+      Syscall_Result      : out Unsigned_64;
+      Result              : out Function_Result) is
    begin
-      pragma
-        Debug (Logging_Enabled, Log_Debug ("User Mode Syscall: Open File"));
-
-      Path_String_Address : constant Virtual_Address_T :=
-        Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1));
-      Path_String_Length : constant Unsigned_64 :=
-        Trap_Context.Gp_Registers (a2);
-      File_Open_Flags : constant File_Open_Flags_T :=
-        Unsigned_64_To_File_Open_Flags (Trap_Context.Gp_Registers (a3));
-
       --  Perform this check first, so that we can ensure that the path string
       --  length won't overflow any further type conversions.
-      if Path_String_Length > Maximum_Path_String_Argument_Length then
+      if Path_String_Length > Unsigned_64 (Path.Max_Length) then
          Log_Error
            ("Path length exceeds maximum length: " & Path_String_Length'Image);
 
@@ -58,55 +50,97 @@ package body System_Calls.Files is
          return;
       end if;
 
-      Read_Path_String_And_Open_File : declare
-         User_Path_String :
-           constant Filesystem_Path_T (1 .. Integer (Path_String_Length))
+      Copy_User_Path_String : declare
+         Path_Length : constant Natural := Natural (Path_String_Length);
+
+         User_Path_String : constant Filesystem_Path_T (1 .. Path_Length)
          with
            Import,
            Convention => C,
            Alignment  => 1,
            Address    => Path_String_Address;
-
-         --  Copy the userland path string into a new variable to ensure it is
-         --  in the correct format, and within the kernel address space.
-         New_Path_String : constant Filesystem_Path_T :=
-           User_Path_String (1 .. Integer (Path_String_Length));
       begin
-         Filesystems.Open_File
-           (Process, New_Path_String, File_Open_Flags, File_Handle, Result);
-         if Is_Error (Result) then
-            Error_Number : constant Syscall_Error_Result_T :=
-              (case Result is
-                 --  Passing an empty path, the path of a file that already
-                 --  exists, or attempting to create a file whose parent
-                 --  isn't a directory, will return an Invalid_Filename
-                 --  result.
-                 when File_Not_Found | Invalid_Filename    => ENOENT,
-                 when Path_Too_Long                        => ENAMETOOLONG,
-                 when Not_Supported                        => ENOTSUP,
-                 --  Truncating a file that is opened read-only.
-                 when Invalid_File_Permissions             => EINVAL,
-                 --  The open file table, the node cache, or a FAT directory
-                 --  is full.
-                 when No_Free_Entries                      => ENFILE,
-                 when Device_IO_Error | Invalid_Filesystem => EIO,
-                 --  Any other result can only be caused by a kernel error.
-                 when others                               => 0);
+         Path.Value (1 .. Path_Length) := User_Path_String;
+         Path.Byte_Length := Path_Length;
+      end Copy_User_Path_String;
 
-            --  If the result can't be mapped to a POSIX errno, it indicates
-            --  a kernel error. In this case return immediately.
-            if Error_Number = 0 then
-               return;
-            end if;
+      Syscall_Result := 0;
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Copy_Path_From_Userspace;
 
-            Syscall_Result :=
-              Syscall_Error_Result_To_Unsigned_64 (-Error_Number);
-            Result := Syscall_Unsuccessful_Without_Kernel_Error;
+   procedure Handle_Open_File_Syscall
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result)
+   is
+      Trap_Context : constant Process_Context_T
+      with
+        Import,
+        Convention => C,
+        Alignment  => 1,
+        Address    => Process.Trap_Context_Addr;
+
+      File_Handle : Process_File_Handle_Access := null;
+
+      Path : Fixed_Length_String_T (Maximum_Path_String_Argument_Length);
+   begin
+      pragma
+        Debug (Logging_Enabled, Log_Debug ("User Mode Syscall: Open File"));
+
+      File_Open_Flags : constant File_Open_Flags_T :=
+        Unsigned_64_To_File_Open_Flags (Trap_Context.Gp_Registers (a3));
+
+      Copy_Path_From_Userspace
+        (Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1)),
+         Trap_Context.Gp_Registers (a2),
+         Path,
+         Syscall_Result,
+         Result);
+      if Result /= Success then
+         return;
+      end if;
+
+      Filesystems.Open_File
+        (Process,
+         Path.Value (1 .. Path.Byte_Length),
+         File_Open_Flags,
+         File_Handle,
+         Result);
+      if Is_Error (Result) then
+         Error_Number : constant Syscall_Error_Result_T :=
+           (case Result is
+              --  Passing an empty path, the path of a file that already
+              --  exists, or attempting to create a file whose parent
+              --  isn't a directory, will return an Invalid_Filename
+              --  result.
+              when File_Not_Found | Invalid_Filename    => ENOENT,
+              when Path_Too_Long                        => ENAMETOOLONG,
+              when Not_Supported                        => ENOTSUP,
+              --  Truncating a file that is opened read-only.
+              when Invalid_File_Permissions             => EINVAL,
+              --  The open file table, the node cache, or a FAT directory
+              --  is full.
+              when No_Free_Entries                      => ENFILE,
+              when Device_IO_Error | Invalid_Filesystem => EIO,
+              --  Any other result can only be caused by a kernel error.
+              when others                               => 0);
+
+         --  If the result can't be mapped to a POSIX errno, it indicates
+         --  a kernel error. In this case return immediately.
+         if Error_Number = 0 then
             return;
          end if;
 
-         pragma Debug (Logging_Enabled, Log_Debug ("Opened file handle"));
-      end Read_Path_String_And_Open_File;
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-Error_Number);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      pragma Debug (Logging_Enabled, Log_Debug ("Opened file handle"));
 
       Syscall_Result := Unsigned_64 (File_Handle.all.File_Handle_Id);
       Result := Success;
@@ -530,5 +564,68 @@ package body System_Calls.Files is
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Get_Working_Directory_Syscall;
+
+   procedure Handle_Change_Working_Directory_Syscall
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result)
+   is
+      Trap_Context : constant Process_Context_T
+      with
+        Import,
+        Convention => C,
+        Alignment  => 1,
+        Address    => Process.Trap_Context_Addr;
+
+      Path : Fixed_Length_String_T (Maximum_Path_String_Argument_Length);
+   begin
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("User Mode Syscall: Change Working Directory"));
+
+      Copy_Path_From_Userspace
+        (Unsigned_64_To_Address (Trap_Context.Gp_Registers (a1)),
+         Trap_Context.Gp_Registers (a2),
+         Path,
+         Syscall_Result,
+         Result);
+      if Result /= Success then
+         return;
+      end if;
+
+      Filesystems.Change_Working_Directory
+        (Process, Path.Value (1 .. Path.Byte_Length), Result);
+      if Is_Error (Result) then
+         Error_Number : constant Syscall_Error_Result_T :=
+           (case Result is
+              --  An empty path returns an Invalid_Filename result.
+              when File_Not_Found | Invalid_Filename    => ENOENT,
+              when Invalid_File_Type                    => ENOTDIR,
+              when Path_Too_Long                        => ENAMETOOLONG,
+              --  The open file table, or the node cache is full.
+              when No_Free_Entries                      => ENFILE,
+              when Device_IO_Error | Invalid_Filesystem => EIO,
+              --  Handles unsupported filesystems.
+              when Not_Supported                        => ENOTSUP,
+              --  Any other result can only be caused by a kernel error.
+              when others                               => 0);
+
+         if Error_Number = 0 then
+            return;
+         end if;
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-Error_Number);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      Syscall_Result := 0;
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Handle_Change_Working_Directory_Syscall;
 
 end System_Calls.Files;

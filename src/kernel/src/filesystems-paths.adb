@@ -118,6 +118,9 @@ package body Filesystems.Paths is
          return;
       end if;
 
+      --  If the specified path string doesn't start with a separator
+      --  character, it's a relative path and should be resolved relative to
+      --  the specified working directory.
       if Path (Path'First) /= Filesystem_Node_Separator then
          Append_Path_Components (Working_Directory, Absolute_Path, Result);
          if Is_Error (Result) then

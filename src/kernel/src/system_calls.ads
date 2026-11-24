@@ -21,7 +21,8 @@ is
    Syscall_Close_File    : constant := 5446_0111;
    Syscall_Truncate_File : constant := 5446_0112;
 
-   Syscall_Get_Working_Directory : constant := 5446_0113;
+   Syscall_Get_Working_Directory    : constant := 5446_0113;
+   Syscall_Change_Working_Directory : constant := 5446_0114;
 
    Syscall_Grow_Process_Heap : constant := 5446_0300;
 

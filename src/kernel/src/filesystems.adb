@@ -408,6 +408,61 @@ package body Filesystems is
       Result := Success;
    end Open_File;
 
+   procedure Change_Working_Directory
+     (Process : in out Process_Control_Block_T;
+      Path    : Filesystem_Path_T;
+      Result  : out Function_Result)
+   is
+      Read_Only_Flags : constant File_Open_Flags_T :=
+        (Access_Mode    => Read_Only,
+         Creation_Flags => (others => False),
+         Status_Flags   => (others => False));
+
+      Resolved_Path : Fixed_Length_String_T (Maximum_Working_Directory_Length);
+
+      Directory_Handle : Process_File_Handle_Access := null;
+   begin
+      Resolve_Process_Path (Process, Path, Resolved_Path, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      --  Convert to a native string type to use as an argument to Open_File.
+      Absolute_Path : constant Filesystem_Path_T :=
+        Resolved_Path.Value (1 .. Resolved_Path.Byte_Length);
+
+      --  The directory is opened, rather than only found, so that the open
+      --  handle keeps its node in the node cache while its type is checked.
+      Open_File
+        (Process, Absolute_Path, Read_Only_Flags, Directory_Handle, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      Is_Directory : constant Boolean :=
+        Can_Filesystem_Node_Contain_Child_Nodes
+          (Directory_Handle.all.File.all);
+
+      Close_File (Directory_Handle, Result);
+      if Is_Error (Result) then
+         return;
+      end if;
+
+      if not Is_Directory then
+         Log_Error ("Node isn't a directory");
+         Result := Invalid_File_Type;
+         return;
+      end if;
+
+      Process.Working_Directory := Resolved_Path;
+
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Change_Working_Directory;
+
    procedure Read_File_Node_Type_Device
      (Process        : in out Process_Control_Block_T;
       File_Handle    : Process_File_Handle_Access;

@@ -262,6 +262,17 @@ is
       Entry_Type  : out Filesystem_Node_Type_T;
       Result      : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Resolves Path against the process's working directory, and makes the
+   --  result its new working directory.
+   --  Returns File_Not_Found if the path doesn't exist, and
+   --  Invalid_File_Type if it isn't a directory or mounted filesystem.
+   ----------------------------------------------------------------------------
+   procedure Change_Working_Directory
+     (Process : in out Process_Control_Block_T;
+      Path    : Filesystem_Path_T;
+      Result  : out Function_Result);
+
    --  This needs to stay in this package to avoid issues re: strict aliasing.
    --  This automatically suppresses the aliasing optimisations.
    --  refer to:
