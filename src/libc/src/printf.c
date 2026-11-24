@@ -192,6 +192,7 @@ int vfprintf(FILE *stream, const char *format, va_list list)
 
 		int lengthSpec = 0;
 		int precSpec = 0;
+		bool hasPrecision = false;
 		bool leftJustify = false;
 		bool zeroPad = false;
 		bool spaceNoSign = false;
@@ -261,6 +262,7 @@ int vfprintf(FILE *stream, const char *format, va_list list)
 
 			if (format[i] == '.')
 			{
+				hasPrecision = true;
 				++i;
 				while (isdigit(format[i]))
 				{
@@ -514,7 +516,17 @@ int vfprintf(FILE *stream, const char *format, va_list list)
 
 			case 's':
 			{
-				displayString(stream, va_arg(list, char *), &chars);
+				// A precision is the most bytes to write. The string doesn't need
+				// a terminator within that many bytes, so the limit is checked
+				// before each byte is read. A negative precision, from '*', counts
+				// as no precision.
+				const char *string = va_arg(list, char *);
+				const bool isLimited = hasPrecision && precSpec >= 0;
+				for (int j = 0; (!isLimited || j < precSpec) && string[j] != '\0'; ++j)
+				{
+					displayCharacter(stream, string[j], &chars);
+				}
+
 				break;
 			}
 
