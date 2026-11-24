@@ -68,8 +68,59 @@ is
       Syscall_Result : out Unsigned_64;
       Result         : out Function_Result);
 
+   ----------------------------------------------------------------------------
+   --  Reads the next entry of the directory open with the file handle in a1,
+   --  into the Directory_Entry_T record in userspace at the address in a2.
+   --  Returns 1 if an entry was read, and 0 at the end of the directory.
+   --  Returns -EBADF if the file handle isn't open, and -ENOTDIR if it isn't
+   --  a directory or mount point.
+   --  Returns -ENOTSUP for a directory whose filesystem can't list entries.
+   --  Returns -EFAULT for a null record address, or a record outside
+   --  userspace.
+   ----------------------------------------------------------------------------
+   procedure Handle_Read_Directory_Entry_Syscall
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result);
+
 private
    Maximum_Path_String_Argument_Length : constant := 256;
+
+   --  The type of a directory entry, as seen by userspace.
+   --  A device mount point is reported as a directory.
+   --  The values are ASCII letters, as used by 'find -type', so that they're
+   --  readable in a memory dump.
+   type Directory_Entry_Type_T is
+     (Directory_Entry_Type_Unknown,
+      Directory_Entry_Type_Device,
+      Directory_Entry_Type_Directory,
+      Directory_Entry_Type_Regular_File)
+   with Size => 8;
+   for Directory_Entry_Type_T use
+     (Directory_Entry_Type_Unknown      => Character'Pos ('?'),
+      Directory_Entry_Type_Device       => Character'Pos ('c'),
+      Directory_Entry_Type_Directory    => Character'Pos ('d'),
+      Directory_Entry_Type_Regular_File => Character'Pos ('f'));
+
+   --  The size of the name field in a directory entry record.
+   --  If this doesn't match the kernel's node name limit, a compile-time error
+   --  will be raised.
+   Directory_Entry_Name_Length : constant := 256;
+
+   pragma
+     Compile_Time_Error
+       (Filesystem_Node_Name_Max_Byte_Length > Directory_Entry_Name_Length,
+        "A node name doesn't fit in a directory entry record");
+
+   --  The record that the read directory entry system call fills in.
+   --  The name isn't terminated. libc mirrors this record in
+   --  straylight_syscall.h.
+   type Directory_Entry_T is record
+      Entry_Type  : Directory_Entry_Type_T;
+      Name_Length : Unsigned_16;
+      Name        : String (1 .. Directory_Entry_Name_Length);
+   end record
+   with Convention => C;
 
    function Unsigned_64_To_File_Open_Flags is new
      Ada.Unchecked_Conversion

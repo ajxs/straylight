@@ -23,6 +23,7 @@ is
 
    Syscall_Get_Working_Directory    : constant := 5446_0113;
    Syscall_Change_Working_Directory : constant := 5446_0114;
+   Syscall_Read_Directory_Entry     : constant := 5446_0115;
 
    Syscall_Grow_Process_Heap : constant := 5446_0300;
 

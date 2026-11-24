@@ -117,6 +117,10 @@ package body System_Calls is
             Handle_Change_Working_Directory_Syscall
               (Process, Syscall_Result, Result);
 
+         when Syscall_Read_Directory_Entry     =>
+            Handle_Read_Directory_Entry_Syscall
+              (Process, Syscall_Result, Result);
+
          when Syscall_Update_Framebuffer       =>
             Handle_Update_Framebuffer_Syscall
               (Process, Syscall_Result, Result);

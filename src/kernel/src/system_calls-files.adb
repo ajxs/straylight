@@ -15,6 +15,39 @@ package body System_Calls.Files is
      Debug_Processes or else Debug_System_Calls;
 
    ----------------------------------------------------------------------------
+   --  Checks a buffer that userspace passed to a system call.
+   --  Returns -EFAULT if the buffer's address is null, or its range is
+   --  outside userspace. On this error, Syscall_Result holds the errno and
+   --  Result is Syscall_Unsuccessful_Without_Kernel_Error.
+   ----------------------------------------------------------------------------
+   procedure Validate_User_Buffer
+     (Buffer_Address : Virtual_Address_T;
+      Buffer_Size    : Storage_Count;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result) is
+   begin
+      if Address_To_Unsigned_64 (Buffer_Address) = 0 then
+         Log_Error ("Null buffer address");
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      if not Is_Valid_Userspace_Address_Range (Buffer_Address, Buffer_Size)
+      then
+         Log_Error ("Invalid non-userspace address range");
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      Syscall_Result := 0;
+      Result := Success;
+   end Validate_User_Buffer;
+
+   ----------------------------------------------------------------------------
    --  Copies a path argument from userspace to kernel memory.
    --  Returns -ENAMETOOLONG if the full path is longer than the output
    --  variable can hold.
@@ -521,11 +554,11 @@ package body System_Calls.Files is
 
       Path_Length : constant Natural := Process.Working_Directory.Byte_Length;
 
-      if Trap_Context.Gp_Registers (a1) = 0 then
-         Log_Error ("Null buffer address");
-
-         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
-         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+      --  A null buffer is rejected before the size is checked, so that a
+      --  meaning can be given to it later, such as asking for the length.
+      Validate_User_Buffer
+        (Buffer_Address, Storage_Count (Path_Length), Syscall_Result, Result);
+      if Result /= Success then
          return;
       end if;
 
@@ -533,18 +566,6 @@ package body System_Calls.Files is
          Log_Error ("Buffer size too small for working directory path");
 
          Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-ERANGE);
-         Result := Syscall_Unsuccessful_Without_Kernel_Error;
-         return;
-      end if;
-
-      --  Validate that the buffer address and size describe a range within the
-      --  valid userspace range.
-      if not Is_Valid_Userspace_Address_Range
-               (Buffer_Address, Storage_Count (Path_Length))
-      then
-         Log_Error ("Invalid non-userspace address range");
-
-         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EFAULT);
          Result := Syscall_Unsuccessful_Without_Kernel_Error;
          return;
       end if;
@@ -627,5 +648,106 @@ package body System_Calls.Files is
          Log_Constraint_Error;
          Result := Constraint_Exception;
    end Handle_Change_Working_Directory_Syscall;
+
+   procedure Handle_Read_Directory_Entry_Syscall
+     (Process        : in out Process_Control_Block_T;
+      Syscall_Result : out Unsigned_64;
+      Result         : out Function_Result)
+   is
+      Trap_Context : constant Process_Context_T
+      with
+        Import,
+        Convention => C,
+        Alignment  => 1,
+        Address    => Process.Trap_Context_Addr;
+
+      File_Handle : Process_File_Handle_Access := null;
+
+      Entry_Name : Filesystem_Node_Name_T;
+      Entry_Type : Filesystem_Node_Type_T;
+   begin
+      pragma
+        Debug
+          (Logging_Enabled,
+           Log_Debug ("User Mode Syscall: Read Directory Entry"));
+
+      File_Handle_Id : constant Process_File_Handle_Id_T :=
+        Process_File_Handle_Id_T (Trap_Context.Gp_Registers (a1));
+
+      Entry_Address : constant Virtual_Address_T :=
+        Unsigned_64_To_Address (Trap_Context.Gp_Registers (a2));
+
+      --  The record is checked before the entry is read, so that a bad
+      --  record address doesn't cause the handle's position to be advanced
+      --  past a record that is never read.
+      Validate_User_Buffer
+        (Entry_Address,
+         Storage_Count (Directory_Entry_T'Size / System.Storage_Unit),
+         Syscall_Result,
+         Result);
+      if Result /= Success then
+         return;
+      end if;
+
+      Find_File_Handle
+        (Process.Process_Id, File_Handle_Id, File_Handle, Result);
+      if Result = Not_Found then
+         Log_Error ("File handle not found");
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-EBADF);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      elsif Is_Error (Result) then
+         return;
+      end if;
+
+      Read_Next_Directory_Entry (File_Handle, Entry_Name, Entry_Type, Result);
+      if Result = End_Of_Directory then
+         Syscall_Result := 0;
+         Result := Success;
+         return;
+      elsif Is_Error (Result) then
+         Error_Number : constant Syscall_Error_Result_T :=
+           (case Result is
+              when Invalid_File_Type => ENOTDIR,
+              when Not_Supported     => ENOTSUP,
+              --  Any other result can only be caused by a kernel error.
+              when others            => 0);
+
+         if Error_Number = 0 then
+            return;
+         end if;
+
+         Syscall_Result := Syscall_Error_Result_To_Unsigned_64 (-Error_Number);
+         Result := Syscall_Unsuccessful_Without_Kernel_Error;
+         return;
+      end if;
+
+      User_Entry : Directory_Entry_T
+      with Import, Alignment => 1, Address => Entry_Address;
+
+      User_Entry.Entry_Type :=
+        (case Entry_Type is
+           when Filesystem_Node_Type_Regular_File       =>
+             Directory_Entry_Type_Regular_File,
+           when Filesystem_Node_Type_Device             =>
+             Directory_Entry_Type_Device,
+           when Filesystem_Node_Type_Directory
+              | Filesystem_Node_Type_Mounted_Filesystem =>
+             Directory_Entry_Type_Directory,
+           when Filesystem_Node_Type_None               =>
+             Directory_Entry_Type_Unknown);
+
+      User_Entry.Name_Length := Unsigned_16 (Entry_Name.Byte_Length);
+      User_Entry.Name (1 .. Entry_Name.Byte_Length) :=
+        Entry_Name.Value (1 .. Entry_Name.Byte_Length);
+
+      Syscall_Result := 1;
+      Result := Success;
+   exception
+      when Constraint_Error =>
+         Log_Constraint_Error;
+         Result := Constraint_Exception;
+   end Handle_Read_Directory_Entry_Syscall;
 
 end System_Calls.Files;
