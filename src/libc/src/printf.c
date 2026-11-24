@@ -175,6 +175,14 @@ static void displayString(FILE *stream, char *c, int *a)
 	}
 }
 
+static void displaySpaces(FILE *stream, int count, int *a)
+{
+	for (int i = 0; i < count; ++i)
+	{
+		displayCharacter(stream, ' ', a);
+	}
+}
+
 /**
  * This implementation was originally based on:
  * https://wiki.osdev.org/User:A22347/Printf
@@ -257,6 +265,14 @@ int vfprintf(FILE *stream, const char *format, va_list list)
 			if (format[i] == '*')
 			{
 				lengthSpec = va_arg(list, int);
+				// A negative width from '*' counts as the '-' flag with a positive
+				// width.
+				if (lengthSpec < 0)
+				{
+					leftJustify = true;
+					lengthSpec = -lengthSpec;
+				}
+
 				++i;
 			}
 
@@ -521,10 +537,35 @@ int vfprintf(FILE *stream, const char *format, va_list list)
 				// before each byte is read. A negative precision, from '*', counts
 				// as no precision.
 				const char *string = va_arg(list, char *);
+
 				const bool isLimited = hasPrecision && precSpec >= 0;
-				for (int j = 0; (!isLimited || j < precSpec) && string[j] != '\0'; ++j)
+
+				int stringLength = 0;
+
+				while ((!isLimited || stringLength < precSpec) &&
+				       string[stringLength] != '\0')
+				{
+					++stringLength;
+				}
+
+				// The width is the fewest bytes to write. A shorter string is padded
+				// with spaces, on the left unless the '-' flag is given. The '0'
+				// flag only applies to numbers.
+				const int padding =
+				    (lengthSpec > stringLength) ? lengthSpec - stringLength : 0;
+				if (!leftJustify)
+				{
+					displaySpaces(stream, padding, &chars);
+				}
+
+				for (int j = 0; j < stringLength; ++j)
 				{
 					displayCharacter(stream, string[j], &chars);
+				}
+
+				if (leftJustify)
+				{
+					displaySpaces(stream, padding, &chars);
 				}
 
 				break;
