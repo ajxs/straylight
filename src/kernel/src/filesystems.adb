@@ -393,6 +393,13 @@ package body Filesystems is
       then
          Truncate_File (Process, File_Handle, 0, Result);
          if Is_Error (Result) then
+            --  Close the opened file handle if the truncate operation failed.
+            Close_Result : Function_Result;
+            Close_File (File_Handle, Close_Result);
+            if Is_Error (Close_Result) then
+               Result := Close_Result;
+            end if;
+
             File_Handle := null;
             return;
          end if;
