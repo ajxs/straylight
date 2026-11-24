@@ -45,8 +45,11 @@ LIBS := \
 
 AS_SOURCES :=
 
-C_SOURCES  :=               \
-	${SRC_DIR}/simple_shell.c
+C_SOURCES  :=                          \
+	${SRC_DIR}/simple_shell.c            \
+	${SRC_DIR}/change_directory.c        \
+	${SRC_DIR}/list_directory.c          \
+	${SRC_DIR}/print_working_directory.c
 
 OBJECTS    := ${AS_SOURCES:.S=.o}
 OBJECTS    += ${C_SOURCES:.c=.o}
