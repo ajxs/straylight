@@ -22,4 +22,6 @@ char *strchr(const char *s, int c);
 
 char *strcpy(char *restrict dst, const char *restrict src);
 
+char *strerror(int errnum);
+
 #endif

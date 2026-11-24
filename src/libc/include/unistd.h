@@ -11,4 +11,8 @@ int truncate(const char *path, off_t length);
 
 int ftruncate(int fd, off_t length);
 
+int chdir(const char *path);
+
+char *getcwd(char *buf, size_t size);
+
 #endif
