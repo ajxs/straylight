@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <wchar.h>
 
 static char *convert_unsigned_int_to_string(uintmax_t i, char b[], int base,
                                             int paddingNo, bool justify,

@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+typedef __WINT_TYPE__ wint_t;
+
 size_t wcslen(const wchar_t *ws);
 
 size_t wcsnlen(const wchar_t *ws, size_t maxlen);
