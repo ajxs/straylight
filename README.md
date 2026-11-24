@@ -16,7 +16,7 @@ The name *Straylight* comes from William Gibson's groundbreaking cyberpunk novel
 |Filesystem|✅|Supports mounting FAT16 and UStar images.
 |Userspace|✅|Supports loading ELF binaries written in C and Ada.
 |SMP|✅|Limited SMP support. Any available process runs on any available processor.
-|Multi-platform|❌|Currently only supports QEMU's [*virt* platform](https://www.qemu.org/docs/master/system/riscv/virt.html). Support for device discovery via the Devicetree standard will be added in a future update.
+|Multi-platform|❌|Currently only supports QEMU's [*virt* platform](https://www.qemu.org/docs/master/system/riscv/virt.html). Minimal support exists for device discovery via the Devicetree standard.
 |POSIX Compatibility|—|Partial POSIX compatibility. Support is currently minimal.
 
 ## Build
